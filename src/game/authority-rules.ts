@@ -153,6 +153,9 @@ export function normalizePerformanceScore(raw: unknown): number {
   return Math.max(0, Math.min(1000, Math.round(n)));
 }
 
+// Resident level is derived from total authoritative XP. The client may cache
+// the display level, but it cannot submit a level value to satisfy raid/Vault
+// gates. One curve therefore serves gameplay, persistence and server checks.
 export function residentXpRequired(level: number) {
   return Math.round(80 + Math.pow(Math.max(1, level), 1.32) * 34);
 }
@@ -169,6 +172,9 @@ export function authorityResidentLevel(totalXp: number) {
   return { level, xp: remaining, xpToNext: residentXpRequired(level) };
 }
 
+// These are the canonical long-campaign construction gates. Higher tiers are
+// intentionally achievement-gated as well as resource-gated: spending caps or
+// finding ore cannot substitute for campaign age, bosses, riders or training.
 const UPGRADE_REGION: RegionId[] = ["ironclad", "ironclad", "slagtown", "blackspire", "brasswater", "veyra"];
 const UPGRADE_ORE = [0, 4, 12, 30, 65, 140];
 const UPGRADE_FAVOR = [0, 2, 6, 14, 28, 50];
