@@ -31,5 +31,9 @@ create table if not exists hollow_mission_ticket (
 create index if not exists hollow_mission_ticket_open_idx
   on hollow_mission_ticket(campaign_id, user_id, settled_at, expires_at);
 
+create unique index if not exists hollow_mission_ticket_one_open_idx
+  on hollow_mission_ticket(campaign_id, user_id)
+  where settled_at is null;
+
 create index if not exists hollow_mission_ticket_recent_idx
   on hollow_mission_ticket(issued_at desc);
