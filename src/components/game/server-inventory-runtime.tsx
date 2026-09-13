@@ -8,11 +8,18 @@ import {
   type ServerInventorySnapshot,
 } from "@/game/server-inventory";
 import { useGame } from "@/game/store";
-import type { Condition, Item } from "@/game/types";
+import type { Condition, GameState, Item } from "@/game/types";
 import { useEffect } from "react";
 
 const CONDITION_RANK: Record<Condition, number> = { Pristine: 0, Worn: 1, Damaged: 2, Broken: 3 };
 let applying = false;
+
+type Fingerprint = {
+  ownerType: "vault" | "resident";
+  residentId: string | null;
+  equipped: boolean;
+  condition: Condition;
+};
 
 function flattenLocalItems() {
   const state = useGame.getState().s;
@@ -42,6 +49,8 @@ function applySnapshot(snapshot: ServerInventorySnapshot, toast?: string) {
         list.push(entry.item);
         byResident.set(entry.residentId, list);
       }
+      // Once Discord authority is active, resident item arrays are only a cache.
+      // Unknown local serials are never retained as gameplay gear.
       s.operatives = s.operatives.map((op) => ({ ...op, inventory: byResident.get(op.id) ?? [] }));
       if (toast) s.toast = toast;
       return { s };
@@ -51,11 +60,38 @@ function applySnapshot(snapshot: ServerInventorySnapshot, toast?: string) {
   }
 }
 
-function itemConditions() {
-  const state = useGame.getState().s;
-  return new Map(
-    [...state.vault, ...state.operatives.flatMap((op) => op.inventory)].map((item) => [item.id, item.condition] as const),
-  );
+function expectedFingerprint(snapshot: ServerInventorySnapshot) {
+  return new Map<string, Fingerprint>(snapshot.items.map((entry) => [entry.item.id, {
+    ownerType: entry.ownerType,
+    residentId: entry.residentId,
+    equipped: !!entry.item.equipped,
+    condition: entry.item.condition,
+  }]));
+}
+
+function currentFingerprint(state: GameState) {
+  const map = new Map<string, Fingerprint>();
+  for (const item of state.vault) {
+    map.set(item.id, { ownerType: "vault", residentId: null, equipped: false, condition: item.condition });
+  }
+  for (const op of state.operatives) {
+    for (const item of op.inventory) {
+      map.set(item.id, { ownerType: "resident", residentId: op.id, equipped: !!item.equipped, condition: item.condition });
+    }
+  }
+  return map;
+}
+
+function unauthorizedMutation(current: Map<string, Fingerprint>, expected: Map<string, Fingerprint>) {
+  if (current.size !== expected.size) return true;
+  for (const [id, live] of current) {
+    const sealed = expected.get(id);
+    if (!sealed) return true;
+    if (live.ownerType !== sealed.ownerType || live.residentId !== sealed.residentId || live.equipped !== sealed.equipped) return true;
+    if (CONDITION_RANK[live.condition] < CONDITION_RANK[sealed.condition]) return true;
+  }
+  for (const id of expected.keys()) if (!current.has(id)) return true;
+  return false;
 }
 
 export function ServerInventoryRuntime() {
@@ -68,14 +104,20 @@ export function ServerInventoryRuntime() {
     }
     let cancelled = false;
     let storeUnsub: (() => void) | null = null;
-    let previousConditions = itemConditions();
+    let lastSnapshot: ServerInventorySnapshot | null = null;
+    let expected = new Map<string, Fingerprint>();
+    const conditionInFlight = new Set<string>();
 
-    const snapshotUnsub = subscribeServerInventory((snapshot) => {
+    const acceptSnapshot = (snapshot: ServerInventorySnapshot, message?: string) => {
       if (cancelled) return;
+      lastSnapshot = snapshot;
+      expected = expectedFingerprint(snapshot);
+      conditionInFlight.clear();
       setServerInventoryAuthorityActive(true);
-      applySnapshot(snapshot);
-      previousConditions = itemConditions();
-    });
+      applySnapshot(snapshot, message);
+    };
+
+    const snapshotUnsub = subscribeServerInventory((snapshot) => acceptSnapshot(snapshot));
 
     const boot = async () => {
       let snapshot = await pullServerInventory().catch(() => null);
@@ -86,27 +128,33 @@ export function ServerInventoryRuntime() {
         if (migratedSnapshot) snapshot = migratedSnapshot;
       }
       if (!snapshot || cancelled) return;
-      setServerInventoryAuthorityActive(true);
       const migrated = snapshot.migrationResult;
-      applySnapshot(
+      acceptSnapshot(
         snapshot,
         migrated
           ? `Tyrone sealed Inventory authority · ${migrated.accepted} legacy item${migrated.accepted === 1 ? "" : "s"} admitted · ${migrated.rejected} rejected.`
           : undefined,
       );
-      previousConditions = itemConditions();
 
       storeUnsub = useGame.subscribe((nextStore) => {
-        if (applying) return;
-        const current = new Map(
-          [...nextStore.s.vault, ...nextStore.s.operatives.flatMap((op) => op.inventory)].map((item) => [item.id, item.condition] as const),
-        );
-        for (const [id, condition] of current) {
-          const before = previousConditions.get(id);
-          if (!before || CONDITION_RANK[condition] <= CONDITION_RANK[before]) continue;
-          void degradeServerItem(id, condition).catch(() => void pullServerInventory());
+        if (applying || !lastSnapshot) return;
+        const current = currentFingerprint(nextStore.s);
+        if (unauthorizedMutation(current, expected)) {
+          acceptSnapshot(lastSnapshot, "Tyrone rejected an unsealed local Inventory change.");
+          return;
         }
-        previousConditions = current;
+
+        for (const [id, live] of current) {
+          const sealed = expected.get(id);
+          if (!sealed) continue;
+          if (CONDITION_RANK[live.condition] <= CONDITION_RANK[sealed.condition]) continue;
+          if (conditionInFlight.has(id)) continue;
+          conditionInFlight.add(id);
+          void degradeServerItem(id, live.condition).catch(() => {
+            conditionInFlight.delete(id);
+            return pullServerInventory();
+          });
+        }
       });
     };
 
