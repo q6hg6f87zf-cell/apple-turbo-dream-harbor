@@ -128,8 +128,15 @@ export function InteractionPolishRuntime() {
       // dossier is also an <aside>, so never classify its internal controls as
       // navigation or they would close the sheet before their click runs.
       if (target.closest("nav button, aside:not(.ms-sheet) > button")) dismissStoreChrome();
+    };
 
+    const onClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (!target) return;
       const store = useGame.getState();
+      // Dismiss overlays only after the full tap/click has completed. Closing
+      // on pointerdown lets the remainder of the same finger gesture land on
+      // newly exposed controls underneath, causing classic mobile tap-through.
       if (store.guideOpen && !target.closest(".ms-pop, [role='dialog']")) store.closeGuide();
       if (store.confirmRest && !target.closest(".ms-pop")) store.cancelRest();
     };
@@ -145,9 +152,11 @@ export function InteractionPolishRuntime() {
     };
 
     document.addEventListener("pointerdown", onPointerDown, true);
+    document.addEventListener("click", onClick, true);
     window.addEventListener("keydown", onKeyDown, true);
     return () => {
       document.removeEventListener("pointerdown", onPointerDown, true);
+      document.removeEventListener("click", onClick, true);
       window.removeEventListener("keydown", onKeyDown, true);
     };
   }, []);
