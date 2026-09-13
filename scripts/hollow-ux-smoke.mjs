@@ -99,24 +99,22 @@ page.on("console", (message) => { if (message.type() === "error") errors.push(`c
 await page.goto(baseURL, { waitUntil: "networkidle", timeout: 60_000 });
 await page.locator('[data-ready="1"]').waitFor({ timeout: 20_000 });
 
-// Resident drawer: open from a real roster control, then dismiss by tapping the
-// backdrop rather than hunting for an X.
+// Resident drawer: open from a real roster control, then put a real mobile tap
+// in the exposed left gutter. Do not force-click a DOM parent because that can
+// accidentally route through the sheet we are trying to prove is dismissible.
 await page.getByText("UX Runner", { exact: true }).first().click();
 const dossierClose = page.getByRole("button", { name: "Close dossier" });
 await dossierClose.waitFor();
-const sheet = page.locator("aside.ms-sheet");
-await sheet.waitFor();
-const sheetBackdrop = sheet.locator("..");
-await sheetBackdrop.click({ position: { x: 8, y: 120 } });
+await page.locator("aside.ms-sheet").waitFor();
+await page.touchscreen.tap(8, 180);
 await dossierClose.waitFor({ state: "detached", timeout: 5_000 });
 
-// Tyrone field manual: backdrop tap must close it.
+// Tyrone field manual: a thumb tap in the outer gutter must close it.
 const help = page.getByRole("button", { name: "Ask Tyrone" }).last();
 await help.click();
 const dialog = page.getByRole("dialog");
 await dialog.waitFor();
-const helpBackdrop = page.locator("div.fixed.inset-0").filter({ has: dialog });
-await helpBackdrop.click({ position: { x: 8, y: 8 } });
+await page.touchscreen.tap(4, 80);
 await dialog.waitFor({ state: "detached", timeout: 5_000 });
 
 // Dangerous-rest confirmation: outside tap is a cancel, never an accidental
@@ -134,8 +132,7 @@ await page.evaluate(async () => {
 await page.getByRole("button", { name: /Dawn|Rest until dawn/ }).click();
 const dawnHeading = page.getByRole("heading", { name: "Dawn is a decision" });
 await dawnHeading.waitFor();
-const restBackdrop = page.locator("div.fixed.inset-0").filter({ has: dawnHeading });
-await restBackdrop.click({ position: { x: 8, y: 8 } });
+await page.touchscreen.tap(4, 80);
 await dawnHeading.waitFor({ state: "detached", timeout: 5_000 });
 
 // Restore the resident so other screens stay usable.
@@ -179,5 +176,5 @@ const overflow = await page.evaluate(() => document.documentElement.scrollWidth 
 assert.ok(overflow <= 2, `AAA interaction pass introduced ${overflow}px horizontal overflow.`);
 assert.deepEqual(errors, [], `Browser errors detected:\n${errors.join("\n")}`);
 
-console.log("Hollow UX smoke passed: backdrop dismissal, Escape dismissal, nav switching and 44px primary touch targets.");
+console.log("Hollow UX smoke passed: real touchscreen backdrop dismissal, Escape dismissal, nav switching and 44px primary touch targets.");
 await browser.close();
