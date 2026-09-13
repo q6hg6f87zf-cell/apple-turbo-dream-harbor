@@ -16,3 +16,5 @@ Hollow Realm now has a staged server-authoritative path for verified TyroneBot r
 - Verified authority mode keeps Vault expansion locked until campaign progression and upgrade requirements are also server-owned.
 
 LocalStorage remains a gameplay/cache layer during this migration. It is not considered a trusted source for linked rider economy values.
+
+The next migration slice is server-owned campaign progression and reward issuance, followed by authoritative Vault expansion and inventory ownership.
