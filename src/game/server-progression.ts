@@ -74,11 +74,16 @@ function headers(json = false) {
   return h;
 }
 
-function requestId(prefix: string) {
+function randomRequestId(prefix: string) {
   const id = typeof crypto !== "undefined" && "randomUUID" in crypto
     ? crypto.randomUUID()
     : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 16)}`;
   return `${prefix}:${id}`;
+}
+
+function stableMissionRequestId(missionId: string) {
+  const clean = missionId.replace(/[^A-Za-z0-9._:-]/g, "").slice(0, 72);
+  return `mission:${clean || randomRequestId("fallback")}`.slice(0, 96);
 }
 
 async function decode(response: Response): Promise<ProgressionResponse> {
@@ -97,14 +102,14 @@ export async function pullServerProgression(): Promise<ServerProgressionSnapshot
   return decode(response);
 }
 
-export async function startServerMission(region: RegionId, kind: MissionKind) {
+export async function startServerMission(region: RegionId, kind: MissionKind, missionId: string) {
   const response = await fetch("/api/hollow/progression", {
     method: "POST",
     credentials: "same-origin",
     headers: headers(true),
     body: JSON.stringify({
       command: "start_mission",
-      requestId: requestId("mission"),
+      requestId: stableMissionRequestId(missionId),
       region,
       kind,
     }),
@@ -135,7 +140,7 @@ export async function advanceServerDay() {
     headers: headers(true),
     body: JSON.stringify({
       command: "advance_day",
-      requestId: requestId("day"),
+      requestId: randomRequestId("day"),
     }),
   });
   return decode(response);
