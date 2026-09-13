@@ -17,6 +17,14 @@ async function economy(command, requestId, amount, extra = {}) {
   });
 }
 
+async function progression(payload) {
+  return fetch(`${baseURL}/api/hollow/progression`, {
+    method: "POST",
+    headers: { "content-type": "application/json", accept: "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
 const contractResponse = await fetch(`${baseURL}/api/tyrone/sync`, {
   headers: { accept: "application/json" },
 });
@@ -136,6 +144,117 @@ const unlinkedTransfer = await body(unlinkedTransferResponse);
 assert.match(unlinkedTransfer.error, /not linked|has not linked/i);
 assert.equal(unlinkedTransfer.treasury.caps + unlinkedTransfer.card.caps, conserved);
 
+// ---- Server-owned campaign progression and reward settlement ----
+const progressRead = await fetch(`${baseURL}/api/hollow/progression`, { headers: { accept: "application/json" } });
+assert.equal(progressRead.status, 200);
+const initialProgress = await body(progressRead);
+assert.equal(initialProgress.authority, "server");
+assert.equal(initialProgress.campaign.day, 1);
+assert.equal(initialProgress.campaign.commandRank, 1);
+assert.equal(initialProgress.campaign.unlocked.ironclad, true);
+assert.equal(initialProgress.campaign.unlocked.slagtown, false);
+
+const prematureDay = await progression({ command: "advance_day", requestId: "qa-day-premature-0001" });
+assert.equal(prematureDay.status, 409, "Campaign day advanced without a settled mission.");
+
+const lockedRegion = await progression({
+  command: "start_mission",
+  requestId: "qa-locked-slagtown-0001",
+  region: "slagtown",
+  kind: "scout",
+});
+assert.equal(lockedRegion.status, 409, "Locked Slag Town accepted an authoritative mission contract.");
+
+const startMissionResponse = await progression({
+  command: "start_mission",
+  requestId: "qa-ironclad-scout-0001",
+  region: "ironclad",
+  kind: "scout",
+});
+assert.equal(startMissionResponse.status, 200);
+const missionStart = await body(startMissionResponse);
+assert.equal(missionStart.ok, true);
+assert.equal(missionStart.ticket.region, "ironclad");
+assert.equal(missionStart.ticket.kind, "scout");
+assert.match(missionStart.ticket.id, /^[a-f0-9]{48,96}$/i);
+
+const duplicateStartResponse = await progression({
+  command: "start_mission",
+  requestId: "qa-ironclad-scout-0001",
+  region: "ironclad",
+  kind: "scout",
+});
+assert.equal(duplicateStartResponse.status, 200);
+const duplicateStart = await body(duplicateStartResponse);
+assert.equal(duplicateStart.duplicate, true);
+assert.equal(duplicateStart.ticket.id, missionStart.ticket.id, "Reload-safe mission request did not return the same ticket.");
+
+const parallelMission = await progression({
+  command: "start_mission",
+  requestId: "qa-parallel-scout-0002",
+  region: "ironclad",
+  kind: "scout",
+});
+assert.equal(parallelMission.status, 409, "Server allowed two simultaneous open mission contracts for one rider.");
+
+const bossTooEarly = await progression({
+  command: "start_mission",
+  requestId: "qa-boss-too-early-0001",
+  region: "ironclad",
+  kind: "boss",
+});
+assert.equal(bossTooEarly.status, 409, "Ironclad boss contract opened without raid readiness.");
+
+const waitMs = Math.max(0, new Date(missionStart.ticket.availableAt).getTime() - Date.now() + 120);
+if (waitMs) await new Promise((resolve) => setTimeout(resolve, waitMs));
+
+const settleResponse = await progression({
+  command: "settle_mission",
+  ticketId: missionStart.ticket.id,
+  performanceScore: 1000,
+  vaultCaps: 999999999,
+  ore: 999999,
+});
+assert.equal(settleResponse.status, 200);
+const settled = await body(settleResponse);
+assert.equal(settled.ok, true);
+assert.equal(settled.reward.vaultCaps, 180, "Client was able to choose the mission cap reward.");
+assert.equal(settled.reward.cardCaps, 32, "Unexpected authoritative Ironclad scout card cut.");
+assert.equal(settled.reward.ore, 0, "Client was able to choose the ore reward.");
+assert.equal(settled.reward.favor, 1);
+assert.equal(settled.campaign.missions.ironclad, 1);
+assert.equal(settled.campaign.intel.ironclad, 2);
+assert.ok([0, 1].includes(settled.campaign.materials.ironclad));
+assert.equal(settled.treasury.caps, 1901);
+assert.equal(settled.card.caps, 4032);
+assert.equal(settled.card.xp, 90);
+
+const settleReplayResponse = await progression({
+  command: "settle_mission",
+  ticketId: missionStart.ticket.id,
+  performanceScore: 0,
+});
+assert.equal(settleReplayResponse.status, 200);
+const settleReplay = await body(settleReplayResponse);
+assert.equal(settleReplay.duplicate, true, "Settled mission ticket was not recognized as a replay.");
+assert.equal(settleReplay.treasury.caps, 1901, "Mission replay minted treasury caps twice.");
+assert.equal(settleReplay.card.caps, 4032, "Mission replay minted card caps twice.");
+assert.equal(settleReplay.card.xp, 90, "Mission replay minted rider XP twice.");
+
+const dayResponse = await progression({ command: "advance_day", requestId: "qa-day-earned-0001" });
+assert.equal(dayResponse.status, 200);
+const dayAdvanced = await body(dayResponse);
+assert.equal(dayAdvanced.campaign.day, 2);
+
+const duplicateDayResponse = await progression({ command: "advance_day", requestId: "qa-day-earned-0001" });
+assert.equal(duplicateDayResponse.status, 200);
+const duplicateDay = await body(duplicateDayResponse);
+assert.equal(duplicateDay.duplicate, true);
+assert.equal(duplicateDay.campaign.day, 2, "Duplicate day command advanced campaign twice.");
+
+const unearnedSecondDay = await progression({ command: "advance_day", requestId: "qa-day-unearned-0002" });
+assert.equal(unearnedSecondDay.status, 409, "Campaign advanced a second day without another settled mission.");
+
 console.log(
-  "Hollow authority smoke passed: trusted sync, one-time claim, replay defense, shared treasury conservation, idempotent card settlement and overdraft protection.",
+  "Hollow authority smoke passed: identity claims, shared card economy, mission tickets, fixed server rewards, replay defense, region gates and earned campaign-day progression.",
 );
