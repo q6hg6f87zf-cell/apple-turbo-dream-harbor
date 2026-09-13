@@ -174,6 +174,135 @@ await page.getByRole("heading", { name: "Inventory" }).waitFor();
 const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 assert.ok(overflow <= 2, `Mobile page overflows horizontally by ${overflow}px.`);
 
+// Authoritative stack logic: repeated bonuses diminish, specialization creates
+// a predictable opposing-stat penalty, buff saturation has a cost, and extreme
+// enchantment resonance becomes unstable rather than scaling forever.
+const stackProbe = await page.evaluate(async () => {
+  const stack = await import("/src/game/loadout-effects.ts");
+  const overloaded = {
+    id: "stack-op",
+    name: "Stack Probe",
+    cls: "Rogue",
+    race: "Human",
+    lineage: "QA",
+    origin: "QA",
+    hp: 10,
+    maxHp: 10,
+    repTitle: "QA",
+    repPassive: "",
+    traitLevel: "Standard",
+    traitBonus: 0,
+    skillName: "QA",
+    skillDesc: "",
+    shadowName: "QA",
+    shadowDesc: "",
+    enchantName: "QA",
+    enchantDesc: "",
+    destiny: "QA",
+    destinyFired: false,
+    giftUsed: false,
+    inventory: [
+      {
+        id: "stack-weapon",
+        name: "Velocity Blade",
+        kind: "weapon",
+        rarity: "Mythic",
+        condition: "Pristine",
+        slot: "weapon",
+        damage: "1d8",
+        effect: "+4 SPD. +2 damage.",
+        lore: "QA",
+        equipped: true,
+        value: 1,
+        tags: ["enchant:a", "enchant:b", "enchant:c"]
+      },
+      {
+        id: "stack-armor",
+        name: "Ward Shell",
+        kind: "armor",
+        rarity: "Legendary",
+        condition: "Pristine",
+        slot: "armor",
+        defense: 2,
+        effect: "+4 DEF.",
+        lore: "QA",
+        equipped: true,
+        value: 1,
+        tags: ["enchant:d", "enchant:e"]
+      },
+      {
+        id: "stack-trinket",
+        name: "Velocity Relay",
+        kind: "trinket",
+        rarity: "Mythic",
+        condition: "Pristine",
+        slot: "trinket",
+        effect: "+4 SPD.",
+        lore: "QA",
+        equipped: true,
+        value: 1,
+        tags: ["enchant:f", "enchant:g"]
+      }
+    ],
+    activeItemEffects: [
+      { name: "Stim A", effect: "+2 SPD", expires: "sortie" },
+      { name: "Stim B", effect: "+2 SPD", expires: "sortie" },
+      { name: "Stim C", effect: "+2 SPD", expires: "sortie" },
+      { name: "Stim D", effect: "+2 SPD", expires: "sortie" }
+    ],
+    companion: null,
+    status: "idle",
+    location: "hq",
+    raids: 0,
+    battles: 0,
+    isHoF: false,
+    curses: [],
+    notes: "",
+    joinedDay: 1
+  };
+
+  const analysis = stack.analyzeLoadout(overloaded);
+  const fullRare = {
+    id: "rare-full",
+    name: "Rare Full",
+    kind: "weapon",
+    rarity: "Rare",
+    condition: "Pristine",
+    slot: "weapon",
+    effect: "QA",
+    lore: "QA",
+    equipped: false,
+    value: 1,
+    tags: ["enchant:first", "enchant:second"]
+  };
+  const extraEnchant = {
+    id: "extra-enchant",
+    name: "Third Coil",
+    kind: "enchantment",
+    rarity: "Rare",
+    condition: "Pristine",
+    effect: "+1 SPD",
+    lore: "QA",
+    equipped: false,
+    value: 1
+  };
+  return {
+    analysis,
+    socket: stack.enchantmentSocketStatus(fullRare),
+    block: stack.canAttachEnchantment(fullRare, extraEnchant)
+  };
+});
+
+assert.ok((stackProbe.analysis.statBonuses.SPD ?? 0) > 4, "SPD stack did not build enough pressure for specialization testing.");
+assert.ok((stackProbe.analysis.statBonuses.SPD ?? 0) < 16, "Repeated SPD bonuses are not diminishing.");
+assert.ok((stackProbe.analysis.statPenalties.DEF ?? 0) < 0, "SPD specialization did not trade away DEF.");
+assert.ok((stackProbe.analysis.statPenalties.WIS ?? 0) < 0, "Buff/enchantment saturation did not penalize WIS.");
+assert.ok((stackProbe.analysis.statPenalties.LCK ?? 0) < 0, "Extreme resonance did not penalize LCK.");
+assert.ok(["strained", "critical"].includes(stackProbe.analysis.pressure), `Expected strained/critical loadout, got ${stackProbe.analysis.pressure}.`);
+assert.equal(stackProbe.socket.used, 2);
+assert.equal(stackProbe.socket.capacity, 2);
+assert.match(stackProbe.block ?? "", /resonance capacity/i);
+
 // Vault item -> preview -> one-tap issue and equip.
 await page.getByRole("button", { name: /QA Rail Carbine/ }).click();
 await page.getByText("Power", { exact: true }).waitFor();
@@ -219,6 +348,6 @@ fs.mkdirSync("artifacts", { recursive: true });
 await page.screenshot({ path: "artifacts/hollow-realm-iphone-smoke.png", fullPage: true });
 
 assert.deepEqual(errors, [], `Browser errors detected:\n${errors.join("\n")}`);
-console.log("Hollow Realm iPhone smoke passed: Inventory actions, Tyrone help and World renderer.");
+console.log("Hollow Realm iPhone smoke passed: stack pressure, Inventory actions, Tyrone help and World renderer.");
 
 await browser.close();
