@@ -100,7 +100,21 @@ await rail.click();
 const unequip = page.getByRole("button", { name: /Unequip/ });
 await unequip.waitFor();
 await unequip.click();
-await page.getByText(/Railspike Carbine unequipped/i).waitFor({ timeout: 10_000 });
+
+// UI copy is allowed to evolve. The contract that matters is that both the
+// hydrated Zustand cache and the server item ledger settle the Unequip.
+await page.waitForFunction(async () => {
+  const mod = await import("/src/game/store.ts");
+  const rail = mod.useGame.getState().s.operatives.flatMap((op) => op.inventory).find((item) => item.name === "Railspike Carbine");
+  return !!rail && rail.equipped === false;
+}, null, { timeout: 10_000 });
+const serverRailEquipped = await page.evaluate(async () => {
+  const response = await fetch("/api/hollow/inventory", { headers: { accept: "application/json" } });
+  const snapshot = await response.json();
+  const rail = snapshot.items.find((entry) => entry.item?.name === "Railspike Carbine");
+  return rail?.item?.equipped;
+});
+assert.equal(serverRailEquipped, false, "Server item ledger did not persist the Unequip action.");
 
 // Inject a new fake item directly into live Zustand after authority hydration.
 // The runtime must snap it back out without waiting for the 30s poll.
@@ -149,5 +163,5 @@ assert.equal(liveState.fakeCount, 0, "Live forged item survived the server owner
 assert.equal(liveState.rail?.equipped, false, "Server Unequip action did not settle into the local cache.");
 assert.deepEqual(errors, [], `Browser errors detected:\n${errors.join("\n")}`);
 
-console.log("Hollow server Inventory browser smoke passed: server UI action settled and live forged gear was rejected immediately.");
+console.log("Hollow server Inventory browser smoke passed: durable server UI action settled and live forged gear was rejected immediately.");
 await browser.close();
