@@ -1,5 +1,6 @@
 import type { GameState, Item, StatKey } from "./types";
 import {
+  analyzeLoadout,
   canAttachEnchantment,
   enchantmentSocketStatus,
 } from "./loadout-effects";
@@ -37,8 +38,6 @@ function appendEffect(op: ReturnType<typeof ensureResidentProgress>, item: Item)
     effect: item.effect,
     expires: item.effect.toLowerCase().includes("encounter") ? "encounter" : "sortie",
   };
-  // Six active field effects are allowed. The loadout-pressure system makes
-  // stacks above two increasingly costly instead of silently discarding them.
   op.activeItemEffects = [...(op.activeItemEffects ?? []), effect].slice(-6);
 }
 
@@ -54,6 +53,13 @@ function clearOneCurse(op: ReturnType<typeof ensureResidentProgress>, effect: st
   if (!lower.includes("clear") || !op.curses.length) return false;
   op.curses = op.curses.slice(1);
   return true;
+}
+
+function loadoutFeedback(itemOwner: ReturnType<typeof ensureResidentProgress>) {
+  const loadout = analyzeLoadout(itemOwner);
+  if (loadout.pressure === "stable") return "";
+  const warning = loadout.warnings[0] ? ` · ${loadout.warnings[0]}` : "";
+  return ` · Strain ${loadout.strain}% ${loadout.pressure.toUpperCase()}${warning}`;
 }
 
 export function useConsumable(
@@ -89,7 +95,8 @@ export function useConsumable(
     temporary ? "field effect prepared" : "",
     mastery.xp ? `+${mastery.xp} mastery XP` : "",
   ].filter(Boolean);
-  return `${item.name} used on ${p.name}. ${pieces.join(" · ") || "Consumed."}.${levelText}`.replace("..", ".");
+  const pressure = temporary ? loadoutFeedback(p) : "";
+  return `${item.name} used on ${p.name}. ${pieces.join(" · ") || "Consumed."}.${levelText}${pressure}`.replace("..", ".");
 }
 
 export function attachEnchantment(
@@ -107,9 +114,6 @@ export function attachEnchantment(
   const block = canAttachEnchantment(target, enchantment);
   if (block) return block;
 
-  // Enchantments remain readable in the item's effect text and tags, but no
-  // longer permanently mutate raw DEF/damage. The authoritative stack system
-  // applies them at runtime with diminishing returns and trade-offs.
   target.tags = [...(target.tags ?? []), `enchant:${enchantment.name}`, `enchant-rarity:${enchantment.rarity}`];
   target.effect = `${target.effect} • ${enchantment.name}: ${enchantment.effect}`;
   target.value += Math.max(1, Math.round(enchantment.value * 0.5));
@@ -118,7 +122,8 @@ export function attachEnchantment(
   removeSourceItem(state, source, enchantmentId);
   const sockets = enchantmentSocketStatus(target);
   const levelText = mastery.after > mastery.before ? ` Level ${mastery.before} → ${mastery.after}.` : "";
-  return `${enchantment.name} attached to ${target.name}. Resonance ${sockets.used}/${sockets.capacity} · +${mastery.xp} mastery XP.${levelText}`.replace("..", ".");
+  const pressure = loadoutFeedback(ensureResidentProgress(op));
+  return `${enchantment.name} attached to ${target.name}. Resonance ${sockets.used}/${sockets.capacity} · +${mastery.xp} mastery XP.${levelText}${pressure}`.replace("..", ".");
 }
 
 export function supportedConsumableSummary(item: Item) {
