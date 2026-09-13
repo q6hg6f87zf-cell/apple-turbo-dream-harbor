@@ -202,7 +202,7 @@ export function AuthenticatedMainMenu() {
           const message = openTerminal();
           if (message) useGame.setState((store) => ({ s: { ...store.s, toast: message } }));
         }}
-        className="absolute right-3 top-3 z-[2] w-[7.5rem] overflow-hidden rounded-[var(--radius-md)] shadow-[var(--shadow-border)] transition-[box-shadow] hover:shadow-[var(--shadow-border-hover)] disabled:cursor-not-allowed disabled:opacity-40 md:right-6 md:top-6 md:w-40"
+        className="absolute right-3 top-3 z-[2] w-[7.5rem] touch-manipulation overflow-hidden rounded-[var(--radius-md)] shadow-[var(--shadow-border)] transition-[box-shadow,transform] hover:shadow-[var(--shadow-border-hover)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 md:right-6 md:top-6 md:w-40"
         aria-label={allowed ? "Open the SYNAPSE black-channel terminal" : "Discord verification required"}
       >
         <img src="/art/terminal.jpg" alt="" className="aspect-[4/3] w-full object-cover" />
@@ -212,8 +212,18 @@ export function AuthenticatedMainMenu() {
       </button>
 
       {ask ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/70 p-4 md:items-center">
-          <div className="ms-pop glass-strong w-full max-w-md rounded-[var(--radius-xl)] p-5 text-left">
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-ink/70 p-4 md:items-center"
+          onClick={() => setAsk(false)}
+          role="presentation"
+        >
+          <div
+            className="ms-pop glass-strong w-full max-w-md rounded-[var(--radius-xl)] p-5 text-left"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Confirm new local file"
+            onClick={(event) => event.stopPropagation()}
+          >
             <h2 className="font-display text-xl">Wipe this local file?</h2>
             <p className="mt-3 text-sm leading-relaxed text-moon">The local roster/cache resets. Server-authoritative campaign value remains governed by Vault 13.</p>
             <div className="mt-5 flex gap-2">
