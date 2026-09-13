@@ -7,7 +7,7 @@ import {
   MISSION_RIDER_XP,
 } from "@/game/resident-progression";
 import { useGame } from "@/game/store";
-import type { GameState } from "@/game/types";
+import type { GameState, LocationId } from "@/game/types";
 import { useEffect } from "react";
 
 const LONG_DAY_GATE: Record<number, number> = {
@@ -17,6 +17,14 @@ const LONG_DAY_GATE: Record<number, number> = {
   4: 28,
   5: 55,
   6: 90,
+};
+
+const BOSS_DAY_GATE: Partial<Record<LocationId, number>> = {
+  ironclad: 8,
+  kingdom: 22,
+  caverns: 40,
+  library: 65,
+  veyra: 95,
 };
 
 function mutate(fn: (state: GameState) => void) {
@@ -37,6 +45,7 @@ export function ResidentProgressionRuntime() {
     const current = useGame.getState();
     const previousUpgradeRoom = current.upgradeRoom;
     const previousUpgradeQuarter = current.upgradeQuarter;
+    const previousDeploy = current.deploy;
 
     const upgradeRoom: typeof previousUpgradeRoom = (room) => {
       const state = useGame.getState().s;
@@ -54,7 +63,16 @@ export function ResidentProgressionRuntime() {
       return previousUpgradeQuarter(quarter);
     };
 
-    useGame.setState({ upgradeRoom, upgradeQuarter });
+    const deploy: typeof previousDeploy = (loc, kind, partyIds) => {
+      if (kind === "boss") {
+        const state = useGame.getState().s;
+        const gate = BOSS_DAY_GATE[loc];
+        if (gate && state.day < gate) return `Tyrone: that boss is not a day-${state.day} problem. Earliest raid window is day ${gate}. Build intel, XP and gear first.`;
+      }
+      return previousDeploy(loc, kind, partyIds);
+    };
+
+    useGame.setState({ upgradeRoom, upgradeQuarter, deploy });
 
     const unsubscribe = useGame.subscribe((nextStore, prevStore) => {
       const previousMission = prevStore.s.mission;
@@ -101,7 +119,11 @@ export function ResidentProgressionRuntime() {
     return () => {
       unsubscribe();
       installed = false;
-      useGame.setState({ upgradeRoom: previousUpgradeRoom, upgradeQuarter: previousUpgradeQuarter });
+      useGame.setState({
+        upgradeRoom: previousUpgradeRoom,
+        upgradeQuarter: previousUpgradeQuarter,
+        deploy: previousDeploy,
+      });
     };
   }, []);
 
