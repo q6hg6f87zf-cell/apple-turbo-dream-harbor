@@ -1,4 +1,5 @@
 import { GameApp } from "@/components/game/App";
+import { AuthorityClaimRuntime } from "@/components/game/authority-claim-runtime";
 import { CampaignBalancePanel } from "@/components/game/campaign-balance-panel";
 import { CampaignBalanceRuntime } from "@/components/game/campaign-balance-runtime";
 import { ClassAliasLayer } from "@/components/game/class-alias-layer";
@@ -18,6 +19,7 @@ function Home() {
   return (
     <>
       <GameApp />
+      <AuthorityClaimRuntime />
       <HollowRealmVisuals />
       <ClassAliasLayer />
       <CampaignBalanceRuntime />
