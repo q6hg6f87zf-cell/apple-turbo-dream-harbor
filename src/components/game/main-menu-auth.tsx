@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { sfx, unlockAudio } from "@/game/audio";
 import { useGame } from "@/game/store";
 import { signInWithDiscord, useDiscordAccess } from "@/lib/auth/discord-access";
-import { BookOpen, RefreshCw, ShieldCheck, TerminalSquare } from "lucide-react";
+import { BookOpen, RefreshCw, ShieldCheck, Terminal } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { CapMark, SectionLabel } from "./primitives";
 import { HelpChrome, TalkOverlay } from "./talk-overlay";
@@ -181,7 +181,7 @@ export function AuthenticatedMainMenu() {
                         if (message) useGame.setState((store) => ({ s: { ...store.s, toast: message } }));
                       }}
                     >
-                      <TerminalSquare className="size-4" /> Black channel
+                      <Terminal className="size-4" /> Black channel
                     </Button>
                   </div>
                 </div>
