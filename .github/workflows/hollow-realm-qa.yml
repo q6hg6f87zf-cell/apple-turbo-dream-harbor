@@ -91,6 +91,11 @@ jobs:
           HOLLOW_QA_URL: http://127.0.0.1:8080
         run: node scripts/hollow-server-inventory-browser-smoke.mjs
 
+      - name: Mobile interaction and dismissal smoke
+        env:
+          HOLLOW_QA_URL: http://127.0.0.1:8080
+        run: node scripts/hollow-ux-smoke.mjs
+
       - name: iPhone-shaped gameplay smoke
         env:
           HOLLOW_QA_URL: http://127.0.0.1:8080
