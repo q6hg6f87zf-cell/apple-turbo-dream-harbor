@@ -5,9 +5,11 @@ import { ClassAliasLayer } from "@/components/game/class-alias-layer";
 import { HollowRealmVisuals } from "@/components/game/hollow-visuals";
 import { ResidentProgressionRuntime } from "@/components/game/resident-progression-runtime";
 import { bootstrapCampaignBalance } from "@/game/balance-bootstrap";
+import { bootstrapTyroneHelp } from "@/game/tyrone-help-bootstrap";
 import { createFileRoute } from "@tanstack/react-router";
 
 bootstrapCampaignBalance();
+bootstrapTyroneHelp();
 
 export const Route = createFileRoute("/")({ component: Home });
 
