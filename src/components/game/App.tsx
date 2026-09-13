@@ -5,15 +5,13 @@ import { useGame } from "@/game/store";
 import type { Screen } from "@/game/types";
 import { cn } from "@/lib/cn";
 import {
-  Archive,
-  BookOpen,
   CircleHelp,
-  IdCard,
+  Globe2,
   Landmark,
   Moon,
+  MoreHorizontal,
+  PackageOpen,
   Plus,
-  ScrollText,
-  Swords,
   Users,
   Volume2,
   VolumeX,
@@ -39,16 +37,18 @@ import {
   RosterView,
   SquadView,
 } from "./views";
+import { InventoryView } from "./inventory-view";
+import { MoreView } from "./more-view";
 
 const NAV: { id: Screen; label: string; icon: typeof Landmark; hint?: string }[] = [
   { id: "hq", label: "Vault 13", icon: Landmark },
-  { id: "roster", label: "Residents", icon: Users },
-  { id: "squad", label: "Squad", icon: IdCard },
-  { id: "map", label: "Explore", icon: Swords, hint: "sortie" },
-  { id: "vault", label: "Salvage", icon: Archive },
-  { id: "ledger", label: "Exchange", icon: ScrollText },
-  { id: "codex", label: "Archive", icon: BookOpen },
+  { id: "map", label: "World", icon: Globe2, hint: "sortie" },
+  { id: "roster", label: "Squad", icon: Users },
+  { id: "inventory", label: "Inventory", icon: PackageOpen },
+  { id: "more", label: "More", icon: MoreHorizontal },
 ];
+
+const MORE_SCREENS: Screen[] = ["forge", "ledger", "vault", "codex", "squad"];
 
 export function GameApp() {
   const hydrate = useGame((g) => g.hydrate);
@@ -132,11 +132,13 @@ export function GameApp() {
         <Hud />
         <ObjectiveBar />
         <main className="ms-scroll min-h-0 flex-1 overflow-y-auto px-4 py-4 pb-28 md:px-8 md:pb-8">
-          <div key={screen} className="ms-rise mx-auto w-full max-w-3xl">
+          <div key={screen} className="ms-rise mx-auto w-full max-w-4xl">
             {screen === "hq" && <HQView />}
             {screen === "roster" && <RosterView />}
             {screen === "forge" && <ForgeView />}
             {screen === "map" && <MapView />}
+            {screen === "inventory" && <InventoryView />}
+            {screen === "more" && <MoreView />}
             {screen === "vault" && <VaultView />}
             {screen === "ledger" && <LedgerView />}
             {screen === "squad" && <SquadView />}
@@ -248,7 +250,7 @@ function Hud() {
       >
         <MoonCrest className="size-7" />
         <span className="hidden font-display text-[11px] uppercase tracking-[0.22em] text-ember md:inline">
-          SYNAPSE
+          VAULT 13
         </span>
       </button>
       <div className="min-w-0 flex-1">
@@ -310,7 +312,7 @@ function Hud() {
       </button>
       <button
         type="button"
-        aria-label="Forge operative"
+        aria-label="Forge resident"
         onClick={() => {
           unlockAudio();
           sfx.click();
@@ -336,7 +338,7 @@ function NavButtons({ compact }: { compact?: boolean }) {
     <>
       {NAV.map((n) => {
         const Icon = n.icon;
-        const active = screen === n.id || (n.id === "roster" && screen === "forge");
+        const active = screen === n.id || (n.id === "more" && MORE_SCREENS.includes(screen));
         const nudge = n.hint === "sortie" && tutorial === "sortie";
         return (
           <button
@@ -356,7 +358,7 @@ function NavButtons({ compact }: { compact?: boolean }) {
             )}
           >
             <Icon className="size-5" />
-            <span className={cn("font-display uppercase tracking-[0.16em]", compact ? "text-[9px]" : "text-[11px]")}>
+            <span className={cn("font-display uppercase tracking-[0.16em]", compact ? "text-[9px]" : "text-[10px]")}>
               {n.label}
             </span>
           </button>
@@ -369,7 +371,7 @@ function NavButtons({ compact }: { compact?: boolean }) {
 function Rail() {
   const setScreen = useGame((g) => g.setScreen);
   return (
-    <aside className="hidden w-[5.5rem] flex-col items-stretch border-r border-line/70 bg-surface py-4 md:flex">
+    <aside className="hidden w-[6.25rem] flex-col items-stretch border-r border-line/70 bg-surface py-4 md:flex">
       <button
         type="button"
         className="mx-auto mb-6"

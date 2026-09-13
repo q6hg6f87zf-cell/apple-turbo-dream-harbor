@@ -1,0 +1,71 @@
+name: Hollow Realm QA
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [feature/hollow-realm-visuals]
+
+jobs:
+  qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        # The repository's existing package-lock is stale against package.json.
+        # Use install for QA so type/build/gameplay checks can run; keep the
+        # lock mismatch visible as a separate repository hygiene issue.
+        run: npm install --no-audit --no-fund
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Production-style Vite build
+        run: npm run build:dev
+
+      - name: Long-campaign simulation
+        env:
+          HOLLOW_SIM_RUNS: 2500
+        run: node scripts/hollow-realm-sim.mjs
+
+      - name: Install Chromium for mobile smoke
+        run: npx playwright install --with-deps chromium
+
+      - name: Start Hollow Realm
+        run: |
+          npm run dev > /tmp/hollow-realm.log 2>&1 &
+          echo $! > /tmp/hollow-realm.pid
+          for i in {1..45}; do
+            if curl --fail --silent http://127.0.0.1:8080 >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/hollow-realm.log
+          exit 1
+
+      - name: iPhone-shaped gameplay smoke
+        env:
+          HOLLOW_QA_URL: http://127.0.0.1:8080
+        run: node scripts/hollow-realm-smoke.mjs
+
+      - name: Upload QA screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hollow-realm-iphone-qa
+          path: artifacts/hollow-realm-iphone-smoke.png
+          if-no-files-found: ignore
+
+      - name: Print dev server log on failure
+        if: failure()
+        run: cat /tmp/hollow-realm.log || true
