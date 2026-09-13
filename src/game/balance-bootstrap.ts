@@ -82,31 +82,38 @@ const QUARTER_BONUS: Record<QuarterId, string[]> = {
   ],
 };
 
-for (const room of Object.keys(ROOM_CAPS) as RoomId[]) {
-  BASE_ROOMS[room].tiers = ROOM_CAPS[room].map((cost, i) => ({
-    cost,
-    bonus: ROOM_BONUS[room][i] ?? ROOM_BONUS[room].at(-1)!,
-  }));
-}
+let bootstrapped = false;
 
-for (const q of Object.keys(QUARTER_CAPS) as QuarterId[]) {
-  QUARTERS[q].tiers = QUARTER_CAPS[q].map((cost, i) => ({
-    cost,
-    bonus: QUARTER_BONUS[q][i] ?? QUARTER_BONUS[q].at(-1)!,
-  }));
-}
+export function bootstrapCampaignBalance(): void {
+  if (bootstrapped) return;
+  bootstrapped = true;
 
-// The current field party is capped at three operatives. Keep Veyra nearly
-// perfect, but mathematically achievable with three fully prepared residents.
-RAID_PROFILES.veyra.minReadiness = 785;
+  for (const room of Object.keys(ROOM_CAPS) as RoomId[]) {
+    BASE_ROOMS[room].tiers = ROOM_CAPS[room].map((cost, i) => ({
+      cost,
+      bonus: ROOM_BONUS[room][i] ?? ROOM_BONUS[room].at(-1)!,
+    }));
+  }
 
-// Keep one shared catalogue so the existing Inventory screen immediately gains
-// the deeper treasure table without duplicating UI logic.
-const known = new Set(HOLLOW_CATALOG.map((item) => `${item.kind}:${item.name}`));
-for (const item of TREASURE_CATALOG) {
-  const key = `${item.kind}:${item.name}`;
-  if (!known.has(key)) {
-    HOLLOW_CATALOG.push(item);
-    known.add(key);
+  for (const q of Object.keys(QUARTER_CAPS) as QuarterId[]) {
+    QUARTERS[q].tiers = QUARTER_CAPS[q].map((cost, i) => ({
+      cost,
+      bonus: QUARTER_BONUS[q][i] ?? QUARTER_BONUS[q].at(-1)!,
+    }));
+  }
+
+  // The current field party is capped at three operatives. Keep Veyra nearly
+  // perfect, but mathematically achievable with three fully prepared residents.
+  RAID_PROFILES.veyra.minReadiness = 785;
+
+  // Keep one shared catalogue so the existing Inventory screen immediately gains
+  // the deeper treasure table without duplicating UI logic.
+  const known = new Set(HOLLOW_CATALOG.map((item) => `${item.kind}:${item.name}`));
+  for (const item of TREASURE_CATALOG) {
+    const key = `${item.kind}:${item.name}`;
+    if (!known.has(key)) {
+      HOLLOW_CATALOG.push(item);
+      known.add(key);
+    }
   }
 }
