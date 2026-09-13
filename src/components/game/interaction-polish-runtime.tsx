@@ -74,6 +74,11 @@ export function InteractionPolishRuntime() {
       }
       @media (max-width: 767px) {
         input, textarea, select { font-size: 16px !important; }
+        aside.ms-sheet {
+          width: min(92vw, 28rem) !important;
+          max-width: min(92vw, 28rem) !important;
+        }
+        aside.ms-sheet button { min-height: 44px; }
       }
       @media (prefers-reduced-motion: no-preference) {
         button:not(:disabled), a[href], [role="button"] {
