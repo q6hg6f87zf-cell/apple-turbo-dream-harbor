@@ -157,11 +157,10 @@ export function TalkOverlay() {
 
 export function HelpFab() {
   const talk = useGame((g) => g.s.talk);
-  const locked = useGame((g) => isTalkLocked(g.s));
   const screen = useGame((g) => g.s.screen);
   const overlay = useGame((g) => !!g.s.combat || !!g.s.mission);
   const open = useGame((g) => g.openGuide);
-  if (talk && locked) return null;
+  if (talk) return null;
   if (screen === "rules") return null;
   const porch = screen === "title" || screen === "briefing";
   return (
