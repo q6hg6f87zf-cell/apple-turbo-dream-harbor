@@ -1,5 +1,16 @@
 import { getBearerToken } from "@/lib/auth/client";
-import type { MissionKind, RegionId } from "./types";
+import type { ClassName, MissionKind, QuarterId, RegionId, RoomId } from "./types";
+
+export type ServerResidentProgress = {
+  id: string;
+  name: string;
+  cls: ClassName;
+  xpTotal: number;
+  level: number;
+  xp: number;
+  xpToNext: number;
+  revision: number;
+};
 
 export type ServerProgressionSnapshot = {
   campaignId: string;
@@ -29,6 +40,7 @@ export type ServerProgressionSnapshot = {
     discordId: string;
     name: string;
   };
+  residents: ServerResidentProgress[];
   authority: "server";
 };
 
@@ -36,6 +48,7 @@ export type ServerMissionTicket = {
   id: string;
   region: RegionId;
   kind: MissionKind;
+  partyIds: string[];
   issuedAt: string;
   availableAt: string;
   expiresAt: string;
@@ -51,6 +64,7 @@ export type MissionRewardReceipt = {
   ore?: number;
   favor?: number;
   riderXp?: number;
+  residentXp?: number;
   intel?: number;
   missionCount?: number;
   materialQty?: number;
@@ -58,11 +72,27 @@ export type MissionRewardReceipt = {
   expired?: boolean;
 };
 
+export type ServerUpgradeReceipt = {
+  nextLevel: number;
+  caps: number;
+  ore: number;
+  favor: number;
+  materialRegion: RegionId;
+  materials: number;
+  bossClears: number;
+  riders: number;
+  minDay: number;
+  commandRank: number;
+  residentLevel: number;
+  residentCount: number;
+};
+
 type ProgressionResponse = ServerProgressionSnapshot & {
   ok?: boolean;
   duplicate?: boolean;
   ticket?: ServerMissionTicket;
   reward?: MissionRewardReceipt;
+  upgrade?: ServerUpgradeReceipt;
   error?: string;
 };
 
@@ -92,6 +122,16 @@ async function decode(response: Response): Promise<ProgressionResponse> {
   return body;
 }
 
+async function command(payload: Record<string, unknown>) {
+  const response = await fetch("/api/hollow/progression", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: headers(true),
+    body: JSON.stringify(payload),
+  });
+  return decode(response);
+}
+
 export async function pullServerProgression(): Promise<ServerProgressionSnapshot | null> {
   const response = await fetch("/api/hollow/progression", {
     method: "GET",
@@ -102,46 +142,50 @@ export async function pullServerProgression(): Promise<ServerProgressionSnapshot
   return decode(response);
 }
 
-export async function startServerMission(region: RegionId, kind: MissionKind, missionId: string) {
-  const response = await fetch("/api/hollow/progression", {
-    method: "POST",
-    credentials: "same-origin",
-    headers: headers(true),
-    body: JSON.stringify({
-      command: "start_mission",
-      requestId: stableMissionRequestId(missionId),
-      region,
-      kind,
-    }),
+export async function startServerMission(
+  region: RegionId,
+  kind: MissionKind,
+  missionId: string,
+  party: Array<{ id: string; name: string; cls: ClassName }>,
+) {
+  const body = await command({
+    command: "start_mission",
+    requestId: stableMissionRequestId(missionId),
+    region,
+    kind,
+    party,
   });
-  const body = await decode(response);
   if (!body.ticket) throw new Error("Server did not issue a mission ticket.");
   return body;
 }
 
 export async function settleServerMission(ticketId: string, performanceScore: number) {
-  const response = await fetch("/api/hollow/progression", {
-    method: "POST",
-    credentials: "same-origin",
-    headers: headers(true),
-    body: JSON.stringify({
-      command: "settle_mission",
-      ticketId,
-      performanceScore,
-    }),
+  return command({
+    command: "settle_mission",
+    ticketId,
+    performanceScore,
   });
-  return decode(response);
 }
 
 export async function advanceServerDay() {
-  const response = await fetch("/api/hollow/progression", {
-    method: "POST",
-    credentials: "same-origin",
-    headers: headers(true),
-    body: JSON.stringify({
-      command: "advance_day",
-      requestId: randomRequestId("day"),
-    }),
+  return command({
+    command: "advance_day",
+    requestId: randomRequestId("day"),
   });
-  return decode(response);
+}
+
+export async function upgradeServerRoom(room: RoomId) {
+  return command({
+    command: "upgrade_room",
+    requestId: randomRequestId(`room-${room}`),
+    room,
+  });
+}
+
+export async function upgradeServerQuarter(quarter: QuarterId) {
+  return command({
+    command: "upgrade_quarter",
+    requestId: randomRequestId(`quarter-${quarter}`),
+    quarter,
+  });
 }
