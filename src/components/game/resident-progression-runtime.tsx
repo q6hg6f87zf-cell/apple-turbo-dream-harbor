@@ -7,7 +7,7 @@ import {
   MISSION_RIDER_XP,
 } from "@/game/resident-progression";
 import { useGame } from "@/game/store";
-import type { GameState, LocationId } from "@/game/types";
+import type { GameState, LocationId, LogEntry } from "@/game/types";
 import { useEffect } from "react";
 
 const LONG_DAY_GATE: Record<number, number> = {
@@ -101,16 +101,14 @@ export function ResidentProgressionRuntime() {
         const rider = state.squad.find((x) => x.id === state.activeMemberId);
         if (rider) rider.xp += riderXp;
 
-        state.log = [
-          {
-            id: `progress-${Date.now().toString(36)}`,
-            day: state.day,
-            kind: "action",
-            who: "Tyrone",
-            what: `Training report: +${residentXp} resident XP · +${riderXp} rider contribution XP${levelUps.length ? ` · ${levelUps.join(", ")}` : ""}.`,
-          },
-          ...state.log,
-        ].slice(0, 80);
+        const entry: LogEntry = {
+          id: `progress-${Date.now().toString(36)}`,
+          day: state.day,
+          kind: "action",
+          who: "Tyrone",
+          what: `Training report: +${residentXp} resident XP · +${riderXp} rider contribution XP${levelUps.length ? ` · ${levelUps.join(", ")}` : ""}.`,
+        };
+        state.log = [entry, ...state.log].slice(0, 80);
 
         if (levelUps.length) state.toast = `${levelUps.join(" · ")} · Tyrone updated the files.`;
       });
