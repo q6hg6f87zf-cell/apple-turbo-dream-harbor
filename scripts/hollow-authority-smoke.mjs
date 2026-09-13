@@ -4,6 +4,7 @@ const baseURL = process.env.HOLLOW_QA_URL ?? "http://127.0.0.1:8080";
 const writeKey = process.env.TYRONE_SYNC_WRITE_KEY ?? "hollow-qa-sync-key";
 const discord = "123456789012345678";
 const unlinkedDiscord = "222222222222222222";
+const qaParty = [{ id: "qa-op-ironbound-01", name: "QA Ironbound", cls: "Warrior" }];
 
 async function body(response) {
   return response.json().catch(() => ({}));
@@ -144,7 +145,7 @@ const unlinkedTransfer = await body(unlinkedTransferResponse);
 assert.match(unlinkedTransfer.error, /not linked|has not linked/i);
 assert.equal(unlinkedTransfer.treasury.caps + unlinkedTransfer.card.caps, conserved);
 
-// ---- Server-owned campaign progression and reward settlement ----
+// ---- Server-owned campaign progression, resident training and rewards ----
 const progressRead = await fetch(`${baseURL}/api/hollow/progression`, { headers: { accept: "application/json" } });
 assert.equal(progressRead.status, 200);
 const initialProgress = await body(progressRead);
@@ -162,6 +163,7 @@ const lockedRegion = await progression({
   requestId: "qa-locked-slagtown-0001",
   region: "slagtown",
   kind: "scout",
+  party: qaParty,
 });
 assert.equal(lockedRegion.status, 409, "Locked Slag Town accepted an authoritative mission contract.");
 
@@ -170,12 +172,14 @@ const startMissionResponse = await progression({
   requestId: "qa-ironclad-scout-0001",
   region: "ironclad",
   kind: "scout",
+  party: qaParty,
 });
 assert.equal(startMissionResponse.status, 200);
 const missionStart = await body(startMissionResponse);
 assert.equal(missionStart.ok, true);
 assert.equal(missionStart.ticket.region, "ironclad");
 assert.equal(missionStart.ticket.kind, "scout");
+assert.deepEqual(missionStart.ticket.partyIds, [qaParty[0].id]);
 assert.match(missionStart.ticket.id, /^[a-f0-9]{48,96}$/i);
 
 const duplicateStartResponse = await progression({
@@ -183,6 +187,7 @@ const duplicateStartResponse = await progression({
   requestId: "qa-ironclad-scout-0001",
   region: "ironclad",
   kind: "scout",
+  party: qaParty,
 });
 assert.equal(duplicateStartResponse.status, 200);
 const duplicateStart = await body(duplicateStartResponse);
@@ -194,16 +199,9 @@ const parallelMission = await progression({
   requestId: "qa-parallel-scout-0002",
   region: "ironclad",
   kind: "scout",
+  party: qaParty,
 });
 assert.equal(parallelMission.status, 409, "Server allowed two simultaneous open mission contracts for one rider.");
-
-const bossTooEarly = await progression({
-  command: "start_mission",
-  requestId: "qa-boss-too-early-0001",
-  region: "ironclad",
-  kind: "boss",
-});
-assert.equal(bossTooEarly.status, 409, "Ironclad boss contract opened without raid readiness.");
 
 const waitMs = Math.max(0, new Date(missionStart.ticket.availableAt).getTime() - Date.now() + 120);
 if (waitMs) await new Promise((resolve) => setTimeout(resolve, waitMs));
@@ -214,6 +212,7 @@ const settleResponse = await progression({
   performanceScore: 1000,
   vaultCaps: 999999999,
   ore: 999999,
+  residentXp: 999999,
 });
 assert.equal(settleResponse.status, 200);
 const settled = await body(settleResponse);
@@ -222,12 +221,17 @@ assert.equal(settled.reward.vaultCaps, 180, "Client was able to choose the missi
 assert.equal(settled.reward.cardCaps, 32, "Unexpected authoritative Ironclad scout card cut.");
 assert.equal(settled.reward.ore, 0, "Client was able to choose the ore reward.");
 assert.equal(settled.reward.favor, 1);
+assert.equal(settled.reward.residentXp, 18, "Client was able to choose resident training XP.");
 assert.equal(settled.campaign.missions.ironclad, 1);
 assert.equal(settled.campaign.intel.ironclad, 2);
 assert.ok([0, 1].includes(settled.campaign.materials.ironclad));
 assert.equal(settled.treasury.caps, 1901);
 assert.equal(settled.card.caps, 4032);
 assert.equal(settled.card.xp, 90);
+const trained = settled.residents.find((resident) => resident.id === qaParty[0].id);
+assert.ok(trained, "Mission party resident was not registered server-side.");
+assert.equal(trained.xpTotal, 18);
+assert.equal(trained.level, 1);
 
 const settleReplayResponse = await progression({
   command: "settle_mission",
@@ -240,6 +244,19 @@ assert.equal(settleReplay.duplicate, true, "Settled mission ticket was not recog
 assert.equal(settleReplay.treasury.caps, 1901, "Mission replay minted treasury caps twice.");
 assert.equal(settleReplay.card.caps, 4032, "Mission replay minted card caps twice.");
 assert.equal(settleReplay.card.xp, 90, "Mission replay minted rider XP twice.");
+assert.equal(settleReplay.residents.find((resident) => resident.id === qaParty[0].id)?.xpTotal, 18, "Mission replay trained the resident twice.");
+
+const bossTooEarly = await progression({
+  command: "start_mission",
+  requestId: "qa-boss-too-early-0001",
+  region: "ironclad",
+  kind: "boss",
+  party: [
+    qaParty[0],
+    { id: "qa-op-sawbones-02", name: "QA Sawbones", cls: "Healer" },
+  ],
+});
+assert.equal(bossTooEarly.status, 409, "Ironclad boss contract opened before the server raid window/readiness gate.");
 
 const dayResponse = await progression({ command: "advance_day", requestId: "qa-day-earned-0001" });
 assert.equal(dayResponse.status, 200);
@@ -255,6 +272,15 @@ assert.equal(duplicateDay.campaign.day, 2, "Duplicate day command advanced campa
 const unearnedSecondDay = await progression({ command: "advance_day", requestId: "qa-day-unearned-0002" });
 assert.equal(unearnedSecondDay.status, 409, "Campaign advanced a second day without another settled mission.");
 
+const prematureVaultUpgrade = await progression({
+  command: "upgrade_room",
+  requestId: "qa-vault-tier2-early-0001",
+  room: "vault",
+});
+assert.equal(prematureVaultUpgrade.status, 409, "Vault Tier 2 bypassed the authoritative Day 7 / Rank 2 / resident gate.");
+const prematureVaultBody = await body(prematureVaultUpgrade);
+assert.match(prematureVaultBody.error, /day 7|command rank 2|resident/i);
+
 console.log(
-  "Hollow authority smoke passed: identity claims, shared card economy, mission tickets, fixed server rewards, replay defense, region gates and earned campaign-day progression.",
+  "Hollow authority smoke passed: identity claims, shared card economy, mission tickets, fixed server rewards, resident XP, replay defense, region gates, earned campaign days and hard Vault construction gates.",
 );
