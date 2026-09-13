@@ -169,7 +169,7 @@ export function HelpFab() {
         open();
       }}
       className={cn(
-        "ms-help fixed z-[42] inline-flex size-12 items-center justify-center rounded-full bg-ink text-ember",
+        "ms-help fixed z-[42] inline-flex size-12 touch-manipulation items-center justify-center rounded-full bg-ink text-ember",
         porch ? "left-3 top-3 md:right-6 md:top-36" : "right-3 bottom-[5.5rem] md:right-6 md:bottom-6",
         !porch && !overlay && "md:hidden",
       )}
@@ -203,11 +203,17 @@ export function FieldManual() {
   const card = MANUAL[id] ?? MANUAL.hq;
 
   return (
-    <div className="fixed inset-0 z-[52] flex items-end justify-center bg-ink/70 p-3 md:items-center">
+    <div
+      className="fixed inset-0 z-[52] flex items-end justify-center bg-ink/70 p-3 md:items-center"
+      onClick={close}
+      role="presentation"
+    >
       <div
         className="ms-pop glass-strong w-full max-w-md rounded-[var(--radius-xl)] p-5 text-left"
         role="dialog"
+        aria-modal="true"
         aria-label={card.title}
+        onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start gap-3">
           <img
@@ -221,9 +227,9 @@ export function FieldManual() {
           </div>
           <button
             type="button"
-            aria-label="Close"
+            aria-label="Close Tyrone field manual"
             onClick={close}
-            className="inline-flex size-11 items-center justify-center rounded-[var(--radius-sm)] text-muted hover:text-paper"
+            className="inline-flex size-11 touch-manipulation items-center justify-center rounded-[var(--radius-sm)] text-muted hover:text-paper"
           >
             <X className="size-4" />
           </button>
