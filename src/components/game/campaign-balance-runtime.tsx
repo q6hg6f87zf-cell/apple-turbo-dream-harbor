@@ -12,7 +12,7 @@ import { canonicalRegionId, regionById } from "@/game/data";
 import { HOLLOW_CATALOG, type CatalogItem } from "@/game/hollow-catalog";
 import { isVacant } from "@/game/squad";
 import { useGame } from "@/game/store";
-import type { GameState, Item, LocationId, MissionKind, Rarity, RegionId } from "@/game/types";
+import type { GameState, Item, LocationId, LogEntry, MissionKind, Rarity, RegionId } from "@/game/types";
 import { useEffect } from "react";
 
 const PAYOUT_TICKS = 43; // 43 × the legacy 1.4s heartbeat ≈ one economy payout/minute.
@@ -51,16 +51,14 @@ function mutateState(fn: (state: GameState) => void) {
 }
 
 function pushLog(state: GameState, who: string, what: string) {
-  state.log = [
-    {
-      id: `matrix-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
-      day: state.day,
-      kind: "loot",
-      who,
-      what,
-    },
-    ...state.log,
-  ].slice(0, 80);
+  const entry: LogEntry = {
+    id: `matrix-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+    day: state.day,
+    kind: "loot",
+    who,
+    what,
+  };
+  state.log = [entry, ...state.log].slice(0, 80);
 }
 
 function ownedNames(state: GameState) {
@@ -240,7 +238,6 @@ export function CampaignBalanceRuntime() {
       const prev = prevStore.s;
       let needsGatePass = false;
 
-      // A completed mission gets a 1000-point S.Y.N.A.P.S.E performance grade.
       const mission = prev.mission;
       if (mission && !next.mission) {
         const oldCount = prev.locations[mission.locationId]?.missions ?? 0;
@@ -279,8 +276,6 @@ export function CampaignBalanceRuntime() {
         }
       }
 
-      // Boss transitions pay both the communal Vault treasury and qualifying
-      // riders' 3D Moon Squad bank cards.
       const bossLocs: LocationId[] = ["ironclad", "kingdom", "caverns", "library", "veyra"];
       for (const loc of bossLocs) {
         if (!prev.locations[loc]?.bossDefeated && next.locations[loc]?.bossDefeated) {
@@ -289,8 +284,6 @@ export function CampaignBalanceRuntime() {
         }
       }
 
-      // Legacy engine unlocks regions by day. Long-form mode overrides that:
-      // the next region opens only after the preceding boss is actually down.
       if (!needsGatePass) {
         const snapshot = useGame.getState().s;
         const test = cloneForMutation(snapshot);
@@ -300,7 +293,6 @@ export function CampaignBalanceRuntime() {
       }
     });
 
-    // Apply the boss-chain lock immediately for existing saves as well.
     mutateState((state) => void enforceRegionGates(state));
 
     return () => {
