@@ -7,6 +7,7 @@ import { LoadoutEffectsRuntime } from "@/components/game/loadout-effects-runtime
 import { ResidentProgressionRuntime } from "@/components/game/resident-progression-runtime";
 import { SecureGameApp } from "@/components/game/secure-game-app";
 import { ServerEconomyRuntime } from "@/components/game/server-economy-runtime";
+import { ServerInventoryRuntime } from "@/components/game/server-inventory-runtime";
 import { ServerProgressionRuntime } from "@/components/game/server-progression-runtime";
 import { bootstrapCampaignBalance } from "@/game/balance-bootstrap";
 import { bootstrapTyroneHelp } from "@/game/tyrone-help-bootstrap";
@@ -24,6 +25,7 @@ function Home() {
       <AuthorityClaimRuntime />
       <ServerEconomyRuntime />
       <ServerProgressionRuntime />
+      <ServerInventoryRuntime />
       <HollowRealmVisuals />
       <ClassAliasLayer />
       <CampaignBalanceRuntime />
