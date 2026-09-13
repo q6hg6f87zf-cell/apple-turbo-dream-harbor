@@ -2,6 +2,7 @@ import { AUTHORITY_BOSS_GATES } from "@/game/authority-rules";
 import { scoreMission } from "@/game/campaign-balance";
 import { canonicalRegionId } from "@/game/data";
 import { cloneState } from "@/game/engine";
+import { claimServerMissionTreasure } from "@/game/server-inventory";
 import {
   advanceServerDay,
   pullServerProgression,
@@ -188,6 +189,8 @@ async function settleCompletedMission(
   try {
     const matrix = scoreMission(prevState, nextState, mission);
     const result = await settleServerMission(ticket.id, matrix.score);
+    const treasure = await claimServerMissionTreasure(ticket.id).catch(() => null);
+    const drops = treasure?.treasure?.result?.drops ?? [];
     const reward = result.reward;
     const parts = [
       reward?.vaultCaps ? `Vault +${reward.vaultCaps.toLocaleString()} caps` : null,
@@ -196,6 +199,7 @@ async function settleCompletedMission(
       reward?.favor ? `+${reward.favor} favor` : null,
       reward?.residentXp ? `residents +${reward.residentXp} XP` : null,
       reward?.materialQty ? `+${reward.materialQty} regional material${reward.materialQty === 1 ? "" : "s"}` : null,
+      drops.length ? `recovered ${drops.map((drop) => drop.name).join(" + ")}` : null,
     ].filter(Boolean);
     applySnapshot(
       result,
