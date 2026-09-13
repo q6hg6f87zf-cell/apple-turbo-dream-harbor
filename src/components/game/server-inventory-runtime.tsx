@@ -1,5 +1,13 @@
 import { cloneState } from "@/game/engine";
 import {
+  buyServerExchange,
+  buyServerVendor,
+  forgeServerResident,
+  grantServerBrokerSupply,
+  pullServerAcquisition,
+  type ServerAcquisitionSnapshot,
+} from "@/game/server-acquisition";
+import {
   degradeServerItem,
   migrateLegacyServerInventory,
   pullServerInventory,
@@ -13,6 +21,7 @@ import { useEffect } from "react";
 
 const CONDITION_RANK: Record<Condition, number> = { Pristine: 0, Worn: 1, Damaged: 2, Broken: 3 };
 let applying = false;
+let acquisitionPending = false;
 
 type Fingerprint = {
   ownerType: "vault" | "resident";
@@ -60,6 +69,32 @@ function applySnapshot(snapshot: ServerInventorySnapshot, toast?: string) {
   }
 }
 
+function applyAcquisition(snapshot: ServerAcquisitionSnapshot, toast?: string) {
+  applying = true;
+  try {
+    useGame.setState((store) => {
+      const s = cloneState(store.s);
+      s.coins = Math.max(0, Number(snapshot.treasury.caps || 0));
+      s.ore = Math.max(0, Number(snapshot.treasury.ore || 0));
+      s.shop = {
+        bargain: snapshot.exchange.bargain,
+        essential: snapshot.exchange.essential,
+        artifact: snapshot.exchange.artifact,
+        day: snapshot.exchange.day,
+        bought: { ...snapshot.exchange.bought },
+      };
+      if (toast) s.toast = toast;
+      return { s };
+    });
+  } finally {
+    applying = false;
+  }
+}
+
+function setToast(message: string) {
+  useGame.setState((store) => ({ s: { ...store.s, toast: message } }));
+}
+
 function expectedFingerprint(snapshot: ServerInventorySnapshot) {
   return new Map<string, Fingerprint>(snapshot.items.map((entry) => [entry.item.id, {
     ownerType: entry.ownerType,
@@ -102,11 +137,23 @@ export function ServerInventoryRuntime() {
       setServerInventoryAuthorityActive(false);
       return;
     }
+
     let cancelled = false;
     let storeUnsub: (() => void) | null = null;
     let lastSnapshot: ServerInventorySnapshot | null = null;
     let expected = new Map<string, Fingerprint>();
     const conditionInFlight = new Set<string>();
+    const brokerInFlight = new Set<string>();
+
+    const original = useGame.getState();
+    const originalForge = original.forge;
+    const originalBuyOffer = original.buyOffer;
+    const originalBuyNpc = original.buyNpc;
+
+    const syncingForge: typeof originalForge = () => "Tyrone is still sealing the Forge ledger. Give him a second.";
+    const syncingOffer: typeof originalBuyOffer = () => "Quartermaster Exchange is syncing its server stock.";
+    const syncingNpc: typeof originalBuyNpc = () => "Vendor ledger is syncing with Vault 13.";
+    useGame.setState({ forge: syncingForge, buyOffer: syncingOffer, buyNpc: syncingNpc });
 
     const acceptSnapshot = (snapshot: ServerInventorySnapshot, message?: string) => {
       if (cancelled) return;
@@ -118,6 +165,18 @@ export function ServerInventoryRuntime() {
     };
 
     const snapshotUnsub = subscribeServerInventory((snapshot) => acceptSnapshot(snapshot));
+
+    const refreshInventory = async () => {
+      const snapshot = await pullServerInventory().catch(() => null);
+      if (snapshot && !cancelled) acceptSnapshot(snapshot);
+      return snapshot;
+    };
+
+    const refreshAcquisition = async (quiet = true) => {
+      const snapshot = await pullServerAcquisition().catch(() => null);
+      if (snapshot && !cancelled) applyAcquisition(snapshot, quiet ? undefined : "Tyrone verified Forge and Exchange authority.");
+      return snapshot;
+    };
 
     const boot = async () => {
       let snapshot = await pullServerInventory().catch(() => null);
@@ -136,8 +195,110 @@ export function ServerInventoryRuntime() {
           : undefined,
       );
 
-      storeUnsub = useGame.subscribe((nextStore) => {
+      const acquisition = await refreshAcquisition(false);
+      if (!acquisition || cancelled) return;
+
+      const secureForge: typeof originalForge = (opts) => {
+        if (acquisitionPending) return "Tyrone is already settling an acquisition.";
+        const before = cloneState(useGame.getState().s);
+        const beforeIds = new Set(before.operatives.map((op) => op.id));
+        const localError = originalForge(opts);
+        if (localError) return localError;
+
+        const forged = useGame.getState().s.operatives.find((op) => !beforeIds.has(op.id));
+        if (!forged) {
+          useGame.setState({ s: before });
+          return "Forge failed to produce a resident record.";
+        }
+
+        acquisitionPending = true;
+        setToast("Tyrone · sealing resident file and starter loadout…");
+        void forgeServerResident(forged.id, forged.name, forged.cls, forged.race)
+          .then(async (receipt) => {
+            applyAcquisition(
+              receipt,
+              receipt.forge?.duplicate
+                ? `${forged.name} was already sealed by Vault 13.`
+                : `${forged.name} sealed · ${receipt.forge?.cost ?? 0} caps · starter loadout serialized.`,
+            );
+            await refreshInventory();
+          })
+          .catch(async (error) => {
+            applying = true;
+            try {
+              useGame.setState({ s: before });
+            } finally {
+              applying = false;
+            }
+            if (lastSnapshot) acceptSnapshot(lastSnapshot);
+            await refreshAcquisition(true);
+            setToast(error instanceof Error ? error.message : "Tyrone rejected the resident forge.");
+          })
+          .finally(() => {
+            acquisitionPending = false;
+          });
+        return null;
+      };
+
+      const secureBuyOffer: typeof originalBuyOffer = (tier) => {
+        if (acquisitionPending) return "Tyrone is already settling an acquisition.";
+        acquisitionPending = true;
+        setToast("Quartermaster Exchange · authorizing purchase…");
+        void buyServerExchange(tier)
+          .then(async (receipt) => {
+            const purchase = receipt.purchase;
+            const detail = purchase?.oreUnits
+              ? `${purchase.name} moved ${purchase.oreUnits} Ore into the Vault reserve.`
+              : `${purchase?.name ?? "Stock"} serialized into Vault 13.`;
+            applyAcquisition(receipt, purchase?.duplicate ? "That Exchange slot is already sold for this campaign day." : `${detail} -${purchase?.price ?? 0} caps.`);
+            await refreshInventory();
+          })
+          .catch((error) => setToast(error instanceof Error ? error.message : "Quartermaster rejected the purchase."))
+          .finally(() => {
+            acquisitionPending = false;
+          });
+        return null;
+      };
+
+      const secureBuyNpc: typeof originalBuyNpc = (name) => {
+        if (acquisitionPending) return "Tyrone is already settling an acquisition.";
+        acquisitionPending = true;
+        setToast("Vendor purchase · checking Vault 13 ledger…");
+        void buyServerVendor(name)
+          .then(async (receipt) => {
+            const purchase = receipt.purchase;
+            const detail = purchase?.oreUnits
+              ? `${purchase.oreUnits} Hollow Ore moved directly into the Vault reserve.`
+              : `${purchase?.name ?? name} serialized into Vault 13.`;
+            applyAcquisition(receipt, purchase?.duplicate ? "Vendor receipt already settled." : `${detail} -${purchase?.price ?? 0} caps.`);
+            await refreshInventory();
+          })
+          .catch((error) => setToast(error instanceof Error ? error.message : "Vendor settlement failed."))
+          .finally(() => {
+            acquisitionPending = false;
+          });
+        return null;
+      };
+
+      useGame.setState({ forge: secureForge, buyOffer: secureBuyOffer, buyNpc: secureBuyNpc });
+
+      storeUnsub = useGame.subscribe((nextStore, prevStore) => {
         if (applying || !lastSnapshot) return;
+
+        for (const op of nextStore.s.operatives) {
+          const before = prevStore.s.operatives.find((candidate) => candidate.id === op.id);
+          if (!before || op.cls !== "Merchant" || !op.giftUsed || before.giftUsed) continue;
+          if (brokerInFlight.has(op.id)) continue;
+          brokerInFlight.add(op.id);
+          void grantServerBrokerSupply(op.id)
+            .then(async (receipt) => {
+              applyAcquisition(receipt, receipt.supply?.duplicate ? "Broker emergency stock was already issued today." : "Tyrone serialized the Broker emergency vial.");
+              await refreshInventory();
+            })
+            .catch((error) => setToast(error instanceof Error ? error.message : "Broker supply could not be sealed."))
+            .finally(() => brokerInFlight.delete(op.id));
+        }
+
         const current = currentFingerprint(nextStore.s);
         if (unauthorizedMutation(current, expected)) {
           acceptSnapshot(lastSnapshot, "Tyrone rejected an unsealed local Inventory change.");
@@ -159,17 +320,22 @@ export function ServerInventoryRuntime() {
     };
 
     void boot();
-    const onFocus = () => void pullServerInventory().catch(() => null);
+    const onFocus = () => {
+      void refreshInventory();
+      void refreshAcquisition(true);
+    };
     window.addEventListener("focus", onFocus);
     const timer = window.setInterval(onFocus, 30_000);
 
     return () => {
       cancelled = true;
+      acquisitionPending = false;
       setServerInventoryAuthorityActive(false);
       snapshotUnsub();
       storeUnsub?.();
       window.removeEventListener("focus", onFocus);
       window.clearInterval(timer);
+      useGame.setState({ forge: originalForge, buyOffer: originalBuyOffer, buyNpc: originalBuyNpc });
     };
   }, [discordId]);
 
