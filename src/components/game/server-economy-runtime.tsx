@@ -74,8 +74,6 @@ export function ServerEconomyRuntime() {
     const originalDeposit = original.depositCard;
     const originalWithdraw = original.withdrawCard;
     const originalGift = original.giftRider;
-    const originalUpgradeRoom = original.upgradeRoom;
-    const originalUpgradeQuarter = original.upgradeQuarter;
 
     const refresh = async (quiet = true) => {
       try {
@@ -133,19 +131,8 @@ export function ServerEconomyRuntime() {
         return null;
       };
 
-      const authorityUpgradeRoom: typeof originalUpgradeRoom = () =>
-        "Vault expansion is server-locked until campaign progression migration is complete.";
-      const authorityUpgradeQuarter: typeof originalUpgradeQuarter = () =>
-        "Resident-quarter expansion is server-locked until campaign progression migration is complete.";
-
       installed = true;
-      useGame.setState({
-        depositCard,
-        withdrawCard,
-        giftRider,
-        upgradeRoom: authorityUpgradeRoom,
-        upgradeQuarter: authorityUpgradeQuarter,
-      });
+      useGame.setState({ depositCard, withdrawCard, giftRider });
     })();
 
     const onFocus = () => void refresh(true);
@@ -161,8 +148,6 @@ export function ServerEconomyRuntime() {
           depositCard: originalDeposit,
           withdrawCard: originalWithdraw,
           giftRider: originalGift,
-          upgradeRoom: originalUpgradeRoom,
-          upgradeQuarter: originalUpgradeQuarter,
         });
       }
     };
