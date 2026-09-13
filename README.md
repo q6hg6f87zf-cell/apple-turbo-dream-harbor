@@ -17,4 +17,6 @@ Hollow Realm now has a staged server-authoritative path for verified TyroneBot r
 
 LocalStorage remains a gameplay/cache layer during this migration. It is not considered a trusted source for linked rider economy values.
 
+The authoritative card layer passed TypeScript, production build, the 2,500-run campaign simulation, server authority security smoke and iPhone-shaped gameplay smoke before this documentation-only update.
+
 The next migration slice is server-owned campaign progression and reward issuance, followed by authoritative Vault expansion and inventory ownership.
