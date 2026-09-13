@@ -1,4 +1,5 @@
 import { GameApp } from "@/components/game/App";
+import { ClassAliasLayer } from "@/components/game/class-alias-layer";
 import { HollowRealmVisuals } from "@/components/game/hollow-visuals";
 import { createFileRoute } from "@tanstack/react-router";
 
@@ -9,6 +10,7 @@ function Home() {
     <>
       <GameApp />
       <HollowRealmVisuals />
+      <ClassAliasLayer />
     </>
   );
 }
