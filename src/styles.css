@@ -1,0 +1,711 @@
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Syne:wght@500;600;700;800&display=swap");
+@import "tailwindcss";
+
+@theme {
+  --color-ink: #0b0f0c;
+  --color-surface: #121814;
+  --color-raised: #171e19;
+  --color-panel: #1c2420;
+  --color-line: #3d4a42;
+  --color-ember: #3ee07a;
+  --color-ember-bright: #7dffb0;
+  --color-paper: #e7f3ea;
+  --color-muted: #8a9a90;
+  --color-moon: #c9b27a;
+  --color-danger: #e24b4b;
+  --color-ok: #3ee07a;
+  --color-void: #7a6e8a;
+  --font-display: "Syne", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --shadow-border: 0 0 0 1px color-mix(in oklab, var(--color-paper) 14%, transparent);
+  --shadow-border-hover: 0 0 0 1px color-mix(in oklab, var(--color-ember) 55%, transparent);
+  --radius-xs: 4px;
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 22px;
+  --radius-xl: 32px;
+  --motion-stagger: 40ms;
+  --motion-micro: 80ms;
+  --motion-quick: 0.15s;
+  --motion-fast: 0.25s;
+  --motion-medium: 0.35s;
+  --motion-slow: 0.4s;
+  --ease-smooth-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-pop: cubic-bezier(0.34, 1.36, 0.64, 1);
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  html,
+  body,
+  #app {
+    background: var(--color-ink);
+    height: 100%;
+    color: var(--color-paper);
+  }
+  body {
+    font-family: var(--font-body);
+    overflow: hidden;
+  }
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+    font-family: var(--font-display);
+  }
+  p {
+    text-wrap: pretty;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-ember);
+    outline-offset: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  :before,
+  :after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+.ms-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklab, var(--color-ember) 50%, transparent) transparent;
+}
+.ms-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.ms-scroll::-webkit-scrollbar-thumb {
+  background: color-mix(in oklab, var(--color-ember) 50%, transparent);
+  border-radius: 99px;
+}
+
+.ms-grain {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
+}
+
+.glass {
+  background: color-mix(in oklab, var(--color-paper) 9%, transparent);
+  -webkit-backdrop-filter: blur(22px) saturate(1.5);
+  backdrop-filter: blur(22px) saturate(1.5);
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklab, white 26%, transparent),
+    inset 0 -1px 0 color-mix(in oklab, black 28%, transparent),
+    0 0 0 1px color-mix(in oklab, var(--color-paper) 16%, transparent),
+    0 18px 40px color-mix(in oklab, black 42%, transparent);
+}
+
+.glass-strong {
+  background: color-mix(in oklab, var(--color-ink) 42%, transparent);
+  -webkit-backdrop-filter: blur(28px) saturate(1.6);
+  backdrop-filter: blur(28px) saturate(1.6);
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklab, white 30%, transparent),
+    0 0 0 1px color-mix(in oklab, var(--color-ember) 22%, transparent),
+    0 24px 50px color-mix(in oklab, black 50%, transparent);
+}
+
+.crt-scan {
+  pointer-events: none;
+  mix-blend-mode: multiply;
+  opacity: 0.28;
+  background: repeating-linear-gradient(
+    color-mix(in oklab, black 18%, transparent) 0,
+    color-mix(in oklab, black 18%, transparent) 1px,
+    transparent 1px 3px
+  );
+}
+
+.ms-moon {
+  background: var(--color-ink);
+  border-radius: 18px;
+  width: 72px;
+  height: 72px;
+  position: relative;
+  box-shadow:
+    inset 0 0 0 1px color-mix(in oklab, var(--color-ember) 55%, transparent),
+    0 0 48px color-mix(in oklab, var(--color-ember) 28%, transparent);
+}
+.ms-moon:after {
+  content: "";
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--color-ember) 18%, transparent),
+    color-mix(in oklab, var(--color-ember) 70%, transparent)
+  );
+  border-radius: 4px;
+  position: absolute;
+  inset: 14px 10px 18px;
+  clip-path: polygon(0 60%, 18% 40%, 32% 68%, 48% 22%, 64% 55%, 80% 30%, 100% 48%, 100% 100%, 0 100%);
+}
+
+.ms-well {
+  background:
+    radial-gradient(ellipse at 50% 0%, color-mix(in oklab, var(--color-ember) 16%, transparent), transparent 55%),
+    color-mix(in oklab, var(--color-raised) 70%, transparent);
+}
+
+@keyframes ms-pulse {
+  0%,
+  to {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+@keyframes ms-rise {
+  0% {
+    opacity: 0;
+    filter: blur(3px);
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    filter: blur();
+    transform: translateY(0);
+  }
+}
+@keyframes ms-dice {
+  0% {
+    transform: rotate(0) scale(0.85);
+  }
+  40% {
+    transform: rotate(200deg) scale(1.05);
+  }
+  to {
+    transform: rotate(360deg) scale(1);
+  }
+}
+@keyframes ms-nudge {
+  0%,
+  to {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-ember) 0%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 6px color-mix(in oklab, var(--color-ember) 28%, transparent);
+  }
+}
+@keyframes ms-pop {
+  0% {
+    opacity: 0;
+    filter: blur(2px);
+    transform: translateY(10px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    filter: blur();
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes ms-shake {
+  0%,
+  to {
+    transform: translate(0);
+  }
+  20% {
+    transform: translate(-3px);
+  }
+  40% {
+    transform: translate(3px);
+  }
+  60% {
+    transform: translate(-2px);
+  }
+  80% {
+    transform: translate(2px);
+  }
+}
+@keyframes ms-sheet {
+  0% {
+    opacity: 0;
+    transform: translate(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(0);
+  }
+}
+@keyframes ms-hit {
+  0%,
+  to {
+    filter: none;
+  }
+  35% {
+    filter: brightness(1.45) saturate(1.2);
+  }
+}
+@keyframes ms-float {
+  0% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+}
+@keyframes ms-coin {
+  0% {
+    opacity: 0.35;
+    filter: blur(2px);
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    filter: blur();
+    transform: translateY(0);
+  }
+}
+@keyframes ms-map-ring {
+  0% {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.8);
+  }
+}
+@keyframes ms-dmg {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+  18% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, -22px);
+  }
+}
+@keyframes term-blink {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  50%,
+  to {
+    opacity: 0;
+  }
+}
+
+.ms-nudge {
+  animation: ms-nudge 1.6s var(--ease-smooth-out) infinite;
+}
+.ms-rise {
+  animation: ms-rise var(--motion-slow) var(--ease-smooth-out) both;
+}
+.ms-pop {
+  animation: ms-pop var(--motion-fast) var(--ease-smooth-out) both;
+}
+.ms-shake {
+  animation: ms-shake 0.42s var(--ease-out);
+}
+.ms-sheet {
+  animation: ms-sheet var(--motion-slow) var(--ease-smooth-out) both;
+}
+.ms-hit {
+  animation: ms-hit 0.28s var(--ease-out);
+}
+.ms-float {
+  animation: ms-float 0.7s var(--ease-smooth-out) both;
+}
+.ms-dmg {
+  animation: ms-dmg 0.72s var(--ease-smooth-out) both;
+}
+.ms-map-ring {
+  transform-box: fill-box;
+  transform-origin: 50%;
+  animation: ms-map-ring 1.6s var(--ease-out) infinite;
+}
+
+.term-screen {
+  background:
+    radial-gradient(ellipse at 50% 0%, color-mix(in oklab, var(--color-ember) 18%, transparent), transparent 50%),
+    #03180a;
+  color: var(--color-ember-bright);
+  font-family: var(--font-mono);
+}
+.term-cursor {
+  background: var(--color-ember);
+  vertical-align: text-bottom;
+  width: 0.55em;
+  height: 1em;
+  animation: 1s step-end infinite term-blink;
+  display: inline-block;
+}
+
+.pip-row:hover {
+  box-shadow: var(--shadow-border-hover);
+}
+
+.ms-help {
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--color-ember) 50%, transparent),
+    0 12px 28px color-mix(in oklab, black 45%, transparent),
+    0 0 22px color-mix(in oklab, var(--color-ember) 22%, transparent);
+}
+.ms-help:hover {
+  color: var(--color-ember-bright);
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--color-ember) 80%, transparent),
+    0 12px 28px color-mix(in oklab, black 45%, transparent),
+    0 0 28px color-mix(in oklab, var(--color-ember) 34%, transparent);
+}
+
+.ms-card-stage {
+  perspective: 1100px;
+  overflow: visible;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.ms-card-shadow {
+  position: absolute;
+  bottom: 0.9rem;
+  left: 50%;
+  width: 70%;
+  height: 1.4rem;
+  margin-left: -35%;
+  border-radius: 100%;
+  background: radial-gradient(ellipse, color-mix(in oklab, black 70%, transparent), transparent 70%);
+  filter: blur(8px);
+  pointer-events: none;
+}
+.ms-card {
+  width: min(100%, 22rem);
+  aspect-ratio: 1.586;
+  position: relative;
+  transform-style: preserve-3d;
+  border-radius: var(--radius-md);
+  will-change: transform;
+  --gx: 32%;
+  --gy: 22%;
+  --shine: 0.18;
+}
+.ms-card-edge {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-md);
+  background: linear-gradient(180deg, #2c2c32 0%, #141416 42%, #070708 100%);
+  transform: translateZ(0);
+  pointer-events: none;
+  box-shadow: 0 0 0 1px #1a1a1e;
+}
+.ms-card-face {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  transform-style: flat;
+  -webkit-transform-style: flat;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  background-color: #050506;
+  color: var(--color-paper);
+}
+.ms-card-plate {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background-color: #050506;
+  z-index: 0;
+  pointer-events: none;
+}
+.ms-card-skin {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  overflow: hidden;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  background-color: #0a0a0c;
+}
+.ms-card-front {
+  transform: rotateY(0deg) translateZ(2.4px);
+}
+.ms-card[data-face="back"] .ms-card-front {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+.ms-card-front .ms-card-skin {
+  background-color: #0a0a0c;
+  background-image:
+    radial-gradient(ellipse at 12% 0%, color-mix(in oklab, var(--color-moon) 18%, #0a0a0c), #0a0a0c 42%),
+    linear-gradient(160deg, #141416 0%, var(--color-ink) 55%, #0a0a0c 100%);
+}
+.ms-card-back {
+  transform: rotateY(180deg) translateZ(2.4px);
+}
+.ms-card[data-face="front"] .ms-card-back {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+.ms-card-back .ms-card-skin {
+  background-color: #0a0a0c;
+  background-image: linear-gradient(180deg, #121214 0%, #0a0a0c 38%, #070708 100%);
+}
+.ms-card-chip {
+  width: 2.4rem;
+  height: 1.7rem;
+  border-radius: 4px;
+  position: relative;
+  background: linear-gradient(135deg, #d9c48a, var(--color-moon) 40%, #8a7840 70%, #f0e2b0);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, black 25%, transparent);
+}
+.ms-card-chip::after {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  background:
+    linear-gradient(#6a5a2e, #6a5a2e) 20% 30% / 22% 18% no-repeat,
+    linear-gradient(#6a5a2e, #6a5a2e) 55% 30% / 22% 18% no-repeat,
+    linear-gradient(#6a5a2e, #6a5a2e) 20% 62% / 22% 18% no-repeat,
+    linear-gradient(#6a5a2e, #6a5a2e) 55% 62% / 22% 18% no-repeat;
+  opacity: 0.45;
+}
+.ms-card-nfc {
+  width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 50%;
+  box-shadow:
+    inset 0 0 0 1px color-mix(in oklab, var(--color-moon) 55%, transparent),
+    inset 0 0 0 3px transparent,
+    inset 0 0 0 4px color-mix(in oklab, var(--color-moon) 35%, transparent),
+    inset 0 0 0 6px transparent,
+    inset 0 0 0 7px color-mix(in oklab, var(--color-moon) 22%, transparent);
+}
+.ms-card-foil,
+.ms-card-glare {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+}
+.ms-card-foil {
+  background: linear-gradient(
+    110deg,
+    transparent 20%,
+    color-mix(in oklab, var(--color-paper) calc(var(--shine, 0.18) * 70%), transparent) 40%,
+    transparent 58%
+  );
+  background-size: 220% 100%;
+  animation: ms-foil 5.5s linear infinite;
+}
+.ms-card-glare {
+  background: radial-gradient(
+    circle at var(--gx, 32%) var(--gy, 22%),
+    color-mix(in oklab, var(--color-paper) 16%, transparent),
+    transparent 42%
+  );
+}
+.ms-card-hatch {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.22;
+  background-image: repeating-linear-gradient(
+    -22deg,
+    transparent 0 11px,
+    color-mix(in oklab, var(--color-moon) 18%, transparent) 11px 12px
+  );
+}
+.ms-card-stripe {
+  position: relative;
+  height: 2.65rem;
+  margin-top: 1.05rem;
+  background: linear-gradient(180deg, #3d342c 0%, #1c1612 14%, #090706 48%, #1a1410 86%, #322a24 100%);
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklab, var(--color-paper) 14%, transparent),
+    inset 0 -1px 0 color-mix(in oklab, black 55%, transparent);
+}
+.ms-card-stripe-track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 28%;
+  height: 38%;
+  background: repeating-linear-gradient(
+    90deg,
+    color-mix(in oklab, var(--color-paper) 8%, transparent) 0 1px,
+    transparent 1px 3px,
+    color-mix(in oklab, black 40%, transparent) 3px 4px,
+    transparent 4px 7px,
+    color-mix(in oklab, var(--color-paper) 5%, transparent) 7px 8px,
+    transparent 8px 12px
+  );
+  opacity: 0.7;
+}
+.ms-card-sig-row {
+  display: flex;
+  align-items: stretch;
+  margin: 0.7rem 0.95rem 0;
+  min-height: 2.7rem;
+  overflow: hidden;
+  border-radius: 2px;
+  background: #efe6d4;
+  box-shadow:
+    inset 0 0 0 1px color-mix(in oklab, black 18%, transparent),
+    0 1px 0 color-mix(in oklab, var(--color-paper) 8%, transparent);
+}
+.ms-card-sig {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  color: #1a1612;
+  background: repeating-linear-gradient(0deg, #efe6d4 0 3px, #e4d8c2 3px 4px);
+}
+.ms-card-sig-label {
+  display: block;
+  padding: 0.22rem 0.5rem 0;
+  font-family: var(--font-display);
+  font-size: 0.52rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: color-mix(in oklab, #1a1612 48%, #8a7a62);
+}
+.ms-card-sig-ink {
+  position: absolute;
+  left: 0.35rem;
+  right: 0.2rem;
+  top: 0.55rem;
+  height: 1.7rem;
+  color: color-mix(in oklab, var(--color-ink) 82%, var(--color-ember));
+  pointer-events: none;
+}
+.ms-card-sig-name {
+  position: absolute;
+  left: 0.55rem;
+  bottom: 0.12rem;
+  margin: 0;
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: 0.92rem;
+  letter-spacing: 0.04em;
+  color: color-mix(in oklab, #1a1612 88%, var(--color-ember));
+  pointer-events: none;
+}
+.ms-card-cvc {
+  display: flex;
+  width: 3.15rem;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #f7f3ea;
+  color: #111;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  letter-spacing: 0.18em;
+  border-left: 1px solid color-mix(in oklab, #1a1612 22%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, black 8%, transparent);
+}
+.ms-card-cvc span {
+  font-family: var(--font-display);
+  font-size: 0.48rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #6a6458;
+}
+.ms-card-back-body {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.7rem 1rem 0.85rem;
+}
+.ms-card-legal {
+  margin-top: 0.4rem;
+  max-width: 16.5rem;
+  font-size: 0.5rem;
+  line-height: 1.35;
+  letter-spacing: 0.01em;
+  color: color-mix(in oklab, var(--color-muted) 88%, var(--color-paper));
+}
+.ms-card-barcode {
+  display: block;
+  width: 3.5rem;
+  height: 0.72rem;
+  margin-top: 0.45rem;
+  background: repeating-linear-gradient(
+    90deg,
+    color-mix(in oklab, var(--color-paper) 55%, transparent) 0 1px,
+    transparent 1px 2px,
+    color-mix(in oklab, var(--color-paper) 70%, transparent) 2px 3px,
+    transparent 3px 5px,
+    color-mix(in oklab, var(--color-paper) 40%, transparent) 5px 6px,
+    transparent 6px 8px
+  );
+  opacity: 0.45;
+}
+.ms-card-holo {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 3px;
+  overflow: hidden;
+  background: conic-gradient(
+    from 210deg,
+    color-mix(in oklab, var(--color-moon) 80%, var(--color-ember)),
+    color-mix(in oklab, var(--color-ember) 45%, var(--color-paper)),
+    var(--color-moon),
+    color-mix(in oklab, var(--color-void) 45%, var(--color-moon)),
+    color-mix(in oklab, var(--color-paper) 40%, var(--color-moon)),
+    color-mix(in oklab, var(--color-moon) 80%, var(--color-ember))
+  );
+  box-shadow:
+    inset 0 0 0 1px color-mix(in oklab, var(--color-paper) 28%, transparent),
+    0 1px 2px color-mix(in oklab, black 40%, transparent);
+}
+.ms-card-holo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    115deg,
+    transparent 30%,
+    color-mix(in oklab, var(--color-paper) 38%, transparent) 48%,
+    transparent 62%
+  );
+  pointer-events: none;
+}
+.ms-card-holo-mark {
+  position: relative;
+  z-index: 1;
+  width: 1.15rem;
+  height: 1.15rem;
+  color: color-mix(in oklab, var(--color-ink) 55%, var(--color-paper));
+}
+.ms-card-last4 {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.22em;
+  color: var(--color-paper);
+  text-shadow: 0 1px 0 color-mix(in oklab, black 55%, transparent);
+}
+@keyframes ms-foil {
+  from {
+    background-position: 0% 0;
+  }
+  to {
+    background-position: 220% 0;
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "url": "http://127.0.0.1:8081/",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "Hollow Realm",
+      "hasCanvas": false,
+      "bodyTextLen": 374,
+      "bodyTextHash": "55566080882f645d1ee731392484e01c8b8259a0c500c9ba8f87662be564b521",
+      "bodyTextPrefix": "S.Y.N.A.P.S.E T-0880 HOLLOW REALM Tyrone keeps the porch light o",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-built.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "Hollow Realm",
+      "hasCanvas": false,
+      "bodyTextLen": 374,
+      "bodyTextHash": "55566080882f645d1ee731392484e01c8b8259a0c500c9ba8f87662be564b521",
+      "bodyTextPrefix": "S.Y.N.A.P.S.E T-0880 HOLLOW REALM Tyrone keeps the porch light o",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-built-mobile.png"
+    }
+  },
+  "brandWarnings": [],
+  "authWarnings": [],
+  "verdictFile": "/workspace/screenshots/app-builder-built.json",
+  "divergesFromBaseline": false,
+  "baselineReasons": []
+}
