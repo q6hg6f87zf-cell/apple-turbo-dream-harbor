@@ -330,14 +330,10 @@ await page.getByText("QA Scrapsteel Bundle", { exact: true }).click();
 await page.getByRole("button", { name: "How to use" }).click();
 await page.getByText(/Construction stock, not pocket clutter|Material stays in Vault 13/).waitFor();
 
-// Move the persisted file into World and exercise the orbital renderer.
-await page.evaluate((key) => {
-  const save = JSON.parse(localStorage.getItem(key) || "{}");
-  save.screen = "map";
-  save.talk = null;
-  localStorage.setItem(key, JSON.stringify(save));
-}, saveKey);
-await page.reload({ waitUntil: "networkidle" });
+// Use the same mobile navigation a real player uses rather than mutating save
+// data underneath the page. force is intentional because the item sheet is
+// still open and changing screens should dismiss that component naturally.
+await page.getByRole("button", { name: "World", exact: true }).click({ force: true });
 await page.getByText(/Orbital Command/).waitFor({ timeout: 20_000 });
 assert.ok((await page.locator("canvas").count()) >= 1, "World renderer did not mount a canvas.");
 
