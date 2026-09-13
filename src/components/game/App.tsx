@@ -41,13 +41,13 @@ import {
 } from "./views";
 
 const NAV: { id: Screen; label: string; icon: typeof Landmark; hint?: string }[] = [
-  { id: "hq", label: "Compound", icon: Landmark },
-  { id: "roster", label: "Roster", icon: Users },
+  { id: "hq", label: "Vault 13", icon: Landmark },
+  { id: "roster", label: "Residents", icon: Users },
   { id: "squad", label: "Squad", icon: IdCard },
-  { id: "map", label: "Deploy", icon: Swords, hint: "sortie" },
-  { id: "vault", label: "Vault", icon: Archive },
-  { id: "ledger", label: "Ledger", icon: ScrollText },
-  { id: "codex", label: "Codex", icon: BookOpen },
+  { id: "map", label: "Explore", icon: Swords, hint: "sortie" },
+  { id: "vault", label: "Salvage", icon: Archive },
+  { id: "ledger", label: "Exchange", icon: ScrollText },
+  { id: "codex", label: "Archive", icon: BookOpen },
 ];
 
 export function GameApp() {
