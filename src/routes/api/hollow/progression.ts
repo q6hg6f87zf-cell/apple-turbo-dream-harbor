@@ -276,6 +276,9 @@ async function registerResidents(userId: string, party: PartyDescriptor[]) {
         ${CAMPAIGN_ID}, ${resident.id}, ${userId}, ${resident.name}, ${resident.cls}, 0, 1, now(), now()
       )
       on conflict (campaign_id, resident_id) do update set
+        -- Class identity is immutable after first server registration. The
+        -- browser may rename a resident for display, but cannot flip a trained
+        -- Ironbound into another class to satisfy raid-diversity checks.
         display_name = excluded.display_name,
         revision = hollow_resident_progress.revision + 1,
         updated_at = now()
