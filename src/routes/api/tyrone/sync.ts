@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { getSql } from "@/lib/db";
 import { env } from "@/lib/env.server";
 
@@ -79,14 +79,14 @@ function contract(origin: string) {
   return {
     authority: "server",
     handshake:
-      "TyroneBot writes arcade totals over an authenticated server-to-server request. Player URLs carry identity/display hints only and never caps, XP, rank, or Pack balances.",
-    open: `${origin}/?d={discordId}&n={username}`,
+      "TyroneBot writes arcade totals over an authenticated server-to-server request and receives a short-lived one-time claim URL. Player URLs never contain caps, XP, rank, or Pack balances.",
+    open: `${origin}/?claim={oneTimeToken}`,
     trustedPost: {
       url: `${origin}/api/tyrone/sync`,
       auth: "Authorization: Bearer <TYRONE_SYNC_WRITE_KEY>",
       body: { discord: "<snowflake>", name: "<username>", caps: 0, xp: 0, level: 1, pack: {} },
     },
-    publicRead: "disabled until an authenticated Hollow Realm user is bound to the Discord rider",
+    publicRead: "disabled; authoritative state is exposed only after an authenticated claim",
   };
 }
 
@@ -100,6 +100,10 @@ type SnapshotRow = {
   revision: number;
   updated_at: string;
 };
+
+function hashClaim(token: string) {
+  return createHash("sha256").update(token).digest("hex");
+}
 
 export const Route = createFileRoute("/api/tyrone/sync")({
   server: {
@@ -180,14 +184,23 @@ export const Route = createFileRoute("/api/tyrone/sync")({
         `;
         const row = rows[0]!;
 
+        await sql`delete from tyrone_identity_claim where expires_at <= now()`;
+        const claim = randomBytes(32).toString("base64url");
+        const claimHash = hashClaim(claim);
+        await sql`
+          insert into tyrone_identity_claim (token_hash, discord_id, expires_at)
+          values (${claimHash}, ${id}, now() + interval '10 minutes')
+        `;
+
         const url = new URL(request.url);
         const origin = `${url.protocol}//${url.host}`;
-        const open = `${origin}/?d=${encodeURIComponent(id)}&n=${encodeURIComponent(name)}`;
+        const open = `${origin}/?claim=${encodeURIComponent(claim)}`;
         return json({
           ok: true,
           discord: row.discord_id,
           name: row.display_name,
           revision: row.revision,
+          claimExpiresInSeconds: 600,
           open,
         });
       },
