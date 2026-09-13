@@ -1,6 +1,6 @@
 import { BASE_ROOMS, QUARTERS } from "./data";
 import { HOLLOW_CATALOG } from "./hollow-catalog";
-import { QUARTER_CAPS, ROOM_CAPS } from "./campaign-balance";
+import { QUARTER_CAPS, RAID_PROFILES, ROOM_CAPS } from "./campaign-balance";
 import { TREASURE_CATALOG } from "./treasure-catalog";
 import type { QuarterId, RoomId } from "./types";
 
@@ -95,6 +95,10 @@ for (const q of Object.keys(QUARTER_CAPS) as QuarterId[]) {
     bonus: QUARTER_BONUS[q][i] ?? QUARTER_BONUS[q].at(-1)!,
   }));
 }
+
+// The current field party is capped at three operatives. Keep Veyra nearly
+// perfect, but mathematically achievable with three fully prepared residents.
+RAID_PROFILES.veyra.minReadiness = 785;
 
 // Keep one shared catalogue so the existing Inventory screen immediately gains
 // the deeper treasure table without duplicating UI logic.
