@@ -81,6 +81,11 @@ jobs:
           HOLLOW_QA_URL: http://127.0.0.1:8080
         run: node scripts/hollow-acquisition-authority-smoke.mjs
 
+      - name: Server mission performance authority smoke
+        env:
+          HOLLOW_QA_URL: http://127.0.0.1:8080
+        run: node scripts/hollow-performance-authority-smoke.mjs
+
       - name: Live browser Inventory authority smoke
         env:
           HOLLOW_QA_URL: http://127.0.0.1:8080
