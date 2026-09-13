@@ -49,8 +49,20 @@ function pushStat(target: Partial<Record<StatKey, number[]>>, stat: StatKey, amo
   target[stat] = [...(target[stat] ?? []), amount];
 }
 
-function parseEffect(effect: string): ParsedEffect {
+function conditionAllows(effect: string, op: Operative) {
+  const lower = effect.toLowerCase();
+  const hpRatio = op.maxHp > 0 ? op.hp / op.maxHp : 0;
+  if (/while\s+below\s+half\s+hp|below\s+50%\s*hp/.test(lower) && hpRatio >= 0.5) return false;
+  if (/while\s+above\s+half\s+hp|above\s+50%\s*hp/.test(lower) && hpRatio <= 0.5) return false;
+  if (/at\s+full\s+hp|while\s+at\s+full\s+hp/.test(lower) && op.hp < op.maxHp) return false;
+  if (/while\s+wounded|when\s+wounded/.test(lower) && op.hp >= op.maxHp) return false;
+  return true;
+}
+
+function parseEffect(effect: string, op: Operative): ParsedEffect {
   const parsed: ParsedEffect = { stats: {}, damage: [] };
+  if (!conditionAllows(effect, op)) return parsed;
+
   const statPattern = /([+-]\s*\d+)\s*(STR|DEF|INT|WIS|SPD|CHA|LCK)\b/gi;
   let match: RegExpExecArray | null;
   while ((match = statPattern.exec(effect))) {
@@ -94,6 +106,9 @@ export function enchantmentSocketStatus(item: Item) {
 export function canAttachEnchantment(item: Item, enchantment: Item): string | null {
   if (!item.slot) return "Enchantments need a weapon, armor, or trinket target.";
   if (enchantment.kind !== "enchantment") return "That item is not an enchantment.";
+  if (/([+-]\s*\d+)\s*(?:weapon\s+)?damage\b/i.test(enchantment.effect) && item.slot !== "weapon") {
+    return "Tyrone: damage resonance needs a weapon. Armor can hold wards, stats and utility, but it cannot fake a sharper barrel.";
+  }
   const sockets = enchantmentSocketStatus(item);
   if (sockets.used >= sockets.capacity) {
     return `Tyrone: ${item.name} is at resonance capacity (${sockets.used}/${sockets.capacity}). Replace the gear or build around what is already attached.`;
@@ -127,14 +142,14 @@ export function analyzeLoadout(op: Operative, candidate?: Item | null): LoadoutA
   const damageSources: number[] = [];
 
   for (const item of gear) {
-    const parsed = parseEffect(item.effect ?? "");
+    const parsed = parseEffect(item.effect ?? "", op);
     for (const stat of STAT_KEYS) {
       for (const amount of parsed.stats[stat] ?? []) pushStat(statSources, stat, amount);
     }
     damageSources.push(...parsed.damage);
   }
   for (const effect of activeEffects) {
-    const parsed = parseEffect(effect.effect ?? "");
+    const parsed = parseEffect(effect.effect ?? "", op);
     for (const stat of STAT_KEYS) {
       for (const amount of parsed.stats[stat] ?? []) pushStat(statSources, stat, amount);
     }
@@ -151,8 +166,6 @@ export function analyzeLoadout(op: Operative, candidate?: Item | null): LoadoutA
   const warnings: string[] = [];
   let overloadPoints = 0;
 
-  // Specializing past +4 in one enhanced stat creates a readable trade-off.
-  // The player may still build a monster in one direction, but another axis gives way.
   for (const stat of STAT_KEYS) {
     const bonus = Math.max(0, statBonuses[stat] ?? 0);
     if (bonus <= 4) continue;
@@ -164,8 +177,6 @@ export function analyzeLoadout(op: Operative, candidate?: Item | null): LoadoutA
     warnings.push(`${stat} specialization +${bonus} overloads ${opposing} by ${penalty}.`);
   }
 
-  // Temporary chemical/field buffs are deliberately potent, but stacking too
-  // many at once adds cognitive and movement penalties instead of free power.
   const buffCount = activeEffects.length;
   if (buffCount >= 3) {
     const wisPenalty = Math.min(2, Math.ceil((buffCount - 2) / 2));
@@ -188,6 +199,14 @@ export function analyzeLoadout(op: Operative, candidate?: Item | null): LoadoutA
     warnings.push("Extreme resonance makes the build less predictable: -1 LCK.");
   }
 
+  const cursedSignals = gear.reduce(
+    (sum, item) => sum + (item.rarity === "Cursed" ? 1 : 0) + (item.tags ?? []).filter((tag) => tag === "enchant-rarity:Cursed").length,
+    0,
+  );
+  if (cursedSignals) {
+    warnings.push(`${cursedSignals} cursed resonance signal${cursedSignals === 1 ? "" : "s"} increase loadout volatility.`);
+  }
+
   const statModifiers: Partial<Record<StatKey, number>> = {};
   for (const stat of STAT_KEYS) {
     const value = (statBonuses[stat] ?? 0) + (statPenalties[stat] ?? 0);
@@ -197,7 +216,7 @@ export function analyzeLoadout(op: Operative, candidate?: Item | null): LoadoutA
   const penaltyWeight = Object.values(statPenalties).reduce((sum, n) => sum + Math.abs(n ?? 0), 0);
   const strain = Math.min(
     100,
-    Math.round(buffCount * 7 + enchantmentCountTotal * 5 + overloadPoints * 6 + penaltyWeight * 8),
+    Math.round(buffCount * 7 + enchantmentCountTotal * 5 + overloadPoints * 6 + penaltyWeight * 8 + cursedSignals * 12),
   );
 
   return {
