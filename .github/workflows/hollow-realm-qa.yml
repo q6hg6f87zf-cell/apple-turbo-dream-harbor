@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [feature/hollow-realm-visuals]
+    branches: [feature/hollow-realm-visuals, feature/server-authoritative-persistence]
 
 jobs:
   qa:
@@ -41,6 +41,8 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Start Hollow Realm
+        env:
+          TYRONE_SYNC_WRITE_KEY: hollow-qa-sync-key
         run: |
           npm run dev > /tmp/hollow-realm.log 2>&1 &
           echo $! > /tmp/hollow-realm.pid
@@ -52,6 +54,12 @@ jobs:
           done
           cat /tmp/hollow-realm.log
           exit 1
+
+      - name: Server authority security smoke
+        env:
+          HOLLOW_QA_URL: http://127.0.0.1:8080
+          TYRONE_SYNC_WRITE_KEY: hollow-qa-sync-key
+        run: node scripts/hollow-authority-smoke.mjs
 
       - name: iPhone-shaped gameplay smoke
         env:
