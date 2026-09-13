@@ -15,13 +15,12 @@ export const CANONICAL_REGION_IDS: RegionId[] = [
   "veyra",
 ];
 
-export const ORIGINS = [
-  "Ironclad",
-  "Slag Town",
-  "Blackspire",
-  "Brasswater",
-  "Veyra City",
-];
+/**
+ * Ironclad is home. Every newly forged character originates here and the
+ * campaign begins here before the wider planet opens up.
+ */
+export const STARTING_REGION: RegionId = "ironclad";
+export const ORIGINS = ["Ironclad"];
 
 export const REGIONS: RegionDefinition[] = [
   {
