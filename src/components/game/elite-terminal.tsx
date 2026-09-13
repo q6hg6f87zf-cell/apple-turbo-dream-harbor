@@ -2,7 +2,7 @@ import { sfx, unlockAudio } from "@/game/audio";
 import { cloneState } from "@/game/engine";
 import { useGame } from "@/game/store";
 import type { GameState, HackState, LogEntry } from "@/game/types";
-import { Cpu, ShieldAlert, TerminalSquare, X } from "lucide-react";
+import { Cpu, ShieldAlert, Terminal, X } from "lucide-react";
 import { useEffect, useRef } from "react";
 
 type DumpRow = {
@@ -348,7 +348,7 @@ export function EliteTerminalOverlay() {
         <div className="crt-scan pointer-events-none absolute inset-0 opacity-45" />
         <header className="relative z-[1] border-b border-ember/25 bg-ink/85 px-4 py-3">
           <div className="flex items-start gap-3">
-            <span className="mt-0.5 flex size-9 items-center justify-center rounded border border-ember/30 bg-ember/5 text-ember"><TerminalSquare className="size-4" /></span>
+            <span className="mt-0.5 flex size-9 items-center justify-center rounded border border-ember/30 bg-ember/5 text-ember"><Terminal className="size-4" /></span>
             <div className="min-w-0 flex-1">
               <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-ember">S.Y.N.A.P.S.E // BLACK CHANNEL</div>
               <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 font-mono text-[11px] text-ember-bright">
