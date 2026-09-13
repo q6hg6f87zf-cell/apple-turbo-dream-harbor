@@ -11,7 +11,10 @@ import {
   degradeServerItem,
   migrateLegacyServerInventory,
   pullServerInventory,
+  repairServerItem,
   setServerInventoryAuthorityActive,
+  setServerItemEquipped,
+  stashServerItem,
   subscribeServerInventory,
   type ServerInventorySnapshot,
 } from "@/game/server-inventory";
@@ -144,16 +147,33 @@ export function ServerInventoryRuntime() {
     let expected = new Map<string, Fingerprint>();
     const conditionInFlight = new Set<string>();
     const brokerInFlight = new Set<string>();
+    const itemActionInFlight = new Set<string>();
 
     const original = useGame.getState();
     const originalForge = original.forge;
     const originalBuyOffer = original.buyOffer;
     const originalBuyNpc = original.buyNpc;
+    const originalEquipItem = original.equipItem;
+    const originalStashItem = original.stashItem;
+    const originalTakeFromVault = original.takeFromVault;
+    const originalRepairItem = original.repairItem;
 
     const syncingForge: typeof originalForge = () => "Tyrone is still sealing the Forge ledger. Give him a second.";
     const syncingOffer: typeof originalBuyOffer = () => "Quartermaster Exchange is syncing its server stock.";
     const syncingNpc: typeof originalBuyNpc = () => "Vendor ledger is syncing with Vault 13.";
-    useGame.setState({ forge: syncingForge, buyOffer: syncingOffer, buyNpc: syncingNpc });
+    const syncingEquip: typeof originalEquipItem = () => setToast("Inventory authority is still syncing the loadout ledger.");
+    const syncingStash: typeof originalStashItem = () => "Inventory authority is still syncing the Vault ledger.";
+    const syncingTake: typeof originalTakeFromVault = () => "Inventory authority is still syncing the Vault ledger.";
+    const syncingRepair: typeof originalRepairItem = () => "Machine Shop authority is still syncing.";
+    useGame.setState({
+      forge: syncingForge,
+      buyOffer: syncingOffer,
+      buyNpc: syncingNpc,
+      equipItem: syncingEquip,
+      stashItem: syncingStash,
+      takeFromVault: syncingTake,
+      repairItem: syncingRepair,
+    });
 
     const acceptSnapshot = (snapshot: ServerInventorySnapshot, message?: string) => {
       if (cancelled) return;
@@ -280,7 +300,72 @@ export function ServerInventoryRuntime() {
         return null;
       };
 
-      useGame.setState({ forge: secureForge, buyOffer: secureBuyOffer, buyNpc: secureBuyNpc });
+      const secureEquipItem: typeof originalEquipItem = (opId, itemId) => {
+        if (itemActionInFlight.has(itemId)) return;
+        const item = useGame.getState().s.operatives.find((op) => op.id === opId)?.inventory.find((entry) => entry.id === itemId);
+        if (!item?.slot) {
+          setToast("That server item does not have an equipment slot.");
+          return;
+        }
+        itemActionInFlight.add(itemId);
+        setToast(`${item.name} · ${item.equipped ? "unequipping" : "equipping"} on the server…`);
+        void setServerItemEquipped(itemId, !item.equipped)
+          .then(() => setToast(`${item.name} ${item.equipped ? "unequipped" : "equipped"}.`))
+          .catch((error) => setToast(error instanceof Error ? error.message : "Tyrone rejected the loadout change."))
+          .finally(() => itemActionInFlight.delete(itemId));
+      };
+
+      const secureStashItem: typeof originalStashItem = (opId, itemId) => {
+        if (itemActionInFlight.has(itemId)) return "Tyrone is already moving that item.";
+        const item = useGame.getState().s.operatives.find((op) => op.id === opId)?.inventory.find((entry) => entry.id === itemId);
+        if (!item) return "Server item not found.";
+        if (item.equipped) return "Unequip first.";
+        itemActionInFlight.add(itemId);
+        setToast(`${item.name} · returning to Vault 13…`);
+        void stashServerItem(itemId)
+          .then(() => setToast(`${item.name} returned to Vault 13.`))
+          .catch((error) => setToast(error instanceof Error ? error.message : "Tyrone rejected the Vault move."))
+          .finally(() => itemActionInFlight.delete(itemId));
+        return null;
+      };
+
+      const secureTakeFromVault: typeof originalTakeFromVault = (_opId, itemId) => {
+        const item = useGame.getState().s.vault.find((entry) => entry.id === itemId);
+        useGame.getState().selectOp(null);
+        useGame.getState().setScreen("inventory");
+        setToast(item ? `Open ${item.name} in Inventory to issue it to a resident.` : "Open Inventory to issue server-sealed gear.");
+        return null;
+      };
+
+      const secureRepairItem: typeof originalRepairItem = (opId, itemId) => {
+        if (itemActionInFlight.has(itemId)) return "Machine Shop is already working on that item.";
+        const state = useGame.getState().s;
+        const item = opId === "vault"
+          ? state.vault.find((entry) => entry.id === itemId)
+          : state.operatives.find((op) => op.id === opId)?.inventory.find((entry) => entry.id === itemId);
+        if (!item) return "Server item not found.";
+        if (item.condition === "Pristine") return "Already pristine.";
+        itemActionInFlight.add(itemId);
+        setToast(`${item.name} · Machine Shop authorizing repair…`);
+        void repairServerItem(itemId)
+          .then(async (receipt) => {
+            setToast(`${item.name} repaired${receipt.repairCost ? ` · ${receipt.repairCost} caps` : ""}.`);
+            await refreshAcquisition(true);
+          })
+          .catch((error) => setToast(error instanceof Error ? error.message : "Machine Shop rejected the repair."))
+          .finally(() => itemActionInFlight.delete(itemId));
+        return null;
+      };
+
+      useGame.setState({
+        forge: secureForge,
+        buyOffer: secureBuyOffer,
+        buyNpc: secureBuyNpc,
+        equipItem: secureEquipItem,
+        stashItem: secureStashItem,
+        takeFromVault: secureTakeFromVault,
+        repairItem: secureRepairItem,
+      });
 
       storeUnsub = useGame.subscribe((nextStore, prevStore) => {
         if (applying || !lastSnapshot) return;
@@ -335,7 +420,15 @@ export function ServerInventoryRuntime() {
       storeUnsub?.();
       window.removeEventListener("focus", onFocus);
       window.clearInterval(timer);
-      useGame.setState({ forge: originalForge, buyOffer: originalBuyOffer, buyNpc: originalBuyNpc });
+      useGame.setState({
+        forge: originalForge,
+        buyOffer: originalBuyOffer,
+        buyNpc: originalBuyNpc,
+        equipItem: originalEquipItem,
+        stashItem: originalStashItem,
+        takeFromVault: originalTakeFromVault,
+        repairItem: originalRepairItem,
+      });
     };
   }, [discordId]);
 
