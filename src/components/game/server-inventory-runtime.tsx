@@ -82,9 +82,10 @@ export function ServerInventoryRuntime() {
       if (!snapshot || cancelled) return;
       if (!snapshot.migration.done) {
         const legacy = flattenLocalItems();
-        snapshot = await migrateLegacyServerInventory(legacy).catch(() => snapshot);
+        const migratedSnapshot = await migrateLegacyServerInventory(legacy).catch(() => null);
+        if (migratedSnapshot) snapshot = migratedSnapshot;
       }
-      if (cancelled) return;
+      if (!snapshot || cancelled) return;
       setServerInventoryAuthorityActive(true);
       const migrated = snapshot.migrationResult;
       applySnapshot(
