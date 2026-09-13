@@ -50,9 +50,7 @@ export type RoomId =
 
 export type QuarterId = "bunk" | "lockbox" | "hearth";
 
-/**
- * Canonical Hollow Realm regions for the rebuilt planetary overworld.
- */
+/** Canonical Hollow Realm regions for the rebuilt planetary overworld. */
 export type RegionId =
   | "ironclad"
   | "slagtown"
@@ -60,13 +58,16 @@ export type RegionId =
   | "brasswater"
   | "veyra";
 
-/**
- * Temporary save-migration IDs. These are removed once old saves are migrated
- * in data/save.ts to Slag Town, Blackspire, and Brasswater.
- */
+/** Legacy runtime IDs stay in place until engine/save migration is complete. */
 export type LegacyRegionId = "kingdom" | "caverns" | "library";
 
-export type LocationId = "hq" | RegionId | LegacyRegionId;
+export type LocationId =
+  | "hq"
+  | "ironclad"
+  | "kingdom"
+  | "caverns"
+  | "library"
+  | "veyra";
 
 export type RegionBiome =
   | "industrial-frontier"
@@ -88,11 +89,8 @@ export type RegionPoiKind =
   | "unknown";
 
 export interface GlobeMarker {
-  /** Latitude in degrees, -90 to 90. */
   lat: number;
-  /** Longitude in degrees, -180 to 180. */
   lon: number;
-  /** Optional visual lift above the globe surface. */
   altitude?: number;
 }
 
@@ -500,11 +498,6 @@ export interface GameState {
   squad: SquadMember[];
   activeMemberId: string | null;
   arc: ArcState | null;
-
-  /**
-   * Transitional next-gen UI state. Optional until store/save migration lands,
-   * keeping the current build valid while the new shell is wired in.
-   */
   worldView?: WorldViewState;
   inventoryView?: InventoryViewState;
   spaceScene?: SpaceSceneSettings;
