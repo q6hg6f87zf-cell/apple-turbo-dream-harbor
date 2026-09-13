@@ -10,11 +10,17 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiTyroneClaimRouteImport } from './routes/api/tyrone/claim'
 import { Route as ApiTyroneSyncRouteImport } from './routes/api/tyrone/sync'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiTyroneClaimRoute = ApiTyroneClaimRouteImport.update({
+  id: '/api/tyrone/claim',
+  path: '/api/tyrone/claim',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiTyroneSyncRoute = ApiTyroneSyncRouteImport.update({
@@ -25,27 +31,31 @@ const ApiTyroneSyncRoute = ApiTyroneSyncRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/api/tyrone/claim': typeof ApiTyroneClaimRoute
   '/api/tyrone/sync': typeof ApiTyroneSyncRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/api/tyrone/claim': typeof ApiTyroneClaimRoute
   '/api/tyrone/sync': typeof ApiTyroneSyncRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/api/tyrone/claim': typeof ApiTyroneClaimRoute
   '/api/tyrone/sync': typeof ApiTyroneSyncRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/tyrone/sync'
+  fullPaths: '/' | '/api/tyrone/claim' | '/api/tyrone/sync'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/tyrone/sync'
-  id: '__root__' | '/' | '/api/tyrone/sync'
+  to: '/' | '/api/tyrone/claim' | '/api/tyrone/sync'
+  id: '__root__' | '/' | '/api/tyrone/claim' | '/api/tyrone/sync'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ApiTyroneClaimRoute: typeof ApiTyroneClaimRoute
   ApiTyroneSyncRoute: typeof ApiTyroneSyncRoute
 }
 
@@ -56,6 +66,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/tyrone/claim': {
+      id: '/api/tyrone/claim'
+      path: '/api/tyrone/claim'
+      fullPath: '/api/tyrone/claim'
+      preLoaderRoute: typeof ApiTyroneClaimRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/tyrone/sync': {
@@ -70,6 +87,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ApiTyroneClaimRoute: ApiTyroneClaimRoute,
   ApiTyroneSyncRoute: ApiTyroneSyncRoute,
 }
 export const routeTree = rootRouteImport
