@@ -181,14 +181,16 @@ await page.getByRole("button", { name: /Unequip/ }).waitFor();
 await page.getByRole("button", { name: /Unequip/ }).click();
 
 // Consumable is targeted and consumed from the real owned list.
-await page.getByRole("button", { name: /QA Med-Gel/ }).click();
+const medGel = page.getByRole("button", { name: /QA Med-Gel/ });
+await medGel.click();
 await page.getByRole("button", { name: /Use on QA Runner/ }).click();
-assert.equal(await page.getByRole("button", { name: /QA Med-Gel/ }).count(), 0, "Consumed item remained in Owned inventory.");
+await medGel.waitFor({ state: "detached", timeout: 5_000 });
 
 // Enchantment attaches to resident gear and disappears as a loose item.
-await page.getByRole("button", { name: /QA Ironbound Coil/ }).click();
+const coil = page.getByRole("button", { name: /QA Ironbound Coil/ });
+await coil.click();
 await page.getByRole("button", { name: /Attach to gear/ }).click();
-assert.equal(await page.getByRole("button", { name: /QA Ironbound Coil/ }).count(), 0, "Attached enchantment remained loose in Owned inventory.");
+await coil.waitFor({ state: "detached", timeout: 5_000 });
 
 // Contextual Tyrone explanation.
 await page.getByRole("button", { name: /QA Scrapsteel Bundle/ }).click();
