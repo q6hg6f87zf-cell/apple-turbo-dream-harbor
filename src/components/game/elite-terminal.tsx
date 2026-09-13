@@ -343,7 +343,11 @@ export function EliteTerminalOverlay() {
   };
 
   return (
-    <div className="fixed inset-0 z-[110] flex items-end justify-center bg-black/90 p-2 backdrop-blur-sm md:items-center md:p-4">
+    <div
+      className="fixed inset-0 z-[110] flex items-end justify-center bg-black/90 p-2 backdrop-blur-sm md:items-center md:p-4"
+      data-terminal-session={hack.sessionId ?? "legacy"}
+      data-terminal-difficulty={difficulty}
+    >
       <div className="term-screen relative flex h-[min(96dvh,820px)] w-full max-w-2xl flex-col overflow-hidden rounded-[var(--radius-lg)] border border-ember/30 shadow-2xl">
         <div className="crt-scan pointer-events-none absolute inset-0 opacity-45" />
         <header className="relative z-[1] border-b border-ember/25 bg-ink/85 px-4 py-3">
@@ -382,6 +386,7 @@ export function EliteTerminalOverlay() {
                   key={`${row.address}-${row.word}`}
                   type="button"
                   disabled={disabled}
+                  data-terminal-token={row.word}
                   onClick={() => choose(row.word)}
                   className="group grid min-h-12 grid-cols-[4.5rem_1fr] items-center gap-2 rounded border border-ember/15 bg-black/20 px-2 text-left font-mono transition-colors hover:border-ember/45 hover:bg-ember/10 disabled:opacity-35"
                 >
