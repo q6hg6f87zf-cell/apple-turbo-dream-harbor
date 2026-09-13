@@ -1,11 +1,16 @@
 import { RACES } from "@/game/data";
 import { cloneState } from "@/game/engine";
 import { analyzeLoadout } from "@/game/loadout-effects";
+import { residentProgress } from "@/game/resident-progression";
 import { useGame } from "@/game/store";
-import type { Operative, StatKey, Stats } from "@/game/types";
+import type { GameState, Operative, StatKey, Stats } from "@/game/types";
 import { useEffect } from "react";
 
 const STAT_KEYS: StatKey[] = ["STR", "DEF", "INT", "WIS", "SPD", "CHA", "LCK"];
+const DAY_GATE = [1, 7, 21, 45, 85, 140];
+const COMMAND_GATE = [1, 2, 4, 6, 8, 10];
+const RESIDENT_LEVEL_GATE = [1, 2, 4, 6, 8, 10];
+const RESIDENT_COUNT_GATE = [0, 1, 1, 2, 2, 3];
 
 type RuntimeRace = { stats: Stats } & Record<string, unknown>;
 type ProgressOperative = Operative & {
@@ -26,6 +31,27 @@ function addDamageBonus(damage: string | undefined, bonus: number) {
   const current = Number(match[2] ?? 0);
   const next = Math.max(0, current + bonus);
   return next ? `${match[1]}+${next}` : match[1];
+}
+
+function vaultProgressionBlock(state: GameState, nextLevel: number): string | null {
+  const index = Math.max(0, Math.min(5, nextLevel - 1));
+  const day = DAY_GATE[index]!;
+  if (state.day < day) return `Vault protocol: tier ${nextLevel} opens on day ${day}.`;
+
+  const command = COMMAND_GATE[index]!;
+  if (state.level < command) return `Tyrone: tier ${nextLevel} needs Command Rank ${command}. Current rank ${state.level}.`;
+
+  const requiredLevel = RESIDENT_LEVEL_GATE[index]!;
+  const requiredCount = RESIDENT_COUNT_GATE[index]!;
+  if (requiredCount) {
+    const qualified = state.operatives.filter(
+      (op) => op.status !== "dead" && residentProgress(op).level >= requiredLevel,
+    ).length;
+    if (qualified < requiredCount) {
+      return `Tyrone: tier ${nextLevel} needs ${requiredCount} resident${requiredCount === 1 ? "" : "s"} at Level ${requiredLevel}+ (${qualified}/${requiredCount}).`;
+    }
+  }
+  return null;
 }
 
 function patchRuntimeLoadouts() {
@@ -85,15 +111,6 @@ function patchRuntimeLoadouts() {
 
 let installed = false;
 
-/**
- * Compatibility bridge for the legacy monolithic combat engine.
- *
- * The authoritative loadout model lives in loadout-effects.ts. The old engine
- * derives combat stats from race data, so this runtime temporarily projects
- * each operative's calculated modifiers into a private race record for the
- * duration of a synchronous roll/action, then restores the save immediately.
- * No temporary race or inflated weapon damage is persisted.
- */
 export function LoadoutEffectsRuntime() {
   useEffect(() => {
     if (installed) return;
@@ -102,6 +119,8 @@ export function LoadoutEffectsRuntime() {
     const current = useGame.getState();
     const originalRollBeat = current.rollBeat;
     const originalCombatAct = current.combatAct;
+    const originalUpgradeRoom = current.upgradeRoom;
+    const originalUpgradeQuarter = current.upgradeQuarter;
 
     const rollBeat: typeof originalRollBeat = () => {
       const restore = patchRuntimeLoadouts();
@@ -121,7 +140,19 @@ export function LoadoutEffectsRuntime() {
       }
     };
 
-    useGame.setState({ rollBeat, combatAct });
+    const upgradeRoom: typeof originalUpgradeRoom = (room) => {
+      const state = useGame.getState().s;
+      const block = vaultProgressionBlock(state, (state.rooms[room] ?? 0) + 1);
+      return block ?? originalUpgradeRoom(room);
+    };
+
+    const upgradeQuarter: typeof originalUpgradeQuarter = (quarter) => {
+      const state = useGame.getState().s;
+      const block = vaultProgressionBlock(state, (state.quarters[quarter] ?? 0) + 1);
+      return block ?? originalUpgradeQuarter(quarter);
+    };
+
+    useGame.setState({ rollBeat, combatAct, upgradeRoom, upgradeQuarter });
 
     const unsubscribe = useGame.subscribe((next, prev) => {
       if (!prev.s.combat || next.s.combat) return;
@@ -144,7 +175,12 @@ export function LoadoutEffectsRuntime() {
     return () => {
       unsubscribe();
       installed = false;
-      useGame.setState({ rollBeat: originalRollBeat, combatAct: originalCombatAct });
+      useGame.setState({
+        rollBeat: originalRollBeat,
+        combatAct: originalCombatAct,
+        upgradeRoom: originalUpgradeRoom,
+        upgradeQuarter: originalUpgradeQuarter,
+      });
     };
   }, []);
 
