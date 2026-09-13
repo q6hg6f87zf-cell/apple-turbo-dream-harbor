@@ -155,7 +155,9 @@ const context = await browser.newContext({
 });
 
 await context.addInitScript(({ key, save }) => {
-  localStorage.setItem(key, JSON.stringify(save));
+  if (!localStorage.getItem(key)) {
+    localStorage.setItem(key, JSON.stringify(save));
+  }
 }, { key: saveKey, save: seedSave });
 
 const page = await context.newPage();
