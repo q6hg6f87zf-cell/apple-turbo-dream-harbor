@@ -127,7 +127,7 @@ export function ServerInventoryView() {
 
   const selected = base.find((row) => row.key === selectedKey) ?? null;
   const owner = selected?.residentId ? state.operatives.find((op) => op.id === selected.residentId) ?? null : null;
-  const resolvedTargetId = selected?.residentId ?? targetId || residents[0]?.id || "";
+  const resolvedTargetId = selected?.residentId ?? (targetId || residents[0]?.id || "");
   const target = state.operatives.find((op) => op.id === resolvedTargetId) ?? owner;
   const preview = selected && target && selected.source !== "catalogue" ? previewItem(target, selected.item) : null;
   const gear = target?.inventory.filter((item) => !!item.slot) ?? [];
