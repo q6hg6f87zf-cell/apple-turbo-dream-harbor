@@ -55,6 +55,16 @@ jobs:
           cat /tmp/hollow-realm.log
           exit 1
 
+      - name: Discord access gate smoke
+        env:
+          HOLLOW_QA_URL: http://127.0.0.1:8080
+        run: node scripts/hollow-discord-access-smoke.mjs
+
+      - name: Main-menu procedural terminal smoke
+        env:
+          HOLLOW_QA_URL: http://127.0.0.1:8080
+        run: node scripts/hollow-main-menu-terminal-smoke.mjs
+
       - name: Server authority security smoke
         env:
           HOLLOW_QA_URL: http://127.0.0.1:8080
