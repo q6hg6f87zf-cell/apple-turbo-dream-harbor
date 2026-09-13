@@ -18,7 +18,27 @@ export type Rarity =
 
 export type Condition = "Pristine" | "Worn" | "Damaged" | "Broken";
 
-export type ItemKind = "weapon" | "armor" | "trinket" | "consumable" | "material";
+export type ItemKind =
+  | "weapon"
+  | "armor"
+  | "trinket"
+  | "consumable"
+  | "enchantment"
+  | "material"
+  | "special";
+
+export type InventoryCategory = "all" | ItemKind;
+export type InventoryScope = "all" | "vault" | "operatives";
+export type InventorySort = "name" | "rarity" | "condition" | "value" | "owner";
+
+export interface InventoryViewState {
+  category: InventoryCategory;
+  scope: InventoryScope;
+  sort: InventorySort;
+  query: string;
+  equippedOnly: boolean;
+  selectedItemId: string | null;
+}
 
 export type RoomId =
   | "vault"
@@ -30,13 +50,112 @@ export type RoomId =
 
 export type QuarterId = "bunk" | "lockbox" | "hearth";
 
-export type LocationId =
-  | "hq"
+/**
+ * Canonical Hollow Realm regions for the rebuilt planetary overworld.
+ */
+export type RegionId =
   | "ironclad"
-  | "kingdom"
-  | "caverns"
-  | "library"
+  | "slagtown"
+  | "blackspire"
+  | "brasswater"
   | "veyra";
+
+/**
+ * Temporary save-migration IDs. These are removed once old saves are migrated
+ * in data/save.ts to Slag Town, Blackspire, and Brasswater.
+ */
+export type LegacyRegionId = "kingdom" | "caverns" | "library";
+
+export type LocationId = "hq" | RegionId | LegacyRegionId;
+
+export type RegionBiome =
+  | "industrial-frontier"
+  | "slag-wastes"
+  | "volcanic-highlands"
+  | "metallic-wetlands"
+  | "city";
+
+export type RegionPoiKind =
+  | "settlement"
+  | "district"
+  | "landmark"
+  | "mission"
+  | "merchant"
+  | "dungeon"
+  | "boss"
+  | "facility"
+  | "ruin"
+  | "unknown";
+
+export interface GlobeMarker {
+  /** Latitude in degrees, -90 to 90. */
+  lat: number;
+  /** Longitude in degrees, -180 to 180. */
+  lon: number;
+  /** Optional visual lift above the globe surface. */
+  altitude?: number;
+}
+
+export interface RegionPointOfInterest {
+  id: string;
+  regionId: RegionId;
+  name: string;
+  kind: RegionPoiKind;
+  x: number;
+  y: number;
+  description: string;
+  discovered: boolean;
+  unlocked: boolean;
+  danger?: number;
+  missionKind?: MissionKind;
+  merchantId?: string;
+  bossId?: string;
+  icon?: string;
+}
+
+export interface RegionDefinition {
+  id: RegionId;
+  name: string;
+  short: string;
+  biome: RegionBiome;
+  description: string;
+  danger: number;
+  marker: GlobeMarker;
+  mapAsset: string;
+  accent?: string;
+  points: RegionPointOfInterest[];
+}
+
+export type WorldViewMode = "globe" | "region";
+
+export interface WorldViewState {
+  mode: WorldViewMode;
+  selectedRegion: RegionId | null;
+  selectedPoiId: string | null;
+  globeZoom: number;
+}
+
+export interface SpaceSceneSettings {
+  meteors: boolean;
+  orbitalDebris: boolean;
+  distantTraffic: boolean;
+  clouds: boolean;
+  aurora: boolean;
+  atmosphere: boolean;
+  starParallax: boolean;
+  quality: "low" | "medium" | "high";
+}
+
+export interface GameArtAssets {
+  tyronePortrait: string;
+  titleWide: string;
+  titleTall: string;
+  globeSurface?: string;
+  globeClouds?: string;
+  globeNightLights?: string;
+  galaxyBackdrop?: string;
+  regionMaps: Partial<Record<RegionId, string>>;
+}
 
 export type OperativeStatus =
   | "idle"
@@ -49,6 +168,9 @@ export type Screen =
   | "title"
   | "briefing"
   | "hq"
+  | "world"
+  | "inventory"
+  | "more"
   | "roster"
   | "forge"
   | "map"
@@ -150,6 +272,9 @@ export interface Item {
   equipped?: boolean;
   cursed?: boolean;
   value: number;
+  tags?: string[];
+  sourceRegion?: RegionId;
+  discoveredDay?: number;
 }
 
 export interface CompanionState {
@@ -264,6 +389,8 @@ export interface CombatState {
   surge?: string;
   encore?: string;
   guardId?: string;
+  regionId?: RegionId;
+  poiId?: string;
 }
 
 export interface MissionBeat {
@@ -295,6 +422,8 @@ export interface MissionState {
     text: string;
   };
   combatQueued?: boolean;
+  regionId?: RegionId;
+  poiId?: string;
 }
 
 export interface LocationProgress {
@@ -303,6 +432,8 @@ export interface LocationProgress {
   missions: number;
   bossUnlocked: boolean;
   bossDefeated: boolean;
+  regionMapUnlocked?: boolean;
+  discoveredPois?: string[];
 }
 
 export interface SquadMember {
@@ -369,4 +500,12 @@ export interface GameState {
   squad: SquadMember[];
   activeMemberId: string | null;
   arc: ArcState | null;
+
+  /**
+   * Transitional next-gen UI state. Optional until store/save migration lands,
+   * keeping the current build valid while the new shell is wired in.
+   */
+  worldView?: WorldViewState;
+  inventoryView?: InventoryViewState;
+  spaceScene?: SpaceSceneSettings;
 }
