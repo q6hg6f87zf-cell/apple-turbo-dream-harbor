@@ -4,6 +4,8 @@ import { getSql } from "@/lib/db";
 import { assertSameSiteRequest } from "@/lib/auth/isolation.server";
 import { requireUserId } from "@/lib/auth/verify.server";
 
+const CAMPAIGN_ID = "moon-squad";
+
 const HEADERS: Record<string, string> = {
   "Cache-Control": "no-store",
   "X-Content-Type-Options": "nosniff",
@@ -54,6 +56,26 @@ async function linkedSnapshot(userId: string): Promise<LinkedSnapshotRow | null>
   return rows[0] ?? null;
 }
 
+async function ensureCampaignMember(userId: string, discordId: string) {
+  const sql = await getSql();
+  await sql`
+    insert into hollow_campaign_state (campaign_id)
+    values (${CAMPAIGN_ID})
+    on conflict (campaign_id) do nothing
+  `;
+  await sql`
+    insert into hollow_campaign_member (
+      campaign_id, user_id, discord_id, card_caps, xp, level, joined_at, updated_at
+    )
+    select ${CAMPAIGN_ID}, ${userId}, s.discord_id, s.caps, s.xp, s.level, now(), now()
+    from tyrone_arcade_snapshot s
+    where s.discord_id = ${discordId}
+    on conflict (campaign_id, user_id) do update set
+      discord_id = excluded.discord_id,
+      updated_at = now()
+  `;
+}
+
 function snapshotJson(row: LinkedSnapshotRow) {
   return {
     discord: row.discord_id,
@@ -76,6 +98,7 @@ export const Route = createFileRoute("/api/tyrone/claim")({
         if (identity.response) return identity.response;
         const row = await linkedSnapshot(identity.userId!);
         if (!row) return json({ error: "no linked Tyrone rider" }, 404);
+        await ensureCampaignMember(identity.userId!, row.discord_id);
         return json(snapshotJson(row));
       },
 
@@ -116,6 +139,8 @@ export const Route = createFileRoute("/api/tyrone/claim")({
             discord_id = excluded.discord_id,
             linked_at = now()
         `;
+
+        await ensureCampaignMember(identity.userId!, discordId);
 
         const row = await linkedSnapshot(identity.userId!);
         if (!row) return json({ error: "claim linked but snapshot missing" }, 500);
