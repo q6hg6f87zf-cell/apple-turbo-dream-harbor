@@ -124,10 +124,10 @@ export function InteractionPolishRuntime() {
         !target.closest("input, textarea, select, label")
       ) active.blur();
 
-      // Primary navigation is a hard context switch. Clear transient chrome
-      // before the destination screen renders so drawers and optional chatter
-      // never ghost across it.
-      if (target.closest("nav button, aside button")) dismissStoreChrome();
+      // Only real app navigation is a hard context switch. The resident
+      // dossier is also an <aside>, so never classify its internal controls as
+      // navigation or they would close the sheet before their click runs.
+      if (target.closest("nav button, aside:not(.ms-sheet) > button")) dismissStoreChrome();
 
       const store = useGame.getState();
       if (store.guideOpen && !target.closest(".ms-pop, [role='dialog']")) store.closeGuide();
