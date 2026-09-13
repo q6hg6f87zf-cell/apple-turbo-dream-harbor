@@ -7,11 +7,13 @@ import {
   pullServerProgression,
   settleServerMission,
   startServerMission,
+  upgradeServerQuarter,
+  upgradeServerRoom,
   type ServerMissionTicket,
   type ServerProgressionSnapshot,
 } from "@/game/server-progression";
 import { useGame } from "@/game/store";
-import type { LocationId, MissionState, RegionId } from "@/game/types";
+import type { GameState, LocationId, MissionState, Operative, RegionId } from "@/game/types";
 import { useEffect } from "react";
 
 const REGION_TO_LOCATION: Record<RegionId, LocationId> = {
@@ -22,15 +24,32 @@ const REGION_TO_LOCATION: Record<RegionId, LocationId> = {
   veyra: "veyra",
 };
 
+type AuthorityProgressOp = Operative & {
+  residentLevel?: number;
+  residentXp?: number;
+  residentXpToNext?: number;
+};
+
+type AuthorityGameState = GameState & {
+  authorityCampaign?: {
+    active: boolean;
+    commandRank: number;
+    materials: Partial<Record<RegionId, number>>;
+    residentLevels: Record<string, number>;
+    revision: number;
+  };
+};
+
 const tickets = new Map<string, Promise<ServerMissionTicket | null>>();
 let applyingSnapshot = false;
 let dayPending = false;
+let upgradePending = false;
 
 function applySnapshot(snapshot: ServerProgressionSnapshot, toast?: string) {
   applyingSnapshot = true;
   try {
     useGame.setState((store) => {
-      const s = cloneState(store.s);
+      const s = cloneState(store.s) as AuthorityGameState;
       s.day = Math.max(1, Number(snapshot.campaign.day || 1));
       s.coins = Math.max(0, Number(snapshot.treasury.caps || 0));
       s.ore = Math.max(0, Number(snapshot.treasury.ore || 0));
@@ -65,6 +84,25 @@ function applySnapshot(snapshot: ServerProgressionSnapshot, toast?: string) {
           bossDefeated: defeated,
         };
       });
+
+      const residentById = new Map(snapshot.residents.map((resident) => [resident.id, resident]));
+      s.operatives = s.operatives.map((op) => {
+        const serverResident = residentById.get(op.id);
+        if (!serverResident) return op;
+        const next = { ...op } as AuthorityProgressOp;
+        next.residentLevel = Math.max(1, Number(serverResident.level || 1));
+        next.residentXp = Math.max(0, Number(serverResident.xp || 0));
+        next.residentXpToNext = Math.max(1, Number(serverResident.xpToNext || 1));
+        return next;
+      });
+
+      s.authorityCampaign = {
+        active: true,
+        commandRank: Math.max(1, Number(snapshot.campaign.commandRank || 1)),
+        materials: { ...snapshot.campaign.materials },
+        residentLevels: Object.fromEntries(snapshot.residents.map((resident) => [resident.id, resident.level])),
+        revision: Number(snapshot.campaign.revision || 0),
+      };
 
       const rider = s.squad.find((member) => member.discordId === snapshot.card.discordId);
       if (rider) {
@@ -110,7 +148,13 @@ function ensureTicket(mission: MissionState): Promise<ServerMissionTicket | null
   const region = canonicalRegionId(mission.locationId);
   if (!region) return Promise.resolve(null);
 
-  const promise = startServerMission(region, mission.kind, mission.id)
+  const state = useGame.getState().s;
+  const party = mission.partyIds
+    .map((id) => state.operatives.find((op) => op.id === id))
+    .filter((op): op is Operative => !!op)
+    .map((op) => ({ id: op.id, name: op.name, cls: op.cls }));
+
+  const promise = startServerMission(region, mission.kind, mission.id, party)
     .then((response) => {
       applySnapshot(response);
       return response.ticket ?? null;
@@ -125,7 +169,11 @@ function ensureTicket(mission: MissionState): Promise<ServerMissionTicket | null
   return promise;
 }
 
-async function settleCompletedMission(before: ServerProgressionSnapshot | null, prevState: ReturnType<typeof useGame.getState>["s"], nextState: ReturnType<typeof useGame.getState>["s"], mission: MissionState) {
+async function settleCompletedMission(
+  prevState: ReturnType<typeof useGame.getState>["s"],
+  nextState: ReturnType<typeof useGame.getState>["s"],
+  mission: MissionState,
+) {
   const ticket = await ensureTicket(mission);
   if (!ticket) return;
   const wait = Math.max(0, new Date(ticket.availableAt).getTime() - Date.now() + 80);
@@ -140,9 +188,13 @@ async function settleCompletedMission(before: ServerProgressionSnapshot | null, 
       reward?.cardCaps ? `card +${reward.cardCaps.toLocaleString()}` : null,
       reward?.ore ? `+${reward.ore} ore` : null,
       reward?.favor ? `+${reward.favor} favor` : null,
+      reward?.residentXp ? `residents +${reward.residentXp} XP` : null,
       reward?.materialQty ? `+${reward.materialQty} regional material${reward.materialQty === 1 ? "" : "s"}` : null,
     ].filter(Boolean);
-    applySnapshot(result, `${result.duplicate ? "Contract already settled" : "Tyrone settled the contract"}${parts.length ? ` · ${parts.join(" · ")}` : ""}.`);
+    applySnapshot(
+      result,
+      `${result.duplicate ? "Contract already settled" : "Tyrone settled the contract"}${parts.length ? ` · ${parts.join(" · ")}` : ""}.`,
+    );
   } catch (error) {
     const fresh = await pullServerProgression().catch(() => null);
     if (fresh) applySnapshot(fresh);
@@ -150,8 +202,6 @@ async function settleCompletedMission(before: ServerProgressionSnapshot | null, 
   } finally {
     tickets.delete(mission.id);
   }
-
-  void before;
 }
 
 export function ServerProgressionRuntime() {
@@ -161,6 +211,9 @@ export function ServerProgressionRuntime() {
     if (!discordId) return;
     let cancelled = false;
     let unsubscribe: (() => void) | null = null;
+    let upgradesInstalled = false;
+    let originalUpgradeRoom: ReturnType<typeof useGame.getState>["upgradeRoom"] | null = null;
+    let originalUpgradeQuarter: ReturnType<typeof useGame.getState>["upgradeQuarter"] | null = null;
 
     const refresh = async (quiet = true) => {
       const snapshot = await pullServerProgression().catch(() => null);
@@ -172,6 +225,53 @@ export function ServerProgressionRuntime() {
     void (async () => {
       const authority = await refresh(false);
       if (!authority || cancelled) return;
+
+      const current = useGame.getState();
+      originalUpgradeRoom = current.upgradeRoom;
+      originalUpgradeQuarter = current.upgradeQuarter;
+
+      const upgradeRoom: typeof current.upgradeRoom = (room) => {
+        if (upgradePending) return "Vault 13 is already settling a construction order.";
+        upgradePending = true;
+        toast("Vault 13 · authorizing construction…");
+        void upgradeServerRoom(room)
+          .then((snapshot) => {
+            const level = Number(snapshot.treasury.rooms?.[room] ?? 0);
+            applySnapshot(snapshot, `${room} construction settled on the server · Tier ${level}.`);
+          })
+          .catch(async (error) => {
+            const fresh = await pullServerProgression().catch(() => null);
+            if (fresh) applySnapshot(fresh);
+            toast(error instanceof Error ? error.message : "Tyrone rejected the construction order.");
+          })
+          .finally(() => {
+            upgradePending = false;
+          });
+        return null;
+      };
+
+      const upgradeQuarter: typeof current.upgradeQuarter = (quarter) => {
+        if (upgradePending) return "Vault 13 is already settling a construction order.";
+        upgradePending = true;
+        toast("Resident Quarters · authorizing construction…");
+        void upgradeServerQuarter(quarter)
+          .then((snapshot) => {
+            const level = Number(snapshot.treasury.quarters?.[quarter] ?? 0);
+            applySnapshot(snapshot, `${quarter} construction settled on the server · Tier ${level}.`);
+          })
+          .catch(async (error) => {
+            const fresh = await pullServerProgression().catch(() => null);
+            if (fresh) applySnapshot(fresh);
+            toast(error instanceof Error ? error.message : "Tyrone rejected the construction order.");
+          })
+          .finally(() => {
+            upgradePending = false;
+          });
+        return null;
+      };
+
+      upgradesInstalled = true;
+      useGame.setState({ upgradeRoom, upgradeQuarter });
 
       const currentMission = useGame.getState().s.mission;
       if (currentMission) void ensureTicket(currentMission);
@@ -186,8 +286,7 @@ export function ServerProgressionRuntime() {
         }
 
         if (prev.mission && !next.mission) {
-          const previousSnapshot = authority;
-          void settleCompletedMission(previousSnapshot, prev, next, prev.mission);
+          void settleCompletedMission(prev, next, prev.mission);
         }
 
         if (!dayPending && next.day > prev.day) {
@@ -215,6 +314,9 @@ export function ServerProgressionRuntime() {
       unsubscribe?.();
       window.removeEventListener("focus", onFocus);
       window.clearInterval(timer);
+      if (upgradesInstalled && originalUpgradeRoom && originalUpgradeQuarter) {
+        useGame.setState({ upgradeRoom: originalUpgradeRoom, upgradeQuarter: originalUpgradeQuarter });
+      }
     };
   }, [discordId]);
 
