@@ -90,7 +90,12 @@ export function TalkOverlay() {
       {pregame ? (
         <div className="fixed inset-0 z-[44] bg-ink/50" aria-hidden />
       ) : null}
-      <div className="fixed inset-x-0 bottom-0 z-[45] p-3 pb-[max(12px,env(safe-area-inset-bottom))] md:p-6">
+      <div
+        className={cn(
+          "fixed inset-x-0 z-[45] p-3 pb-[max(12px,env(safe-area-inset-bottom))] md:bottom-0 md:p-6",
+          pregame ? "bottom-0" : "bottom-[5.25rem]",
+        )}
+      >
         <button
           type="button"
           className="mx-auto flex w-full max-w-2xl items-end gap-3 rounded-[var(--radius-xl)] bg-ink/92 p-3 text-left shadow-[var(--shadow-border-hover)] backdrop-blur-md md:p-4"
