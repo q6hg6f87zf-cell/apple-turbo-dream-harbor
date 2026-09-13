@@ -5,7 +5,15 @@
 // migrated in stages.
 export * from "./data-legacy";
 
+import {
+  BASE_ROOMS as LEGACY_BASE_ROOMS,
+  QUARTERS as LEGACY_QUARTERS,
+  WORLD as LEGACY_WORLD,
+} from "./data-legacy";
 import type { RegionDefinition, RegionId } from "./types";
+
+export const WORLD_NAME = "Hollow Realm";
+export const HOME_BASE_NAME = "Vault 13";
 
 export const CANONICAL_REGION_IDS: RegionId[] = [
   "ironclad",
@@ -17,10 +25,148 @@ export const CANONICAL_REGION_IDS: RegionId[] = [
 
 /**
  * Ironclad is home. Every newly forged character originates here and the
- * campaign begins here before the wider planet opens up.
+ * campaign begins here before the wider Hollow Realm opens up.
  */
 export const STARTING_REGION: RegionId = "ironclad";
+export const HOME_BASE_REGION: RegionId = STARTING_REGION;
 export const ORIGINS = ["Ironclad"];
+
+export const HOME_BASE_DESCRIPTION =
+  "Vault 13 is an old sealed shelter cut into the ridgeline beyond Ironclad's outer rail. TyroneBot lives here, and every Moon Squad resident who joins the Hollow Realm is given a bunk, a locker and a place at the table.";
+
+/**
+ * Player-facing Vault 13 room names. Internal IDs deliberately stay unchanged
+ * so existing saves, upgrade math and gameplay actions remain compatible.
+ */
+export const BASE_ROOMS = {
+  ...LEGACY_BASE_ROOMS,
+  vault: {
+    ...LEGACY_BASE_ROOMS.vault,
+    name: "Salvage Depot",
+    desc: "Secure racks, reclamation cages and tagged shelves for weapons, armor, scrap and anything dragged home from the Hollow Realm.",
+    tiers: [
+      { cost: 0, bonus: "20 item capacity. Reclaimed salvage generates +3 caps/tick." },
+      { cost: 2500, bonus: "50 capacity. Climate seals slow gear degradation. +6 caps/tick." },
+      { cost: 8000, bonus: "100 capacity. Hardened storage preserves condition. +10 caps/tick." },
+    ],
+  },
+  barracks: {
+    ...LEGACY_BASE_ROOMS.barracks,
+    name: "Resident Quarters",
+    desc: "Bunks, lockers and narrow steel corridors for the people who call Vault 13 home. More beds mean a larger active roster.",
+    tiers: [
+      { cost: 1800, bonus: "+2 operative beds. Vault perimeter defended on 12+." },
+      { cost: 5000, bonus: "+4 operative beds. Vault perimeter defended on 10+." },
+      { cost: 12000, bonus: "+6 operative beds. Defended on 8+. Residents can counter-attack." },
+    ],
+  },
+  forge: {
+    ...LEGACY_BASE_ROOMS.forge,
+    name: "Machine Shop",
+    desc: "Welders, lathes, presses and a jury-rigged forge line keep Vault 13's equipment alive long after it should have failed.",
+    tiers: [
+      { cost: 1400, bonus: "Field repair 400c. Worn gear can be restored." },
+      { cost: 4200, bonus: "Repair 220c. Adds one enchantment socket." },
+      { cost: 11000, bonus: "Repair 80c. Two sockets. Experimental self-repair on 16+." },
+    ],
+  },
+  infirmary: {
+    ...LEGACY_BASE_ROOMS.infirmary,
+    name: "Med Bay",
+    desc: "Old surgical lamps, scavenged diagnostics and a cabinet Tyrone insists is still within expiration date.",
+    tiers: [
+      { cost: 2200, bonus: "Treat wounds 80c. Stabilise downed residents." },
+      { cost: 6500, bonus: "Treat void infection. Repair companion trauma." },
+      { cost: 15000, bonus: "Attempt resurrection on 10+. Full emergency service." },
+    ],
+  },
+  watchtower: {
+    ...LEGACY_BASE_ROOMS.watchtower,
+    name: "Perimeter Control",
+    desc: "Surface cameras, floodlights, motion sensors and patched radar watch the badlands between Vault 13 and Ironclad.",
+    tiers: [
+      { cost: 2000, bonus: "Mission DC -1. Early warning for night incursions." },
+      { cost: 6000, bonus: "Mission DC -2. Track bounty movement across the wastes." },
+      { cost: 14000, bonus: "Mission DC -3. Deep-range villain intel unlocked." },
+    ],
+  },
+  ledger: {
+    ...LEGACY_BASE_ROOMS.ledger,
+    name: "Quartermaster Exchange",
+    desc: "Vault 13's ration counter, trade desk, bounty board and cap ledger. If it enters the vault, somebody signs for it.",
+    tiers: [
+      { cost: 1600, bonus: "Bargain stock delivered each dawn." },
+      { cost: 4800, bonus: "Essential stock. Better exchange rates." },
+      { cost: 10000, bonus: "Artifact chance. 15% Quartermaster discount." },
+    ],
+  },
+};
+
+export const QUARTERS = {
+  ...LEGACY_QUARTERS,
+  bunk: {
+    ...LEGACY_QUARTERS.bunk,
+    name: "Resident Bunk",
+    tiers: [
+      { cost: 800, bonus: "+1 to the first roll after a night in Vault 13." },
+      { cost: 2000, bonus: "+2 Max HP from upgraded living conditions." },
+      { cost: 4500, bonus: "Full HP restoration after sleeping in the vault." },
+    ],
+  },
+  lockbox: {
+    ...LEGACY_QUARTERS.lockbox,
+    name: "Personal Footlocker",
+    tiers: [
+      { cost: 1000, bonus: "25% protection from theft and loss." },
+      { cost: 2800, bonus: "50% protection from theft and loss." },
+      { cost: 6000, bonus: "75% protection. Vault-grade locking assembly." },
+    ],
+  },
+  hearth: {
+    ...LEGACY_QUARTERS.hearth,
+    name: "Common Room",
+    tiers: [
+      { cost: 1200, bonus: "Companions recover 1 HP at dawn." },
+      { cost: 2800, bonus: "Companions gain +1 to passive rolls." },
+      { cost: 5500, bonus: "Companions fully recover at dawn." },
+    ],
+  },
+};
+
+/**
+ * Transitional live-world override. The current flat-map runtime still uses
+ * legacy region IDs, but Vault 13 is already placed beside Ironclad and uses
+ * the new base identity. The 3D globe/region-map rebuild will eventually make
+ * Vault 13 an Ironclad POI rather than a separate overworld pin.
+ */
+export const WORLD = LEGACY_WORLD.map((loc) => {
+  if (loc.id === "hq") {
+    return {
+      ...loc,
+      name: HOME_BASE_NAME,
+      short: "Vault 13",
+      x: 22,
+      y: 48,
+      danger: 1,
+      desc: HOME_BASE_DESCRIPTION,
+      features: [
+        "Resident Quarters",
+        "Machine Shop",
+        "Med Bay",
+        "Salvage Depot",
+        "Perimeter Control",
+        "Quartermaster Exchange",
+      ],
+    };
+  }
+  if (loc.id === "ironclad") {
+    return {
+      ...loc,
+      desc: "Ironclad is the first hard settlement beyond Vault 13: forged walls, rail cuts, slag lanterns and a checkpoint that pretends the wasteland stops at the gate.",
+    };
+  }
+  return loc;
+});
 
 export const REGIONS: RegionDefinition[] = [
   {
@@ -29,12 +175,25 @@ export const REGIONS: RegionDefinition[] = [
     short: "Ironclad",
     biome: "industrial-frontier",
     description:
-      "A hard northern frontier of iron ridges, rail cuts and fortress works. The first gate into the Hollow still pretends it controls what passes through.",
+      "A hard northern frontier of iron ridges, rail cuts and fortress works. Vault 13 is buried into the ridgeline beyond the outer rail, close enough to trade with Ironclad and far enough away to survive its problems.",
     danger: 3,
     marker: { lat: 34, lon: -118, altitude: 0.012 },
     mapAsset: "/map/regions/ironclad.jpg",
     accent: "iron",
     points: [
+      {
+        id: "ironclad-vault13",
+        regionId: "ironclad",
+        name: "Vault 13",
+        kind: "facility",
+        x: 20,
+        y: 72,
+        description:
+          "Home. A sealed pre-collapse shelter on Ironclad's outskirts where TyroneBot and the residents of the Hollow Realm live between expeditions.",
+        discovered: true,
+        unlocked: true,
+        danger: 1,
+      },
       {
         id: "ironclad-gate",
         regionId: "ironclad",
