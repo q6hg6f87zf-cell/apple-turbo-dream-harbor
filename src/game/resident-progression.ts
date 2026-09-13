@@ -1,3 +1,4 @@
+import { analyzeLoadout } from "./loadout-effects";
 import type { Item, MissionKind, Operative, Rarity } from "./types";
 
 export type ActiveItemEffect = {
@@ -81,7 +82,6 @@ export function grantResidentXp(op: Operative, amount: number) {
     p.residentXp! -= p.residentXpToNext!;
     p.residentLevel! += 1;
     p.residentXpToNext = requiredXp(p.residentLevel!);
-    // Every level matters without turning early residents into tanks overnight.
     p.maxHp += 1;
     p.hp = Math.min(p.maxHp, p.hp + 1);
   }
@@ -128,7 +128,7 @@ function conditionFactor(item: Item) {
 export function itemPower(item: Item) {
   const base = RARITY_POWER[item.rarity];
   const combat = damageAverage(item.damage) * 3.2 + (item.defense ?? 0) * 9;
-  const attachments = (item.tags ?? []).filter((tag) => tag.startsWith("enchant:")).length * 10;
+  const attachments = (item.tags ?? []).filter((tag) => tag.startsWith("enchant:")).length * 4;
   return Math.round((base + combat + attachments) * conditionFactor(item));
 }
 
@@ -140,9 +140,12 @@ export function residentPower(op: Operative, candidate?: Item | null) {
     gear = equipped.filter((item) => item.slot !== candidate.slot).concat(candidate);
   }
   const gearPower = gear.reduce((sum, item) => sum + itemPower(item), 0);
-  const effects = ((op as ProgressiveOperative).activeItemEffects?.length ?? 0) * 5;
+  const loadout = analyzeLoadout(op, candidate);
+  const modifierPower = Object.values(loadout.statModifiers).reduce((sum, n) => sum + (n ?? 0) * 9, 0);
+  const damagePower = loadout.damageBonus * 7;
+  const strainCost = Math.round(loadout.strain * 0.35);
   const experience = Math.min(90, op.battles * 2 + op.raids * 5);
-  return Math.round(70 + progress.level * 17 + op.maxHp * 2 + gearPower + experience + effects);
+  return Math.max(1, Math.round(70 + progress.level * 17 + op.maxHp * 2 + gearPower + experience + modifierPower + damagePower - strainCost));
 }
 
 export function previewItem(op: Operative, item: Item) {
@@ -160,6 +163,7 @@ export function previewItem(op: Operative, item: Item) {
   const projectedPower = item.slot ? residentPower(op, item) : currentPower;
   const replaced = item.slot ? op.inventory.find((x) => x.equipped && x.slot === item.slot) ?? null : null;
   const fit = item.classHint ? (item.classHint === op.cls ? "best" : "off-class") : "universal";
+  const loadout = item.slot ? analyzeLoadout(op, item) : analyzeLoadout(op);
   return {
     currentLevel: current.level,
     projectedLevel,
@@ -171,6 +175,7 @@ export function previewItem(op: Operative, item: Item) {
     powerDelta: projectedPower - currentPower,
     replaced,
     fit,
+    loadout,
   } as const;
 }
 
