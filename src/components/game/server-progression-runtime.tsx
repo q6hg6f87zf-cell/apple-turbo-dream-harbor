@@ -30,20 +30,26 @@ type AuthorityProgressOp = Operative & {
   residentXpToNext?: number;
 };
 
+export type AuthorityCampaignCache = {
+  active: boolean;
+  commandRank: number;
+  materials: Partial<Record<RegionId, number>>;
+  residentLevels: Record<string, number>;
+  revision: number;
+};
+
 type AuthorityGameState = GameState & {
-  authorityCampaign?: {
-    active: boolean;
-    commandRank: number;
-    materials: Partial<Record<RegionId, number>>;
-    residentLevels: Record<string, number>;
-    revision: number;
-  };
+  authorityCampaign?: AuthorityCampaignCache;
 };
 
 const tickets = new Map<string, Promise<ServerMissionTicket | null>>();
 let applyingSnapshot = false;
 let dayPending = false;
 let upgradePending = false;
+
+export function authorityCampaignCache(state: GameState): AuthorityCampaignCache | null {
+  return (state as AuthorityGameState).authorityCampaign ?? null;
+}
 
 function applySnapshot(snapshot: ServerProgressionSnapshot, toast?: string) {
   applyingSnapshot = true;
