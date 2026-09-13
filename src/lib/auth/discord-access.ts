@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { authEnabled, getBearerToken, signIn } from "./client";
 import { DISCORD_PROVIDER_ID } from "./providers";
 import { useCurrentUserState } from "./use-current-user";
@@ -59,6 +59,8 @@ export function useDiscordAccess() {
   const session = useCurrentUserState();
   const [access, setAccess] = useState<DiscordAccess | null>(authEnabled ? null : DEV_ACCESS);
   const [pending, setPending] = useState(authEnabled);
+  const [revision, setRevision] = useState(0);
+  const refresh = useCallback(() => setRevision((value) => value + 1), []);
 
   useEffect(() => {
     if (!authEnabled) {
@@ -98,9 +100,9 @@ export function useDiscordAccess() {
     return () => {
       cancelled = true;
     };
-  }, [session.isPending, session.user?.id]);
+  }, [session.isPending, session.user?.id, revision]);
 
-  return { access, pending: pending || session.isPending, user: session.user };
+  return { access, pending: pending || session.isPending, user: session.user, refresh };
 }
 
 export async function signInWithDiscord() {
