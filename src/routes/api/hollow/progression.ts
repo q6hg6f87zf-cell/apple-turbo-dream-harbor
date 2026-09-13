@@ -277,7 +277,6 @@ async function registerResidents(userId: string, party: PartyDescriptor[]) {
       )
       on conflict (campaign_id, resident_id) do update set
         display_name = excluded.display_name,
-        class_key = excluded.class_key,
         revision = hollow_resident_progress.revision + 1,
         updated_at = now()
       where hollow_resident_progress.created_by_user_id = ${userId}
