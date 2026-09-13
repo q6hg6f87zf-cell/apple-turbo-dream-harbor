@@ -1,4 +1,5 @@
 import { useGame } from "@/game/store";
+import { isTalkLocked } from "@/game/talk";
 import { useEffect } from "react";
 
 const STYLE_ID = "hollow-aaa-interactions";
@@ -8,6 +9,7 @@ function dismissStoreChrome() {
   if (store.guideOpen) store.closeGuide();
   if (store.confirmRest) store.cancelRest();
   if (store.s.hack) store.closeTerminal();
+  if (store.s.talk && !isTalkLocked(store.s)) store.skipTalk();
   if (store.s.selectedId && !store.s.mission && !store.s.combat) store.selectOp(null);
 }
 
@@ -118,7 +120,8 @@ export function InteractionPolishRuntime() {
       ) active.blur();
 
       // Primary navigation is a hard context switch. Clear transient chrome
-      // before the destination screen renders so drawers never ghost across it.
+      // before the destination screen renders so drawers and optional chatter
+      // never ghost across it.
       if (target.closest("nav button, aside button")) dismissStoreChrome();
 
       const store = useGame.getState();
