@@ -3,6 +3,7 @@ import { CampaignBalancePanel } from "@/components/game/campaign-balance-panel";
 import { CampaignBalanceRuntime } from "@/components/game/campaign-balance-runtime";
 import { ClassAliasLayer } from "@/components/game/class-alias-layer";
 import { HollowRealmVisuals } from "@/components/game/hollow-visuals";
+import { InteractionPolishRuntime } from "@/components/game/interaction-polish-runtime";
 import { LoadoutEffectsRuntime } from "@/components/game/loadout-effects-runtime";
 import { ResidentProgressionRuntime } from "@/components/game/resident-progression-runtime";
 import { SecureGameApp } from "@/components/game/secure-game-app";
@@ -31,6 +32,7 @@ function Home() {
       <CampaignBalanceRuntime />
       <ResidentProgressionRuntime />
       <LoadoutEffectsRuntime />
+      <InteractionPolishRuntime />
       <CampaignBalancePanel />
     </>
   );
