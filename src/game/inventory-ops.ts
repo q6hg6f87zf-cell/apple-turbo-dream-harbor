@@ -1,5 +1,9 @@
 import type { GameState, Item, StatKey } from "./types";
 import {
+  canAttachEnchantment,
+  enchantmentSocketStatus,
+} from "./loadout-effects";
+import {
   ensureResidentProgress,
   grantItemMastery,
   type ActiveItemEffect,
@@ -33,7 +37,9 @@ function appendEffect(op: ReturnType<typeof ensureResidentProgress>, item: Item)
     effect: item.effect,
     expires: item.effect.toLowerCase().includes("encounter") ? "encounter" : "sortie",
   };
-  op.activeItemEffects = [...(op.activeItemEffects ?? []), effect].slice(-4);
+  // Six active field effects are allowed. The loadout-pressure system makes
+  // stacks above two increasingly costly instead of silently discarding them.
+  op.activeItemEffects = [...(op.activeItemEffects ?? []), effect].slice(-6);
 }
 
 function parseHealing(item: Item) {
@@ -69,7 +75,7 @@ export function useConsumable(
   else if (heal > 0) p.hp = Math.min(p.maxHp, p.hp + heal);
 
   const cleared = clearOneCurse(p, item.effect);
-  const temporary = /\+\d+\s+(str|def|int|wis|spd|cha|lck)|ignore|resistance|immunity|prevent|bonus|penalt/i.test(item.effect);
+  const temporary = /[+-]\s*\d+\s*(str|def|int|wis|spd|cha|lck|(?:weapon\s+)?damage)|ignore|resistance|immunity|prevent|bonus|penalt/i.test(item.effect);
   if (temporary) appendEffect(p, item);
 
   const mastery = grantItemMastery(p, item);
@@ -80,23 +86,10 @@ export function useConsumable(
   const pieces = [
     healed > 0 ? `+${healed} HP` : "",
     cleared ? "1 condition cleared" : "",
-    temporary ? "effect prepared" : "",
+    temporary ? "field effect prepared" : "",
     mastery.xp ? `+${mastery.xp} mastery XP` : "",
   ].filter(Boolean);
   return `${item.name} used on ${p.name}. ${pieces.join(" · ") || "Consumed."}.${levelText}`.replace("..", ".");
-}
-
-function addDamageBonus(damage: string | undefined, bonus: number) {
-  if (!damage || bonus <= 0) return damage;
-  const match = damage.match(/^(\d+d\d+)(?:\+(\d+))?$/i);
-  if (!match) return damage;
-  const next = Number(match[2] ?? 0) + bonus;
-  return `${match[1]}+${next}`;
-}
-
-function numericBonus(effect: string, label: string) {
-  const match = effect.match(new RegExp(`\\+(\\d+)\\s+${label}`, "i"));
-  return match ? Number(match[1]) : 0;
 }
 
 export function attachEnchantment(
@@ -110,34 +103,39 @@ export function attachEnchantment(
   const op = state.operatives.find((x) => x.id === targetOpId);
   const target = op?.inventory.find((item) => item.id === targetItemId);
   if (!enchantment || !op || !target) return "Tyrone cannot find the enchantment or target gear.";
-  if (enchantment.kind !== "enchantment") return "That item cannot be attached as an enchantment.";
-  if (!target.slot) return "Enchantments need a weapon, armor, or trinket target.";
-  if ((target.tags ?? []).some((tag) => tag === `enchant:${enchantment.name}`)) return "That enchantment is already attached.";
 
-  const defense = numericBonus(enchantment.effect, "DEF");
-  const damage = numericBonus(enchantment.effect, "damage");
+  const block = canAttachEnchantment(target, enchantment);
+  if (block) return block;
+
+  // Enchantments remain readable in the item's effect text and tags, but no
+  // longer permanently mutate raw DEF/damage. The authoritative stack system
+  // applies them at runtime with diminishing returns and trade-offs.
   target.tags = [...(target.tags ?? []), `enchant:${enchantment.name}`, `enchant-rarity:${enchantment.rarity}`];
   target.effect = `${target.effect} • ${enchantment.name}: ${enchantment.effect}`;
   target.value += Math.max(1, Math.round(enchantment.value * 0.5));
-  if (defense) target.defense = (target.defense ?? 0) + defense;
-  if (damage) target.damage = addDamageBonus(target.damage, damage);
 
   const mastery = grantItemMastery(op, enchantment);
   removeSourceItem(state, source, enchantmentId);
+  const sockets = enchantmentSocketStatus(target);
   const levelText = mastery.after > mastery.before ? ` Level ${mastery.before} → ${mastery.after}.` : "";
-  return `${enchantment.name} attached to ${target.name}. +${mastery.xp} mastery XP.${levelText}`.replace("..", ".");
+  return `${enchantment.name} attached to ${target.name}. Resonance ${sockets.used}/${sockets.capacity} · +${mastery.xp} mastery XP.${levelText}`.replace("..", ".");
 }
 
 export function supportedConsumableSummary(item: Item) {
   const heal = parseHealing(item);
-  const temporary = /\+\d+\s+(str|def|int|wis|spd|cha|lck)|ignore|resistance|immunity|prevent|bonus|penalt/i.test(item.effect);
+  const temporary = /[+-]\s*\d+\s*(str|def|int|wis|spd|cha|lck|(?:weapon\s+)?damage)|ignore|resistance|immunity|prevent|bonus|penalt/i.test(item.effect);
   const clear = item.effect.toLowerCase().includes("clear");
   if (heal === Infinity) return "Fully restores HP.";
   if (heal > 0 && clear) return `Restores ${heal} HP and can clear a condition.`;
   if (heal > 0) return `Restores ${heal} HP.`;
   if (clear) return "Clears one current negative condition when possible.";
-  if (temporary) return "Prepares its listed effect for the next sortie or encounter.";
+  if (temporary) return "Prepares its listed effect for the next sortie or encounter. Stacking several field buffs increases strain.";
   return "Consumes the item and records mastery XP for the resident.";
+}
+
+function numericBonus(effect: string, label: string) {
+  const match = effect.match(new RegExp(`([+-]\\s*\\d+)\\s+${label}`, "i"));
+  return match ? Number(match[1]!.replace(/\s/g, "")) : 0;
 }
 
 export function statHints(item: Item): Partial<Record<StatKey, number>> {
