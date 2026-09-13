@@ -7,6 +7,7 @@ import { HollowRealmVisuals } from "@/components/game/hollow-visuals";
 import { LoadoutEffectsRuntime } from "@/components/game/loadout-effects-runtime";
 import { ResidentProgressionRuntime } from "@/components/game/resident-progression-runtime";
 import { ServerEconomyRuntime } from "@/components/game/server-economy-runtime";
+import { ServerProgressionRuntime } from "@/components/game/server-progression-runtime";
 import { bootstrapCampaignBalance } from "@/game/balance-bootstrap";
 import { bootstrapTyroneHelp } from "@/game/tyrone-help-bootstrap";
 import { createFileRoute } from "@tanstack/react-router";
@@ -22,6 +23,7 @@ function Home() {
       <GameApp />
       <AuthorityClaimRuntime />
       <ServerEconomyRuntime />
+      <ServerProgressionRuntime />
       <HollowRealmVisuals />
       <ClassAliasLayer />
       <CampaignBalanceRuntime />
