@@ -181,19 +181,21 @@ await page.getByRole("button", { name: /Unequip/ }).waitFor();
 await page.getByRole("button", { name: /Unequip/ }).click();
 
 // Consumable is targeted and consumed from the real owned list.
-const medGel = page.getByRole("button", { name: /QA Med-Gel/ });
+const medGel = page.getByText("QA Med-Gel", { exact: true });
 await medGel.click();
 await page.getByRole("button", { name: /Use on QA Runner/ }).click();
 await medGel.waitFor({ state: "detached", timeout: 5_000 });
 
-// Enchantment attaches to resident gear and disappears as a loose item.
-const coil = page.getByRole("button", { name: /QA Ironbound Coil/ });
-await coil.click();
+// Enchantment attaches to resident gear and disappears as a loose item. The
+// enchantment name is expected to remain inside the target gear effect text.
+const looseCoilTitle = page.getByText("QA Ironbound Coil", { exact: true });
+await looseCoilTitle.click();
 await page.getByRole("button", { name: /Attach to gear/ }).click();
-await coil.waitFor({ state: "detached", timeout: 5_000 });
+await looseCoilTitle.waitFor({ state: "detached", timeout: 5_000 });
+await page.getByText(/QA Ironbound Coil: \+1 DEF/).waitFor({ timeout: 5_000 });
 
 // Contextual Tyrone explanation.
-await page.getByRole("button", { name: /QA Scrapsteel Bundle/ }).click();
+await page.getByText("QA Scrapsteel Bundle", { exact: true }).click();
 await page.getByRole("button", { name: "How to use" }).click();
 await page.getByText(/Construction stock, not pocket clutter|Material stays in Vault 13/).waitFor();
 
