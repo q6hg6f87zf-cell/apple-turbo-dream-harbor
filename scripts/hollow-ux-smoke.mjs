@@ -99,13 +99,21 @@ page.on("console", (message) => { if (message.type() === "error") errors.push(`c
 await page.goto(baseURL, { waitUntil: "networkidle", timeout: 60_000 });
 await page.locator('[data-ready="1"]').waitFor({ timeout: 20_000 });
 
-// Resident drawer: open from a real roster control, then put a real mobile tap
-// in the exposed left gutter. Do not force-click a DOM parent because that can
-// accidentally route through the sheet we are trying to prove is dismissible.
+// Resident dossier: internal controls must not accidentally dismiss the sheet,
+// the mobile layout must expose a real backdrop gutter, and a genuine thumb tap
+// in that gutter must close it.
 await page.getByText("UX Runner", { exact: true }).first().click();
 const dossierClose = page.getByRole("button", { name: "Close dossier" });
 await dossierClose.waitFor();
-await page.locator("aside.ms-sheet").waitFor();
+const sheet = page.locator("aside.ms-sheet");
+await sheet.waitFor();
+const sheetBox = await sheet.boundingBox();
+assert.ok(sheetBox && sheetBox.width < 428, "Resident dossier consumed the full mobile viewport; no dismiss gutter exists.");
+const kitTab = page.getByRole("button", { name: "kit", exact: true });
+const kitBox = await kitTab.boundingBox();
+assert.ok(kitBox && kitBox.height >= 44, "Dossier Kit tab is smaller than a 44px touch target.");
+await kitTab.click();
+await dossierClose.waitFor({ state: "visible" });
 await page.touchscreen.tap(8, 180);
 await dossierClose.waitFor({ state: "detached", timeout: 5_000 });
 
@@ -176,5 +184,5 @@ const overflow = await page.evaluate(() => document.documentElement.scrollWidth 
 assert.ok(overflow <= 2, `AAA interaction pass introduced ${overflow}px horizontal overflow.`);
 assert.deepEqual(errors, [], `Browser errors detected:\n${errors.join("\n")}`);
 
-console.log("Hollow UX smoke passed: real touchscreen backdrop dismissal, Escape dismissal, nav switching and 44px primary touch targets.");
+console.log("Hollow UX smoke passed: dossier controls, real touchscreen backdrop dismissal, Escape dismissal, nav switching and 44px primary touch targets.");
 await browser.close();
