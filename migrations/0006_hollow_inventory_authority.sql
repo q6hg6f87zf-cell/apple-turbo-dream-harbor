@@ -38,13 +38,12 @@ create table if not exists hollow_inventory_migration (
 );
 
 create table if not exists hollow_item_mastery (
-  campaign_id text not null references hollow_campaign_state(campaign_id) on delete cascade,
+  instance_id text not null references hollow_item_instance(instance_id) on delete cascade,
   resident_id text not null,
-  template_key text not null,
   mastery_kind text not null check (mastery_kind in ('equip','consume','enchant')),
   granted_xp integer not null default 0,
   granted_at timestamptz not null default now(),
-  primary key (campaign_id, resident_id, template_key, mastery_kind)
+  primary key (instance_id, resident_id, mastery_kind)
 );
 
 create table if not exists hollow_item_drop_event (
