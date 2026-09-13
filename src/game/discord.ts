@@ -1,5 +1,4 @@
-import { PACK_KEYS } from "./inventory";
-import type { GameState, PackCounts, PackKey } from "./types";
+import type { GameState, PackCounts } from "./types";
 
 export const WHO_KEY = "synaps-t0880-v1:who";
 
@@ -8,6 +7,13 @@ export interface DiscordIdentity {
   name: string;
 }
 
+/**
+ * Transitional identity envelope.
+ *
+ * IMPORTANT: `caps`, `xp`, `level`, and `pack` remain optional on the type only
+ * so older call sites and trusted server responses can migrate without a flag
+ * day. Public URL parsing NEVER fills those fields anymore.
+ */
 export interface DiscordSnap {
   id: string;
   name: string;
@@ -24,21 +30,6 @@ export interface HandshakeDelta {
   pack: Partial<PackCounts>;
 }
 
-const PACK_PARAM: Record<string, PackKey> = {
-  pin: "bobby_pin",
-  bobby_pin: "bobby_pin",
-  stim: "stimpak",
-  stimpak: "stimpak",
-  ment: "mentats",
-  mentats: "mentats",
-  holo: "holotape",
-  holotape: "holotape",
-  sarsa: "sarsaparilla",
-  sarsaparilla: "sarsaparilla",
-  probe: "probe_kit",
-  probe_kit: "probe_kit",
-};
-
 function params(): URLSearchParams {
   if (typeof window === "undefined") return new URLSearchParams();
   const q = new URLSearchParams(window.location.search);
@@ -49,12 +40,6 @@ function params(): URLSearchParams {
     if (!q.has(k)) q.set(k, v);
   });
   return q;
-}
-
-function num(raw: string | null): number | undefined {
-  if (raw == null || raw === "") return undefined;
-  const n = Number(raw);
-  return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : undefined;
 }
 
 function cleanId(raw: string | null): string | null {
@@ -72,32 +57,18 @@ export function isSnowflake(raw: string): boolean {
   return /^\d{17,22}$/.test(raw.trim());
 }
 
+/**
+ * Parse only a display/identity hint from a URL.
+ *
+ * Older links may still contain `caps`, `xp`, `lvl`, `pack`, `stim`, etc. They
+ * are intentionally ignored. A URL is navigation, never an economy authority.
+ */
 export function snapFromParams(q: URLSearchParams): DiscordSnap | null {
   const id = cleanId(q.get("d") || q.get("discord") || q.get("user_id") || q.get("uid"));
   if (!id) return null;
-  const pack: Partial<PackCounts> = {};
-  const packed = q.get("pack");
-  if (packed) {
-    try {
-      const obj = JSON.parse(packed) as Record<string, number>;
-      PACK_KEYS.forEach((k) => {
-        if (typeof obj[k] === "number") pack[k] = Math.max(0, Math.floor(obj[k]));
-      });
-    } catch {
-      /* ignore bad json */
-    }
-  }
-  Object.entries(PACK_PARAM).forEach(([param, key]) => {
-    const n = num(q.get(param));
-    if (n != null) pack[key] = n;
-  });
   return {
     id,
     name: cleanName(q.get("n") || q.get("name") || q.get("nick") || q.get("username"), id),
-    caps: num(q.get("caps") || q.get("coins") || q.get("coin")),
-    xp: num(q.get("xp")),
-    level: num(q.get("lvl") || q.get("level")),
-    pack: Object.keys(pack).length ? pack : undefined,
     source: "url",
   };
 }
@@ -166,33 +137,18 @@ export function snapshotFromSearch(): DiscordSnap | null {
   return snapFromParams(params());
 }
 
+/**
+ * Legacy compatibility shim.
+ *
+ * This function used to raise local caps/XP/rank/Pack values to client-provided
+ * floors. It now applies identity metadata only. Economy authority is moving to
+ * authenticated server commands and may never be increased by URL/client data.
+ */
 export function applyFloor(state: GameState, snap: DiscordSnap | null): HandshakeDelta {
   const delta: HandshakeDelta = { caps: 0, xp: 0, pack: {} };
   if (!snap) return delta;
   state.discordId = snap.id;
   state.discordName = snap.name;
-  if (snap.caps != null && snap.caps > state.coins) {
-    delta.caps = snap.caps - state.coins;
-    state.coins = snap.caps;
-  }
-  if (snap.level != null && snap.level > state.level) {
-    state.level = snap.level;
-  }
-  if (snap.xp != null && snap.xp > state.xp) {
-    delta.xp = snap.xp - state.xp;
-    state.xp = snap.xp;
-  }
-  if (snap.pack) {
-    PACK_KEYS.forEach((k) => {
-      const want = snap.pack?.[k];
-      if (want == null) return;
-      const have = state.pack[k] ?? 0;
-      if (want > have) {
-        delta.pack[k] = want - have;
-        state.pack[k] = want;
-      }
-    });
-  }
   return delta;
 }
 
@@ -200,47 +156,27 @@ export function deltaEmpty(d: HandshakeDelta) {
   return d.caps === 0 && d.xp === 0 && Object.keys(d.pack).length === 0;
 }
 
-export function stampedUrl(origin: string, snap: Pick<DiscordSnap, "id" | "name" | "caps" | "xp" | "level">): string {
+/**
+ * Share links identify a rider for display only. Never serialize economy state
+ * into a URL.
+ */
+export function stampedUrl(
+  origin: string,
+  snap: Pick<DiscordSnap, "id" | "name"> & Partial<Pick<DiscordSnap, "caps" | "xp" | "level">>,
+): string {
   const u = new URL(origin);
   u.searchParams.set("d", snap.id);
   u.searchParams.set("n", snap.name);
-  if (snap.caps != null) u.searchParams.set("caps", String(snap.caps));
-  if (snap.xp != null) u.searchParams.set("xp", String(snap.xp));
-  if (snap.level != null) u.searchParams.set("lvl", String(snap.level));
   return u.toString();
 }
 
-export async function pullRemote(id: string, timeoutMs = 1200): Promise<DiscordSnap | null> {
-  if (typeof window === "undefined" || !id) return null;
-  const ctrl = new AbortController();
-  const t = window.setTimeout(() => ctrl.abort(), timeoutMs);
-  try {
-    const res = await fetch(`/api/tyrone/sync?d=${encodeURIComponent(id)}`, {
-      signal: ctrl.signal,
-      headers: { accept: "application/json" },
-    });
-    if (!res.ok) return null;
-    const body = (await res.json()) as {
-      discord?: string;
-      name?: string;
-      caps?: number;
-      xp?: number;
-      level?: number;
-      pack?: Partial<PackCounts>;
-    };
-    if (!body || typeof body !== "object") return null;
-    return {
-      id,
-      name: cleanName(body.name ?? null, id),
-      caps: typeof body.caps === "number" ? body.caps : undefined,
-      xp: typeof body.xp === "number" ? body.xp : undefined,
-      level: typeof body.level === "number" ? body.level : undefined,
-      pack: body.pack,
-      source: "api",
-    };
-  } catch {
-    return null;
-  } finally {
-    window.clearTimeout(t);
-  }
+/**
+ * Legacy public remote pull is intentionally disabled.
+ *
+ * Reading a snapshot by an arbitrary Discord id would still let an unverified
+ * browser impersonate another rider. The next persistence slice binds a Better
+ * Auth user to a Tyrone-issued claim before any authoritative state is returned.
+ */
+export async function pullRemote(_id: string, _timeoutMs = 1200): Promise<DiscordSnap | null> {
+  return null;
 }

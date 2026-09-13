@@ -12,7 +12,7 @@ const variants = {
 };
 
 const sizes = {
-  sm: "min-h-10 px-3 text-xs",
+  sm: "min-h-11 px-3 text-xs",
   md: "min-h-11 px-4 text-sm",
   lg: "min-h-12 px-5 text-sm",
 };
@@ -34,7 +34,7 @@ export function Button({
     <button
       type={type}
       className={cn(
-        "inline-flex items-center justify-center gap-2 rounded-[var(--radius-sm)] font-display text-[11px] font-semibold uppercase tracking-[0.14em] transition-[color,background-color,box-shadow,transform] duration-150 ease-out active:scale-[0.96] disabled:pointer-events-none",
+        "inline-flex touch-manipulation select-none items-center justify-center gap-2 rounded-[var(--radius-sm)] font-display text-[11px] font-semibold uppercase tracking-[0.14em] outline-none transition-[color,background-color,box-shadow,transform,opacity] duration-150 ease-out active:scale-[0.96] focus-visible:ring-2 focus-visible:ring-ember/80 focus-visible:ring-offset-2 focus-visible:ring-offset-ink disabled:pointer-events-none disabled:cursor-not-allowed disabled:saturate-50",
         variants[variant],
         sizes[size],
         className,

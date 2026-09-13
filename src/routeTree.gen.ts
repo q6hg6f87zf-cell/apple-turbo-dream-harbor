@@ -10,71 +10,97 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiHollowAccessRouteImport } from './routes/api/hollow/access'
+import { Route as ApiHollowAcquisitionRouteImport } from './routes/api/hollow/acquisition'
+import { Route as ApiHollowEconomyRouteImport } from './routes/api/hollow/economy'
+import { Route as ApiHollowInventoryRouteImport } from './routes/api/hollow/inventory'
+import { Route as ApiHollowProgressionRouteImport } from './routes/api/hollow/progression'
+import { Route as ApiTyroneClaimRouteImport } from './routes/api/tyrone/claim'
 import { Route as ApiTyroneSyncRouteImport } from './routes/api/tyrone/sync'
 
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiTyroneSyncRoute = ApiTyroneSyncRouteImport.update({
-  id: '/api/tyrone/sync',
-  path: '/api/tyrone/sync',
-  getParentRoute: () => rootRouteImport,
-} as any)
+const IndexRoute = IndexRouteImport.update({ id: '/', path: '/', getParentRoute: () => rootRouteImport } as any)
+const ApiHollowAccessRoute = ApiHollowAccessRouteImport.update({ id: '/api/hollow/access', path: '/api/hollow/access', getParentRoute: () => rootRouteImport } as any)
+const ApiHollowAcquisitionRoute = ApiHollowAcquisitionRouteImport.update({ id: '/api/hollow/acquisition', path: '/api/hollow/acquisition', getParentRoute: () => rootRouteImport } as any)
+const ApiHollowEconomyRoute = ApiHollowEconomyRouteImport.update({ id: '/api/hollow/economy', path: '/api/hollow/economy', getParentRoute: () => rootRouteImport } as any)
+const ApiHollowInventoryRoute = ApiHollowInventoryRouteImport.update({ id: '/api/hollow/inventory', path: '/api/hollow/inventory', getParentRoute: () => rootRouteImport } as any)
+const ApiHollowProgressionRoute = ApiHollowProgressionRouteImport.update({ id: '/api/hollow/progression', path: '/api/hollow/progression', getParentRoute: () => rootRouteImport } as any)
+const ApiTyroneClaimRoute = ApiTyroneClaimRouteImport.update({ id: '/api/tyrone/claim', path: '/api/tyrone/claim', getParentRoute: () => rootRouteImport } as any)
+const ApiTyroneSyncRoute = ApiTyroneSyncRouteImport.update({ id: '/api/tyrone/sync', path: '/api/tyrone/sync', getParentRoute: () => rootRouteImport } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/api/hollow/access': typeof ApiHollowAccessRoute
+  '/api/hollow/acquisition': typeof ApiHollowAcquisitionRoute
+  '/api/hollow/economy': typeof ApiHollowEconomyRoute
+  '/api/hollow/inventory': typeof ApiHollowInventoryRoute
+  '/api/hollow/progression': typeof ApiHollowProgressionRoute
+  '/api/tyrone/claim': typeof ApiTyroneClaimRoute
   '/api/tyrone/sync': typeof ApiTyroneSyncRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/api/hollow/access': typeof ApiHollowAccessRoute
+  '/api/hollow/acquisition': typeof ApiHollowAcquisitionRoute
+  '/api/hollow/economy': typeof ApiHollowEconomyRoute
+  '/api/hollow/inventory': typeof ApiHollowInventoryRoute
+  '/api/hollow/progression': typeof ApiHollowProgressionRoute
+  '/api/tyrone/claim': typeof ApiTyroneClaimRoute
   '/api/tyrone/sync': typeof ApiTyroneSyncRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/api/hollow/access': typeof ApiHollowAccessRoute
+  '/api/hollow/acquisition': typeof ApiHollowAcquisitionRoute
+  '/api/hollow/economy': typeof ApiHollowEconomyRoute
+  '/api/hollow/inventory': typeof ApiHollowInventoryRoute
+  '/api/hollow/progression': typeof ApiHollowProgressionRoute
+  '/api/tyrone/claim': typeof ApiTyroneClaimRoute
   '/api/tyrone/sync': typeof ApiTyroneSyncRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/tyrone/sync'
+  fullPaths: '/' | '/api/hollow/access' | '/api/hollow/acquisition' | '/api/hollow/economy' | '/api/hollow/inventory' | '/api/hollow/progression' | '/api/tyrone/claim' | '/api/tyrone/sync'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/tyrone/sync'
-  id: '__root__' | '/' | '/api/tyrone/sync'
+  to: '/' | '/api/hollow/access' | '/api/hollow/acquisition' | '/api/hollow/economy' | '/api/hollow/inventory' | '/api/hollow/progression' | '/api/tyrone/claim' | '/api/tyrone/sync'
+  id: '__root__' | '/' | '/api/hollow/access' | '/api/hollow/acquisition' | '/api/hollow/economy' | '/api/hollow/inventory' | '/api/hollow/progression' | '/api/tyrone/claim' | '/api/tyrone/sync'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ApiHollowAccessRoute: typeof ApiHollowAccessRoute
+  ApiHollowAcquisitionRoute: typeof ApiHollowAcquisitionRoute
+  ApiHollowEconomyRoute: typeof ApiHollowEconomyRoute
+  ApiHollowInventoryRoute: typeof ApiHollowInventoryRoute
+  ApiHollowProgressionRoute: typeof ApiHollowProgressionRoute
+  ApiTyroneClaimRoute: typeof ApiTyroneClaimRoute
   ApiTyroneSyncRoute: typeof ApiTyroneSyncRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/tyrone/sync': {
-      id: '/api/tyrone/sync'
-      path: '/api/tyrone/sync'
-      fullPath: '/api/tyrone/sync'
-      preLoaderRoute: typeof ApiTyroneSyncRouteImport
-      parentRoute: typeof rootRouteImport
-    }
+    '/': { id: '/'; path: '/'; fullPath: '/'; preLoaderRoute: typeof IndexRouteImport; parentRoute: typeof rootRouteImport }
+    '/api/hollow/access': { id: '/api/hollow/access'; path: '/api/hollow/access'; fullPath: '/api/hollow/access'; preLoaderRoute: typeof ApiHollowAccessRouteImport; parentRoute: typeof rootRouteImport }
+    '/api/hollow/acquisition': { id: '/api/hollow/acquisition'; path: '/api/hollow/acquisition'; fullPath: '/api/hollow/acquisition'; preLoaderRoute: typeof ApiHollowAcquisitionRouteImport; parentRoute: typeof rootRouteImport }
+    '/api/hollow/economy': { id: '/api/hollow/economy'; path: '/api/hollow/economy'; fullPath: '/api/hollow/economy'; preLoaderRoute: typeof ApiHollowEconomyRouteImport; parentRoute: typeof rootRouteImport }
+    '/api/hollow/inventory': { id: '/api/hollow/inventory'; path: '/api/hollow/inventory'; fullPath: '/api/hollow/inventory'; preLoaderRoute: typeof ApiHollowInventoryRouteImport; parentRoute: typeof rootRouteImport }
+    '/api/hollow/progression': { id: '/api/hollow/progression'; path: '/api/hollow/progression'; fullPath: '/api/hollow/progression'; preLoaderRoute: typeof ApiHollowProgressionRouteImport; parentRoute: typeof rootRouteImport }
+    '/api/tyrone/claim': { id: '/api/tyrone/claim'; path: '/api/tyrone/claim'; fullPath: '/api/tyrone/claim'; preLoaderRoute: typeof ApiTyroneClaimRouteImport; parentRoute: typeof rootRouteImport }
+    '/api/tyrone/sync': { id: '/api/tyrone/sync'; path: '/api/tyrone/sync'; fullPath: '/api/tyrone/sync'; preLoaderRoute: typeof ApiTyroneSyncRouteImport; parentRoute: typeof rootRouteImport }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
-  ApiTyroneSyncRoute: ApiTyroneSyncRoute,
+  IndexRoute,
+  ApiHollowAccessRoute,
+  ApiHollowAcquisitionRoute,
+  ApiHollowEconomyRoute,
+  ApiHollowInventoryRoute,
+  ApiHollowProgressionRoute,
+  ApiTyroneClaimRoute,
+  ApiTyroneSyncRoute,
 }
-export const routeTree = rootRouteImport
-  ._addFileChildren(rootRouteChildren)
-  ._addFileTypes<FileRouteTypes>()
+export const routeTree = rootRouteImport._addFileChildren(rootRouteChildren)._addFileTypes<FileRouteTypes>()
 
 import type { getRouter } from './router.tsx'
 import type { createStart } from '@tanstack/react-start'
