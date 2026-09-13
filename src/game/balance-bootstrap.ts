@@ -88,6 +88,27 @@ export function bootstrapCampaignBalance(): void {
   if (bootstrapped) return;
   bootstrapped = true;
 
+  // Endgame remains expensive, but it should be achievable through months of
+  // successful play rather than requiring an accidental year-long cap wall.
+  ROOM_CAPS.vault[5] = 900_000;
+  ROOM_CAPS.barracks[5] = 1_050_000;
+  ROOM_CAPS.forge[5] = 980_000;
+  ROOM_CAPS.infirmary[5] = 1_100_000;
+  ROOM_CAPS.watchtower[5] = 1_050_000;
+  ROOM_CAPS.ledger[5] = 1_060_000;
+  QUARTER_CAPS.bunk[5] = 600_000;
+  QUARTER_CAPS.lockbox[5] = 650_000;
+  QUARTER_CAPS.hearth[5] = 700_000;
+
+  // Bosses are the dependable source of late construction resources. RNG can
+  // accelerate a project, but a successful raid chain must not leave the Vault
+  // permanently ore-starved.
+  Object.assign(RAID_PROFILES.ironclad, { oreReward: 20, favorReward: 6 });
+  Object.assign(RAID_PROFILES.slagtown, { oreReward: 40, favorReward: 12 });
+  Object.assign(RAID_PROFILES.blackspire, { oreReward: 75, favorReward: 22 });
+  Object.assign(RAID_PROFILES.brasswater, { oreReward: 130, favorReward: 38 });
+  Object.assign(RAID_PROFILES.veyra, { oreReward: 220, favorReward: 65 });
+
   for (const room of Object.keys(ROOM_CAPS) as RoomId[]) {
     BASE_ROOMS[room].tiers = ROOM_CAPS[room].map((cost, i) => ({
       cost,
@@ -106,8 +127,6 @@ export function bootstrapCampaignBalance(): void {
   // perfect, but mathematically achievable with three fully prepared residents.
   RAID_PROFILES.veyra.minReadiness = 785;
 
-  // Keep one shared catalogue so the existing Inventory screen immediately gains
-  // the deeper treasure table without duplicating UI logic.
   const known = new Set(HOLLOW_CATALOG.map((item) => `${item.kind}:${item.name}`));
   for (const item of TREASURE_CATALOG) {
     const key = `${item.kind}:${item.name}`;
