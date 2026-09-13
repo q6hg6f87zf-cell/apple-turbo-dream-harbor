@@ -1,9 +1,9 @@
 import type { LocationId } from "@/game/types";
-import { HollowGlobe } from "./globe";
+import { HollowGlobeAAA } from "./globe-aaa";
 
 /**
  * WorldAtlas keeps the legacy component contract used by MapView while the
- * actual presentation is now the live Hollow Realm orbital globe.
+ * presentation is handled by the cinematic Hollow Realm orbital renderer.
  */
 export function WorldAtlas({
   loc,
@@ -12,5 +12,5 @@ export function WorldAtlas({
   loc: LocationId;
   onSelect: (id: LocationId) => void;
 }) {
-  return <HollowGlobe loc={loc} onSelect={onSelect} />;
+  return <HollowGlobeAAA loc={loc} onSelect={onSelect} />;
 }
