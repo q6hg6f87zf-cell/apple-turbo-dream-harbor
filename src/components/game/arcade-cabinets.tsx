@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { creeUnread, spendLockpick, spendSlot } from "@/game/arcade";
-import { CREE, SLOT_FACE, SLOT_GLYPHS, SLOT_TRIPLE, SLOT_WEIGHT, type SlotGlyph } from "@/game/arcade-banks";
+import { CREE, SLOT_ART, SLOT_FACE, SLOT_GLYPHS, SLOT_TINT, SLOT_TRIPLE, SLOT_WEIGHT, type SlotGlyph } from "@/game/arcade-banks";
 import { cellId, isDiagonalPath, lineCells, makeWordSearch, samePath } from "@/game/words";
 import { pulseDuck, rumble, setHeartBed, setReelMotor, sfx, startHeartBed, startReelMotor, stopHeartBed, stopReelMotor } from "@/game/audio";
 import { addTrauma, drainFly, hitstop, payoutFly, punchClick } from "@/game/juice";
@@ -710,7 +710,23 @@ export function SlotsPlay({ onDone }: { onDone: () => void }) {
                           rowGround(row, lines, spinning),
                         )}
                       >
-                        <span className="ms-glyph-face leading-none">{SLOT_FACE[glyph]}</span>
+                        <span
+                          className="ms-slot-symbol"
+                          style={{ "--sym": SLOT_TINT[glyph] } as React.CSSProperties}
+                        >
+                          {SLOT_ART[glyph] ? (
+                            <img
+                              src={SLOT_ART[glyph]}
+                              alt=""
+                              loading="lazy"
+                              decoding="async"
+                              draggable={false}
+                              className="ms-slot-symbol-art"
+                            />
+                          ) : (
+                            <span className="ms-glyph-face leading-none">{SLOT_FACE[glyph]}</span>
+                          )}
+                        </span>
                         <span className="text-[10px] tracking-[0.14em]">{glyph}</span>
                       </div>
                     );

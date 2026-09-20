@@ -679,3 +679,29 @@ export const SLOT_FACE: Record<SlotGlyph, string> = {
   MOON: "☾",
   KANE: "K",
 };
+
+/**
+ * Reel faces, drawn from the things these symbols actually are. MOON keeps its
+ * glyph on purpose: the crest is already the right mark, and one flat symbol
+ * among five photographs is easy to pick out of a spin.
+ */
+export const SLOT_ART: Partial<Record<SlotGlyph, string>> = {
+  CAP: "/art/items/thumbs/ammo.jpg",
+  PIN: "/art/items/thumbs/bobby-pin.jpg",
+  TAPE: "/art/items/thumbs/cell.jpg",
+  STIM: "/art/items/thumbs/stim.jpg",
+  KANE: "/art/items/thumbs/sigil.jpg",
+};
+
+/**
+ * One hue each. At rest the photograph reads; at speed the blur eats detail and
+ * only colour survives, so colour is what tells the reels apart.
+ */
+export const SLOT_TINT: Record<SlotGlyph, string> = {
+  PIN: "#8592a0",
+  CAP: "var(--color-ember)",
+  TAPE: "#5b9c91",
+  STIM: "#9fae5c",
+  MOON: "var(--color-moon)",
+  KANE: "var(--color-danger)",
+};

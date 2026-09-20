@@ -1859,3 +1859,28 @@ body[data-region-map="1"] .ms-help,
 .ms-chip-rail::-webkit-scrollbar {
   display: none;
 }
+
+/* Reel faces. The plate carries the colour and the still sits on top of it —
+   tinting the photograph itself failed, because these are lit for a dark shelf
+   and a blend that preserves luminance leaves a black square black. At speed
+   the blur eats the object and only the plate is left, which is the point. */
+.ms-slot-symbol {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  color: var(--sym);
+  background:
+    radial-gradient(circle at 50% 32%, color-mix(in oklab, var(--sym) 62%, transparent), transparent 72%),
+    color-mix(in oklab, var(--sym) 34%, var(--color-ink));
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--sym) 72%, transparent);
+}
+.ms-slot-symbol-art {
+  width: 82%;
+  height: 82%;
+  object-fit: contain;
+  filter: brightness(1.6) contrast(1.12) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.65));
+}
