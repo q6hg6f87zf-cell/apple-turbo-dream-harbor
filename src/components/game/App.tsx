@@ -159,6 +159,7 @@ export function GameApp() {
       data-ready="1"
       data-screen={screen}
       data-chrome={kind}
+      data-shake="1"
     >
       <SceneBackdrop />
       {kind === "hub" ? <Rail /> : null}

@@ -154,7 +154,10 @@ function ensureCss() {
 function tick() {
   trauma = Math.max(0, trauma - 0.048);
   const shake = trauma * trauma;
-  const root = document.querySelector("main") as HTMLElement | null;
+  // Never the scroll container: a translate/rotate there makes it the
+  // containing block for fixed descendants and forces the scroller to
+  // recomposite mid-gesture.
+  const root = document.querySelector("[data-shake]") as HTMLElement | null;
   const orbit = document.getElementById("hollow-orbit-stage") as HTMLElement | null;
   const target = orbit ?? root;
   if (target) {
@@ -228,12 +231,24 @@ export function shockwaveAt(x: number, y: number) {
   addTrauma(0.28);
 }
 
+/**
+ * Tier 1 — an ordinary tap. The CSS :active state carries the visual; this is
+ * just the tactile confirmation. Navigation should feel effortless, not loud.
+ */
+export function tapFeedback() {
+  haptic(6);
+}
+
+/**
+ * Tier 2 — a committed action: Buy, Equip, Deploy, Deal. Confirmation, not
+ * fireworks. Screen shake belongs to tier 3, which callers author per outcome
+ * through addTrauma/hitstop.
+ */
 export function punchClick(x: number, y: number) {
   rippleAt(x, y);
   sparksAt(x, y);
   flashAt(x, y);
   haptic(12);
-  addTrauma(0.16);
 }
 
 export function hitstop(ms = 90) {

@@ -1,5 +1,6 @@
 import { X } from "lucide-react";
 import { useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 export function ItemInspectShell({
   onClose,
@@ -22,7 +23,10 @@ export function ItemInspectShell({
 }) {
   const [zoom, setZoom] = useState(false);
 
-  return (
+  // Rendered out of the inventory list on purpose: inside it, the sheet was a
+  // "fixed" element within a transformed scroll container, and its commit
+  // buttons inherited the list's tap suppression.
+  const sheet = (
     <div
       className="fixed inset-0 z-[70] overflow-hidden bg-ink md:bg-ink/85 md:p-6"
       onClick={onClose}
@@ -99,4 +103,7 @@ export function ItemInspectShell({
       </div>
     </div>
   );
+
+  if (typeof document === "undefined") return sheet;
+  return createPortal(sheet, document.body);
 }

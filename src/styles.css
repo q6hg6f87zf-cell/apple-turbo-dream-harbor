@@ -1681,3 +1681,111 @@
   }
 }
 
+
+/* ---------------------------------------------------------------------------
+   Interaction surface. Previously injected at runtime by
+   InteractionPolishRuntime; it lives here so the cascade is reviewable.
+   --------------------------------------------------------------------------- */
+
+button,
+a[href],
+[role="button"],
+select,
+summary {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* Inventory is a vertical list of role=button rows inside its own scroller.
+   Keep the pan explicit and keep press transforms off the rows. */
+.ms-inv-list,
+.ms-inv-list *,
+.ms-inv-row,
+[data-inventory-list] [role="button"] {
+  touch-action: pan-y !important;
+}
+
+button:not(:disabled),
+a[href],
+[role="button"],
+select,
+summary {
+  cursor: pointer;
+}
+button:disabled,
+[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+button:focus-visible,
+a[href]:focus-visible,
+[role="button"]:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--color-ember) 82%, white);
+  outline-offset: 2px;
+}
+
+@media (max-width: 767px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+  aside.ms-sheet {
+    width: min(92vw, 28rem) !important;
+    max-width: min(92vw, 28rem) !important;
+  }
+  aside.ms-sheet button {
+    min-height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Tier 1 — ordinary taps. Quick and quiet. */
+  button:not(:disabled),
+  a[href],
+  [role="button"] {
+    transition-property: transform, color, background-color, border-color, box-shadow, opacity, filter;
+    transition-duration: 180ms;
+    transition-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  button:not(:disabled):active,
+  a[href]:active,
+  [role="button"]:active {
+    transform: scale(0.97);
+    transition-duration: 70ms;
+    transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  /* Tier 2 — a committed action carries the weight. */
+  [data-juice="commit"]:not(:disabled):active {
+    transform: scale(0.94);
+    filter: brightness(1.18);
+    box-shadow:
+      0 0 0 1px color-mix(in oklab, var(--color-ember) 70%, transparent),
+      0 0 22px color-mix(in oklab, var(--color-ember) 35%, transparent);
+  }
+
+  /* Rows must never transform: that is what stops Safari starting a pan. */
+  .ms-inv-row:active,
+  [data-inventory-list] [role="button"]:active,
+  [data-inventory-list] button:active {
+    transform: none;
+    filter: none;
+    box-shadow: none;
+  }
+}
+
+html,
+body {
+  overscroll-behavior: none;
+}
+
+body[data-orbit="1"] .ms-help,
+body[data-region-map="1"] .ms-help,
+[data-chrome="task"] .ms-help,
+[data-chrome="focused"] .ms-help {
+  display: none !important;
+}
