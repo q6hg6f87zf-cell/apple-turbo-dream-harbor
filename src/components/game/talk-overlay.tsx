@@ -1,7 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { sfx } from "@/game/audio";
 import { TALK, MANUAL, isPregameTalk, isTalkLocked, renderTalk, scriptForScreen } from "@/game/talk";
-import { isTaskScreen } from "@/game/shell";
 import { useGame } from "@/game/store";
 import type { TyroneAssist } from "@/game/types";
 import { cn } from "@/lib/cn";
@@ -161,18 +160,23 @@ export function TalkOverlay() {
   );
 }
 
+/**
+ * Tyrone's Ask affordance on the porch only.
+ *
+ * In game it floated over the bottom-right of every hub, where it sat on top of
+ * list rows and duplicated both the screen's own help control and the overflow
+ * menu — three ways to ask the same question. Inside the shell, Ask now belongs
+ * to the header. Out here there is no header, so the button stays.
+ */
 export function HelpFab() {
   const talk = useGame((g) => g.s.talk);
   const screen = useGame((g) => g.s.screen);
-  const overlay = useGame((g) => !!g.s.combat || !!g.s.mission);
   const named = useGame((g) => Boolean(g.s.playerName?.trim()));
   const started = useGame((g) => g.s.started);
   const open = useGame((g) => g.openGuide);
   if (talk) return null;
-  if (screen === "rules") return null;
-  if (isTaskScreen(screen)) return null;
   if (!started && !named) return null;
-  const porch = screen === "title" || screen === "briefing";
+  if (screen !== "title" && screen !== "briefing") return null;
   return (
     <button
       type="button"
@@ -182,11 +186,7 @@ export function HelpFab() {
         sfx.click();
         open();
       }}
-      className={cn(
-        "ms-help fixed z-[42] inline-flex size-12 touch-manipulation items-center justify-center rounded-full bg-ink text-ember",
-        porch ? "left-3 top-3 md:left-6 md:top-36" : "right-3 bottom-[5.5rem] md:right-6 md:bottom-6",
-        !porch && !overlay && "md:hidden",
-      )}
+      className="ms-help fixed left-3 top-3 z-[42] inline-flex size-12 touch-manipulation items-center justify-center rounded-full bg-ink text-ember md:left-6 md:top-36"
     >
       <CircleHelp className="size-5" />
     </button>

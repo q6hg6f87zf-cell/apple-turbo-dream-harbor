@@ -26,7 +26,6 @@ import { cn } from "@/lib/cn";
 import {
   Archive,
   Check,
-  CircleHelp,
   PackageCheck,
   Search,
   Sparkles,
@@ -399,14 +398,7 @@ export function InventoryFast() {
                 className="min-h-11 w-full rounded-[var(--radius-sm)] bg-raised pl-9 pr-3 text-secondary text-paper shadow-[var(--shadow-border)] outline-none"
               />
             </label>
-            <button type="button" onClick={() => setHelpMode("explain")} className="flex size-11 shrink-0 items-center justify-center rounded-full border border-ember/40 bg-ember/10 text-ember" aria-label="Ask Tyrone">
-              <CircleHelp className="size-4" />
-            </button>
           </div>
-
-          {helpMode && !selected ? (
-            <TyronePanel text="Owned is what you actually have. Catalogue is the record. Weapons split into rifles, melee, sidearms, shotguns, energy, heavy. Tap a row. Act at the bottom." onClose={() => setHelpMode(null)} />
-          ) : null}
 
           <ModeToggle
             value={mode}

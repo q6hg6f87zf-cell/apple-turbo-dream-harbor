@@ -28,7 +28,7 @@ import {
 import { useGame } from "@/game/store";
 import type { AmmoType, InventoryCategory, Item, Operative, Rarity, RegionId } from "@/game/types";
 import { cn } from "@/lib/cn";
-import { Archive, Check, CircleHelp, Crosshair, PackageCheck, Search, Sparkles, Wrench, X, Zap } from "lucide-react";
+import { Archive, Check, Crosshair, PackageCheck, Search, Sparkles, Wrench, Zap } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { ItemThumb } from "./item-thumb";
 import { inventorySession, rememberInventory } from "@/game/inventory-session";
@@ -119,7 +119,6 @@ export function ServerInventoryView() {
   const [targetId, setTargetId] = useState("");
   const [targetGearId, setTargetGearId] = useState("");
   const [pending, setPending] = useState(false);
-  const [help, setHelp] = useState(false);
   const showCaliber = category === "ammo";
 
   useEffect(() => {
@@ -242,12 +241,8 @@ export function ServerInventoryView() {
                 className="min-h-11 w-full rounded-[var(--radius-sm)] bg-raised pl-9 pr-3 text-secondary text-paper shadow-[var(--shadow-border)] outline-none"
               />
             </label>
-            <button type="button" onClick={() => setHelp((v) => !v)} className="flex size-11 shrink-0 items-center justify-center rounded-full border border-ember/40 bg-ember/10 text-ember" aria-label="Ask Tyrone">
-              <CircleHelp className="size-4" />
-            </button>
           </div>
 
-          {help ? <Panel className="border-ember/30 bg-ember/5"><div className="flex items-start gap-3"><img src="/art/tyrone.jpg" alt="" className="size-12 rounded-[var(--radius-sm)] object-cover" /><p className="flex-1 text-sm leading-relaxed text-moon">Owned is sealed on the server. Catalogue is the design record. Weapons split into rifles, melee, sidearms, shotguns, energy, heavy.</p><button type="button" onClick={() => setHelp(false)}><X className="size-4 text-muted" /></button></div></Panel> : null}
 
           <ModeToggle
             value={mode}
@@ -303,7 +298,7 @@ export function ServerInventoryView() {
         {rows.map((row) => {
           const chamber = chamberLine(row.item);
           return (
-            <InventoryRow key={row.key} onOpen={() => { setSelectedKey(row.key); setHelp(false); setTargetGearId(""); if (!targetId && residents[0]) setTargetId(residents[0].id); }} className="flex min-h-14 w-full min-w-0 items-center gap-2.5 overflow-hidden rounded-[var(--radius-md)] bg-raised px-2.5 py-2 text-left shadow-[var(--shadow-border)]">
+            <InventoryRow key={row.key} onOpen={() => { setSelectedKey(row.key); setTargetGearId(""); if (!targetId && residents[0]) setTargetId(residents[0].id); }} className="flex min-h-14 w-full min-w-0 items-center gap-2.5 overflow-hidden rounded-[var(--radius-md)] bg-raised px-2.5 py-2 text-left shadow-[var(--shadow-border)]">
               <ItemThumb kind={row.item.kind} name={row.item.name} ammoType={row.item.ammoType} weaponFamily={row.item.weaponFamily} size="sm" />
               <div className="min-w-0 flex-1 overflow-hidden">
                 <div className="flex min-w-0 items-center justify-between gap-2"><span className="min-w-0 truncate font-display text-sm">{row.item.name}</span><RarityMark rarity={row.item.rarity} /></div>

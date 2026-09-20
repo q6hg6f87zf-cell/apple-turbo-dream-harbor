@@ -20,7 +20,7 @@ import {
   Volume2,
   VolumeX,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { MoonCardSheet } from "./card";
 import { MoonCrest } from "./primitives";
 
@@ -45,6 +45,7 @@ export function HubHeader() {
   const s = useGame((g) => g.s);
   const rest = useGame((g) => g.rest);
   const setScreen = useGame((g) => g.setScreen);
+  const openGuide = useGame((g) => g.openGuide);
   const me = useGame((g) => plateMember(g.s));
   const busy = !!s.mission || !!s.combat;
   const [cardOpen, setCardOpen] = useState(false);
@@ -83,14 +84,26 @@ export function HubHeader() {
             <span className="min-w-0 flex-1 truncate font-display text-body leading-tight text-paper">
               {vacant ? "Unclaimed plate" : me.name}
             </span>
+            <span className="shrink-0 text-label tabular-nums text-muted">D{s.day}</span>
             <span className="shrink-0 font-display text-value tabular-nums text-ember">
               Plate · {me.personalCaps.toLocaleString()}
             </span>
           </span>
         </button>
-        <span className="flex size-11 shrink-0 items-center justify-center rounded-[var(--radius-sm)] font-display text-value tabular-nums text-paper shadow-[var(--shadow-border)]">
-          D{s.day}
-        </span>
+        {/* Ask lives in the header on every screen now, hub and task alike. The
+            floating button it replaces sat on top of list rows. */}
+        <button
+          type="button"
+          data-help="1"
+          aria-label="Ask Tyrone"
+          onClick={() => {
+            sfx.click();
+            openGuide();
+          }}
+          className="inline-flex size-11 shrink-0 items-center justify-center rounded-[var(--radius-sm)] text-ember shadow-[var(--shadow-border)]"
+        >
+          <CircleHelp className="size-5" />
+        </button>
         <button
           type="button"
           data-overflow="1"
@@ -133,7 +146,6 @@ function OverflowMenu({
   const assist = useGame((g) => g.s.tyrone?.settings.assist ?? "normal");
   const setAssist = useGame((g) => g.setTyroneAssist);
   const setScreen = useGame((g) => g.setScreen);
-  const openGuide = useGame((g) => g.openGuide);
 
   return (
     <div className="relative z-30">
@@ -180,18 +192,6 @@ function OverflowMenu({
         >
           <CircleHelp className="size-4 text-ember" />
           Assist · {assist}
-        </button>
-        <button
-          type="button"
-          className="flex min-h-11 w-full items-center gap-3 rounded-[var(--radius-sm)] px-3 text-left text-body text-paper hover:bg-raised"
-          onClick={() => {
-            sfx.click();
-            openGuide();
-            onClose();
-          }}
-        >
-          <CircleHelp className="size-4 text-ember" />
-          Ask Tyrone
         </button>
         <button
           type="button"
