@@ -32,6 +32,9 @@ jobs:
       - name: Production-style Vite build
         run: npm run build:dev
 
+      - name: Game rules and shell unit tests
+        run: npm run test:game
+
       - name: Long-campaign simulation
         env:
           HOLLOW_SIM_RUNS: 2500
@@ -39,6 +42,11 @@ jobs:
 
       - name: Install Chromium for mobile smoke
         run: npx playwright install --with-deps chromium
+
+      # Needs no dev server: it compiles the globe's own shaders and compares
+      # the baked planet against the procedural one.
+      - name: Globe terrain bake parity
+        run: node scripts/globe-bake-qa.mjs
 
       - name: Start Hollow Realm
         env:

@@ -41,32 +41,9 @@ type MarkerHit = {
   unlocked: boolean;
 };
 
-const VERTEX_SHADER = `#version 300 es
-in vec2 a_position;
-out vec2 v_uv;
-void main() {
-  v_uv = a_position * 0.5 + 0.5;
-  gl_Position = vec4(a_position, 0.0, 1.0);
-}`;
-
-const FRAGMENT_SHADER = `#version 300 es
-precision highp float;
-in vec2 v_uv;
-out vec4 outColor;
-uniform vec2 u_resolution;
-uniform float u_time;
-uniform float u_yaw;
-uniform float u_pitch;
-uniform float u_zoom;
-uniform vec3 u_regionDir[5];
-uniform vec3 u_regionColor[5];
-uniform sampler2D u_tex0;
-uniform sampler2D u_tex1;
-uniform sampler2D u_tex2;
-uniform sampler2D u_tex3;
-uniform sampler2D u_tex4;
-uniform float u_texReady;
-#define PI 3.14159265359
+// The hash/fbm block is shared with the terrain bake below, so the baked
+// fields and the live fallback are the same noise to the last bit.
+const TERRAIN_NOISE_GLSL = `#define PI 3.14159265359
 
 float hash21(vec2 p) {
   p = fract(p * vec2(123.34, 456.21));
@@ -101,7 +78,37 @@ float fbm(vec3 p) {
 float ridge(vec3 p) {
   float n = fbm(p);
   return 1.0 - abs(n * 2.0 - 1.0);
-}
+}`;
+
+const VERTEX_SHADER = `#version 300 es
+in vec2 a_position;
+out vec2 v_uv;
+void main() {
+  v_uv = a_position * 0.5 + 0.5;
+  gl_Position = vec4(a_position, 0.0, 1.0);
+}`;
+
+const FRAGMENT_SHADER = `#version 300 es
+precision highp float;
+in vec2 v_uv;
+out vec4 outColor;
+uniform vec2 u_resolution;
+uniform float u_time;
+uniform float u_yaw;
+uniform float u_pitch;
+uniform float u_zoom;
+uniform vec3 u_regionDir[5];
+uniform vec3 u_regionColor[5];
+uniform sampler2D u_tex0;
+uniform sampler2D u_tex1;
+uniform sampler2D u_tex2;
+uniform sampler2D u_tex3;
+uniform sampler2D u_tex4;
+uniform float u_texReady;
+uniform sampler2D u_bakeA;
+uniform sampler2D u_bakeB;
+uniform float u_bakeReady;
+${TERRAIN_NOISE_GLSL}
 vec3 rotateX(vec3 v, float a) {
   float c = cos(a), s = sin(a);
   return vec3(v.x, c*v.y - s*v.z, s*v.y + c*v.z);
@@ -254,13 +261,31 @@ void main() {
   vec3 landColor = vec3(0.32, 0.3, 0.24);
   vec3 painted = vec3(0.0);
   float paintWeight = 0.0;
+  float archNoise;
+  if (u_bakeReady > 0.5) {
+    // Continent shape does not move, so it is baked once into an equirect pair
+    // and read back here. Six octaves of noise per region, per pixel, per frame
+    // bought nothing but heat.
+    vec2 buv = vec2(atan(nrm.x, nrm.z) / (2.0 * PI) + 0.5, latitude / PI + 0.5);
+    vec4 packA = texture(u_bakeA, buv);
+    vec4 packB = texture(u_bakeB, buv);
+    influence[0] = packA.r;
+    influence[1] = packA.g;
+    influence[2] = packA.b;
+    influence[3] = packA.a;
+    influence[4] = packB.r;
+    archNoise = packB.g;
+  } else {
+    for (int i = 0; i < 5; i++) {
+      float ang = acos(clamp(dot(nrm, u_regionDir[i]), -1.0, 1.0));
+      float coast = (fbm(nrm * 7.4 + vec3(float(i) * 2.7, 1.4, 4.1)) - 0.5) * 0.18;
+      influence[i] = smoothstep(0.7, 0.2, ang + coast);
+    }
+    archNoise = smoothstep(0.74, 0.88, fbm(nrm * 9.2 + vec3(4.0, 1.0, 9.0)));
+  }
   for (int i = 0; i < 5; i++) {
-    float ang = acos(clamp(dot(nrm, u_regionDir[i]), -1.0, 1.0));
-    float coast = (fbm(nrm * 7.4 + vec3(float(i) * 2.7, 1.4, 4.1)) - 0.5) * 0.18;
-    float m = smoothstep(0.7, 0.2, ang + coast);
-    influence[i] = m;
-    if (m > island) {
-      island = m;
+    if (influence[i] > island) {
+      island = influence[i];
       landColor = u_regionColor[i];
     }
   }
@@ -274,7 +299,7 @@ void main() {
     landColor = mix(landColor, painted / max(0.001, paintWeight), 0.72);
   }
 
-  float archipelago = smoothstep(0.74, 0.88, fbm(nrm * 9.2 + vec3(4.0, 1.0, 9.0))) * tropic * 0.28;
+  float archipelago = archNoise * tropic * 0.28;
   float landMask = max(max(island, polar * 0.62), archipelago);
   float rivers = smoothstep(0.012, 0.0, abs(fbm(nrm * 12.2) - 0.47));
   landMask *= 1.0 - rivers * (1.0 - polar) * 0.55;
@@ -344,6 +369,36 @@ void main() {
   float air = pow(1.0 - max(dot(normal, -ray), 0.0), 4.2);
   surface = mix(surface, vec3(0.25, 0.48, 0.78), air * 0.22);
   outColor = vec4(pow(mix(background, surface, 0.985), vec3(0.88)), 1.0);
+}
+`;
+
+// One-time pass that writes the planet's fixed geography into two equirect
+// maps: the five region fields in A (rgba) and the fifth field plus the
+// archipelago mask in B. Everything time-varying — weather, waves, the slag
+// glow, the terminator — stays live in the main shader.
+const BAKE_SIZE = { width: 1024, height: 512 };
+
+const BAKE_FRAGMENT_SHADER = `#version 300 es
+precision highp float;
+in vec2 v_uv;
+layout(location = 0) out vec4 outA;
+layout(location = 1) out vec4 outB;
+uniform vec3 u_regionDir[5];
+${TERRAIN_NOISE_GLSL}
+
+void main() {
+  float lon = (v_uv.x - 0.5) * 2.0 * PI;
+  float lat = (v_uv.y - 0.5) * PI;
+  float cosLat = cos(lat);
+  vec3 nrm = normalize(vec3(cosLat * sin(lon), sin(lat), cosLat * cos(lon)));
+  float influence[5];
+  for (int i = 0; i < 5; i++) {
+    float ang = acos(clamp(dot(nrm, u_regionDir[i]), -1.0, 1.0));
+    float coast = (fbm(nrm * 7.4 + vec3(float(i) * 2.7, 1.4, 4.1)) - 0.5) * 0.18;
+    influence[i] = smoothstep(0.7, 0.2, ang + coast);
+  }
+  outA = vec4(influence[0], influence[1], influence[2], influence[3]);
+  outB = vec4(influence[4], smoothstep(0.74, 0.88, fbm(nrm * 9.2 + vec3(4.0, 1.0, 9.0))), 0.0, 1.0);
 }
 `;
 
@@ -437,6 +492,83 @@ function compileShader(gl: WebGL2RenderingContext, type: number, source: string)
   }
   return shader;
 }
+function bakeTerrain(gl: WebGL2RenderingContext, regionDirections: Float32Array) {
+  let program: WebGLProgram | null = null;
+  let vao: WebGLVertexArrayObject | null = null;
+  let buffer: WebGLBuffer | null = null;
+  let fbo: WebGLFramebuffer | null = null;
+  let texA: WebGLTexture | null = null;
+  let texB: WebGLTexture | null = null;
+
+  const makeTarget = () => {
+    const tex = gl.createTexture();
+    if (!tex) throw new Error("Bake texture allocation failed.");
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, BAKE_SIZE.width, BAKE_SIZE.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    // Longitude wraps; without REPEAT the dateline reads as a seam down the globe.
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    return tex;
+  };
+
+  try {
+    const vertexShader = compileShader(gl, gl.VERTEX_SHADER, VERTEX_SHADER);
+    const fragmentShader = compileShader(gl, gl.FRAGMENT_SHADER, BAKE_FRAGMENT_SHADER);
+    program = gl.createProgram();
+    if (!program) throw new Error("Bake program allocation failed.");
+    gl.attachShader(program, vertexShader);
+    gl.attachShader(program, fragmentShader);
+    gl.linkProgram(program);
+    gl.deleteShader(vertexShader);
+    gl.deleteShader(fragmentShader);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      throw new Error(gl.getProgramInfoLog(program) ?? "Bake program link failed.");
+    }
+
+    texA = makeTarget();
+    texB = makeTarget();
+    fbo = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texA, 0);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT1, gl.TEXTURE_2D, texB, 0);
+    gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1]);
+    if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) {
+      throw new Error("Bake framebuffer incomplete.");
+    }
+
+    vao = gl.createVertexArray();
+    buffer = gl.createBuffer();
+    gl.bindVertexArray(vao);
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+    const position = gl.getAttribLocation(program, "a_position");
+    gl.enableVertexAttribArray(position);
+    gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
+
+    gl.useProgram(program);
+    gl.uniform3fv(gl.getUniformLocation(program, "u_regionDir[0]"), regionDirections);
+    gl.viewport(0, 0, BAKE_SIZE.width, BAKE_SIZE.height);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    return { texA, texB };
+  } catch (error) {
+    // Any refusal here just means the planet draws itself the old way.
+    console.warn("Hollow Realm terrain bake fallback", error);
+    if (texA) gl.deleteTexture(texA);
+    if (texB) gl.deleteTexture(texB);
+    return null;
+  } finally {
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.bindVertexArray(null);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    if (fbo) gl.deleteFramebuffer(fbo);
+    if (buffer) gl.deleteBuffer(buffer);
+    if (vao) gl.deleteVertexArray(vao);
+    if (program) gl.deleteProgram(program);
+  }
+}
+
 function openRegionMap(regionId: RegionId) {
   const store = useGame.getState();
   const location = REGION_TO_LOCATION[regionId];
@@ -585,6 +717,9 @@ export function HollowGlobeWebGL({
     const colorsUniform = gl.getUniformLocation(program, "u_regionColor[0]");
     const texUniforms = [0, 1, 2, 3, 4].map((i) => gl.getUniformLocation(program, `u_tex${i}`));
     const texReadyUniform = gl.getUniformLocation(program, "u_texReady");
+    const bakeAUniform = gl.getUniformLocation(program, "u_bakeA");
+    const bakeBUniform = gl.getUniformLocation(program, "u_bakeB");
+    const bakeReadyUniform = gl.getUniformLocation(program, "u_bakeReady");
     requestRegionBitmaps();
     const textures = CANONICAL_REGION_IDS.map((id) => makeFallbackTexture(gl, REGION_COLORS[id]));
     const uploaded = new Set<number>();
@@ -608,6 +743,7 @@ export function HollowGlobeWebGL({
       }),
     );
     const regionColors = new Float32Array(CANONICAL_REGION_IDS.flatMap((id) => REGION_COLORS[id]));
+    const baked = bakeTerrain(gl, regionDirections);
 
     let width = 1;
     let height = 1;
@@ -760,6 +896,15 @@ export function HollowGlobeWebGL({
         gl.uniform1i(texUniforms[i], i);
       });
       gl.uniform1f(texReadyUniform, texReady);
+      if (baked) {
+        gl.activeTexture(gl.TEXTURE5);
+        gl.bindTexture(gl.TEXTURE_2D, baked.texA);
+        gl.uniform1i(bakeAUniform, 5);
+        gl.activeTexture(gl.TEXTURE6);
+        gl.bindTexture(gl.TEXTURE_2D, baked.texB);
+        gl.uniform1i(bakeBUniform, 6);
+      }
+      gl.uniform1f(bakeReadyUniform, baked ? 1 : 0);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
       drawMarkers(now);
       raf = requestAnimationFrame(frame);
@@ -774,6 +919,10 @@ export function HollowGlobeWebGL({
       if (vao) gl.deleteVertexArray(vao);
       if (program) gl.deleteProgram(program);
       for (const tex of textures) if (tex) gl.deleteTexture(tex);
+      if (baked) {
+        gl.deleteTexture(baked.texA);
+        gl.deleteTexture(baked.texB);
+      }
     };
   }, [locations, selected]);
 
