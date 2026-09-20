@@ -252,10 +252,12 @@ export function Dice20({
         ctx.lineTo(pb[0], pb[1]);
         ctx.lineTo(pc[0], pc[1]);
         ctx.closePath();
-        const g = Math.round(22 + lit * 78);
-        const e = Math.round(48 + lit * 96);
-        ctx.fillStyle = `rgb(${g},${e},${Math.round(g * 1.04)})`;
-        if (band === "crit" && !spinning) ctx.fillStyle = `rgb(${Math.round(18 + lit * 28)},${Math.round(88 + lit * 145)},${Math.round(48 + lit * 82)})`;
+        // Cast brass, lit from the side. Crit runs to bright gold.
+        const warm = Math.round(38 + lit * 150);
+        const mid = Math.round(24 + lit * 100);
+        ctx.fillStyle = `rgb(${warm},${mid},${Math.round(14 + lit * 58)})`;
+        if (band === "crit" && !spinning)
+          ctx.fillStyle = `rgb(${Math.round(64 + lit * 178)},${Math.round(46 + lit * 140)},${Math.round(20 + lit * 72)})`;
         if ((band === "fumble" || band === "fail") && !spinning)
           ctx.fillStyle = `rgb(${Math.round(78 + lit * 90)},${Math.round(20 + lit * 22)},${Math.round(20 + lit * 22)})`;
         ctx.fill();
@@ -280,19 +282,19 @@ export function Dice20({
         if (winner) {
           ctx.beginPath();
           ctx.arc(0, 0, fontPx * 0.72, 0, Math.PI * 2);
-          ctx.fillStyle = "rgba(8,12,10,0.45)";
+          ctx.fillStyle = "rgba(11,9,8,0.5)";
           ctx.fill();
         }
         ctx.lineJoin = "round";
         ctx.miterLimit = 2;
         ctx.lineWidth = Math.max(2.2, fontPx * 0.18);
-        ctx.strokeStyle = winner ? "rgba(10,16,12,0.95)" : "rgba(10,16,12,0.8)";
+        ctx.strokeStyle = winner ? "rgba(11,9,8,0.95)" : "rgba(11,9,8,0.8)";
         ctx.font = `800 ${fontPx}px Cinzel, Georgia, serif`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         const label = String(f.n);
         ctx.strokeText(label, 0, 1);
-        ctx.fillStyle = winner ? "rgba(244,247,240,1)" : `rgba(231,243,234,${0.55 + f.nz * 0.45})`;
+        ctx.fillStyle = winner ? "rgba(248,238,214,1)" : `rgba(241,227,194,${0.55 + f.nz * 0.45})`;
         ctx.fillText(label, 0, 1);
         ctx.restore();
       });

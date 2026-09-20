@@ -9,6 +9,7 @@ import { useGame } from "@/game/store";
 import type { Operative } from "@/game/types";
 import { STAT_COPY, STAT_ORDER } from "@/game/stats-copy";
 import { cn } from "@/lib/cn";
+import { CommandBar, EncounterBackdrop } from "./encounter-scene";
 import {
   ClassGlyph,
   Coin,
@@ -107,118 +108,130 @@ export function MissionOverlay() {
     .filter(Boolean) as Operative[];
   const partyDown = party.length > 0 && party.every((o) => o.hp <= 0 || o.status === "dead");
 
+  const choosing = !!(mission.waiting && beat?.tactics && !beat.tacticId);
+
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center bg-ink/80 p-3 md:items-center">
-      <div className="ms-pop max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-[var(--radius-xl)] bg-surface p-5 shadow-[var(--shadow-border)] ms-scroll">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="font-display text-[10px] uppercase tracking-[0.22em] text-ember">
-              {loc.short} · {mission.approach ?? "standard"} · {mission.kind} · beat {mission.beatIndex + 1}/{mission.beats.length}
+    <div className="fixed inset-0 z-40 flex flex-col" data-mission="1">
+      <EncounterBackdrop locationId={mission.locationId} />
+
+      <div className="relative z-[1] flex min-h-0 flex-1 flex-col">
+        <div className="shrink-0 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="font-display text-label uppercase tracking-[0.22em] text-ember">
+                {loc.short} · {mission.approach ?? "standard"} · {mission.kind} · beat {mission.beatIndex + 1}/
+                {mission.beats.length}
+              </div>
+              <h2 className="mt-1 font-display text-2xl leading-tight">{beat?.title ?? "Return"}</h2>
             </div>
-            <h2 className="mt-1 font-display text-xl">{beat?.title ?? "Return"}</h2>
-          </div>
-          <div className="text-right text-xs text-muted">
-            <Coin n={mission.coins} />
-          </div>
-        </div>
-
-        <div className="mt-3 flex gap-2">
-          {party.map((op) => (
-            <div key={op.id} className="flex items-center gap-1.5">
-              <Portrait op={op} size={28} />
-              <span className="hidden text-[11px] text-muted sm:inline">{op.name}</span>
+            <div className="shrink-0 text-right text-label text-muted">
+              <Coin n={mission.coins} />
             </div>
-          ))}
-        </div>
-
-        <div className="mt-3 flex gap-1.5">
-          {mission.beats.map((b, i) => (
-            <span
-              key={`${b.id}-${i}`}
-              className={cn(
-                "h-1.5 flex-1 rounded-full",
-                i < mission.beatIndex ? "bg-ok" : i === mission.beatIndex ? "bg-ember" : "bg-line",
-              )}
-            />
-          ))}
-        </div>
-
-        <p className="mt-4 text-[15px] leading-relaxed text-moon">{beat?.prompt}</p>
-        {beat && lead && beat.tacticId ? (
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-wider text-muted">
-            <span className="rounded-full bg-ink px-2 py-1 text-ember">
-              {beat.stat} {leadStats ? leadStats[beat.stat] : ""} · DC {beat.dc}
-            </span>
-            <span>{lead.name} rolls</span>
           </div>
-        ) : null}
 
-        {mission.waiting && beat?.tactics && !beat.tacticId ? (
-          <div className="mt-4 space-y-2">
-            <p className="font-display text-[10px] uppercase tracking-[0.16em] text-ember">Call it</p>
-            {beat.tactics.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => {
-                  sfx.click();
-                  pickTactic(t.id);
-                }}
-                className="flex min-h-14 w-full flex-col items-start justify-center rounded-[var(--radius-md)] bg-ink px-3 py-2 text-left shadow-[var(--shadow-border)]"
-              >
-                <span className="font-display text-sm text-paper">{t.label}</span>
-                <span className="mt-0.5 text-[12px] text-muted">{t.blurb}</span>
-              </button>
+          <div className="mt-3 flex items-center gap-2">
+            {party.map((op) => (
+              <div key={op.id} className="flex items-center gap-1.5">
+                <Portrait op={op} size={28} />
+                <span className="hidden text-label text-muted sm:inline">{op.name}</span>
+              </div>
             ))}
           </div>
-        ) : (
-          <>
-        <div className="mt-5 flex justify-center">
-          <DiceFace value={mission.lastRoll?.value} band={mission.lastRoll?.band} spinning={spin} size={128} />
-        </div>
-        {mission.lastRoll ? (
-          <p className="mt-3 text-center text-sm text-muted">
-            {mission.lastRoll.text}. {BAND_COPY[mission.lastRoll.band]}
-          </p>
-        ) : null}
 
-        <ul className="mt-4 space-y-1.5 text-sm text-muted">
-          {mission.narrative.slice(-4).map((n, i) => (
-            <li key={i} className={i === mission.narrative.slice(-4).length - 1 ? "text-paper" : ""}>
-              {n}
-            </li>
-          ))}
-        </ul>
-
-        {mission.loot.length ? (
-          <div className="mt-4 border-t border-line pt-3">
-            <SectionLabel>Recovered</SectionLabel>
-            {mission.loot.map((it) => (
-              <ItemLine key={it.id} item={it} />
+          <div className="mt-3 flex gap-1.5">
+            {mission.beats.map((b, i) => (
+              <span
+                key={`${b.id}-${i}`}
+                className={cn(
+                  "h-1.5 flex-1 rounded-full",
+                  i < mission.beatIndex ? "bg-ok" : i === mission.beatIndex ? "bg-ember" : "bg-line",
+                )}
+              />
             ))}
           </div>
-        ) : null}
+        </div>
 
-        <div className="mt-5">
-          {mission.waiting ? (
-            <Button className="w-full" variant="ember" onClick={onRoll} disabled={spin} sound="none" autoFocus>
-              Roll d20
-            </Button>
+        <div className="ms-scroll min-h-0 flex-1 overflow-y-auto px-4 pb-4">
+          <p className="text-body leading-relaxed text-moon">{beat?.prompt}</p>
+          {beat && lead && beat.tacticId ? (
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-label uppercase tracking-wider text-muted">
+              <span className="rounded-full bg-ink/70 px-2 py-1 text-ember">
+                {beat.stat} {leadStats ? leadStats[beat.stat] : ""} · DC {beat.dc}
+              </span>
+              <span>{lead.name} rolls</span>
+            </div>
+          ) : null}
+
+          {choosing ? (
+            <div className="mt-4 space-y-2">
+              <p className="font-display text-label uppercase tracking-[0.16em] text-ember">Call it</p>
+              {beat?.tactics?.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => {
+                    sfx.click();
+                    pickTactic(t.id);
+                  }}
+                  className="flex min-h-14 w-full flex-col items-start justify-center rounded-[var(--radius-md)] bg-ink/75 px-3 py-2 text-left shadow-[var(--shadow-border)] backdrop-blur-sm"
+                >
+                  <span className="font-display text-body text-paper">{t.label}</span>
+                  <span className="mt-0.5 text-secondary text-muted">{t.blurb}</span>
+                </button>
+              ))}
+            </div>
           ) : (
-            <Button
-              className="w-full"
-              sound="none"
-              autoFocus
-              onClick={() => {
-                sfx.click();
-                cont();
-              }}
-            >
-              {last || partyDown ? "Return to HQ" : "Continue"}
-            </Button>
+            <>
+              <div className="mt-5 flex justify-center">
+                <DiceFace value={mission.lastRoll?.value} band={mission.lastRoll?.band} spinning={spin} size={128} />
+              </div>
+              {mission.lastRoll ? (
+                <p className="mt-3 text-center text-secondary text-muted">
+                  {mission.lastRoll.text}. {BAND_COPY[mission.lastRoll.band]}
+                </p>
+              ) : null}
+
+              <ul className="mt-4 space-y-1.5 text-secondary text-muted">
+                {mission.narrative.slice(-4).map((n, i, all) => (
+                  <li key={i} className={i === all.length - 1 ? "text-paper" : ""}>
+                    {n}
+                  </li>
+                ))}
+              </ul>
+
+              {mission.loot.length ? (
+                <div className="mt-4 border-t border-line pt-3">
+                  <SectionLabel>Recovered</SectionLabel>
+                  {mission.loot.map((it) => (
+                    <ItemLine key={it.id} item={it} />
+                  ))}
+                </div>
+              ) : null}
+            </>
           )}
         </div>
-          </>
+
+        {choosing ? null : (
+          <CommandBar>
+            {mission.waiting ? (
+              <Button className="w-full" variant="ember" onClick={onRoll} disabled={spin} sound="none" autoFocus>
+                Roll d20
+              </Button>
+            ) : (
+              <Button
+                className="w-full"
+                variant="ember"
+                sound="none"
+                autoFocus
+                onClick={() => {
+                  sfx.click();
+                  cont();
+                }}
+              >
+                {last || partyDown ? "Return to HQ" : "Continue"}
+              </Button>
+            )}
+          </CommandBar>
         )}
       </div>
     </div>
@@ -397,123 +410,150 @@ export function CombatOverlay() {
       ]
     : [];
 
+  const standing = combat.enemies.filter((e) => e.hp > 0).length;
+  const hullPct = enemy ? Math.max(0, Math.min(100, (enemy.hp / Math.max(1, enemy.maxHp)) * 100)) : 0;
+
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center bg-ink/85 p-3 md:items-center">
-      <div
-        className={cn(
-          "ms-pop max-h-[94vh] w-full max-w-lg overflow-y-auto rounded-[var(--radius-xl)] bg-surface p-5 shadow-[0_0_0_1px_color-mix(in_oklab,var(--color-danger)_40%,transparent)] ms-scroll",
-          flash && "ms-hit ms-shake",
-        )}
-      >
-        <div className="relative">
-          <div className="font-display text-[10px] uppercase tracking-[0.22em] text-danger">
-            Contact · round {combat.turn}
+    <div className="fixed inset-0 z-40 flex flex-col" data-combat="1">
+      <EncounterBackdrop locationId={combat.locationId} tone="danger" />
+
+      <div className={cn("relative z-[1] flex min-h-0 flex-1 flex-col", flash && "ms-hit")}>
+        <div className="shrink-0 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="font-display text-label uppercase tracking-[0.22em] text-danger">
+              Contact · round {combat.turn}
+            </span>
+            {combat.enemies.length > 1 ? (
+              <span className="text-label tabular-nums text-muted">
+                {standing}/{combat.enemies.length} standing
+              </span>
+            ) : null}
           </div>
-          <h2 className="mt-1 font-display text-xl">{enemy?.name}</h2>
+
+          <h2 className="mt-1 font-display text-3xl leading-tight text-paper">{enemy?.name}</h2>
           {v ? (
-            <p className="text-xs text-muted">
+            <p className="text-label text-muted">
               {v.title} · {v.arc}
             </p>
           ) : null}
           {phase ? (
-            <p className="mt-1 font-display text-[10px] uppercase tracking-wider text-ember">{phase.name}</p>
+            <p className="mt-1 font-display text-label uppercase tracking-[0.16em] text-ember">{phase.name}</p>
           ) : null}
-          <p className="mt-2 text-sm italic text-moon">{enemy?.flavor}</p>
-          {enemy ? <HpBar hp={enemy.hp} max={enemy.maxHp} className="mt-3" label="Hull" /> : null}
-          {combat.incomingSoft ? (
-            <p className="mt-1 font-display text-[10px] uppercase tracking-[0.16em] text-ember">Bracing · next hit lands softer</p>
-          ) : null}
-          <div className="mt-1 text-xs tabular-nums text-muted">
-            DC {enemy?.dc}
-            {enemy?.armorClass ? ` · ${enemy.armorClass}` : ""}
-            {enemy?.preferredRange ? ` · ${enemy.preferredRange}` : ""}
-            {combat.enemies.length > 1
-              ? ` · ${combat.enemies.filter((e) => e.hp > 0).length}/${combat.enemies.length} standing`
-              : ""}
+
+          <div className="relative mt-3">
+            <div className="ms-hull-track">
+              <div className="ms-hull-fill" style={{ width: `${hullPct}%` }} />
+            </div>
+            <div className="mt-1 flex items-center justify-between text-label tabular-nums text-muted">
+              <span>
+                Hull {enemy?.hp ?? 0}/{enemy?.maxHp ?? 0}
+              </span>
+              <span>
+                DC {enemy?.dc}
+                {enemy?.armorClass ? ` · ${enemy.armorClass}` : ""}
+                {enemy?.preferredRange ? ` · ${enemy.preferredRange}` : ""}
+              </span>
+            </div>
+            {float.n ? <FloatNum n={float.n} kind={float.n > 0 ? "dmg" : "heal"} tick={float.tick} /> : null}
           </div>
-          {float.n ? <FloatNum n={float.n} kind={float.n > 0 ? "dmg" : "heal"} tick={float.tick} /> : null}
+
+          {combat.incomingSoft ? (
+            <p className="mt-1 font-display text-label uppercase tracking-[0.16em] text-ember">
+              Bracing · next hit lands softer
+            </p>
+          ) : null}
         </div>
 
-        <div className="mt-4 grid gap-2">
-          {party.map((op) => (
-            <div
-              key={op.id}
-              className={cn(
-                "flex items-center gap-3 rounded-[var(--radius-sm)] px-3 py-2 transition-colors duration-150",
-                actor?.id === op.id ? "bg-ember/10 shadow-[var(--shadow-border-hover)]" : "shadow-[var(--shadow-border)]",
-                hurtId === op.id && "ms-hit",
-              )}
-            >
-              <Portrait op={op} size={36} />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="truncate">
-                    {op.name}
-                    {actor?.id === op.id ? (
-                      <span className="ml-2 font-display text-[9px] uppercase tracking-wider text-ember">acting</span>
-                    ) : null}
-                  </span>
+        {/* The room fills the gap; the fight's words sit down against the party. */}
+        <div className="ms-scroll min-h-0 flex-1 overflow-y-auto px-4" aria-live="polite">
+          <div className="flex min-h-full flex-col justify-end space-y-1 text-secondary text-muted">
+            {combat.log.slice(-10).map((line, i, all) => (
+              <p key={i} className={i === all.length - 1 ? "text-paper" : ""}>
+                {line}
+              </p>
+            ))}
+          </div>
+        </div>
+
+        <div className="shrink-0 px-3 py-3">
+          <div className="grid grid-cols-3 gap-2">
+            {party.map((op) => (
+              <div
+                key={op.id}
+                className={cn(
+                  "min-w-0 rounded-[var(--radius-sm)] bg-ink/70 px-2 py-2 backdrop-blur-sm transition-colors duration-150",
+                  actor?.id === op.id
+                    ? "shadow-[var(--shadow-border-hover)]"
+                    : "shadow-[var(--shadow-border)]",
+                  hurtId === op.id && "ms-hit",
+                )}
+              >
+                <div className="flex min-w-0 items-center gap-2">
+                  <Portrait op={op} size={28} />
+                  <span className="min-w-0 flex-1 truncate text-label text-paper">{op.name}</span>
                 </div>
-                <HpBar hp={op.hp} max={op.maxHp} className="mt-1" />
-                {actor?.id === op.id && actorGun ? (
-                  <p className="mt-1 font-display text-[9px] uppercase tracking-[0.14em] text-ember">{magLine(actorGun)}</p>
+                <HpBar hp={op.hp} max={op.maxHp} className="mt-1.5" />
+                {actor?.id === op.id ? (
+                  <p className="mt-1 truncate font-display text-label uppercase tracking-[0.14em] text-ember">
+                    {actorGun ? magLine(actorGun) : "acting"}
+                  </p>
                 ) : null}
               </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-4 max-h-28 space-y-1 overflow-y-auto text-sm text-muted ms-scroll" aria-live="polite">
-          {combat.log.slice(-6).map((line, i) => (
-            <p key={i} className={i === combat.log.slice(-6).length - 1 ? "text-paper" : ""}>
-              {line}
-            </p>
-          ))}
-        </div>
-
-        {actor && actor.hp > 0 ? (
-          <>
-            <p className="mt-3 text-xs text-moon">{ACT_HELP[help]}</p>
-            <p className="mt-1 font-display text-[10px] uppercase tracking-[0.16em] text-muted">Keys 1–6</p>
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              {actions.map((a) => {
-                const Icon = a.icon;
-                return (
-                  <button
-                    key={a.id}
-                    type="button"
-                    disabled={a.disabled || lock}
-                    onClick={() => {
-                      setHelp(a.id);
-                      go(a.id);
-                    }}
-                    className={cn(
-                      "flex min-h-14 flex-col items-start justify-center rounded-[var(--radius-sm)] px-3 py-2 text-left transition-transform active:scale-[0.96] disabled:opacity-40",
-                      a.variant === "ember" && "bg-ember text-ink",
-                      a.variant === "ghost" && "bg-transparent text-paper shadow-[var(--shadow-border)]",
-                      a.variant === "quiet" && "bg-raised text-muted",
-                      a.variant === "danger" && "bg-danger/15 text-danger",
-                    )}
-                  >
-                    <span className="flex items-center gap-2 font-display text-[11px] uppercase tracking-[0.14em]">
-                      <Icon className="size-4" /> <span className="truncate">{a.label}</span>
-                    </span>
-                    <span className="mt-0.5 font-body text-[11px] normal-case tracking-normal text-current/70">
-                      {ACT_SHORT[a.id]}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </>
-        ) : (
-          <div className="mt-4">
-            <p className="text-sm text-danger">No one standing.</p>
-            <Button className="mt-3 w-full" variant="danger" sound="none" onClick={() => { sfx.whoosh(); extract(); }}>
-              Extract the fallen
-            </Button>
+            ))}
           </div>
-        )}
+        </div>
+
+        <CommandBar>
+          {actor && actor.hp > 0 ? (
+            <>
+              <p className="mb-2 min-h-8 text-secondary text-moon">{ACT_HELP[help]}</p>
+              <div className="grid grid-cols-3 gap-2">
+                {actions.map((a) => {
+                  const Icon = a.icon;
+                  return (
+                    <button
+                      key={a.id}
+                      type="button"
+                      disabled={a.disabled || lock}
+                      data-juice={a.variant === "ember" ? "commit" : undefined}
+                      onClick={() => {
+                        setHelp(a.id);
+                        go(a.id);
+                      }}
+                      className={cn(
+                        "flex min-h-16 flex-col items-center justify-center gap-1 rounded-[var(--radius-sm)] px-2 py-2 text-center disabled:opacity-40",
+                        a.variant === "ember" && "bg-ember text-ink",
+                        a.variant === "ghost" && "bg-ink/60 text-paper shadow-[var(--shadow-border)]",
+                        a.variant === "quiet" && "bg-raised/80 text-muted",
+                        a.variant === "danger" && "bg-danger/20 text-danger",
+                      )}
+                    >
+                      <Icon className="size-4 shrink-0" />
+                      <span className="line-clamp-2 w-full font-display text-label uppercase leading-tight tracking-[0.08em]">
+                        {a.label}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="mb-2 text-secondary text-danger">No one standing.</p>
+              <Button
+                className="w-full"
+                variant="danger"
+                sound="none"
+                onClick={() => {
+                  sfx.whoosh();
+                  extract();
+                }}
+              >
+                Extract the fallen
+              </Button>
+            </>
+          )}
+        </CommandBar>
       </div>
     </div>
   );
