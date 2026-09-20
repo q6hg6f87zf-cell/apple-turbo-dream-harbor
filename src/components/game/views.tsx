@@ -75,6 +75,7 @@ import { TerminalCard, TyroneHandshake } from "./menu";
 import { ItemInspectShell } from "./item-inspect";
 import { ItemThumb } from "./item-thumb";
 import { FIT_TONE, MarketLotCard, lotFit, lotSpecs } from "./market-lot";
+import { RegionSheet } from "./region-sheet";
 import { WakeScene } from "./wake-scene";
 import { PorchStrip } from "./porch-presence";
 import { useOpeningBeat } from "@/game/opening";
@@ -1017,6 +1018,7 @@ export function MapView() {
   const [kind, setKind] = useState<MissionKind>("scout");
   const [approach, setApproach] = useState<MissionApproach>("standard");
   const [orbit, setOrbit] = useState(false);
+  const [sheet, setSheet] = useState(false);
   const touched = useRef(false);
   const progress = s.locations[loc] ?? EMPTY_PROGRESS;
   const merchant = NPCS.find((n) => n.loc === loc);
@@ -1077,7 +1079,7 @@ export function MapView() {
       <div>
         <SectionLabel>The Hollow Realm</SectionLabel>
         <h2 className="font-display text-2xl">World</h2>
-        <p className="mt-1 text-sm text-muted">Pick a region. Orbit is the planet. Ground is the job.</p>
+        <p className="mt-1 text-secondary text-muted">Pick a region to brief the sortie. Orbit is the planet.</p>
       </div>
 
       <div className="grid grid-cols-1 gap-2">
@@ -1096,6 +1098,7 @@ export function MapView() {
                 shockwaveAt(e.clientX, e.clientY);
                 sfx.click();
                 selectLoc(w.id as LocationId);
+                setSheet(true);
               }}
               className={cn(
                 "flex min-h-[4.75rem] items-center gap-3 overflow-hidden rounded-[var(--radius-lg)] text-left shadow-[var(--shadow-border)] disabled:opacity-45",
@@ -1117,12 +1120,12 @@ export function MapView() {
         })}
       </div>
 
+      {/* A chooser has no single commit, so Orbit stays secondary. */}
       <Button
-        variant="ember"
+        variant="ghost"
         className="w-full min-h-14"
         onClick={(e) => {
           punchClick(e.clientX, e.clientY);
-          shockwaveAt(e.clientX, e.clientY);
           sfx.whoosh();
           closeRegionMap();
           setOrbit(true);
@@ -1131,7 +1134,34 @@ export function MapView() {
         <Globe2 className="size-4" /> Orbit the Hollow
       </Button>
 
-      <Panel className="bg-ink/92">
+      {sheet ? (
+        <RegionSheet
+          title={L.name}
+          locationId={loc}
+          onClose={() => setSheet(false)}
+          command={
+            <Button
+              className={cn("w-full", s.tutorial === "sortie" && "ms-nudge")}
+              variant="ember"
+              sound="none"
+              disabled={!party.length || !progress.unlocked}
+              onClick={(e) => {
+                const msg = deploy(loc, kind, party, { poiId: poi?.id, approach });
+                if (msg) err(msg);
+                else {
+                  punchClick(e.clientX, e.clientY);
+                  shockwaveAt(e.clientX, e.clientY);
+                  sfx.deploy();
+                  touched.current = false;
+                  setParty([]);
+                  setSheet(false);
+                }
+              }}
+            >
+              {party.length ? `Deploy ${party.length} to ${L.short}` : "Pick who walks"}
+            </Button>
+          }
+        >
         <div>
           <p className="font-display text-[10px] uppercase tracking-[0.2em] text-ember">{regionById(regionId).continent}</p>
           <h3 className="font-display text-lg">{L.name}</h3>
@@ -1167,7 +1197,7 @@ export function MapView() {
             {poi ? <p className="mt-2 text-xs text-muted">{poi.description}</p> : null}
             {poi ? (
               <Button
-                variant="ember"
+                variant="ghost"
                 className="mt-3 w-full min-h-12"
                 data-poi-act={poi.id}
                 onClick={() => {
@@ -1307,29 +1337,8 @@ export function MapView() {
                 })}
               </div>
             )}
-
-            <Button
-              className={cn("mt-4 w-full", s.tutorial === "sortie" && "ms-nudge")}
-              variant="ember"
-              sound="none"
-              disabled={!party.length}
-              onClick={(e) => {
-                const msg = deploy(loc, kind, party, { poiId: poi?.id, approach });
-                if (msg) err(msg);
-                else {
-                  punchClick(e.clientX, e.clientY);
-                  shockwaveAt(e.clientX, e.clientY);
-                  sfx.deploy();
-                  touched.current = false;
-                  setParty([]);
-                }
-              }}
-            >
-              Deploy {party.length ? `· ${party.length} to ${L.short}` : "— pick who walks"}
-            </Button>
           </>
         )}
-      </Panel>
 
       {merchant && progress.unlocked ? (
         <Panel>
@@ -1348,6 +1357,8 @@ export function MapView() {
             ))}
           </div>
         </Panel>
+      ) : null}
+        </RegionSheet>
       ) : null}
 
       {orbit ? (
