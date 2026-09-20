@@ -28,7 +28,16 @@ import {
 import { sfx, unlockAudio } from "@/game/audio";
 import { useGame } from "@/game/store";
 import { currentArcLoc, isVacant, seatedMember } from "@/game/squad";
-import type { ClassName, LocationId, LocationProgress, MissionApproach, MissionKind, RoomId } from "@/game/types";
+import type {
+  ClassName,
+  LocationId,
+  LocationProgress,
+  MarketLot,
+  MissionApproach,
+  MissionKind,
+  RoomId,
+} from "@/game/types";
+import { itemArt } from "@/game/item-art";
 import { cn } from "@/lib/cn";
 import {
   Archive,
@@ -63,6 +72,9 @@ import {
   StatusPill,
 } from "./primitives";
 import { TerminalCard, TyroneHandshake } from "./menu";
+import { ItemInspectShell } from "./item-inspect";
+import { ItemThumb } from "./item-thumb";
+import { FIT_TONE, MarketLotCard, lotFit, lotSpecs } from "./market-lot";
 import { WakeScene } from "./wake-scene";
 import { PorchStrip } from "./porch-presence";
 import { useOpeningBeat } from "@/game/opening";
@@ -1511,95 +1523,57 @@ export function MarketView() {
   const stalls = (market?.lots ?? []).filter((l) => !l.visitor);
   const guests = (market?.lots ?? []).filter((l) => l.visitor);
   const left = s.shift?.watchesLeft ?? 0;
+  const [openLotId, setOpenLotId] = useState<string | null>(null);
+
+  const open = (market?.lots ?? []).find((lot) => lot.id === openLotId) ?? null;
+  const priceOf = (lot: MarketLot) => Math.round(lot.price * disc);
+
+  const card = (lot: MarketLot) => {
+    const price = priceOf(lot);
+    return (
+      <MarketLotCard
+        key={lot.id}
+        lot={lot}
+        price={price}
+        fit={lotFit(s, lot)}
+        affordable={me.personalCaps >= price}
+        onBuy={() => err(buyLot(lot.id))}
+        onInspect={() => setOpenLotId(lot.id)}
+      />
+    );
+  };
 
   return (
     <div className="space-y-4 pb-8" data-market="1">
-      <SectionLabel>Ironclad · under the Gate</SectionLabel>
-      <h2 className="font-display text-2xl">Moon Squad Market</h2>
-      <p className="text-sm text-muted">
-        Limited stalls. Dawn reprint. The black card pays — not the vault drawer. Tyrone keeps a radio over this yard:
-        Relay Tower Three.
-      </p>
-      <p className="text-sm text-moon">
-        {left} watch{left === 1 ? "" : "es"} left · plate <Coin n={me.personalCaps} />
-      </p>
+      <div>
+        <SectionLabel>Ironclad · under the Gate</SectionLabel>
+        <h2 className="font-display text-2xl">Moon Squad Market</h2>
+        <p className="mt-1 text-secondary text-moon">
+          {left} watch{left === 1 ? "" : "es"} left · plate <Coin n={me.personalCaps} /> · dawn reprints the crates
+        </p>
+      </div>
 
       {visitor ? (
-        <Panel className="bg-ember/10" data-market-visitor={visitor.id}>
+        <Panel className="border border-ember/40 bg-surface/95" data-market-visitor={visitor.id}>
           <SectionLabel>Visiting stall</SectionLabel>
           <h3 className="font-display text-lg">{visitor.name}</h3>
-          <p className="text-[11px] uppercase tracking-[0.16em] text-ember">{visitor.title}</p>
-          <p className="mt-2 text-sm text-moon">{visitor.blurb}</p>
-          <div className="mt-3 space-y-2">
-            {guests.map((lot) => {
-              const price = Math.round(lot.price * disc);
-              const sold = lot.qty <= 0;
-              return (
-                <div
-                  key={lot.id}
-                  data-lot={lot.id}
-                  className="flex items-start justify-between gap-3 rounded-[var(--radius-sm)] bg-ink/60 px-3 py-3"
-                >
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <RarityMark rarity={lot.rarity} />
-                      <span className="font-display text-sm text-paper">{lot.name}</span>
-                    </div>
-                    <p className="mt-1 text-xs text-muted">{lot.effect}</p>
-                    <p className="mt-1 text-[11px] text-moon">{sold ? "Gone" : `${lot.qty} left`}</p>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="ember"
-                    disabled={sold || me.personalCaps < price}
-                    onClick={() => err(buyLot(lot.id))}
-                  >
-                    {sold ? "Sold" : <Coin n={price} />}
-                  </Button>
-                </div>
-              );
-            })}
-          </div>
+          <p className="text-label uppercase tracking-[0.16em] text-ember">{visitor.title}</p>
+          <p className="mt-2 text-secondary text-moon">{visitor.blurb}</p>
+          <div className="mt-3 space-y-2">{guests.map(card)}</div>
         </Panel>
       ) : (
-        <Panel>
-          <p className="text-sm text-muted">
-            No visiting merchant today. They sit every third dawn — Marrow, Cinder Bess, Nine-Lift, Salt Wren, White
-            Glove. Climb the tower if you want the rumor first.
-          </p>
-        </Panel>
+        <p className="text-secondary text-muted">
+          No visiting stall today. They sit every third dawn — climb the Relay Tower for the rumour first.
+        </p>
       )}
 
       <SectionLabel>Daily stalls</SectionLabel>
       {!stalls.length ? (
         <Panel>
-          <p className="text-sm">Stalls are dark until you assume command.</p>
+          <p className="text-secondary">Stalls are dark until you assume command.</p>
         </Panel>
       ) : (
-        stalls.map((lot) => {
-          const price = Math.round(lot.price * disc);
-          const sold = lot.qty <= 0;
-          return (
-            <Panel key={lot.id} className="bg-raised">
-              <div className="flex items-start justify-between gap-3" data-lot={lot.id}>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <RarityMark rarity={lot.rarity} />
-                    <span className="font-display text-[10px] uppercase tracking-[0.16em] text-muted">
-                      {lot.sourceRegion}
-                    </span>
-                  </div>
-                  <div className="mt-1 font-display text-lg">{lot.name}</div>
-                  <p className="text-sm text-muted">{lot.effect}</p>
-                  <p className="mt-1 text-[11px] text-moon">{sold ? "Sold out until dawn" : `${lot.qty} in crate`}</p>
-                </div>
-                <Button variant="ghost" onClick={() => err(buyLot(lot.id))} disabled={sold || me.personalCaps < price}>
-                  {sold ? "Sold" : <Coin n={price} />}
-                </Button>
-              </div>
-            </Panel>
-          );
-        })
+        <div className="space-y-2">{stalls.map(card)}</div>
       )}
 
       <div className="grid grid-cols-2 gap-2">
@@ -1619,6 +1593,65 @@ export function MarketView() {
           Relay Tower
         </Button>
       </div>
+
+      {open ? (
+        <ItemInspectShell
+          onClose={() => setOpenLotId(null)}
+          heroSrc={itemArt({
+            kind: open.kind,
+            name: open.name,
+            ammoType: open.ammoType,
+            weaponFamily: open.weaponFamily,
+          })}
+          hero={
+            <ItemThumb
+              kind={open.kind}
+              name={open.name}
+              ammoType={open.ammoType}
+              weaponFamily={open.weaponFamily}
+              size="hero"
+            />
+          }
+          eyebrow={<SectionLabel>{regionById(open.sourceRegion).name} stock</SectionLabel>}
+          title={<h3 className="font-display text-xl text-paper">{open.name}</h3>}
+          badges={
+            <>
+              <RarityMark rarity={open.rarity} />
+              <span className={cn("text-label", open.qty <= 0 ? "text-danger" : "text-moon")}>
+                {open.qty <= 0 ? "Sold out" : `${open.qty} in crate`}
+              </span>
+            </>
+          }
+          actions={
+            <Button
+              variant="ember"
+              className="w-full"
+              disabled={open.qty <= 0 || me.personalCaps < priceOf(open)}
+              onClick={() => {
+                err(buyLot(open.id));
+                setOpenLotId(null);
+              }}
+            >
+              {open.qty <= 0 ? "Sold out until dawn" : <>Buy · <Coin n={priceOf(open)} /></>}
+            </Button>
+          }
+        >
+          <p className={cn("text-secondary", FIT_TONE[lotFit(s, open).tone])}>{lotFit(s, open).text}</p>
+          <Panel className="mt-3 bg-raised p-3">
+            <p className="text-secondary leading-relaxed text-paper">{open.effect}</p>
+          </Panel>
+          {lotSpecs(open).length ? (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {lotSpecs(open).map((spec) => (
+                <span key={spec} className="rounded-full bg-ink/70 px-2 py-1 text-label text-muted">
+                  {spec}
+                </span>
+              ))}
+            </div>
+          ) : null}
+          <p className="mt-3 text-secondary italic leading-relaxed text-moon">{open.lore}</p>
+        </ItemInspectShell>
+      ) : null}
     </div>
   );
 }

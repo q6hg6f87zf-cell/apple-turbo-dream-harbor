@@ -908,9 +908,9 @@
   border-radius: var(--radius-lg);
   background: linear-gradient(
     180deg,
-    transparent 0%,
-    color-mix(in oklab, var(--color-ink) 58%, transparent) 2.5rem,
-    color-mix(in oklab, var(--color-ink) 74%, transparent) 100%
+    color-mix(in oklab, var(--color-ink) 34%, transparent) 0%,
+    color-mix(in oklab, var(--color-ink) 62%, transparent) 2.5rem,
+    color-mix(in oklab, var(--color-ink) 78%, transparent) 100%
   );
 }
 [data-screen="inventory"] .ms-content-scrim::before {
