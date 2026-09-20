@@ -61,8 +61,11 @@ describe("blackjack", () => {
 
   it("stand against a lower dealer total wins even money", () => {
     const t = emptyTable();
-    // player 10+9, dealer 7 + 2 then hits 6 = 15
-    t.shoe = [c("6"), c("2"), c("7"), c("9"), c("10")];
+    // Pops from the end: player 10+9 = 19, dealer 7+2 = 9, then hits 6 = 15
+    // and 2 = 17 and stands. The shoe has to cover every dealer draw — one card
+    // short and the dealer finishes out of a fresh random shoe, which is how
+    // this test used to lose to a 19 and push about one run in six.
+    t.shoe = [c("2"), c("6"), c("2"), c("7"), c("9"), c("10")];
     let table = deal(t, 50);
     table = stand(table);
     assert.equal(table.phase, "settle");

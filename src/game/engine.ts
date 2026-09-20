@@ -57,6 +57,7 @@ import {
   weaponDamageAvg,
 } from "./data";
 import { REGION_LOCATION, campaignOpenRegions } from "./arsenal";
+import { applyArmor, fieldArmor, rangeHitMod, resolveWeapon } from "./weapon-ops";
 import { APPROACHES, locationToRegion, type FieldDeploy } from "./field-ops";
 import { emptyMarket } from "./market";
 import { emptyShift } from "./shift";
@@ -822,7 +823,15 @@ export function spawnCombat(state: GameState, opts: { boss?: boolean }): GameSta
         phase: 0,
         tags: ["boss"],
         flavor: v.tagline,
+        // The matchup the villain was written with: Gravenor shrugs off a blade
+        // and opens up to a shotgun. Without these it is just a bag of HP.
+        armorClass: v.armorClass,
+        preferredRange: v.preferredRange,
+        resist: v.resist,
+        weakness: v.weakness,
+        resistAmt: v.resistAmt,
       });
+      applyPhase(enemies[enemies.length - 1]!, v, 0);
     }
   } else if (m.kind === "bounty" && state.bounty) {
     enemies.push({
@@ -835,6 +844,7 @@ export function spawnCombat(state: GameState, opts: { boss?: boolean }): GameSta
       dc: state.bounty.dc,
       tags: ["bounty"],
       flavor: state.bounty.type,
+      ...fieldArmor(state.bounty.name),
     });
   } else {
     const pool = ENEMIES[loc];
@@ -851,6 +861,7 @@ export function spawnCombat(state: GameState, opts: { boss?: boolean }): GameSta
         dc: e.dc,
         tags: [],
         flavor: e.flavor,
+        ...fieldArmor(e.name),
       });
     }
   }
@@ -898,6 +909,27 @@ function enemyPhase(v: NonNullable<ReturnType<typeof villainById>>, hp: number):
   return 0;
 }
 
+/**
+ * Re-cut a boss's line from its base stats plus the phase it has just entered.
+ * Always from base, never from the current values, so a phase never stacks on
+ * the one before it and the numbers stay the ones the villain was written with.
+ */
+function applyPhase(target: Combatant, v: NonNullable<ReturnType<typeof villainById>>, index: number) {
+  const fx = v.phases[index]?.effect;
+  target.atk = Math.max(1, v.atk + (fx?.atk ?? 0));
+  target.def = Math.max(0, v.def + (fx?.def ?? 0));
+  target.dc = Math.max(6, v.dc + (fx?.dc ?? 0));
+}
+
+function topThreat(combat: CombatState, party: Operative[]): Operative | null {
+  const threat = combat.threat ?? {};
+  let best: Operative | null = null;
+  for (const member of party) {
+    if (!best || (threat[member.id] ?? 0) > (threat[best.id] ?? 0)) best = member;
+  }
+  return best && (threat[best.id] ?? 0) > 0 ? best : null;
+}
+
 export function resolvePlayerAction(
   state: GameState,
   action: "strike" | "guard" | "gift" | "item" | "flee" | "skill",
@@ -906,6 +938,16 @@ export function resolvePlayerAction(
   if (!combat) return state;
   const actor = combatActor(state);
   if (!actor) return finishCombat(state, false);
+
+  // A boss in a `speaks` phase is at zero and still standing. Whatever the
+  // squad does with that round, the last word is his.
+  if (combat.reckoning) {
+    const v = villainById(combat.reckoning);
+    combat.reckoning = undefined;
+    combat.log = [...combat.log, v?.lastWord ? `${v.name}: "${v.lastWord}"` : "It stops."].slice(-12);
+    state.combat = combat;
+    return finishCombat(state, true);
+  }
 
   const guarded = action === "guard";
   const log: string[] = [...combat.log];
@@ -1058,7 +1100,12 @@ export function resolvePlayerAction(
   }
   const target = combat.enemies.find((e) => e.hp > 0);
   if (!target) return finishCombat(state, true);
-  const hit = total >= target.dc || b === "crit";
+  // Bringing a close-range gun to a target that fights at distance is a choice
+  // the squad makes in the Vault, and it is paid for here.
+  const profile = resolveWeapon(weapon);
+  const reach = action === "strike" ? rangeHitMod(profile.rangeBand, target.preferredRange, profile.family) : 0;
+  const swing = total + reach;
+  const hit = swing >= target.dc || b === "crit";
   if (action === "guard") {
     log.push(`${actor.name} sets a guard.`);
     combat.guardId = actor.id;
@@ -1066,11 +1113,15 @@ export function resolvePlayerAction(
   if (hit && action === "strike") {
     const avg = weapon ? weaponDamageAvg(weapon.damage ?? "1d6") : 3;
     let dmg = Math.max(1, avg - Math.floor(target.def / 2) + (b === "crit" ? 4 : b === "strong" ? 2 : 0));
+    const plain = dmg;
+    dmg = applyArmor(dmg, profile, target);
     dmg *= surge;
     if (b === "weak") dmg = Math.max(1, Math.floor(dmg * 0.6));
     target.hp = Math.max(0, target.hp - dmg);
+    combat.threat = { ...(combat.threat ?? {}), [actor.id]: (combat.threat?.[actor.id] ?? 0) + dmg };
+    const matchup = dmg > plain * surge ? " Weak point." : dmg < plain * surge ? " Armor eats it." : "";
     log.push(
-      `${actor.name} strikes ${target.name} for ${dmg}. ${BAND_LABEL[b]} (${roll}→${total} vs ${target.dc}).`,
+      `${actor.name} strikes ${target.name} for ${dmg}. ${BAND_LABEL[b]} (${roll}→${swing} vs ${target.dc}).${matchup}`,
     );
     if (target.isBoss && combat.bossId) {
       const v = villainById(combat.bossId);
@@ -1078,17 +1129,23 @@ export function resolvePlayerAction(
         const ph = enemyPhase(v, target.hp);
         if (ph !== target.phase) {
           target.phase = ph;
+          applyPhase(target, v, ph);
           log.push(`${v.phases[ph].name}: ${v.phases[ph].desc}`);
+          const alone = combat.enemies.every((e) => e.id === target.id || e.hp <= 0);
+          if (v.phases[ph].effect?.speaks && alone) combat.reckoning = v.id;
         }
       }
     }
   } else if (action === "strike") {
-    log.push(`${actor.name} misses ${target.name}. ${BAND_LABEL[b]} (${roll}→${total} vs ${target.dc}).`);
+    const short = reach < 0 ? " Wrong range." : "";
+    log.push(`${actor.name} misses ${target.name}. ${BAND_LABEL[b]} (${roll}→${swing} vs ${target.dc}).${short}`);
   }
 
   combat.enemies = combat.enemies.map((e) => (e.id === target.id ? { ...target } : e));
   combat.log = log.slice(-12);
   state.combat = combat;
+  // A reckoning holds the fight open: the villain is down and still owed a beat.
+  if (combat.reckoning) return state;
   if (combat.enemies.every((e) => e.hp <= 0)) return finishCombat(state, true);
   return enemyTurn(state);
 }
@@ -1105,11 +1162,14 @@ function enemyTurn(state: GameState): GameState {
     state.combat = combat;
     return finishCombat(state, false);
   }
+  const bossPhase = combat.bossId ? villainById(combat.bossId)?.phases : undefined;
   combat.enemies
     .filter((e) => e.hp > 0)
     .forEach((e) => {
       const up = party.filter((p) => p.hp > 0);
-      const target = pick(up.length ? up : party);
+      const focused = e.isBoss && bossPhase?.[e.phase ?? 0]?.effect?.focus;
+      const target = (focused ? topThreat(combat, up.length ? up : party) : null)
+        ?? pick(up.length ? up : party);
       if (!target) return;
       const roll = d20();
       const stats = computeStats(target);
@@ -1158,10 +1218,16 @@ export function finishCombat(state: GameState, won: boolean, fled = false): Game
     const payout = Math.round((120 + locById(combat.locationId).danger * 40) * combat.rewardMult);
     state.coins += payout;
     grantXp(state, combat.bossId ? 28 : 8);
+    // The fight's own log dies with the overlay. A villain's last word belongs
+    // in the debrief, where the squad is still standing there reading it.
+    const dying = !fled && combat.bossId ? villainById(combat.bossId) : null;
+    const farewell = dying?.lastWord ? [`${dying.name}: "${dying.lastWord}"`] : [];
+    if (dying?.lastWord) pushLog(state, "note", dying.name, dying.lastWord);
     if (state.mission) {
       state.mission.coins += payout;
       state.mission.narrative = [
         ...state.mission.narrative,
+        ...farewell,
         fled ? "They left a body and a question." : `The field goes still. +${payout} caps.`,
       ];
     }

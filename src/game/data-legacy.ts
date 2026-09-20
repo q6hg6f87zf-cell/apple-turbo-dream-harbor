@@ -868,6 +868,24 @@ export const WORLD: WorldLoc[] = [
   },
 ];
 
+/**
+ * What a phase does, not just what it is called.
+ *
+ * atk/def/dc are deltas on the villain's base line, applied whole each time a
+ * phase is entered — never stacked — so a boss that is worn down escalates on
+ * a curve the fiction already describes. `focus` makes it hunt whoever has hurt
+ * it most instead of picking at random. `speaks` marks a round of lucidity: the
+ * villain is at zero, does not swing, and the fight waits for one last beat
+ * from the player before it closes.
+ */
+export interface VillainPhaseEffect {
+  atk?: number;
+  def?: number;
+  dc?: number;
+  focus?: boolean;
+  speaks?: boolean;
+}
+
 export interface VillainDef {
   id: string;
   name: string;
@@ -881,7 +899,9 @@ export interface VillainDef {
   atk: number;
   def: number;
   dc: number;
-  phases: { name: string; at: number; desc: string }[];
+  phases: { name: string; at: number; desc: string; effect?: VillainPhaseEffect }[];
+  /** Spoken over the killing blow. The last thing the region says to you. */
+  lastWord?: string;
   lootName: string;
   armorClass?: ArmorClass;
   preferredRange?: RangeBand;
@@ -906,11 +926,12 @@ export const VILLAINS: VillainDef[] = [
     def: 5,
     dc: 14,
     phases: [
-      { name: "The Watcher", at: 32, desc: "Observes. Tests. Will speak if approached with respect." },
-      { name: "The Hunter", at: 20, desc: "Targets whoever hurt his pack. Precise." },
-      { name: "The Feral", at: 10, desc: "The man recedes. Reckless, devastating." },
-      { name: "The Reckoning", at: 0, desc: "One round of lucidity. He speaks." },
+      { name: "The Watcher", at: 32, desc: "Observes. Tests. Will speak if approached with respect.", effect: { atk: -2 } },
+      { name: "The Hunter", at: 20, desc: "Targets whoever hurt his pack. Precise.", effect: { dc: 1, focus: true } },
+      { name: "The Feral", at: 10, desc: "The man recedes. Reckless, devastating.", effect: { atk: 3, def: -2, focus: true } },
+      { name: "The Reckoning", at: 0, desc: "One round of lucidity. He speaks.", effect: { speaks: true } },
     ],
+    lastWord: "The pack was mine to keep fed. Tell the gate I held the line longer than the unit did.",
     lootName: "Ashen Fang",
     armorClass: "beast",
     preferredRange: "close",
@@ -932,10 +953,11 @@ export const VILLAINS: VillainDef[] = [
     def: 5,
     dc: 15,
     phases: [
-      { name: "The Chancellor", at: 28, desc: "Diplomatic. Helpful. Building trust to spend later." },
-      { name: "The Negotiator", at: 16, desc: "Offers improve. Costs worsen." },
-      { name: "The Unmourned", at: 6, desc: "Drops the facade. Uses every piece of leverage." },
+      { name: "The Chancellor", at: 28, desc: "Diplomatic. Helpful. Building trust to spend later.", effect: { atk: -2, def: 1 } },
+      { name: "The Negotiator", at: 16, desc: "Offers improve. Costs worsen.", effect: { atk: 1, dc: 1 } },
+      { name: "The Unmourned", at: 6, desc: "Drops the facade. Uses every piece of leverage.", effect: { atk: 4, def: -1, focus: true } },
     ],
+    lastWord: "The ledgers balance. They always balanced. Nobody ever asked what was in the other column.",
     lootName: "Furnace Court Key",
     armorClass: "plate",
     preferredRange: "mid",
@@ -957,10 +979,11 @@ export const VILLAINS: VillainDef[] = [
     def: 4,
     dc: 15,
     phases: [
-      { name: "The Guide", at: 30, desc: "Presents as a resource. Her help always serves the project." },
-      { name: "The Architect", at: 18, desc: "Stops pretending. Starts explaining." },
-      { name: "The Burned", at: 8, desc: "Project near completion." },
+      { name: "The Guide", at: 30, desc: "Presents as a resource. Her help always serves the project.", effect: { atk: -1 } },
+      { name: "The Architect", at: 18, desc: "Stops pretending. Starts explaining.", effect: { def: 2, dc: 1 } },
+      { name: "The Burned", at: 8, desc: "Project near completion.", effect: { atk: 4, def: -2, focus: true } },
     ],
+    lastWord: "The mountain was never a map. I drew it anyway, and it held. Look at what it holds now.",
     lootName: "Master Cavern Map",
     armorClass: "machine",
     preferredRange: "long",
@@ -983,10 +1006,11 @@ export const VILLAINS: VillainDef[] = [
     def: 6,
     dc: 16,
     phases: [
-      { name: "The Archive", at: 36, desc: "Passive. Answers questions. Always truly." },
-      { name: "The Collector", at: 22, desc: "The Pull intensifies. You are being read." },
-      { name: "The Answer", at: 8, desc: "Asks each character one question about their Destiny Thread." },
+      { name: "The Archive", at: 36, desc: "Passive. Answers questions. Always truly.", effect: { atk: -2, def: 2 } },
+      { name: "The Collector", at: 22, desc: "The Pull intensifies. You are being read.", effect: { atk: 2, dc: 1, focus: true } },
+      { name: "The Answer", at: 8, desc: "Asks each character one question about their Destiny Thread.", effect: { atk: 3, dc: 2, focus: true } },
     ],
+    lastWord: "You asked nothing. That is the first honest thing anyone has brought down here.",
     lootName: "Founding Document",
     armorClass: "machine",
     preferredRange: "close",
@@ -1008,10 +1032,11 @@ export const VILLAINS: VillainDef[] = [
     def: 7,
     dc: 18,
     phases: [
-      { name: "Lockstep", at: 48, desc: "The suit moves like a T-0880. The pilot inside is still learning fear." },
-      { name: "Directive", at: 28, desc: "Kane speaks through the visor. Resource acquisition is not a request." },
-      { name: "Successor", at: 12, desc: "The frame overclocks. The human almost keeps up." },
+      { name: "Lockstep", at: 48, desc: "The suit moves like a T-0880. The pilot inside is still learning fear.", effect: { def: 1 } },
+      { name: "Directive", at: 28, desc: "Kane speaks through the visor. Resource acquisition is not a request.", effect: { atk: 2, dc: 1, focus: true } },
+      { name: "Successor", at: 12, desc: "The frame overclocks. The human almost keeps up.", effect: { atk: 4, def: -2, focus: true } },
     ],
+    lastWord: "She will build another. She has the line. She does not have the one that walked off it.",
     lootName: "Moon Squad Challenge Coin",
     armorClass: "powered",
     preferredRange: "mid",

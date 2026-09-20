@@ -40,6 +40,12 @@ jobs:
           HOLLOW_SIM_RUNS: 2500
         run: node scripts/hollow-realm-sim.mjs
 
+      # The campaign sim models the economy and never enters a fight. This one
+      # drives the combat engine itself, and fails if what the squad carries
+      # stops changing how the boss goes.
+      - name: Boss matchup simulation
+        run: node --import ./scripts/register-ts-ext.mjs scripts/combat-balance-sim.mjs 400
+
       - name: Install Chromium for mobile smoke
         run: npx playwright install --with-deps chromium
 
@@ -123,6 +129,11 @@ jobs:
         env:
           HOLLOW_QA_URL: http://127.0.0.1:8080
         run: node scripts/hollow-ux-passes-qa.mjs
+
+      - name: Boss fight reads
+        env:
+          HOLLOW_QA_URL: http://127.0.0.1:8080
+        run: node scripts/boss-fight-qa.mjs
 
       - name: Upload UX screenshots
         if: always()

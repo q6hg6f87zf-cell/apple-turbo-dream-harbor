@@ -627,6 +627,10 @@ export interface CombatState {
   regionId?: RegionId;
   poiId?: string;
   incomingSoft?: number;
+  /** Damage each operative has dealt this fight. A focused boss hunts the top. */
+  threat?: Record<string, number>;
+  /** Set when a boss has entered a `speaks` phase: it is down, and owed a beat. */
+  reckoning?: string;
 }
 
 export interface MissionTactic {
