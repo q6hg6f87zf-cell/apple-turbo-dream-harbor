@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { defaultState } from "./engine";
-import { chromeKind, guidanceMode, guidanceSignal } from "./shell";
+import { chromeKind, guidanceMode, guidanceSignal, navSignalKey, navSignals } from "./shell";
 
 describe("guidanceMode", () => {
   it("tutorial is guided even if idle flavor would apply", () => {
@@ -81,5 +81,69 @@ describe("chromeKind", () => {
     assert.equal(chromeKind("codex"), "task");
     assert.equal(chromeKind("title"), "none");
     assert.equal(chromeKind("briefing"), "none");
+  });
+});
+
+describe("navSignals", () => {
+  const ready = () => {
+    const s = defaultState();
+    s.started = true;
+    s.tutorial = "done";
+    s.operatives = [{ id: "a", name: "Mira", status: "idle", location: "hq", inventory: [] } as never];
+    s.shift = { ...(s.shift ?? ({} as never)), watchesLeft: 3 } as never;
+    return s;
+  };
+
+  it("flags the World when someone can walk and there is a watch left", () => {
+    assert.ok(navSignals(ready()).has("map"));
+  });
+
+  it("says nothing while the tutorial is talking", () => {
+    const s = ready();
+    s.tutorial = "sortie";
+    assert.equal(navSignals(s).size, 0);
+  });
+
+  it("says nothing while the guidance row is urgent", () => {
+    const s = ready();
+    s.operatives = [{ id: "a", name: "Mira", status: "downed", inventory: [] } as never];
+    assert.equal(guidanceMode(s), "urgent");
+    assert.equal(navSignals(s).size, 0);
+  });
+
+  it("drops the World once the watches are spent", () => {
+    const s = ready();
+    s.shift = { ...(s.shift ?? ({} as never)), watchesLeft: 0 } as never;
+    assert.ok(!navSignals(s).has("map"));
+  });
+
+  it("flags Inventory when the vault holds gear for an open slot", () => {
+    const s = ready();
+    s.vault = [{ id: "g", name: "Rifle", slot: "weapon" } as never];
+    assert.ok(navSignals(s).has("inventory"));
+  });
+
+  it("leaves Inventory alone when every slot is filled", () => {
+    const s = ready();
+    s.operatives = [
+      {
+        id: "a",
+        name: "Mira",
+        status: "idle",
+        location: "hq",
+        inventory: [
+          { id: "w", slot: "weapon", equipped: true },
+          { id: "r", slot: "armor", equipped: true },
+          { id: "t", slot: "trinket", equipped: true },
+        ],
+      } as never,
+    ];
+    s.vault = [{ id: "g", name: "Rifle", slot: "weapon" } as never];
+    assert.ok(!navSignals(s).has("inventory"));
+  });
+
+  it("is comparable by value so the dock can subscribe to it", () => {
+    const s = ready();
+    assert.equal(navSignalKey(s), navSignalKey(s));
   });
 });

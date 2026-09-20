@@ -1,6 +1,6 @@
 import { sfx, isMuted, toggleMute, unlockAudio } from "@/game/audio";
 import { openRadioDeck } from "@/game/radio";
-import { guidanceSignal, isTaskScreen, TASK_META } from "@/game/shell";
+import { guidanceSignal, isTaskScreen, navSignalKey, TASK_META } from "@/game/shell";
 import { isVacant, plateMember } from "@/game/squad";
 import { useGame } from "@/game/store";
 import type { Screen, TyroneAssist } from "@/game/types";
@@ -20,7 +20,7 @@ import {
   Volume2,
   VolumeX,
 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { MoonCardSheet } from "./card";
 import { MoonCrest } from "./primitives";
 
@@ -307,6 +307,8 @@ export function NavButtons({ compact }: { compact?: boolean }) {
   const screen = useGame((g) => g.s.screen);
   const setScreen = useGame((g) => g.setScreen);
   const tutorial = useGame((g) => g.s.tutorial);
+  const signalKey = useGame((g) => navSignalKey(g.s));
+  const signals = useMemo(() => new Set(signalKey.split(",").filter(Boolean)), [signalKey]);
 
   return (
     <>
@@ -317,6 +319,7 @@ export function NavButtons({ compact }: { compact?: boolean }) {
           (n.id === "hq" && VAULT_SCREENS.includes(screen)) ||
           (n.id === "more" && MORE_SCREENS.includes(screen));
         const nudge = n.hint === "sortie" && tutorial === "sortie";
+        const waiting = !active && signals.has(n.id);
         return (
           <button
             key={n.id}
@@ -335,7 +338,16 @@ export function NavButtons({ compact }: { compact?: boolean }) {
               nudge && "ms-nudge text-ember",
             )}
           >
-            <Icon className="size-5" />
+            <span className="relative">
+              <Icon className="size-5" />
+              {waiting ? (
+                <span
+                  data-nav-dot={n.id}
+                  aria-hidden
+                  className="absolute -right-1.5 -top-0.5 size-1.5 rounded-full bg-ember"
+                />
+              ) : null}
+            </span>
             <span className={cn("font-display uppercase tracking-[0.12em] text-label", compact && "leading-none")}>
               {n.label}
             </span>
