@@ -1,5 +1,4 @@
 import type { Screen } from "./types";
-import { REGION_ART, regionThumb } from "./art";
 
 export const ROOM_ART: Record<string, string> = {
   hq: "/art/rooms/command.jpg",
@@ -19,39 +18,33 @@ export const ROOM_ART: Record<string, string> = {
 
 export const ROOM_FALLBACK = "/art/rooms/corridor.jpg";
 
-const EXTRA_ART = [
-  "/art/title-plate.jpg",
-  "/art/tyrone.jpg",
-  "/art/terminal.jpg",
-  "/art/tunnel.jpg",
-  "/map/overworld.jpg",
-  "/art/places/ironclad-street.jpg",
-  "/art/places/slagtown-street.jpg",
-  "/art/places/blackspire-street.jpg",
-  "/art/places/brasswater-street.jpg",
-  "/art/places/veyra-street.jpg",
-  "/art/places/vault-13-exterior.jpg",
-  "/art/places/ironclad-market.jpg",
-  "/art/places/thirty-eight.jpg",
-  "/art/rooms/squad.jpg",
-];
+/** The rooms a player can reach in one dock tap. */
+const DOCK_ROOMS: Screen[] = ["hq", "map", "arcade", "inventory", "more"];
 
 let warmed = false;
 
-export function preloadRoomArt() {
+/**
+ * Warm only the rooms one tap away, and only once the room on screen has
+ * painted. Streets, regional maps, the terminal and every thumbnail used to
+ * ride along here — roughly 13MB on entry — and now load when the screen that
+ * needs them asks.
+ */
+export function preloadRoomArt(current?: Screen | string) {
   if (typeof window === "undefined" || warmed) return;
   warmed = true;
-  const urls = [
-    ...Object.values(ROOM_ART),
-    ROOM_FALLBACK,
-    ...(Object.keys(REGION_ART) as (keyof typeof REGION_ART)[]).map((id) => regionThumb(id)),
-    ...EXTRA_ART,
-  ];
-  for (const src of urls) {
-    const img = new Image();
-    img.decoding = "async";
-    img.src = src;
-  }
+  const here = current ? roomArtFor(current) : "";
+  const queue = [...new Set(DOCK_ROOMS.map((id) => roomArtFor(id)))].filter((src) => src !== here);
+  const run = () => {
+    for (const src of queue) {
+      const img = new Image();
+      img.decoding = "async";
+      img.src = src;
+    }
+  };
+  const idle = (window as unknown as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number })
+    .requestIdleCallback;
+  if (idle) idle(run, { timeout: 3000 });
+  else window.setTimeout(run, 1200);
 }
 
 export function roomArtFor(screen: Screen | string) {

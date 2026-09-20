@@ -1,4 +1,3 @@
-import { preloadRoomArt } from "@/game/rooms";
 import { TICK_SECONDS } from "@/game/data";
 import { sfx, startAmbient, toggleMute, unlockAudio } from "@/game/audio";
 import { chromeKind, isTaskScreen } from "@/game/shell";
@@ -50,10 +49,6 @@ export function GameApp() {
   useLayoutEffect(() => {
     if (!hydrated) hydrate();
   }, [hydrate, hydrated]);
-
-  useEffect(() => {
-    preloadRoomArt();
-  }, []);
 
   useEffect(() => {
     if (!hydrated) return;

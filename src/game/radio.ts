@@ -319,7 +319,9 @@ export function getRadioSnapshot(): RadioSnapshot {
 
 function makeDeck(c: AudioContext, bus: GainNode): Deck {
   const el = new Audio();
-  el.preload = "auto";
+  // Beds are 5-10MB. Assigning a src should cost a header, not the whole tape;
+  // play() pulls the audio when the player actually hears it.
+  el.preload = "metadata";
   el.crossOrigin = "anonymous";
   el.loop = false;
   el.setAttribute("playsinline", "");
