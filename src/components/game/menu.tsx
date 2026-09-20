@@ -1,14 +1,15 @@
 import { Button } from "@/components/ui/button";
+import { hasPlayerProfile } from "@/game/engine";
 import { PACK_CATALOG, PACK_KEYS } from "@/game/inventory";
 import { sfx, unlockAudio } from "@/game/audio";
 import { stampedUrl } from "@/game/discord";
+import { seatedMember } from "@/game/squad";
 import { useGame } from "@/game/store";
 import type { PackKey } from "@/game/types";
 import { cn } from "@/lib/cn";
 import {
   Archive,
   BookOpen,
-  CircleDot,
   Copy,
   Cpu,
   Disc3,
@@ -20,6 +21,11 @@ import {
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { CapMark, Coin, Panel, RarityMark, SectionLabel } from "./primitives";
 import { HelpChrome, TalkOverlay } from "./talk-overlay";
+import { OpeningBoot, TitleBackdrop } from "./title-scene";
+import { WakeScene } from "./wake-scene";
+import { useOpeningBeat } from "@/game/opening";
+
+export { TitleBackdrop };
 
 const PACK_ICON: Record<PackKey, typeof Pin> = {
   bobby_pin: Pin,
@@ -40,12 +46,96 @@ function copyText(text: string) {
   void navigator.clipboard?.writeText(text);
 }
 
-export function TitleBackdrop({ className }: { className?: string }) {
+export function ProfileStamp({
+  prefill,
+  prefillHandle,
+  handleLocked,
+}: {
+  prefill?: string;
+  prefillHandle?: string;
+  handleLocked?: boolean;
+}) {
+  const stamp = useGame((g) => g.stampProfile);
+  const rider = useGame((g) => seatedMember(g.s));
+  const [name, setName] = useState("");
+  const [handle, setHandle] = useState("");
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (prefill) setName((current) => current || prefill);
+    if (prefillHandle) setHandle((current) => current || prefillHandle.replace(/^@/, ""));
+  }, [prefill, prefillHandle]);
+
+  const liveHandle = (handle || prefillHandle || "").replace(/^@/, "");
+
   return (
-    <picture className="absolute inset-0 block size-full">
-      <source media="(max-width: 700px)" srcSet="/art/title-tall.jpg" />
-      <img src="/art/title-wide.jpg" alt="" className={cn("size-full object-cover", className)} />
-    </picture>
+    <form
+      className="space-y-3"
+      data-profile="1"
+      onSubmit={(e) => {
+        e.preventDefault();
+        unlockAudio();
+        const msg = stamp(name, liveHandle);
+        if (msg) {
+          setErr(msg);
+          sfx.hurt();
+          return;
+        }
+        sfx.unlock();
+      }}
+    >
+      <SectionLabel>Rider file</SectionLabel>
+      <p className="text-sm leading-relaxed text-moon">
+        Stamp the name Tyrone found east of the highway. Discord sits under it on the black card.
+      </p>
+      <label className="block">
+        <span className="font-display text-[10px] uppercase tracking-[0.18em] text-muted">Chosen name</span>
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          autoComplete="nickname"
+          maxLength={24}
+          placeholder="Your name"
+          suppressHydrationWarning
+          className="mt-1 min-h-12 w-full rounded-[var(--radius-sm)] bg-ink px-3 text-sm text-paper shadow-[var(--shadow-border)] outline-none"
+        />
+      </label>
+      <label className="block">
+        <span className="font-display text-[10px] uppercase tracking-[0.18em] text-muted">
+          {handleLocked ? "Discord handle" : "Handle · optional"}
+        </span>
+        <input
+          value={liveHandle ? `@${liveHandle}` : handle}
+          onChange={(e) => {
+            if (handleLocked) return;
+            setHandle(e.target.value.replace(/^@/, ""));
+          }}
+          readOnly={handleLocked}
+          autoComplete="username"
+          maxLength={25}
+          placeholder="@callsign"
+          suppressHydrationWarning
+          className="mt-1 min-h-12 w-full rounded-[var(--radius-sm)] bg-ink px-3 text-sm text-paper shadow-[var(--shadow-border)] outline-none read-only:text-ember"
+        />
+      </label>
+      <div className="rounded-[var(--radius-md)] border border-line/70 bg-ink px-3 py-3">
+        <p className="font-display text-[10px] uppercase tracking-[0.2em] text-muted">Moon Squad plate</p>
+        <p className="mt-1 truncate font-display text-lg text-paper">{name.trim() || "Unclaimed"}</p>
+        <p className="truncate font-mono text-[12px] text-moon">
+          {liveHandle ? `@${liveHandle}` : "Discord handle lands here"}
+        </p>
+        <p className="mt-2 text-[11px] leading-relaxed text-muted">
+          {rider.personalCaps.toLocaleString()} caps on the seated card
+        </p>
+      </div>
+      {err ? <p className="text-sm text-danger">{err}</p> : null}
+      <Button type="submit" variant="ember" size="lg" className="w-full" disabled={name.trim().length < 2}>
+        Stamp the black card
+      </Button>
+      <p className="font-display text-[10px] uppercase tracking-[0.18em] text-muted">
+        Name on the plate · Discord underneath
+      </p>
+    </form>
   );
 }
 
@@ -139,12 +229,19 @@ export function MainMenu() {
   const rooms = useGame((g) => g.s.rooms);
   const openTerminal = useGame((g) => g.openTerminal);
   const hack = useGame((g) => g.s.hack);
+  const term = useGame((g) => g.s.term);
   const rider = useGame((g) => g.s.discordName);
   const riderId = useGame((g) => g.s.discordId);
   const handshake = useGame((g) => g.handshake);
   const squadN = useGame((g) => g.s.squad.length);
   const linkDiscord = useGame((g) => g.linkDiscord);
   const talking = useGame((g) => !!g.s.talk);
+  const talkScript = useGame((g) => g.s.talk?.script);
+  const talkLine = useGame((g) => g.s.talk?.i ?? 0);
+  const named = useGame((g) => hasPlayerProfile(g.s));
+  const playerName = useGame((g) => g.s.playerName);
+  const beat = useOpeningBeat();
+  const waking = talkScript === "wake" || beat === "wake";
   const [ask, setAsk] = useState(false);
   const [link, setLink] = useState(false);
   const [did, setDid] = useState("");
@@ -154,6 +251,7 @@ export function MainMenu() {
   const roomN = Object.values(rooms).filter((n) => n > 0).length;
 
   const boot = () => {
+    if (!named) return;
     unlockAudio();
     if (started) resume();
     else assume();
@@ -161,7 +259,7 @@ export function MainMenu() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (ask || talking) {
+      if (ask || talking || !named) {
         if (e.key === "Escape") setAsk(false);
         return;
       }
@@ -171,34 +269,23 @@ export function MainMenu() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [ask, started, talking]);
+  }, [ask, started, talking, named]);
 
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden bg-ink text-paper" data-ready="1">
-      <TitleBackdrop />
-      <div className="crt-scan absolute inset-0 opacity-20" />
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--color-ink)_12%,transparent),color-mix(in_oklab,var(--color-ink)_38%,transparent)_42%,color-mix(in_oklab,var(--color-ink)_88%,transparent)_78%,var(--color-ink))]" />
-
-      <div className="relative z-[1] flex min-h-0 flex-1 flex-col justify-end px-4 pb-8 pt-16 md:justify-end md:px-10 md:pb-10">
-        <div className="mx-auto flex w-full max-w-lg flex-col gap-5 md:max-w-xl">
-          <div className="flex items-end gap-4">
-            <img
-              src="/art/tyrone.jpg"
-              alt="Tyrone Bot, S.Y.N.A.P.S.E T-0880"
-              className="size-20 rounded-[var(--radius-md)] object-cover shadow-[var(--shadow-border-hover)] md:size-24"
-            />
-            <div className="min-w-0">
-              <p className="font-display text-[11px] uppercase tracking-[0.42em] text-ember">S.Y.N.A.P.S.E T-0880</p>
-              <h1 className="mt-1 font-display text-4xl tracking-[0.08em] text-paper md:text-5xl">
-                HOLLOW
-                <span className="block text-ember">REALM</span>
-              </h1>
-              <p className="mt-2 text-xs text-moon">Tyrone keeps the porch light on.</p>
-            </div>
-          </div>
-
-          <div className="glass-strong rounded-[var(--radius-xl)] p-4 md:p-5">
-            {started ? (
+      {waking ? <WakeScene line={talkScript === "wake" ? talkLine : 0} /> : <TitleBackdrop />}
+      {waking ? null : <div className="title-veil pointer-events-none absolute inset-0 z-[1]" />}
+      <OpeningBoot>
+      <div className={cn("relative z-[2] flex min-h-0 flex-1 flex-col justify-end px-4 pb-8 pt-16 md:px-10 md:pb-10", waking && "pointer-events-none opacity-0")}>
+        <div className="mx-auto flex w-full max-w-lg flex-col gap-3 md:max-w-xl">
+          <div className="ms-title-dock rounded-[var(--radius-xl)] bg-ink/62 p-4 shadow-[var(--shadow-border)] backdrop-blur-md md:p-5">
+            <p className="font-display text-[11px] uppercase tracking-[0.42em] text-ember">S.Y.N.A.P.S.E T-0880</p>
+            <p className="mt-1 text-xs text-moon">Tyrone keeps the porch light on.</p>
+            {!named && !started ? (
+              <div className="mt-4">
+                <ProfileStamp />
+              </div>
+            ) : started ? (
               <div>
                 <div className="flex items-center justify-between gap-3">
                   <SectionLabel>Active file</SectionLabel>
@@ -239,28 +326,33 @@ export function MainMenu() {
                 )}
               </div>
             ) : (
-              <div>
-                <SectionLabel>No file on this CRT</SectionLabel>
+              <div className="mt-4">
+                <SectionLabel>File stamped</SectionLabel>
                 <p className="mt-2 text-sm leading-relaxed text-moon">
-                  Howdy, partner. Assume command and I will walk you through the ranch before anybody rolls a die. The
-                  word is S.Y.N.A.P.S.E. Caps, loot, and the squad live in this vault — not the Games button.
+                  {playerName}. I found you east of the highway. No tracks. Wake up and I will walk you into Vault 13.
                 </p>
-                {riderId ? (
-                  <p className="mt-3 font-display text-[10px] uppercase tracking-[0.18em] text-ember">
-                    Rider {rider} · {riderId} waiting
-                  </p>
-                ) : null}
               </div>
             )}
+            {named ? (
             <div className="mt-5 flex flex-col gap-2">
-              <Button variant="ember" size="lg" className="w-full" onClick={boot} disabled={talking}>
-                {started ? `Resume · Day ${day}` : "Assume command"}
+              <Button
+                variant="ember"
+                size="lg"
+                className="w-full"
+                onPointerDown={() => {
+                  unlockAudio();
+                }}
+                onClick={boot}
+                disabled={talking}
+              >
+                {started ? `Assume command · Day ${day}` : "Wake up"}
               </Button>
               {started ? (
                 <Button variant="ghost" className="w-full" onClick={() => setAsk(true)} disabled={talking}>
                   New file
                 </Button>
               ) : null}
+              {started ? (
               <div className="grid grid-cols-2 gap-2">
                 <Button variant="quiet" className="w-full" onClick={() => setScreen("rules")}>
                   <BookOpen className="size-4" /> Rules
@@ -269,7 +361,9 @@ export function MainMenu() {
                   {riderId ? "Switch rider" : "Link rider"}
                 </Button>
               </div>
+              ) : null}
             </div>
+            ) : null}
             {link ? (
               <form
                 className="mt-3 space-y-2"
@@ -299,32 +393,37 @@ export function MainMenu() {
                 </div>
               </form>
             ) : null}
+            {started ? (
             <p className="mt-4 font-display text-[10px] uppercase tracking-[0.22em] text-muted">
-              Resume · New · Rules · The word is SYNAPSE
+              Resume · New · The word is SYNAPSE
             </p>
+            ) : null}
           </div>
         </div>
       </div>
+      </OpeningBoot>
 
+      {named || started ? (
       <button
         type="button"
         onClick={() => {
           unlockAudio();
-          if (!started) {
-            fail("Boot a file first. Then tap the CRT.");
-            return;
-          }
           const msg = openTerminal();
           if (msg) fail(msg);
         }}
-        className="absolute right-3 top-3 z-[2] w-[7.5rem] overflow-hidden rounded-[var(--radius-md)] shadow-[var(--shadow-border)] transition-[box-shadow] hover:shadow-[var(--shadow-border-hover)] md:right-6 md:top-6 md:w-40"
-        aria-label="Tap the SYNAPSE terminal"
+        className={cn(
+          "absolute right-3 top-3 z-[2] w-[7.5rem] overflow-hidden rounded-[var(--radius-md)] shadow-[var(--shadow-border)] transition-[box-shadow] hover:shadow-[var(--shadow-border-hover)] md:right-6 md:top-6 md:w-40",
+          waking && "pointer-events-none opacity-0",
+        )}
+        aria-label="Sit the SYNAPSE terminal"
+        data-sit-crt="1"
       >
         <img src="/art/terminal.jpg" alt="" className="aspect-[4/3] w-full object-cover" />
         <span className="absolute inset-x-0 bottom-0 bg-ink/70 px-2 py-1 font-mono text-[9px] uppercase tracking-[0.16em] text-ember">
-          {hack ? "LINK LIVE" : "SYNAPSE · NO SIGNAL"}
+          {hack || term ? "LINK LIVE" : "SYNAPSE LINK"}
         </span>
       </button>
+      ) : null}
 
       {ask ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/70 p-4 md:items-center">
@@ -340,6 +439,7 @@ export function MainMenu() {
                 onClick={() => {
                   useGame.getState().reset();
                   setAsk(false);
+                  unlockAudio();
                   useGame.getState().assumeCommand();
                 }}
               >
@@ -483,7 +583,7 @@ export function VaultView() {
         <img src="/art/vault-pack.jpg" alt="Vault pack" className="h-40 w-full object-cover md:h-52" />
         <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/40 to-transparent" />
         <div className="absolute bottom-3 left-4 right-4">
-          <SectionLabel>Pip-Boy · /inv</SectionLabel>
+          <SectionLabel>T-0880 · /inv</SectionLabel>
           <h2 className="font-display text-2xl">The Vault</h2>
         </div>
       </div>
@@ -602,86 +702,7 @@ function ClockStat({ label, value }: { label: string; value: string }) {
 }
 
 export function TerminalOverlay() {
-  const hack = useGame((g) => g.s.hack);
-  const close = useGame((g) => g.closeTerminal);
-  const pick = useGame((g) => g.hackPick);
-  const bracket = useGame((g) => g.hackBracket);
-  const logRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    logRef.current?.scrollTo({ top: logRef.current.scrollHeight });
-  }, [hack?.log.length]);
-  useEffect(() => {
-    if (!hack) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [hack, close]);
-  if (!hack) return null;
-  const onWord = (w: string) => {
-    if (hack.won || hack.locked) return;
-    sfx.hack();
-    const r = pick(w);
-    if (r === "won") sfx.unlock();
-    else if (r === "denied" || r === "lock") sfx.deny();
-  };
-  return (
-    <div className="fixed inset-0 z-[70] flex items-end justify-center bg-ink/85 p-3 md:items-center">
-      <div className="term-screen relative flex h-[min(92dvh,720px)] w-full max-w-lg flex-col overflow-hidden rounded-[var(--radius-lg)] shadow-[var(--shadow-border-hover)]">
-        <div className="crt-scan absolute inset-0 opacity-40" />
-        <div className="relative z-[1] flex items-start justify-between gap-3 border-b border-ember/25 px-4 py-3">
-          <div>
-            <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-ember">SYNAPSE TERMLINK</div>
-            <div className="mt-1 font-mono text-xs">
-              {hack.won ? "ACCESS GRANTED" : hack.locked ? "LOCKOUT" : `${hack.tries} ATTEMPT(S) LEFT`}
-            </div>
-          </div>
-          <Button variant="quiet" size="sm" onClick={close}>
-            Jack out
-          </Button>
-        </div>
-        <div
-          ref={logRef}
-          className="relative z-[1] max-h-36 overflow-y-auto px-4 py-3 font-mono text-[12px] leading-relaxed text-ember-bright ms-scroll"
-        >
-          {hack.log.map((line, i) => (
-            <div key={`${i}-${line}`}>{line}</div>
-          ))}
-          <span className="term-cursor" />
-        </div>
-        <div className="relative z-[1] min-h-0 flex-1 overflow-y-auto px-3 pb-4 ms-scroll">
-          <div className="grid grid-cols-2 gap-2">
-            {hack.words.map((w) => (
-              <button
-                key={w}
-                type="button"
-                disabled={hack.won || hack.locked}
-                onClick={() => onWord(w)}
-                className="min-h-11 rounded-[var(--radius-xs)] border border-ember/30 bg-ink/40 px-2 font-mono text-sm tracking-[0.14em] text-ember-bright hover:bg-ember/15 disabled:opacity-40"
-              >
-                {w}
-              </button>
-            ))}
-          </div>
-          <button
-            type="button"
-            disabled={hack.won || hack.locked || hack.dudsLeft.length === 0}
-            onClick={() => {
-              sfx.click();
-              const msg = bracket();
-              if (msg) fail(msg);
-              else sfx.hack();
-            }}
-            className="mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-[var(--radius-xs)] border border-ember/20 font-mono text-[11px] uppercase tracking-[0.18em] text-ember/80 hover:text-ember-bright disabled:opacity-40"
-          >
-            <CircleDot className="size-3.5" />
-            Pry brackets · remove dud
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+  return null;
 }
 
 export function TerminalCard({ children }: { children?: ReactNode }) {
@@ -709,7 +730,7 @@ export function TerminalCard({ children }: { children?: ReactNode }) {
         <SectionLabel>Easter egg</SectionLabel>
         <div className="font-display text-lg">SYNAPSE terminal</div>
         <p className="mt-1 text-xs text-moon">
-          {drained ? "Account mostly empty." : locked ? "Lockout. Dawn, or a probe kit." : "Tap the CRT. Hack it."}
+          {drained ? "Archive already recovered." : locked ? "Security lockout. Dawn, or a probe kit." : "Sit the CRT. The files are live."}
         </p>
         {children}
       </div>

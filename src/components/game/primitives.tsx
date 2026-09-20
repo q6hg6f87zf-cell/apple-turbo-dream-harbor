@@ -1,5 +1,7 @@
 import { cn } from "@/lib/cn";
 import { sfx } from "@/game/audio";
+import { className, displayRace } from "@/game/presentation";
+import { bandForRoll, STAT_COPY, STAT_ORDER } from "@/game/stats-copy";
 import type { ClassName, Item, Operative, Rarity, Stats } from "@/game/types";
 import {
   Crosshair,
@@ -142,38 +144,98 @@ export function HpBar({
   hp,
   max,
   className,
+  label,
 }: {
   hp: number;
   max: number;
   className?: string;
+  label?: string;
 }) {
   const pct = Math.max(0, Math.min(100, (hp / Math.max(1, max)) * 100));
   const tone = pct > 60 ? "bg-ok" : pct > 30 ? "bg-ember" : "bg-danger";
   return (
-    <div className={cn("h-1.5 w-full overflow-hidden rounded-full bg-ink", className)}>
-      <div
-        className={cn("h-full rounded-full transition-[width] duration-300 ease-out", tone)}
-        style={{ width: `${pct}%` }}
-      />
+    <div className={className}>
+      {label ? (
+        <div className="mb-1 flex items-baseline justify-between gap-2">
+          <span className="truncate font-display text-[10px] uppercase tracking-[0.16em] text-paper">{label}</span>
+          <span className="shrink-0 font-mono text-[11px] tabular-nums text-muted">
+            {hp}/{max}
+          </span>
+        </div>
+      ) : null}
+      <div className="flex items-center gap-2">
+        <div className="relative h-2.5 min-h-2.5 w-full overflow-hidden rounded-full bg-ink shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--color-paper)_12%,transparent)]">
+          <div
+            className={cn("h-full rounded-full transition-[width] duration-300 ease-out", tone)}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        {!label ? (
+          <span className="shrink-0 font-mono text-[11px] tabular-nums text-muted">
+            {hp}/{max}
+          </span>
+        ) : null}
+      </div>
     </div>
   );
 }
 
-export function StatGrid({ stats, primary }: { stats: Stats; primary?: keyof Stats }) {
+export function StatGrid({
+  stats,
+  primary,
+  dice,
+}: {
+  stats: Stats;
+  primary?: keyof Stats;
+  dice?: Partial<Stats>;
+}) {
+  const [open, setOpen] = useState<keyof Stats | null>(null);
+  const copy = open ? STAT_COPY[open] : null;
+  const roll = open && dice ? dice[open] : undefined;
+  const band = typeof roll === "number" ? bandForRoll(roll) : null;
   return (
-    <div className="grid grid-cols-7 gap-1">
-      {(Object.keys(stats) as (keyof Stats)[]).map((k) => (
-        <div
-          key={k}
-          className={cn(
-            "rounded-[var(--radius-xs)] bg-ink/60 px-1 py-1.5 text-center",
-            primary === k && "shadow-[var(--shadow-border-hover)]",
-          )}
-        >
-          <div className="font-display text-[9px] tracking-wider text-muted">{k}</div>
-          <div className="font-display text-sm tabular-nums text-paper">{stats[k]}</div>
+    <div data-stat-grid="1">
+      <div className="grid grid-cols-7 gap-1">
+        {STAT_ORDER.map((k) => (
+          <button
+            key={k}
+            type="button"
+            data-stat={k}
+            aria-pressed={open === k}
+            onClick={() => {
+              sfx.click();
+              setOpen((cur) => (cur === k ? null : k));
+            }}
+            className={cn(
+              "min-h-11 rounded-[var(--radius-xs)] bg-ink/60 px-1 py-1.5 text-center",
+              primary === k && "shadow-[var(--shadow-border-hover)]",
+              open === k && "bg-ember/15",
+            )}
+          >
+            <div className="font-display text-[9px] tracking-wider text-muted">{k}</div>
+            <div className="font-display text-sm tabular-nums text-paper">{stats[k]}</div>
+          </button>
+        ))}
+      </div>
+      <p className="mt-2 text-center font-display text-[9px] uppercase tracking-[0.16em] text-muted">
+        Tap a score · what it does
+      </p>
+      {copy ? (
+        <div className="mt-2 rounded-[var(--radius-md)] bg-ink/70 px-3 py-3" data-stat-explain={copy.key}>
+          <p className="font-display text-[10px] uppercase tracking-[0.18em] text-ember">
+            {copy.key} · {copy.name}
+            {primary === copy.key ? " · primary" : ""}
+          </p>
+          <p className="mt-1 text-xs text-muted">{copy.short}</p>
+          <p className="mt-1 text-sm leading-relaxed text-paper">{copy.does}</p>
+          <p className="mt-1 text-xs leading-relaxed text-moon">{copy.checks}</p>
+          {band && typeof roll === "number" ? (
+            <p className="mt-2 text-xs leading-relaxed text-ember">
+              Body die {roll} · {band.label}. {band.meaning}
+            </p>
+          ) : null}
         </div>
-      ))}
+      ) : null}
     </div>
   );
 }
@@ -293,7 +355,7 @@ export function OpChip({
           <StatusPill status={op.status} />
         </div>
         <div className="truncate text-[11px] text-muted">
-          {op.cls} · {op.race}
+          {className(op.cls)} · {displayRace(op.race)}
         </div>
         <HpBar hp={op.hp} max={op.maxHp} className="mt-1" />
       </div>

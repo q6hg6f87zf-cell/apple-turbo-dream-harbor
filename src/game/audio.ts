@@ -1,11 +1,20 @@
+import { addTrauma } from "./juice";
+
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
 let sfxBus: GainNode | null = null;
 let musicBus: GainNode | null = null;
 let ambientNodes: { osc: OscillatorNode; osc2: OscillatorNode; lfo: OscillatorNode; gain: GainNode } | null = null;
+let motor: { osc: OscillatorNode; filt: BiquadFilterNode; gain: GainNode } | null = null;
 let muted = false;
+let sfxLevel = 0.85;
+let musicLevel = 0.58;
 
 const MUTE_KEY = "moon-squad-mute";
+const MIX_KEY = "hollow-radio-mix-v1";
+
+const unlockHooks = new Set<() => void>();
+const muteHooks = new Set<(next: boolean) => void>();
 
 function loadMute() {
   if (typeof window === "undefined") return;
@@ -14,11 +23,41 @@ function loadMute() {
   } catch {
     muted = false;
   }
+  try {
+    const raw = localStorage.getItem(MIX_KEY);
+    if (!raw) return;
+    const mix = JSON.parse(raw) as { sfx?: number; music?: number };
+    if (typeof mix.sfx === "number") sfxLevel = clamp01(mix.sfx);
+    if (typeof mix.music === "number") musicLevel = clamp01(mix.music);
+  } catch {
+    /* ignore */
+  }
 }
 
 if (typeof window !== "undefined") loadMute();
 
-function ac(): AudioContext | null {
+function clamp01(n: number) {
+  return Math.max(0, Math.min(1, n));
+}
+
+function curve(n: number) {
+  return n * n;
+}
+
+function persistMix() {
+  try {
+    localStorage.setItem(MIX_KEY, JSON.stringify({ sfx: sfxLevel, music: musicLevel }));
+  } catch {
+    /* ignore */
+  }
+}
+
+function applyBusGains(c: AudioContext) {
+  if (sfxBus) sfxBus.gain.setTargetAtTime(curve(sfxLevel) * 0.95, c.currentTime, 0.04);
+  if (musicBus) musicBus.gain.setTargetAtTime(curve(musicLevel) * 0.72, c.currentTime, 0.05);
+}
+
+export function ac(): AudioContext | null {
   if (typeof window === "undefined") return null;
   if (!ctx) {
     const C = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
@@ -27,8 +66,7 @@ function ac(): AudioContext | null {
     master = ctx.createGain();
     sfxBus = ctx.createGain();
     musicBus = ctx.createGain();
-    sfxBus.gain.value = 0.85;
-    musicBus.gain.value = 0.55;
+    applyBusGains(ctx);
     master.gain.value = muted ? 0 : 0.9;
     sfxBus.connect(master);
     musicBus.connect(master);
@@ -38,13 +76,51 @@ function ac(): AudioContext | null {
   return ctx;
 }
 
+export function getMusicBus() {
+  ac();
+  return musicBus;
+}
+
+export function addUnlockHook(fn: () => void) {
+  unlockHooks.add(fn);
+  return () => unlockHooks.delete(fn);
+}
+
+export function addMuteHook(fn: (next: boolean) => void) {
+  muteHooks.add(fn);
+  return () => muteHooks.delete(fn);
+}
+
 export function unlockAudio() {
   ac();
+  unlockHooks.forEach((fn) => fn());
   if (!muted) startAmbient();
 }
 
 export function isMuted() {
   return muted;
+}
+
+export function sfxMix() {
+  return sfxLevel;
+}
+
+export function musicMix() {
+  return musicLevel;
+}
+
+export function setSfxMix(value: number) {
+  sfxLevel = clamp01(value);
+  persistMix();
+  const c = ac();
+  if (c) applyBusGains(c);
+}
+
+export function setMusicMix(value: number) {
+  musicLevel = clamp01(value);
+  persistMix();
+  const c = ac();
+  if (c) applyBusGains(c);
 }
 
 export function toggleMute() {
@@ -61,6 +137,7 @@ export function toggleMute() {
   }
   if (muted) stopAmbient();
   else startAmbient();
+  muteHooks.forEach((fn) => fn(muted));
   return muted;
 }
 
@@ -127,7 +204,7 @@ export function startAmbient() {
   if (!c || !musicBus || muted || ambientNodes) return;
   const gain = c.createGain();
   gain.gain.value = 0.0001;
-  gain.gain.setTargetAtTime(0.028, c.currentTime, 1.2);
+  gain.gain.setTargetAtTime(0.018, c.currentTime, 1.2);
   const o1 = c.createOscillator();
   const o2 = c.createOscillator();
   o1.type = "sine";
@@ -170,16 +247,138 @@ export function stopAmbient() {
   ambientNodes = null;
 }
 
+export function duckAmbient(duck: boolean) {
+  if (duck) stopAmbient();
+  else if (!muted) startAmbient();
+}
+
+export function pulseDuck(strength = 0.55, holdMs = 900) {
+  const c = ac();
+  if (!c || !musicBus || muted) return;
+  const base = curve(musicLevel) * 0.72;
+  musicBus.gain.cancelScheduledValues(c.currentTime);
+  musicBus.gain.setTargetAtTime(base * Math.max(0.12, 1 - strength), c.currentTime, 0.07);
+  window.setTimeout(() => {
+    if (!musicBus || !ctx) return;
+    musicBus.gain.setTargetAtTime(muted ? 0 : curve(musicLevel) * 0.72, ctx.currentTime, 0.22);
+  }, holdMs);
+}
+
+export function startReelMotor() {
+  stopReelMotor();
+  const c = ac();
+  if (!c || !sfxBus || muted) return;
+  const osc = c.createOscillator();
+  osc.type = "sawtooth";
+  osc.frequency.value = 38;
+  const filt = c.createBiquadFilter();
+  filt.type = "lowpass";
+  filt.frequency.value = 420;
+  const gain = c.createGain();
+  gain.gain.value = 0.0001;
+  gain.gain.setTargetAtTime(0.028, c.currentTime, 0.08);
+  osc.connect(filt);
+  filt.connect(gain);
+  gain.connect(sfxBus);
+  osc.start();
+  motor = { osc, filt, gain };
+}
+
+export function setReelMotor(t: number) {
+  const c = ac();
+  if (!c || !motor) return;
+  const k = Math.max(0, Math.min(1, t));
+  motor.osc.frequency.setTargetAtTime(26 + k * 70, c.currentTime, 0.05);
+  motor.filt.frequency.setTargetAtTime(280 + k * 900, c.currentTime, 0.05);
+  motor.gain.gain.setTargetAtTime(0.012 + k * 0.026, c.currentTime, 0.05);
+}
+
+export function stopReelMotor() {
+  const c = ac();
+  const n = motor;
+  motor = null;
+  if (!c || !n) return;
+  try {
+    n.gain.gain.setTargetAtTime(0.0001, c.currentTime, 0.04);
+    n.osc.stop(c.currentTime + 0.12);
+  } catch {
+    /* already stopped */
+  }
+  window.setTimeout(() => {
+    try {
+      n.osc.disconnect();
+      n.filt.disconnect();
+      n.gain.disconnect();
+    } catch {
+      /* ignore */
+    }
+  }, 180);
+}
+
+let heartBed: { osc: OscillatorNode; osc2: OscillatorNode; gain: GainNode } | null = null;
+
+export function startHeartBed(rate = 1.15) {
+  stopHeartBed();
+  const c = ac();
+  if (!c || !sfxBus || muted) return;
+  const gain = c.createGain();
+  gain.gain.value = 0.0001;
+  gain.gain.setTargetAtTime(0.034, c.currentTime, 0.12);
+  const o1 = c.createOscillator();
+  const o2 = c.createOscillator();
+  o1.type = "sine";
+  o2.type = "sine";
+  o1.frequency.value = 46 * rate;
+  o2.frequency.value = 38 * rate;
+  o1.connect(gain);
+  o2.connect(gain);
+  gain.connect(sfxBus);
+  o1.start();
+  o2.start();
+  heartBed = { osc: o1, osc2: o2, gain };
+}
+
+export function setHeartBed(t: number) {
+  const c = ac();
+  if (!c || !heartBed) return;
+  const k = Math.max(0, Math.min(1, t));
+  heartBed.osc.frequency.setTargetAtTime(42 + k * 28, c.currentTime, 0.08);
+  heartBed.gain.gain.setTargetAtTime(0.018 + k * 0.04, c.currentTime, 0.08);
+}
+
+export function stopHeartBed() {
+  const c = ac();
+  const n = heartBed;
+  heartBed = null;
+  if (!c || !n) return;
+  try {
+    n.gain.gain.setTargetAtTime(0.0001, c.currentTime, 0.08);
+    n.osc.stop(c.currentTime + 0.16);
+    n.osc2.stop(c.currentTime + 0.16);
+  } catch {
+    /* already stopped */
+  }
+}
+
 export const sfx = {
   click: () => {
-    tone({ freq: jitter(620, 0.06), dur: 0.045, type: "triangle", gain: 0.035 });
-    tone({ freq: jitter(1240, 0.04), dur: 0.03, type: "sine", gain: 0.018, detune: 8 });
+    tone({ freq: jitter(88, 0.08), dur: 0.05, type: "sine", gain: 0.048, freqEnd: 52 });
+    tone({ freq: jitter(620, 0.06), dur: 0.045, type: "triangle", gain: 0.032 });
+    tone({ freq: jitter(1560, 0.05), dur: 0.026, type: "sine", gain: 0.016, detune: 10 });
+    rumble(8);
+  },
+  machine: () => {
+    tone({ freq: 64, dur: 0.32, type: "sine", gain: 0.05, freqEnd: 38 });
+    noise(0.1, 0.022, 160);
+    rumble(18);
   },
   dice: () => {
     noise(0.05, 0.04, 1800);
     tone({ freq: jitter(170), dur: 0.07, type: "sawtooth", gain: 0.04 });
     window.setTimeout(() => tone({ freq: jitter(240), dur: 0.07, type: "sawtooth", gain: 0.04 }), 70);
     window.setTimeout(() => tone({ freq: jitter(340), dur: 0.1, type: "triangle", gain: 0.05 }), 150);
+    addTrauma(0.22);
+    rumble(14);
   },
   coin: () => {
     tone({ freq: jitter(880, 0.03), dur: 0.08, type: "square", gain: 0.03 });
@@ -188,10 +387,14 @@ export const sfx = {
   hit: () => {
     noise(0.08, 0.05, 400);
     tone({ freq: jitter(110, 0.1), dur: 0.14, type: "sawtooth", gain: 0.07, freqEnd: 70 });
+    addTrauma(0.38);
+    rumble(18);
   },
   hurt: () => {
     tone({ freq: jitter(90, 0.08), dur: 0.2, type: "square", gain: 0.06, freqEnd: 55 });
     noise(0.1, 0.03, 220);
+    addTrauma(0.42);
+    rumble(20);
   },
   miss: () => {
     tone({ freq: jitter(420), dur: 0.09, type: "sine", gain: 0.03, freqEnd: 180 });
@@ -201,11 +404,100 @@ export const sfx = {
     tone({ freq: 523, dur: 0.12, type: "triangle", gain: 0.05 });
     window.setTimeout(() => tone({ freq: 784, dur: 0.14, type: "triangle", gain: 0.045 }), 70);
     window.setTimeout(() => tone({ freq: 1046, dur: 0.18, type: "sine", gain: 0.04 }), 140);
+    addTrauma(0.72);
+    rumble(28);
   },
   win: () => {
     tone({ freq: 392, dur: 0.12, type: "triangle", gain: 0.04 });
     window.setTimeout(() => tone({ freq: 523, dur: 0.14, type: "triangle", gain: 0.04 }), 90);
     window.setTimeout(() => tone({ freq: 659, dur: 0.2, type: "sine", gain: 0.045 }), 180);
+  },
+  jackpot: () => {
+    noise(0.12, 0.05, 900);
+    tone({ freq: 196, dur: 0.22, type: "sawtooth", gain: 0.06, freqEnd: 98 });
+    window.setTimeout(() => tone({ freq: 523, dur: 0.16, type: "triangle", gain: 0.05 }), 80);
+    window.setTimeout(() => tone({ freq: 659, dur: 0.18, type: "triangle", gain: 0.05 }), 160);
+    window.setTimeout(() => tone({ freq: 784, dur: 0.28, type: "sine", gain: 0.055 }), 260);
+    window.setTimeout(() => tone({ freq: 1046, dur: 0.32, type: "sine", gain: 0.04 }), 380);
+    addTrauma(0.85);
+    rumble(40);
+  },
+  dry: () => {
+    noise(0.09, 0.025, 280);
+    tone({ freq: jitter(70, 0.04), dur: 0.18, type: "sine", gain: 0.04, freqEnd: 42 });
+    rumble(10);
+  },
+  lever: () => {
+    noise(0.06, 0.04, 500);
+    tone({ freq: jitter(90, 0.06), dur: 0.14, type: "sawtooth", gain: 0.055, freqEnd: 48 });
+    window.setTimeout(() => tone({ freq: jitter(220, 0.05), dur: 0.07, type: "triangle", gain: 0.03 }), 90);
+    rumble(16);
+    addTrauma(0.2);
+  },
+  reelTick: () => {
+    tone({ freq: jitter(1900, 0.12), dur: 0.018, type: "square", gain: 0.012 });
+    tone({ freq: jitter(140, 0.1), dur: 0.03, type: "sine", gain: 0.018, freqEnd: 90 });
+  },
+  reelStop: () => {
+    noise(0.04, 0.035, 700);
+    tone({ freq: jitter(110, 0.06), dur: 0.09, type: "square", gain: 0.05, freqEnd: 55 });
+    rumble(11);
+  },
+  heart: () => {
+    tone({ freq: 52, dur: 0.11, type: "sine", gain: 0.06, freqEnd: 40 });
+    window.setTimeout(() => tone({ freq: 46, dur: 0.14, type: "sine", gain: 0.045, freqEnd: 36 }), 160);
+    rumble(8);
+  },
+  hold: () => {
+    tone({ freq: 120, dur: 0.7, type: "sine", gain: 0.03, attack: 0.05, freqEnd: 280 });
+  },
+  clockTick: () => {
+    tone({ freq: jitter(880, 0.04), dur: 0.04, type: "square", gain: 0.022 });
+    tone({ freq: jitter(220, 0.05), dur: 0.05, type: "sine", gain: 0.02 });
+  },
+  clockWarn: () => {
+    tone({ freq: 740, dur: 0.08, type: "square", gain: 0.035 });
+    window.setTimeout(() => tone({ freq: 620, dur: 0.1, type: "square", gain: 0.03 }), 90);
+    rumble(9);
+  },
+  lockTick: () => {
+    tone({ freq: jitter(1480, 0.08), dur: 0.025, type: "triangle", gain: 0.02 });
+  },
+  pinSet: () => {
+    tone({ freq: 392, dur: 0.07, type: "square", gain: 0.03 });
+    window.setTimeout(() => tone({ freq: 523, dur: 0.1, type: "triangle", gain: 0.035 }), 50);
+    rumble(10);
+  },
+  chip: () => {
+    tone({ freq: jitter(1240, 0.05), dur: 0.04, type: "square", gain: 0.018 });
+    tone({ freq: jitter(180, 0.06), dur: 0.07, type: "sine", gain: 0.028, freqEnd: 90 });
+    rumble(6);
+  },
+  plateDrain: () => {
+    tone({ freq: jitter(220, 0.04), dur: 0.16, type: "sine", gain: 0.04, freqEnd: 70 });
+    noise(0.08, 0.02, 420);
+  },
+  nearMiss: () => {
+    tone({ freq: 196, dur: 0.22, type: "sine", gain: 0.045, freqEnd: 330 });
+    window.setTimeout(() => {
+      noise(0.07, 0.03, 260);
+      tone({ freq: 90, dur: 0.18, type: "sawtooth", gain: 0.04, freqEnd: 48 });
+    }, 240);
+    rumble(18);
+  },
+  bankPop: () => {
+    tone({ freq: jitter(660, 0.04), dur: 0.06, type: "triangle", gain: 0.03 });
+    window.setTimeout(() => tone({ freq: jitter(880, 0.03), dur: 0.08, type: "sine", gain: 0.028 }), 40);
+    rumble(8);
+  },
+  lockIn: () => {
+    noise(0.04, 0.03, 1100);
+    tone({ freq: 523, dur: 0.08, type: "square", gain: 0.03 });
+    window.setTimeout(() => tone({ freq: 784, dur: 0.12, type: "triangle", gain: 0.028 }), 50);
+    rumble(12);
+  },
+  countTick: () => {
+    tone({ freq: jitter(1480, 0.08), dur: 0.018, type: "square", gain: 0.01 });
   },
   dawn: () => {
     tone({ freq: 196, dur: 0.45, type: "sine", gain: 0.035, attack: 0.08, freqEnd: 330, bus: "music" });
@@ -214,6 +506,8 @@ export const sfx = {
   deploy: () => {
     tone({ freq: jitter(80, 0.05), dur: 0.16, type: "sine", gain: 0.06, freqEnd: 50 });
     window.setTimeout(() => sfx.click(), 40);
+    addTrauma(0.55);
+    rumble(22);
   },
   forge: () => {
     noise(0.07, 0.045, 900);
@@ -223,10 +517,22 @@ export const sfx = {
   whoosh: () => {
     noise(0.14, 0.04, 700);
     tone({ freq: 480, dur: 0.16, type: "sine", gain: 0.03, freqEnd: 140 });
+    addTrauma(0.18);
   },
   hack: () => {
     tone({ freq: jitter(880, 0.04), dur: 0.05, type: "square", gain: 0.03 });
     window.setTimeout(() => tone({ freq: jitter(1240, 0.04), dur: 0.04, type: "square", gain: 0.02 }), 40);
+  },
+  termKey: () => {
+    noise(0.018, 0.022, jitter(2400, 0.18));
+    tone({ freq: jitter(1680, 0.12), dur: 0.028, type: "square", gain: 0.018 });
+    tone({ freq: jitter(420, 0.1), dur: 0.04, type: "triangle", gain: 0.012, freqEnd: 180 });
+  },
+  termType: (n = 4) => {
+    const count = Math.max(1, Math.min(18, Math.floor(n)));
+    for (let i = 0; i < count; i++) {
+      window.setTimeout(() => sfx.termKey(), i * (16 + Math.floor(Math.random() * 18)));
+    }
   },
   deny: () => {
     tone({ freq: jitter(140, 0.06), dur: 0.16, type: "square", gain: 0.05, freqEnd: 70 });
@@ -236,6 +542,19 @@ export const sfx = {
     tone({ freq: 392, dur: 0.08, type: "square", gain: 0.03 });
     window.setTimeout(() => tone({ freq: 523, dur: 0.1, type: "square", gain: 0.03 }), 70);
     window.setTimeout(() => tone({ freq: 784, dur: 0.16, type: "square", gain: 0.035 }), 150);
+  },
+  swipe: () => {
+    noise(0.12, 0.035, 900);
+    tone({ freq: 220, dur: 0.12, type: "sine", gain: 0.04, freqEnd: 90 });
+    window.setTimeout(() => {
+      tone({ freq: 1480, dur: 0.06, type: "square", gain: 0.02 });
+      rumble(12);
+    }, 80);
+  },
+  reel: () => {
+    noise(0.035, 0.03, 1400);
+    tone({ freq: jitter(190, 0.08), dur: 0.05, type: "triangle", gain: 0.035, freqEnd: 90 });
+    rumble(7);
   },
 };
 

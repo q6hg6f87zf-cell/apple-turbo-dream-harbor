@@ -1,12 +1,17 @@
 import { Button } from "@/components/ui/button";
+import { hasPlayerProfile } from "@/game/engine";
+import { seatedMember } from "@/game/squad";
 import { sfx, unlockAudio } from "@/game/audio";
 import { useGame } from "@/game/store";
 import { signInWithDiscord, useDiscordAccess } from "@/lib/auth/discord-access";
-import { BookOpen, RefreshCw, ShieldCheck, Terminal } from "lucide-react";
+import { RefreshCw, ShieldCheck } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { CapMark, SectionLabel } from "./primitives";
 import { HelpChrome, TalkOverlay } from "./talk-overlay";
-import { TitleBackdrop } from "./menu";
+import { ProfileStamp } from "./menu";
+import { OpeningBoot, TitleBackdrop, SynapseLoadBar } from "./title-scene";
+import { MoonCard } from "./card";
+import { RadioChip, RadioDeckSheet, RadioDirector } from "./radio-deck";
 
 function FileStat({ label, value }: { label: string; value: ReactNode }) {
   return (
@@ -21,7 +26,6 @@ export function AuthenticatedMainMenu() {
   const assume = useGame((g) => g.assumeCommand);
   const resume = useGame((g) => g.resumeSession);
   const reset = useGame((g) => g.reset);
-  const setScreen = useGame((g) => g.setScreen);
   const openTerminal = useGame((g) => g.openTerminal);
   const linkDiscord = useGame((g) => g.linkDiscord);
   const started = useGame((g) => g.s.started);
@@ -33,8 +37,13 @@ export function AuthenticatedMainMenu() {
   const ops = useGame((g) => g.s.operatives);
   const rooms = useGame((g) => g.s.rooms);
   const riderId = useGame((g) => g.s.discordId);
+  const playerName = useGame((g) => g.s.playerName);
+  const playerHandle = useGame((g) => g.s.playerHandle);
+  const me = useGame((g) => seatedMember(g.s));
+  const named = useGame((g) => hasPlayerProfile(g.s));
   const talking = useGame((g) => !!g.s.talk);
-  const { access, pending, user, refresh } = useDiscordAccess();
+  const hydrated = useGame((g) => g.hydrated);
+  const { access, pending, refresh } = useDiscordAccess();
   const [ask, setAsk] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [signingIn, setSigningIn] = useState(false);
@@ -45,12 +54,14 @@ export function AuthenticatedMainMenu() {
   const roomN = Object.values(rooms).filter((n) => n > 0).length;
 
   useEffect(() => {
-    if (!allowed || !access?.discordId || access.discordId === riderId) return;
-    linkDiscord(access.discordId, access.name ?? user?.displayName ?? "Discord Rider");
-  }, [access?.discordId, access?.name, allowed, linkDiscord, riderId, user?.displayName]);
+    if (!allowed || !access?.discordId) return;
+    const handle = access.handle || (access.name && !/\s/.test(access.name) ? access.name : "");
+    if (riderId === access.discordId && (!handle || playerHandle === handle)) return;
+    linkDiscord(access.discordId, handle);
+  }, [access?.discordId, access?.handle, access?.name, allowed, linkDiscord, riderId, playerHandle]);
 
   const boot = () => {
-    if (!allowed) return;
+    if (!allowed || !named) return;
     unlockAudio();
     sfx.click();
     if (started) resume();
@@ -72,7 +83,7 @@ export function AuthenticatedMainMenu() {
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (ask || talking) {
+      if (ask || talking || !named) {
         if (event.key === "Escape") setAsk(false);
         return;
       }
@@ -89,25 +100,16 @@ export function AuthenticatedMainMenu() {
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden bg-ink text-paper" data-ready="1">
       <TitleBackdrop />
-      <div className="crt-scan absolute inset-0 opacity-20" />
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--color-ink)_12%,transparent),color-mix(in_oklab,var(--color-ink)_38%,transparent)_42%,color-mix(in_oklab,var(--color-ink)_88%,transparent)_78%,var(--color-ink))]" />
-
-      <div className="relative z-[1] flex min-h-0 flex-1 flex-col justify-end px-4 pb-8 pt-16 md:px-10 md:pb-10">
-        <div className="mx-auto flex w-full max-w-lg flex-col gap-5 md:max-w-xl">
-          <div className="flex items-end gap-4">
-            <img
-              src="/art/tyrone.jpg"
-              alt="Tyrone Bot, S.Y.N.A.P.S.E T-0880"
-              className="size-20 rounded-[var(--radius-md)] object-cover shadow-[var(--shadow-border-hover)] md:size-24"
-            />
-            <div className="min-w-0">
-              <p className="font-display text-[11px] uppercase tracking-[0.42em] text-ember">S.Y.N.A.P.S.E T-0880</p>
-              <h1 className="mt-1 font-display text-4xl tracking-[0.08em] text-paper md:text-5xl">HOLLOW<span className="block text-ember">REALM</span></h1>
-              <p className="mt-2 text-xs text-moon">Vault 13 recognizes verified riders only.</p>
-            </div>
-          </div>
-
-          <div className="glass-strong rounded-[var(--radius-xl)] p-4 md:p-5">
+      <div className="title-veil pointer-events-none absolute inset-0 z-[1]" />
+      <OpeningBoot gateReady={hydrated && !pending}>
+      <div className="relative z-[2] flex min-h-0 flex-1 flex-col justify-end px-4 pb-8 pt-16 md:px-10 md:pb-10">
+        <div className="mx-auto flex w-full max-w-lg flex-col gap-3 md:max-w-xl">
+          {started && allowed ? <RadioChip /> : null}
+          <div className="ms-title-dock rounded-[var(--radius-xl)] bg-ink/62 p-4 shadow-[var(--shadow-border)] backdrop-blur-md md:p-5">
+            <p className="font-display text-[11px] uppercase tracking-[0.42em] text-ember">S.Y.N.A.P.S.E T-0880</p>
+            <p className="mt-1 text-xs text-moon">
+              {!allowed ? "Vault 13 recognizes verified riders only." : named ? "Tyrone keeps the porch light on." : "Stamp a name. Then we wake you."}
+            </p>
             {!allowed ? (
               <div>
                 <div className="flex items-center justify-between gap-3">
@@ -115,7 +117,12 @@ export function AuthenticatedMainMenu() {
                   <ShieldCheck className="size-4 text-ember" />
                 </div>
                 {pending ? (
-                  <p className="mt-3 text-sm text-moon">Tyrone is checking the Discord uplink…</p>
+                  <div className="mt-3">
+                    <p className="text-sm text-moon">Tyrone is checking the Discord uplink…</p>
+                    <div className="mt-3">
+                      <SynapseLoadBar value={null} label="Discord uplink" />
+                    </div>
+                  </div>
                 ) : access?.stage === "tyrone" ? (
                   <>
                     <p className="mt-3 font-display text-sm text-paper">Discord authenticated{access.name ? ` · ${access.name}` : ""}</p>
@@ -137,14 +144,19 @@ export function AuthenticatedMainMenu() {
                   </>
                 )}
                 {(authError || access?.error) ? <p className="mt-3 text-xs leading-relaxed text-danger">{authError ?? access?.error}</p> : null}
-                <Button variant="quiet" className="mt-3 w-full" onClick={() => setScreen("rules")}>
-                  <BookOpen className="size-4" /> View field manual
-                </Button>
+              </div>
+            ) : !named ? (
+              <div className="mt-4">
+                <ProfileStamp
+                  prefill={playerName || ""}
+                  prefillHandle={playerHandle || access?.handle || ""}
+                  handleLocked={Boolean(access?.handle || playerHandle)}
+                />
               </div>
             ) : (
               <>
                 {started ? (
-                  <div>
+                  <div className="mt-4">
                     <div className="flex items-center justify-between gap-3">
                       <SectionLabel>Verified active file</SectionLabel>
                       <p className="font-display text-[10px] uppercase tracking-[0.18em] text-muted">Rank {level} · {xp}/{xpToNext} XP</p>
@@ -157,59 +169,60 @@ export function AuthenticatedMainMenu() {
                     </div>
                   </div>
                 ) : (
-                  <div>
-                    <SectionLabel>Verified rider</SectionLabel>
+                  <div className="mt-4">
+                    <SectionLabel>File stamped</SectionLabel>
                     <p className="mt-2 text-sm leading-relaxed text-moon">
-                      {access?.devBypass ? "Development authority is active." : `${access?.name ?? user?.displayName ?? "Discord rider"} is cleared through Discord.`} Tyrone will walk the first resident through Vault 13 before the campaign opens up.
+                      {playerName}. I found you east of the highway. No tracks. Wake up and I will walk you into Vault 13.
                     </p>
+                    {playerHandle ? (
+                      <p className="mt-3 font-display text-[10px] uppercase tracking-[0.18em] text-ember">@{playerHandle}</p>
+                    ) : null}
+                    <div className="mt-4">
+                      <MoonCard member={me} />
+                    </div>
                   </div>
                 )}
 
                 <div className="mt-5 flex flex-col gap-2">
-                  <Button variant="ember" size="lg" className="w-full" onClick={boot} disabled={talking}>
-                    {started ? `Resume · Day ${day}` : "Assume command"}
+                  <Button
+                    variant="ember"
+                    size="lg"
+                    className="w-full"
+                    onPointerDown={() => {
+                      unlockAudio();
+                    }}
+                    onClick={boot}
+                    disabled={talking}
+                  >
+                    {started ? `Assume command · Day ${day}` : "Wake up"}
                   </Button>
                   {started ? <Button variant="ghost" className="w-full" onClick={() => setAsk(true)} disabled={talking}>New file</Button> : null}
-                  <div className="grid grid-cols-2 gap-2">
-                    <Button variant="quiet" className="w-full" onClick={() => setScreen("rules")}><BookOpen className="size-4" /> Rules</Button>
-                    <Button
-                      variant="quiet"
-                      className="w-full"
-                      onClick={() => {
-                        unlockAudio();
-                        const message = openTerminal();
-                        if (message) useGame.setState((store) => ({ s: { ...store.s, toast: message } }));
-                      }}
-                    >
-                      <Terminal className="size-4" /> Black channel
-                    </Button>
-                  </div>
                 </div>
-                <p className="mt-4 font-display text-[9px] uppercase tracking-[0.2em] text-muted">
-                  Discord verified · server authority online · terminal password rotates per breach
-                </p>
               </>
             )}
           </div>
         </div>
       </div>
+      </OpeningBoot>
 
+      {allowed ? (
       <button
         type="button"
-        disabled={!allowed}
         onClick={() => {
           unlockAudio();
           const message = openTerminal();
           if (message) useGame.setState((store) => ({ s: { ...store.s, toast: message } }));
         }}
-        className="absolute right-3 top-3 z-[2] w-[7.5rem] touch-manipulation overflow-hidden rounded-[var(--radius-md)] shadow-[var(--shadow-border)] transition-[box-shadow,transform] hover:shadow-[var(--shadow-border-hover)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 md:right-6 md:top-6 md:w-40"
-        aria-label={allowed ? "Open the SYNAPSE black-channel terminal" : "Discord verification required"}
+        className="absolute right-3 top-3 z-[2] w-[7.5rem] touch-manipulation overflow-hidden rounded-[var(--radius-md)] shadow-[var(--shadow-border)] transition-[box-shadow,transform] hover:shadow-[var(--shadow-border-hover)] active:scale-[0.98] md:right-6 md:top-6 md:w-40"
+        aria-label="Sit the SYNAPSE terminal"
+        data-sit-crt="1"
       >
         <img src="/art/terminal.jpg" alt="" className="aspect-[4/3] w-full object-cover" />
         <span className="absolute inset-x-0 bottom-0 bg-ink/75 px-2 py-1 font-mono text-[9px] uppercase tracking-[0.16em] text-ember">
-          {allowed ? "BLACK CHANNEL · ARMED" : "AUTH REQUIRED"}
+          SIT THE CRT
         </span>
       </button>
+      ) : null}
 
       {ask ? (
         <div
@@ -233,6 +246,7 @@ export function AuthenticatedMainMenu() {
                 onClick={() => {
                   reset();
                   setAsk(false);
+                  unlockAudio();
                   useGame.getState().assumeCommand();
                 }}
               >
@@ -244,8 +258,10 @@ export function AuthenticatedMainMenu() {
         </div>
       ) : null}
 
+      <RadioDirector />
       <TalkOverlay />
       <HelpChrome />
+      <RadioDeckSheet />
     </div>
   );
 }

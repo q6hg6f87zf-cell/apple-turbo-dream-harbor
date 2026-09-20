@@ -8,9 +8,11 @@ import { HollowGlobeWebGL } from "./globe-webgl";
 export function WorldAtlas({
   loc,
   onSelect,
+  theater = false,
 }: {
   loc: LocationId;
   onSelect: (id: LocationId) => void;
+  theater?: boolean;
 }) {
-  return <HollowGlobeWebGL loc={loc} onSelect={onSelect} />;
+  return <HollowGlobeWebGL loc={loc} onSelect={onSelect} theater={theater} />;
 }

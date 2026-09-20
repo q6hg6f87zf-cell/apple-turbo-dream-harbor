@@ -24,12 +24,77 @@ export type ItemKind =
   | "trinket"
   | "consumable"
   | "enchantment"
+  | "attachment"
   | "material"
   | "special";
 
-export type InventoryCategory = "all" | ItemKind;
+export type InventoryCategory = "all" | ItemKind | "ammo";
 export type InventoryScope = "all" | "vault" | "operatives";
 export type InventorySort = "name" | "rarity" | "condition" | "value" | "owner";
+
+/** Ballistic / energy / heavy families used by rifles, attachments and ammo. */
+export type WeaponFamily =
+  | "melee"
+  | "pistol"
+  | "smg"
+  | "rifle"
+  | "shotgun"
+  | "sniper"
+  | "energy"
+  | "heavy";
+
+export type AttachmentSlot =
+  | "optic"
+  | "muzzle"
+  | "barrel"
+  | "mag"
+  | "stock"
+  | "underbarrel"
+  | "receiver";
+
+export type AmmoType =
+  | "9mm"
+  | ".45"
+  | "5.56"
+  | ".30-30"
+  | ".270"
+  | ".30-06"
+  | ".308"
+  | ".300"
+  | "12g"
+  | "rail"
+  | "bolt"
+  | "cell"
+  | "laser";
+
+export type AmmoGrade = "surplus" | "ball" | "plus" | "match" | "special";
+
+
+export type ArmorClass = "soft" | "plate" | "powered" | "phase" | "beast" | "machine";
+
+export type RangeBand = "close" | "mid" | "long";
+
+/** Optional rifle / attachment / ammo fields. Missing on old saves; hydrate at use. */
+export interface WeaponSpec {
+  weaponFamily?: WeaponFamily;
+  ammoType?: AmmoType;
+  rangeBand?: RangeBand;
+  ap?: number;
+  accuracy?: number;
+  recoil?: number;
+  attachmentSlot?: AttachmentSlot;
+  fitsFamilies?: WeaponFamily[];
+  sockets?: Partial<Record<AttachmentSlot, string>>;
+  ammoCount?: number;
+  mag?: number;
+  magSize?: number;
+  /** Stamped when a mag is seated from a named box. Factory loads leave this empty. */
+  ammoLoad?: string;
+  ammoGrade?: AmmoGrade;
+  loadAp?: number;
+  loadDamage?: number;
+  loadAccuracy?: number;
+}
 
 export interface InventoryViewState {
   category: InventoryCategory;
@@ -86,6 +151,7 @@ export type RegionPoiKind =
   | "boss"
   | "facility"
   | "ruin"
+  | "radio"
   | "unknown";
 
 export interface GlobeMarker {
@@ -109,20 +175,25 @@ export interface RegionPointOfInterest {
   merchantId?: string;
   bossId?: string;
   icon?: string;
+  action?: PoiAction;
 }
 
 export interface RegionDefinition {
   id: RegionId;
   name: string;
   short: string;
+  continent: string;
   biome: RegionBiome;
   description: string;
   danger: number;
   marker: GlobeMarker;
   mapAsset: string;
+  streetAsset?: string;
   accent?: string;
   points: RegionPointOfInterest[];
 }
+
+export type PoiAction = "shop" | "listen" | "salvage" | "scout" | "home" | "boss";
 
 export type WorldViewMode = "globe" | "region";
 
@@ -162,6 +233,8 @@ export type OperativeStatus =
   | "dead"
   | "infirmary";
 
+export type TutorialStep = "briefing" | "forge" | "sortie" | "shift" | "rest" | "done";
+
 export type Screen =
   | "title"
   | "briefing"
@@ -177,7 +250,8 @@ export type Screen =
   | "arcade"
   | "rules"
   | "vault"
-  | "squad";
+  | "squad"
+  | "market";
 
 export type MissionKind =
   | "scout"
@@ -186,6 +260,68 @@ export type MissionKind =
   | "trade"
   | "bounty"
   | "boss";
+
+export type MissionApproach = "ghost" | "standard" | "breach";
+
+export type WatchId = "dawn" | "morning" | "midday" | "afternoon" | "dusk" | "night";
+
+export type DayTaskKind =
+  | "sortie"
+  | "crates"
+  | "visitor"
+  | "aegis"
+  | "treat"
+  | "scan"
+  | "repair"
+  | "run"
+  | "tribute"
+  | "crisis"
+  | "cabinet"
+  | "market"
+  | "tower"
+  | "salvage";
+
+export interface TaskChoice {
+  id: string;
+  label: string;
+  blurb: string;
+  need?: "caps" | "ore" | "op";
+  cost?: number;
+}
+
+export interface TaskCrate {
+  id: string;
+  label: string;
+  result: "good" | "junk" | "trap";
+  payload: string;
+}
+
+export interface DayTask {
+  id: string;
+  kind: DayTaskKind;
+  title: string;
+  brief: string;
+  why: string;
+  watchCost: number;
+  required: boolean;
+  loc?: LocationId;
+  poiId?: string;
+  missionKind?: MissionKind;
+  choices?: TaskChoice[];
+  crates?: TaskCrate[];
+  status: "open" | "active" | "done" | "failed";
+  report?: string;
+  failNote?: string;
+}
+
+export interface ShiftState {
+  day: number;
+  watch: WatchId;
+  watchesLeft: number;
+  board: DayTask[];
+  log: string[];
+  activeId: string | null;
+}
 
 export type RollBand =
   | "fumble"
@@ -222,6 +358,45 @@ export interface DailyClocks {
   triviaLives: number;
   tfLives: number;
   unscramble: number;
+  knowledgeDraws: number;
+  lockpicks: number;
+  slots: number;
+  cardTap: number;
+}
+
+export type ArcadeGameId =
+  | "trivia"
+  | "truefalse"
+  | "scramble"
+  | "wordsearch"
+  | "lockpick"
+  | "slots"
+  | "hack"
+  | "cree"
+  | "blackjack"
+  | "roulette"
+  | "poker";
+
+export interface ArcadeState {
+  triviaSeen: string[];
+  tfSeen: string[];
+  scrambleSeen: string[];
+  creeRead: string[];
+  earned: Record<ArcadeGameId, number>;
+  lastGame: ArcadeGameId | null;
+}
+
+export interface ArcadePayout {
+  game: ArcadeGameId;
+  caps: number;
+  xp: number;
+  loc?: LocationId;
+  moonFavor?: number;
+  pack?: boolean;
+  packKey?: PackKey;
+  note: string;
+  retireId?: string;
+  retireKind?: "trivia" | "tf" | "scramble" | "cree";
 }
 
 export interface HackState {
@@ -234,6 +409,24 @@ export interface HackState {
   lastLikeness: number | null;
   locked: boolean;
   won: boolean;
+}
+
+export type TermPage =
+  | "boot"
+  | "home"
+  | "records"
+  | "squad"
+  | "radio"
+  | "ledger"
+  | "mail"
+  | "porch"
+  | "lock";
+
+export interface TermSession {
+  page: TermPage;
+  booted: boolean;
+  output: string[];
+  sessionId: string;
 }
 
 export interface Stats {
@@ -255,7 +448,7 @@ export interface RollEntry {
   desc?: string;
 }
 
-export interface Item {
+export interface Item extends WeaponSpec {
   id: string;
   name: string;
   kind: ItemKind;
@@ -314,6 +507,8 @@ export interface Operative {
   curses: string[];
   notes: string;
   joinedDay: number;
+  /** d20s stamped at the forge. Missing on old saves — computeStats uses class floor. */
+  statDice?: Stats;
 }
 
 export interface Resident {
@@ -322,12 +517,13 @@ export interface Resident {
   role: "guard" | "medic" | "scout" | "quartermaster" | "smith" | "spymaster";
 }
 
-export interface ShopOffer {
+export interface ShopOffer extends WeaponSpec {
   name: string;
   price: number;
   kind: ItemKind;
   rarity: Rarity;
   effect: string;
+  damage?: string;
 }
 
 export interface DailyShop {
@@ -336,6 +532,43 @@ export interface DailyShop {
   artifact: ShopOffer;
   day: number;
   bought?: Partial<Record<"bargain" | "essential" | "artifact", boolean>>;
+}
+
+export interface MarketLot extends WeaponSpec {
+  id: string;
+  name: string;
+  kind: ItemKind;
+  rarity: Rarity;
+  effect: string;
+  lore: string;
+  value: number;
+  price: number;
+  qty: number;
+  sourceRegion: RegionId;
+  visitor?: boolean;
+  classHint?: ClassName;
+  damage?: string;
+  defense?: number;
+  slot?: "weapon" | "armor" | "trinket";
+}
+
+export interface VisitingMerchant {
+  id: string;
+  name: string;
+  title: string;
+  blurb: string;
+  regionId: RegionId;
+}
+
+export interface MarketState {
+  day: number;
+  lots: MarketLot[];
+  visitor: VisitingMerchant | null;
+}
+
+export interface PoiWatchLog {
+  day: number;
+  used: string[];
 }
 
 export interface Bounty {
@@ -370,6 +603,11 @@ export interface Combatant {
   phase?: number;
   tags: string[];
   flavor: string;
+  armorClass?: ArmorClass;
+  preferredRange?: RangeBand;
+  resist?: string[];
+  weakness?: string[];
+  resistAmt?: number;
 }
 
 export interface CombatState {
@@ -389,6 +627,15 @@ export interface CombatState {
   guardId?: string;
   regionId?: RegionId;
   poiId?: string;
+  incomingSoft?: number;
+}
+
+export interface MissionTactic {
+  id: string;
+  label: string;
+  blurb: string;
+  stat: StatKey;
+  dcMod: number;
 }
 
 export interface MissionBeat {
@@ -398,6 +645,8 @@ export interface MissionBeat {
   stat: StatKey;
   dc: number;
   kind: "check" | "combat" | "loot" | "merchant" | "boss";
+  tactics?: MissionTactic[];
+  tacticId?: string;
 }
 
 export interface MissionState {
@@ -422,6 +671,7 @@ export interface MissionState {
   combatQueued?: boolean;
   regionId?: RegionId;
   poiId?: string;
+  approach?: MissionApproach;
 }
 
 export interface LocationProgress {
@@ -453,11 +703,103 @@ export interface ArcState {
   log: string[];
 }
 
+export type TyroneAssist = "off" | "minimal" | "normal" | "helpful" | "high";
+
+export type TyroneEventType =
+  | "forge"
+  | "deploy"
+  | "roll"
+  | "mission"
+  | "combat"
+  | "dawn"
+  | "death"
+  | "downed"
+  | "upgrade"
+  | "hack"
+  | "buy"
+  | "rest"
+  | "promise"
+  | "ask"
+  | "region"
+  | "boss";
+
+export interface TyroneEpisode {
+  id: string;
+  day: number;
+  ticks: number;
+  type: TyroneEventType;
+  locationId?: string;
+  regionId?: string;
+  poiId?: string;
+  operativeIds: string[];
+  missionKind?: string;
+  description: string;
+  outcome?: string;
+  importance: number;
+  weight: number;
+  tags: string[];
+  permanent: boolean;
+  recalled: number;
+}
+
+export interface TyroneFact {
+  id: string;
+  claim: string;
+  evidence: number;
+  tags: string[];
+}
+
+export interface TyronePromise {
+  id: string;
+  text: string;
+  poiId?: string;
+  locationId?: string;
+  day: number;
+  kept?: boolean;
+}
+
+export interface TyroneBond {
+  trust: number;
+  familiarity: number;
+  respect: number;
+  conflict: number;
+  sharedHistory: number;
+  humor: number;
+  concern: number;
+  loyalty: number;
+}
+
+export interface TyroneWorking {
+  actions: string[];
+  lastRegion: string | null;
+  lastPoi: string | null;
+  lastAsk: string | null;
+}
+
+export interface TyroneMind {
+  episodic: TyroneEpisode[];
+  semantic: TyroneFact[];
+  story: string[];
+  promises: TyronePromise[];
+  relationship: TyroneBond;
+  settings: { assist: TyroneAssist; showNumbers: boolean };
+  cooldowns: Record<string, number>;
+  lastSpeechAt: number;
+  lastSpeechConcept: string | null;
+  lastSilentReason: string;
+  lastSpeakReason: string;
+  speechCount: number;
+  failedBeats: Record<string, number>;
+  working: TyroneWorking;
+  utterance: string | null;
+}
+
 export interface GameState {
   version: number;
   started: boolean;
-  tutorial: "briefing" | "forge" | "sortie" | "rest" | "done";
+  tutorial: TutorialStep;
   screen: Screen;
+  openedFrom: Screen | null;
   day: number;
   coins: number;
   ore: number;
@@ -476,8 +818,11 @@ export interface GameState {
   terminalDrained: boolean;
   terminalLockDay: number;
   hack: HackState | null;
+  term: TermSession | null;
   operatives: Operative[];
   shop: DailyShop | null;
+  market: MarketState | null;
+  poiWatch: PoiWatchLog;
   bounty: Bounty | null;
   locations: Record<LocationId, LocationProgress>;
   mission: MissionState | null;
@@ -492,6 +837,8 @@ export interface GameState {
   lastParty: string[];
   discordId: string | null;
   discordName: string | null;
+  playerName: string | null;
+  playerHandle: string | null;
   talk: { script: string; i: number } | null;
   seenTalk: string[];
   talkQueue: string[];
@@ -501,4 +848,10 @@ export interface GameState {
   worldView?: WorldViewState;
   inventoryView?: InventoryViewState;
   spaceScene?: SpaceSceneSettings;
+  kaneHeat: number;
+  selectedPoiId: string | null;
+  regionMapOpen: boolean;
+  shift: ShiftState;
+  arcade: ArcadeState;
+  tyrone: TyroneMind;
 }

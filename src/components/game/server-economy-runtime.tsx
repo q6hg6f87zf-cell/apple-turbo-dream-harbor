@@ -1,5 +1,6 @@
 import { cloneState } from "@/game/engine";
 import { pullServerEconomy, sendEconomyCommand, type ServerEconomySnapshot } from "@/game/server-economy";
+import { STARTER_PLATE } from "@/game/rooms";
 import { useGame } from "@/game/store";
 import { useEffect } from "react";
 
@@ -27,7 +28,14 @@ function applySnapshot(snapshot: ServerEconomySnapshot, toast?: string) {
 
     const rider = s.squad.find((member) => member.discordId === snapshot.card.discordId);
     if (rider) {
-      rider.personalCaps = snapshot.card.caps;
+      const incoming = Math.max(0, Math.floor(Number(snapshot.card.caps) || 0));
+      const local = Math.max(0, Math.floor(Number(rider.personalCaps) || 0));
+      const keepStarter =
+        incoming === 0 &&
+        local >= STARTER_PLATE &&
+        rider.joinedDay === s.day &&
+        (s.clocks?.slots ?? 8) >= 7;
+      rider.personalCaps = keepStarter ? local : incoming;
       rider.xp = snapshot.card.xp;
     }
     if (s.discordId === snapshot.card.discordId) {

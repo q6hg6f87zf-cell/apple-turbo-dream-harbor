@@ -1,10 +1,13 @@
 import { sfx } from "@/game/audio";
-import { cardNumber, isVacant } from "@/game/squad";
+import { cardNumber, isVacant, plateHandle, seatedMember } from "@/game/squad";
 import type { SquadMember } from "@/game/types";
+import { useGame } from "@/game/store";
 import { cn } from "@/lib/cn";
-import { FlipHorizontal, RotateCcw, RotateCw } from "lucide-react";
+import { FlipHorizontal, RotateCcw, RotateCw, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { MoonCrest } from "./primitives";
+import { Button } from "@/components/ui/button";
 
 const MIN_Z = 0.82;
 const MAX_Z = 1.85;
@@ -266,7 +269,7 @@ export function MoonCard({ member, className }: { member: SquadMember; className
   const num = cardNumber(member.id);
   const vacant = isVacant(member);
   const holder = vacant ? "Unclaimed" : member.name;
-  const handle = vacant ? "claim this plate" : member.discordHandle ?? "unlinked rider";
+  const handle = plateHandle(member);
   const cvc = String((member.id.length * 137 + holder.length * 19) % 1000).padStart(3, "0");
   const last4 = num.replace(/\s/g, "").slice(-4);
 
@@ -390,4 +393,50 @@ export function MoonCard({ member, className }: { member: SquadMember; className
       </div>
     </div>
   );
+}
+
+export function MoonCardSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const me = useGame((g) => seatedMember(g.s));
+  const setScreen = useGame((g) => g.setScreen);
+  if (!open) return null;
+  const sheet = (
+    <div
+      className="fixed inset-0 z-[80] flex items-end justify-center bg-ink/80 p-3 backdrop-blur-md md:items-center"
+      onClick={onClose}
+    >
+      <div
+        className="ms-pop w-full max-w-md rounded-[var(--radius-xl)] border border-line bg-surface p-5 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div>
+            <p className="font-display text-[10px] uppercase tracking-[0.2em] text-ember">Moon Squad</p>
+            <h2 className="font-display text-xl">Personal plate</h2>
+            <p className="mt-1 text-sm text-muted">Drag to rotate. Pinch or wheel to zoom. Double-tap to flip.</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex size-11 shrink-0 items-center justify-center rounded-full border border-line text-muted"
+            aria-label="Close card"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+        <MoonCard member={me} />
+        <Button
+          className="mt-4 w-full"
+          variant="ember"
+          onClick={() => {
+            sfx.click();
+            setScreen("ledger");
+            onClose();
+          }}
+        >
+          Open ledger
+        </Button>
+      </div>
+    </div>
+  );
+  return typeof document === "undefined" ? sheet : createPortal(sheet, document.body);
 }

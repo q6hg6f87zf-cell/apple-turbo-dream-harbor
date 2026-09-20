@@ -1,6 +1,7 @@
 import { ARMOR, LEDGER_POOLS, RACES, WEAPONS } from "./data";
 import { HOLLOW_CATALOG } from "./hollow-catalog";
-import type { ClassName, Item, ItemKind, Rarity, RegionId } from "./types";
+import { TREASURE_CATALOG } from "./treasure-catalog";
+import type { ClassName, Item, ItemKind, Rarity, RegionId, WeaponSpec } from "./types";
 
 export type AuthorityItemTemplate = {
   key: string;
@@ -15,7 +16,7 @@ export type AuthorityItemTemplate = {
   damage?: string;
   defense?: number;
   sourceRegion?: RegionId;
-};
+} & WeaponSpec;
 
 export type AuthorityVendorOffer = {
   vendor: string;
@@ -89,6 +90,24 @@ export const NPC_VENDOR_OFFERS: AuthorityVendorOffer[] = [
     lore: "A flat stone worn smooth by soldiers who had more time than steel.",
   },
   {
+    vendor: "Quartermaster Rudge",
+    name: "Union Forge M4 Carbine",
+    price: 810,
+    kind: "weapon",
+    rarity: "Uncommon",
+    effect: "M4 pattern. Short 5.56. Handy in alleys.",
+    lore: "Union Forge heat-treat. Chambered 5.56.",
+  },
+  {
+    vendor: "Quartermaster Rudge",
+    name: "Watchworks 5.56 Box",
+    price: 140,
+    kind: "consumable",
+    rarity: "Common",
+    effect: "30 rounds of 5.56. M4, M16 and SAW feed.",
+    lore: "Sealed crate. Stamped Watchworks.",
+  },
+  {
     vendor: "Nylah the Dredge",
     name: "Focus Crystal",
     price: 300,
@@ -108,7 +127,7 @@ export const NPC_VENDOR_OFFERS: AuthorityVendorOffer[] = [
   },
   {
     vendor: "Sister Vex",
-    name: "Aether Bandages",
+    name: "Field Gel",
     price: 250,
     kind: "consumable",
     rarity: "Uncommon",
@@ -159,6 +178,8 @@ for (const weapon of WEAPONS) {
     slot: "weapon",
     classHint: weapon.cls,
     damage: weapon.damage,
+    weaponFamily: "melee",
+    rangeBand: "close",
   });
 }
 
@@ -188,6 +209,18 @@ for (const pool of Object.values(LEDGER_POOLS)) {
       lore: "Quartermaster Exchange record.",
       value: offer.price,
       slot: slotFor(offer.kind),
+      damage: offer.damage,
+      weaponFamily: offer.weaponFamily,
+      ammoType: offer.ammoType,
+      rangeBand: offer.rangeBand,
+      ap: offer.ap,
+      accuracy: offer.accuracy,
+      recoil: offer.recoil,
+      attachmentSlot: offer.attachmentSlot,
+      fitsFamilies: offer.fitsFamilies,
+      ammoCount: offer.ammoCount,
+      magSize: offer.magSize,
+      mag: offer.mag,
     });
   }
 }
@@ -206,6 +239,45 @@ for (const item of HOLLOW_CATALOG) {
     damage: item.damage,
     defense: item.defense,
     sourceRegion: item.sourceRegion,
+    weaponFamily: item.weaponFamily,
+    ammoType: item.ammoType,
+    rangeBand: item.rangeBand,
+    ap: item.ap,
+    accuracy: item.accuracy,
+    recoil: item.recoil,
+    attachmentSlot: item.attachmentSlot,
+    fitsFamilies: item.fitsFamilies,
+    ammoCount: item.ammoCount,
+    magSize: item.magSize,
+    mag: item.mag,
+  });
+}
+
+for (const item of TREASURE_CATALOG) {
+  templates.push({
+    key: keyFor(item.kind, item.name),
+    name: item.name,
+    kind: item.kind,
+    rarity: item.rarity,
+    effect: item.effect,
+    lore: item.lore,
+    value: item.value,
+    slot: slotFor(item.kind),
+    classHint: item.classHint,
+    damage: item.damage,
+    defense: item.defense,
+    sourceRegion: item.sourceRegion,
+    weaponFamily: item.weaponFamily,
+    ammoType: item.ammoType,
+    rangeBand: item.rangeBand,
+    ap: item.ap,
+    accuracy: item.accuracy,
+    recoil: item.recoil,
+    attachmentSlot: item.attachmentSlot,
+    fitsFamilies: item.fitsFamilies,
+    ammoCount: item.ammoCount,
+    magSize: item.magSize,
+    mag: item.mag,
   });
 }
 
@@ -299,13 +371,20 @@ export function itemFromAuthorityTemplate(
     equipped?: boolean;
     discoveredDay?: number;
     enchantments?: AuthorityItemTemplate[];
+    attachments?: AuthorityItemTemplate[];
   },
 ): Item {
   const enchantments = opts?.enchantments ?? [];
-  const effect = enchantments.length
-    ? `${template.effect} • ${enchantments.map((entry) => `${entry.name}: ${entry.effect}`).join(" • ")}`
+  const attachments = opts?.attachments ?? [];
+  const extras = [...enchantments, ...attachments];
+  const effect = extras.length
+    ? `${template.effect} • ${extras.map((entry) => `${entry.name}: ${entry.effect}`).join(" • ")}`
     : template.effect;
-  const value = template.value + enchantments.reduce((sum, entry) => sum + Math.max(1, Math.round(entry.value * 0.5)), 0);
+  const value = template.value + extras.reduce((sum, entry) => sum + Math.max(1, Math.round(entry.value * 0.5)), 0);
+  const sockets: Item["sockets"] = {};
+  for (const part of attachments) {
+    if (part.attachmentSlot) sockets[part.attachmentSlot] = part.name;
+  }
   return {
     id: instanceId,
     name: template.name,
@@ -320,9 +399,24 @@ export function itemFromAuthorityTemplate(
     lore: template.lore,
     equipped: !!opts?.equipped,
     value,
-    tags: enchantments.flatMap((entry) => [`enchant:${entry.name}`, `enchant-rarity:${entry.rarity}`]),
+    tags: [
+      ...enchantments.flatMap((entry) => [`enchant:${entry.name}`, `enchant-rarity:${entry.rarity}`]),
+      ...attachments.flatMap((entry) => [`socket:${entry.attachmentSlot}:${entry.name}`]),
+    ],
     sourceRegion: template.sourceRegion,
     discoveredDay: opts?.discoveredDay,
+    weaponFamily: template.weaponFamily,
+    ammoType: template.ammoType,
+    rangeBand: template.rangeBand,
+    ap: template.ap,
+    accuracy: template.accuracy,
+    recoil: template.recoil,
+    attachmentSlot: template.attachmentSlot,
+    fitsFamilies: template.fitsFamilies,
+    ammoCount: template.ammoCount,
+    magSize: template.magSize,
+    mag: template.mag ?? template.magSize,
+    sockets: Object.keys(sockets).length ? sockets : undefined,
   };
 }
 

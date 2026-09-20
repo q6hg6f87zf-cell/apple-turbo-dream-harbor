@@ -1,23 +1,32 @@
 import { useEffect } from "react";
 import { CLASS_PRESENTATION } from "@/game/presentation";
+import { LEGACY_LINEAGE_MAP, LEGACY_RACE_MAP } from "@/game/data-legacy";
 import type { ClassName } from "@/game/types";
 
-const OLD_NAMES = Object.keys(CLASS_PRESENTATION) as ClassName[];
-const RE = new RegExp(`\\b(${OLD_NAMES.join("|")})\\b`, "g");
+const CLASS_NAMES = Object.keys(CLASS_PRESENTATION) as ClassName[];
+const CLASS_RE = new RegExp(`\\b(${CLASS_NAMES.join("|")})\\b`, "g");
+const RACE_KEYS = Object.keys(LEGACY_RACE_MAP).sort((a, b) => b.length - a.length);
+const LINEAGE_KEYS = Object.keys(LEGACY_LINEAGE_MAP).sort((a, b) => b.length - a.length);
+const LORE_RE = new RegExp(
+  `\\b(${[...RACE_KEYS, ...LINEAGE_KEYS].map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})\\b`,
+  "g",
+);
 
 function replaceText(node: Text) {
   const parent = node.parentElement;
   if (!parent || parent.closest("script,style,textarea,input,select,option")) return;
   const before = node.nodeValue ?? "";
-  if (!RE.test(before)) {
-    RE.lastIndex = 0;
-    return;
+  CLASS_RE.lastIndex = 0;
+  LORE_RE.lastIndex = 0;
+  let after = before;
+  if (CLASS_RE.test(after)) {
+    CLASS_RE.lastIndex = 0;
+    after = after.replace(CLASS_RE, (raw) => CLASS_PRESENTATION[raw as ClassName]?.name ?? raw);
   }
-  RE.lastIndex = 0;
-  const after = before.replace(RE, (raw) => {
-    const meta = CLASS_PRESENTATION[raw as ClassName];
-    return meta ? `${meta.emoji} ${meta.name}` : raw;
-  });
+  if (LORE_RE.test(after)) {
+    LORE_RE.lastIndex = 0;
+    after = after.replace(LORE_RE, (raw) => LEGACY_RACE_MAP[raw] ?? LEGACY_LINEAGE_MAP[raw] ?? raw);
+  }
   if (after !== before) node.nodeValue = after;
 }
 
@@ -36,10 +45,8 @@ function scan(root: Node) {
 
 /**
  * Presentation-only migration layer.
- *
- * The engine and save files deliberately keep the original class keys so old
- * saves remain valid. This layer makes every legacy screen speak the current
- * Hollow Realm class language until each legacy view is retired/refactored.
+ * Engine keys stay Warrior / Wizard / etc. Player-facing chrome speaks Ironbound,
+ * Riftwright, and the Hollow Realm bloodlines.
  */
 export function ClassAliasLayer() {
   useEffect(() => {

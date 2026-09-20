@@ -50,13 +50,21 @@ import {
   makeItemFromArmor,
   makeItemFromWeapon,
   pickByRoll,
+  resolveLineage,
+  resolveRaceName,
   starterWeapon,
   villainById,
   weaponDamageAvg,
 } from "./data";
+import { REGION_LOCATION, campaignOpenRegions } from "./arsenal";
+import { APPROACHES, locationToRegion, type FieldDeploy } from "./field-ops";
+import { emptyMarket } from "./market";
+import { emptyShift } from "./shift";
+import { emptyTyrone } from "./tyrone-mind";
+import { scoreFromDice, STAT_ORDER } from "./stats-copy";
 import { freshClocks, grantPackLoot, starterPack } from "./inventory";
 import { queueTalk } from "./talk";
-import { ensureSquad, maybeSpendArcTurn } from "./squad";
+import { ensureSquad, maybeSpendArcTurn, stampSeatedPlate } from "./squad";
 
 export function uid(prefix = "id"): string {
   return `${prefix}-${Math.random().toString(36).slice(2, 9)}-${Date.now().toString(36)}`;
@@ -113,13 +121,15 @@ export function emptyStats(): Stats {
 
 export function computeStats(op: Operative): Stats {
   const base = CLASS_BASE[op.cls];
-  const race = RACES[op.race]?.stats ?? emptyStats();
+  const race = RACES[resolveRaceName(op.race)]?.stats ?? emptyStats();
   const primary = PRIMARY_STAT[op.cls];
   const companion = op.companion?.status === "active" ? COMPANIONS[op.companion.type] : null;
   const armor = op.inventory.find((i) => i.equipped && i.slot === "armor");
   const out: Stats = { ...emptyStats() };
   (Object.keys(base) as (keyof Stats)[]).forEach((k) => {
-    let v = base[k] + (race[k] ?? 0);
+    const dice = op.statDice?.[k];
+    let v = typeof dice === "number" ? scoreFromDice(base[k], dice) : base[k];
+    v += race[k] ?? 0;
     if (k === primary) v += op.traitBonus;
     if (companion?.statBuff[k]) v += companion.statBuff[k] as number;
     if (k === "CHA" && op.isHoF) v += 3;
@@ -265,6 +275,7 @@ export function defaultState(): GameState {
     started: false,
     tutorial: "briefing",
     screen: "title",
+    openedFrom: null,
     day: 1,
     coins: 1400,
     ore: 0,
@@ -306,12 +317,30 @@ export function defaultState(): GameState {
     lastParty: [],
     discordId: null,
     discordName: null,
+    playerName: null,
+    playerHandle: null,
     talk: null,
     seenTalk: [],
     talkQueue: [],
     squad: [],
     activeMemberId: null,
     arc: null,
+    kaneHeat: 0,
+    selectedPoiId: null,
+    regionMapOpen: false,
+    market: emptyMarket(1),
+    poiWatch: { day: 1, used: [] },
+    term: null,
+    shift: emptyShift(1),
+    arcade: {
+      triviaSeen: [],
+      tfSeen: [],
+      scrambleSeen: [],
+      creeRead: [],
+      earned: { trivia: 0, truefalse: 0, scramble: 0, wordsearch: 0, lockpick: 0, slots: 0, hack: 0, cree: 0, blackjack: 0, roulette: 0, poker: 0 },
+      lastGame: null,
+    },
+    tyrone: emptyTyrone(),
   };
 }
 
@@ -347,7 +376,7 @@ export function forgeOperative(opts: {
   lineage: string;
   origin: string;
   day: number;
-  rolls?: Partial<Record<"rep" | "trait" | "skill" | "shadow" | "enchant" | "destiny", number>>;
+  rolls?: Partial<Record<"rep" | "trait" | "skill" | "shadow" | "enchant" | "destiny" | StatKey, number>>;
 }): Operative {
   const rolls = {
     rep: opts.rolls?.rep ?? d20(),
@@ -357,13 +386,19 @@ export function forgeOperative(opts: {
     enchant: opts.rolls?.enchant ?? d20(),
     destiny: opts.rolls?.destiny ?? d20(),
   };
+  const statDice = emptyStats();
+  STAT_ORDER.forEach((k) => {
+    statDice[k] = opts.rolls?.[k] ?? d20();
+  });
   const rep = pickByRoll(REP[opts.cls], rolls.rep);
   const trait = TRAIT_TIERS.find((t) => rolls.trait >= t.range[0] && rolls.trait <= t.range[1])!;
   const skill = pickByRoll(SIGNATURE[opts.cls], rolls.skill);
   const shadow = pickByRoll(SHADOW[opts.cls], rolls.shadow);
   const enchant = pickByRoll(ENCHANTS[opts.cls], rolls.enchant);
   const destiny = pickByRoll(DESTINY[opts.cls], rolls.destiny);
-  const race = RACES[opts.race];
+  const raceName = resolveRaceName(opts.race);
+  const race = RACES[raceName];
+  const lineage = resolveLineage(raceName, opts.lineage);
   const hp = CLASS_HP[opts.cls];
   const weapon = makeItem({ ...starterWeapon(opts.cls), equipped: true });
   const kit: Item[] = [
@@ -375,7 +410,7 @@ export function forgeOperative(opts: {
         rarity: "Common",
         condition: "Pristine",
         effect: "Starting kit.",
-        lore: `${opts.race} issue.`,
+        lore: `${raceName} issue.`,
         value: 40,
       }),
     ),
@@ -384,8 +419,8 @@ export function forgeOperative(opts: {
     id: uid("op"),
     name: opts.name.trim() || randomName(),
     cls: opts.cls,
-    race: opts.race,
-    lineage: opts.lineage,
+    race: raceName,
+    lineage,
     origin: opts.origin,
     hp,
     maxHp: hp,
@@ -412,6 +447,7 @@ export function forgeOperative(opts: {
     curses: [],
     notes: "",
     joinedDay: opts.day,
+    statDice,
   };
 }
 
@@ -427,9 +463,11 @@ export function buildMission(
   loc: LocationId,
   kind: MissionKind,
   partyIds: string[],
+  field?: FieldDeploy,
 ): MissionState {
   const L = locById(loc);
-  const dc = missionDc(state, loc, kind);
+  const approach = APPROACHES.find((a) => a.id === field?.approach);
+  const dc = clamp(missionDc(state, loc, kind) + (approach?.dc ?? 0), 8, 19);
   const lead = partyLead(state, partyIds);
   const beats: MissionBeat[] = [];
   const add = (
@@ -495,6 +533,9 @@ export function buildMission(
       `SYNAPSE deploys to ${L.name}. ${partyIds.length} operative${partyIds.length > 1 ? "s" : ""}.`,
     ],
     waiting: true,
+    regionId: locationToRegion(loc) ?? undefined,
+    poiId: field?.poiId,
+    approach: field?.approach,
   };
 }
 
@@ -697,22 +738,8 @@ export function completeMission(state: GameState): GameState {
     state.toast = `${L.name}: ${villainById(L.bossId)?.name ?? "A name"} is in play.`;
     pushLog(state, "note", "Watchtower", `Boss unlocked in ${L.short}: ${villainById(L.bossId)?.name ?? "Unknown"}.`);
   }
-  WORLD.forEach((w) => {
-    if (w.unlockDay <= state.day && !state.locations[w.id].unlocked && w.id !== "veyra") {
-      const prereq =
-        w.id === "kingdom"
-          ? state.day >= 2
-          : w.id === "caverns"
-            ? state.day >= 3
-            : w.id === "library"
-              ? state.day >= 4
-              : true;
-      if (prereq) state.locations[w.id].unlocked = true;
-    }
-  });
-  if (state.locations.library.bossDefeated || state.day >= 6) {
-    state.locations.veyra.unlocked = true;
-  }
+  // Campaign flags, not the calendar, open the next continent.
+  syncWorldUnlocks(state);
 
   m.partyIds.forEach((id) => {
     const i = state.operatives.findIndex((o) => o.id === id);
@@ -1207,10 +1234,7 @@ export function restOvernight(state: GameState): GameState {
   deaths.forEach((o) => pushLog(state, "death", o.name, "Permanently dead. The infirmary was not ready."));
   state.shop = rollShop(state.day);
   state.bounty = rollBounty(state);
-  WORLD.forEach((w) => {
-    if (w.unlockDay <= state.day) state.locations[w.id].unlocked = true;
-  });
-  if (state.locations.library.bossDefeated) state.locations.veyra.unlocked = true;
+  syncWorldUnlocks(state);
 
   const roll = Math.random();
   const watched = state.rooms.watchtower >= 1 || state.residents.some((r) => r.role === "guard");
@@ -1334,6 +1358,58 @@ export function hireResidentCost(state: GameState): number {
 
 export function companionCost(type: string): number {
   return COMPANIONS[type]?.cost ?? 900;
+}
+
+export function hasPlayerProfile(state: GameState): boolean {
+  return Boolean(state.playerName?.trim());
+}
+
+export function stampPlayerProfile(state: GameState, name: string, handle?: string | null): string | null {
+  const clean = name.trim().replace(/^@/, "").slice(0, 24);
+  if (clean.length < 2) return "Stamp a name first, partner.";
+  state.playerName = clean;
+  const hid = (handle ?? "").trim().replace(/^@/, "");
+  if (hid.length >= 2) state.playerHandle = hid;
+  return stampSeatedPlate(state);
+}
+
+export function syncWorldUnlocks(state: GameState) {
+  const open = campaignOpenRegions(state.day, state.locations);
+  for (const region of open) {
+    const loc = REGION_LOCATION[region];
+    if (state.locations[loc]) state.locations[loc].unlocked = true;
+  }
+  if (!open.includes("veyra") && state.locations.veyra) {
+    state.locations.veyra.unlocked = false;
+  }
+}
+
+export function spawnAegisYard(state: GameState): GameState {
+  const idle = idleAtHq(state);
+  const party = (idle.length ? idle : living(state)).slice(0, 3).map((o) => o.id);
+  const enemy: Combatant = {
+    id: uid("aegis"),
+    name: "AEGIS 2753",
+    hp: 28,
+    maxHp: 28,
+    atk: 7,
+    def: 5,
+    dc: 14,
+    tags: ["aegis", "powered"],
+    flavor: "Kane leftover on the porch. Serial still warm.",
+    armorClass: "powered",
+  };
+  state.combat = {
+    locationId: "hq",
+    missionKind: "raid",
+    partyIds: party,
+    enemies: [enemy],
+    turn: 1,
+    actorIndex: 0,
+    log: ["A 2753 frame is on the porch. Tyrone did not invite it."],
+    rewardMult: 1.4,
+  };
+  return state;
 }
 
 export type { ShopOffer, Resident };

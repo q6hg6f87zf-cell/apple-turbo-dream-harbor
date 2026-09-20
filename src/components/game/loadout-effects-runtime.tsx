@@ -1,4 +1,4 @@
-import { RACES } from "@/game/data";
+import { RACES, resolveRaceName } from "@/game/data";
 import { cloneState } from "@/game/engine";
 import { analyzeLoadout } from "@/game/loadout-effects";
 import { residentProgress } from "@/game/resident-progression";
@@ -63,7 +63,8 @@ function patchRuntimeLoadouts() {
     const s = cloneState(store.s);
     s.operatives = s.operatives.map((op) => {
       const analysis = analyzeLoadout(op);
-      const baseRace = raceTable[op.race];
+      const raceKey = op.race.startsWith("__stack_") ? op.race : resolveRaceName(op.race);
+      const baseRace = raceTable[raceKey];
       const weapon = op.inventory.find((item) => item.equipped && item.slot === "weapon");
       const hasStats = Object.values(analysis.statModifiers).some((n) => !!n);
       const hasDamage = !!analysis.damageBonus;

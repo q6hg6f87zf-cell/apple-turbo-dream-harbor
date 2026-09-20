@@ -15,8 +15,41 @@ function authDisabled() {
   return String(process.env.VITE_AUTH_ENABLED ?? "").trim() === "false";
 }
 
+function looksLikeHandle(value: string) {
+  const t = value.trim().replace(/^@/, "");
+  return /^[a-z0-9._]{2,32}$/i.test(t) || /^.+#\d{4}$/.test(t);
+}
+
 function isSnowflake(value: string) {
   return /^\d{17,22}$/.test(value);
+}
+
+async function discordHandleFromToken(accessToken: string | null | undefined, fallbackName: string) {
+  const fallback = looksLikeHandle(fallbackName) ? fallbackName.trim().replace(/^@/, "") : "";
+  if (!accessToken) return { name: fallbackName, handle: fallback };
+  try {
+    const response = await fetch("https://discord.com/api/users/@me", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      signal: AbortSignal.timeout(1600),
+    });
+    if (!response.ok) return { name: fallbackName, handle: fallback };
+    const me = (await response.json()) as {
+      username?: string;
+      global_name?: string | null;
+      discriminator?: string;
+    };
+    const username = (me.username ?? "").trim();
+    const handle =
+      username && me.discriminator && me.discriminator !== "0"
+        ? `${username}#${me.discriminator}`
+        : username || fallback;
+    return {
+      name: (me.global_name || username || fallbackName).trim(),
+      handle: handle.replace(/^@/, "").slice(0, 32),
+    };
+  } catch {
+    return { name: fallbackName, handle: fallback };
+  }
 }
 
 async function bootstrapDiscordIdentity(userId: string, discordId: string, displayName: string) {
@@ -86,8 +119,8 @@ export const Route = createFileRoute("/api/hollow/access")({
         }
 
         const sql = await getSql();
-        const rows = await sql<{ account_id: string; name: string }>`
-          select a."accountId" as account_id, u."name" as name
+        const rows = await sql<{ account_id: string; name: string; access_token: string | null }>`
+          select a."accountId" as account_id, u."name" as name, a."accessToken" as access_token
           from "account" a
           join "user" u on u."id" = a."userId"
           where a."userId" = ${userId} and a."providerId" = ${DISCORD_PROVIDER_ID}
@@ -108,6 +141,8 @@ export const Route = createFileRoute("/api/hollow/access")({
           }, 403);
         }
 
+        const profile = await discordHandleFromToken(discordAccount.access_token, discordAccount.name || "Moon Squad Rider");
+
         let links = await sql<{ discord_id: string }>`
           select discord_id from hollow_identity_link where user_id = ${userId} limit 1
         `;
@@ -116,7 +151,7 @@ export const Route = createFileRoute("/api/hollow/access")({
         // path becomes one click. If it does not, Tyrone's one-time claim remains
         // the trusted bridge instead of guessing at identity.
         if (!links[0] && isSnowflake(discordAccount.account_id)) {
-          await bootstrapDiscordIdentity(userId, discordAccount.account_id, discordAccount.name || "Moon Squad Rider");
+          await bootstrapDiscordIdentity(userId, discordAccount.account_id, profile.name || "Moon Squad Rider");
           links = await sql<{ discord_id: string }>`
             select discord_id from hollow_identity_link where user_id = ${userId} limit 1
           `;
@@ -132,7 +167,8 @@ export const Route = createFileRoute("/api/hollow/access")({
             devBypass: false,
             provider: DISCORD_PROVIDER_ID,
             stage: "tyrone",
-            name: discordAccount.name,
+            name: profile.name,
+            handle: profile.handle || undefined,
             error: "Discord is signed in. Ask TyroneBot for your one-time Hollow Realm verification link.",
           }, 403);
         }
@@ -145,7 +181,8 @@ export const Route = createFileRoute("/api/hollow/access")({
           devBypass: false,
           provider: DISCORD_PROVIDER_ID,
           discordId: link.discord_id,
-          name: discordAccount.name,
+          name: profile.name,
+          handle: profile.handle || undefined,
           stage: "ready",
         });
       },

@@ -1,5 +1,6 @@
 import { regionById } from "@/game/data";
-import { MAIN_MENU_ART, REGION_ART } from "@/game/art";
+import { knownPois } from "@/game/field-ops";
+import { MAIN_MENU_ART } from "@/game/art";
 import { useGame } from "@/game/store";
 import type { LocationId, RegionId } from "@/game/types";
 import { Map, Minus, Plus, X } from "lucide-react";
@@ -26,32 +27,24 @@ const REGION_ORDER: RegionId[] = ["ironclad", "slagtown", "blackspire", "brasswa
 export function HollowRealmVisuals() {
   const screen = useGame((g) => g.s.screen);
   const selectedLoc = useGame((g) => g.s.selectedLoc);
-  const locations = useGame((g) => g.s.locations);
+  const selectedPoiId = useGame((g) => g.s.selectedPoiId);
+  const mapOpen = useGame((g) => !!g.s.regionMapOpen);
   const selectLoc = useGame((g) => g.selectLoc);
-  const [mapOpen, setMapOpen] = useState(false);
+  const selectPoi = useGame((g) => g.selectPoi);
+  const closeRegionMap = useGame((g) => g.closeRegionMap);
+  const s = useGame((g) => g.s);
   const [zoom, setZoom] = useState(1);
 
   const regionId = LOCATION_TO_REGION[selectedLoc ?? "ironclad"] ?? "ironclad";
   const region = regionById(regionId);
 
   useEffect(() => {
-    if (screen !== "map") setMapOpen(false);
-  }, [screen]);
+    if (screen !== "map" && mapOpen) closeRegionMap();
+  }, [screen, mapOpen, closeRegionMap]);
 
   useEffect(() => {
-    const open = (event: Event) => {
-      const detail = (event as CustomEvent<{ regionId?: RegionId }>).detail;
-      const id = detail?.regionId;
-      if (!id) return;
-      const target = REGION_TO_LOCATION[id];
-      if (!locations[target]?.unlocked) return;
-      selectLoc(target);
-      setZoom(1);
-      setMapOpen(true);
-    };
-    window.addEventListener("hollow:open-region-map", open);
-    return () => window.removeEventListener("hollow:open-region-map", open);
-  }, [locations, selectLoc]);
+    if (mapOpen) setZoom(1);
+  }, [mapOpen, regionId]);
 
   return (
     <>
@@ -91,17 +84,16 @@ export function HollowRealmVisuals() {
         [data-ready="1"]:not([data-screen]) button { letter-spacing: .08em; }
         .hollow-region-map-image {
           image-rendering: auto;
-          filter: saturate(.97) contrast(1.04);
           transform-origin: center top;
         }
       `}</style>
 
-      {screen === "map" && mapOpen ? (
-        <div className="fixed inset-0 z-[60] flex flex-col bg-ink text-paper">
+      {false && screen === "map" && mapOpen ? (
+        <div className="fixed inset-0 z-[120] flex flex-col bg-ink text-paper">
           <header className="flex shrink-0 items-center gap-3 border-b border-line bg-surface/95 px-3 py-3 backdrop-blur">
             <button
               type="button"
-              onClick={() => setMapOpen(false)}
+              onClick={() => closeRegionMap()}
               className="flex size-11 items-center justify-center rounded-lg border border-line text-moon"
               aria-label="Back to Hollow Realm globe"
             >
@@ -135,7 +127,7 @@ export function HollowRealmVisuals() {
           <div className="flex shrink-0 gap-2 overflow-x-auto border-b border-line bg-raised/80 px-3 py-2">
             {REGION_ORDER.map((id) => {
               const target = REGION_TO_LOCATION[id];
-              const unlocked = !!locations[target]?.unlocked;
+              const unlocked = !!s.locations[target]?.unlocked;
               const def = regionById(id);
               return (
                 <button
@@ -158,34 +150,65 @@ export function HollowRealmVisuals() {
             })}
           </div>
 
-          <div className="ms-scroll min-h-0 flex-1 overflow-auto bg-[#080706] p-4" style={{ touchAction: "pan-x pan-y pinch-zoom" }}>
-            <div
-              className="mx-auto overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl transition-[width] duration-200"
-              style={{ width: `${Math.max(720, 900 * zoom)}px`, maxWidth: "none" }}
-            >
+          <div className="ms-scroll min-h-0 flex-1 overflow-auto bg-[#080706]" style={{ touchAction: "pan-x pan-y pinch-zoom" }}>
+            <div className="relative origin-top">
               <img
-                src={REGION_ART[regionId]}
+                src={region.mapAsset}
                 alt={`${region.name} regional map`}
-                className="h-auto w-full select-none hollow-region-map-image"
+                className="block h-auto max-w-none select-none"
                 draggable={false}
+                style={{ width: `${Math.round(zoom * 100)}%` }}
               />
+              {knownPois(s, REGION_TO_LOCATION[regionId]).map((point) => {
+                const active = selectedPoiId === point.id;
+                return (
+                  <button
+                    key={point.id}
+                    type="button"
+                    onClick={() => selectPoi(point.id)}
+                    style={{ left: `${point.x}%`, top: `${point.y}%` }}
+                    className={`absolute flex min-h-11 min-w-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border px-2 font-display text-[9px] uppercase tracking-[0.12em] shadow-lg ${
+                      active
+                        ? "border-ember bg-ember text-ink"
+                        : "border-ember/70 bg-ink/85 text-ember-bright backdrop-blur-md"
+                    }`}
+                    aria-label={point.name}
+                  >
+                    <span className="max-w-[7rem] truncate px-1">{point.name}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
           <footer className="shrink-0 border-t border-line bg-surface px-4 py-3" style={{ paddingBottom: "max(12px, env(safe-area-inset-bottom))" }}>
-            <div className="flex items-start justify-between gap-3">
-              <p className="text-sm leading-relaxed text-moon">{region.description}</p>
-              <span className="shrink-0 rounded-full border border-line bg-ink px-2 py-1 font-display text-[9px] uppercase tracking-[0.13em] text-ember">
-                {Math.round(zoom * 100)}%
-              </span>
-            </div>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {region.points.slice(0, 5).map((point) => (
-                <span key={point.id} className="rounded-full border border-line bg-ink px-2 py-1 text-[11px] text-muted">
-                  {point.name}
-                </span>
-              ))}
-            </div>
+            {(() => {
+              const locId = REGION_TO_LOCATION[regionId];
+              const poi = knownPois(s, locId).find((p) => p.id === selectedPoiId) ?? knownPois(s, locId)[0];
+              return (
+                <div className="flex items-start gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-display text-sm text-paper">{poi?.name ?? region.name}</p>
+                    <p className="mt-1 text-sm leading-relaxed text-moon">{poi?.description ?? region.description}</p>
+                  </div>
+                  <span className="shrink-0 rounded-full border border-line bg-ink px-2 py-1 font-display text-[9px] uppercase tracking-[0.13em] text-ember">
+                    {Math.round(zoom * 100)}%
+                  </span>
+                </div>
+              );
+            })()}
+            <button
+              type="button"
+              onClick={() => {
+                const locId = REGION_TO_LOCATION[regionId];
+                const poi = knownPois(s, locId)[0];
+                if (!selectedPoiId && poi) selectPoi(poi.id);
+                closeRegionMap();
+              }}
+              className="mt-3 flex min-h-12 w-full items-center justify-center rounded-[var(--radius-md)] bg-ember font-display text-[11px] uppercase tracking-[0.16em] text-ink"
+            >
+              Lock this site
+            </button>
           </footer>
         </div>
       ) : null}

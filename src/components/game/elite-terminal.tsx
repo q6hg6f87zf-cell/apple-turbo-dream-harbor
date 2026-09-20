@@ -1,9 +1,19 @@
 import { sfx, unlockAudio } from "@/game/audio";
 import { cloneState } from "@/game/engine";
+import { currentPorch, watchPorch, type PorchSnapshot } from "@/game/porch";
 import { useGame } from "@/game/store";
-import type { GameState, HackState, LogEntry } from "@/game/types";
+import {
+  BOOT_LINES,
+  emptyTerm,
+  homeChoices,
+  pageBody,
+  pageChoices,
+  termLog,
+  type TermChoice,
+} from "@/game/terminal";
+import type { GameState, HackState, LogEntry, TermPage } from "@/game/types";
 import { Cpu, ShieldAlert, Terminal, X } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 type DumpRow = {
   address: string;
@@ -252,6 +262,10 @@ function exploitElite(state: GameState): string | null {
   return null;
 }
 
+function reducedMotion() {
+  return typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
 let installed = false;
 
 export function EliteTerminalRuntime() {
@@ -259,17 +273,26 @@ export function EliteTerminalRuntime() {
     if (installed) return;
     installed = true;
     const original = useGame.getState();
-    const originalOpen = original.openTerminal;
     const originalPick = original.hackPick;
     const originalBracket = original.hackBracket;
+    const originalBreach = original.termBreach;
 
     useGame.setState({
-      openTerminal: () => {
+      termBreach: () => {
         let message: string | null = null;
         useGame.setState((store) => {
           const s = cloneState(store.s);
+          if (!s.term) s.term = emptyTerm();
           message = openEliteHack(s);
-          if (message) s.toast = message;
+          if (message) {
+            s.toast = message;
+            termLog(s, message);
+            s.term.page = "home";
+            s.term.booted = true;
+          } else {
+            s.term.page = "lock";
+            s.term.booted = true;
+          }
           return { s };
         });
         return message;
@@ -296,33 +319,223 @@ export function EliteTerminalRuntime() {
 
     return () => {
       installed = false;
-      useGame.setState({ openTerminal: originalOpen, hackPick: originalPick, hackBracket: originalBracket });
+      useGame.setState({ termBreach: originalBreach, hackPick: originalPick, hackBracket: originalBracket });
     };
   }, []);
   return null;
 }
 
-export function EliteTerminalOverlay() {
-  const hack = useGame((store) => store.s.hack) as EliteHack | null;
+function usePorchSnap() {
+  const [snap, setSnap] = useState<PorchSnapshot>(currentPorch);
+  useEffect(() => watchPorch(setSnap), []);
+  return snap;
+}
+
+function CrtShell({
+  children,
+  session,
+  page,
+  onClose,
+}: {
+  children: ReactNode;
+  session: string;
+  page: TermPage | "dump";
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-[110] flex items-end justify-center bg-ink/92 p-2 backdrop-blur-[2px] md:items-center md:p-4"
+      data-terminal-session={session}
+      data-terminal-page={page}
+    >
+      <div className="term-bezel relative flex h-[min(96dvh,840px)] w-full max-w-2xl flex-col overflow-hidden">
+        <div className="term-screen relative flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="crt-scan pointer-events-none absolute inset-0 opacity-50" />
+          <div className="term-flicker pointer-events-none absolute inset-0" />
+          <header className="relative z-[1] flex items-start justify-between gap-3 border-b border-ember/25 px-4 py-3">
+            <div className="min-w-0">
+              <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-ember">S.Y.N.A.P.S.E ACCESS PROTOCOL</div>
+              <div className="mt-1 font-mono text-[11px] text-ember-bright">Vault 13 · SYNAPSE · T-0880</div>
+            </div>
+            <button
+              type="button"
+              aria-label="Jack out"
+              onClick={onClose}
+              className="flex size-10 items-center justify-center rounded-[var(--radius-xs)] border border-ember/25 text-ember/70 hover:text-ember"
+            >
+              <X className="size-4" />
+            </button>
+          </header>
+          <div className="relative z-[1] min-h-0 flex-1">{children}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BootView({ onDone }: { onDone: () => void }) {
+  const [lines, setLines] = useState<string[]>(reducedMotion() ? [...BOOT_LINES] : []);
+  const done = useRef(false);
+  const onDoneRef = useRef(onDone);
+  onDoneRef.current = onDone;
+
+  useEffect(() => {
+    if (reducedMotion()) {
+      onDoneRef.current();
+      return;
+    }
+    let i = 0;
+    let timer = 0;
+    const tick = () => {
+      if (done.current) return;
+      if (i >= BOOT_LINES.length) {
+        timer = window.setTimeout(() => onDoneRef.current(), 280);
+        return;
+      }
+      const line = BOOT_LINES[i++] ?? "";
+      sfx.termType(Math.max(2, line.length));
+      setLines((prev) => [...prev, line]);
+      timer = window.setTimeout(tick, line ? 70 + Math.min(160, line.length * 9) : 160);
+    };
+    timer = window.setTimeout(tick, 120);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  return (
+    <button
+      type="button"
+      className="term-phosphor flex h-full w-full flex-col justify-start px-5 py-5 text-left font-mono text-[13px] leading-relaxed text-ember-bright"
+      onClick={() => {
+        done.current = true;
+        setLines([...BOOT_LINES]);
+        sfx.termType(8);
+        onDone();
+      }}
+    >
+      {lines.map((line, i) => (
+        <div key={`${i}-${line}`} className="min-h-5">
+          {line || "\u00a0"}
+        </div>
+      ))}
+      <span className="term-cursor mt-1" />
+    </button>
+  );
+}
+
+function FileList({
+  choices,
+  onPick,
+}: {
+  choices: TermChoice[];
+  onPick: (choice: TermChoice) => void;
+}) {
+  return (
+    <div className="mt-3 space-y-1">
+      {choices.map((choice) => (
+        <button
+          key={choice.id}
+          type="button"
+          data-term-choice={choice.id}
+          onClick={() => onPick(choice)}
+          className="term-choice flex min-h-11 w-full items-center gap-3 rounded-[var(--radius-xs)] px-2 text-left font-mono text-[13px] tracking-[0.04em] text-ember-bright"
+        >
+          <span className="w-7 shrink-0 text-ember">[{choice.id}]</span>
+          <span>{choice.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function ShellView({ page }: { page: TermPage }) {
+  const state = useGame((store) => store.s);
+  const output = state.term?.output ?? [];
+  const pick = useGame((store) => store.termSelect);
+  const breach = useGame((store) => store.termBreach);
+  const go = useGame((store) => store.termGo);
   const close = useGame((store) => store.closeTerminal);
-  const pick = useGame((store) => store.hackPick);
-  const bracket = useGame((store) => store.hackBracket);
+  const porch = usePorchSnap();
   const logRef = useRef<HTMLDivElement>(null);
+  const body = pageBody(state, page);
+  const choices = page === "home" ? homeChoices(state) : pageChoices(page);
+  const porchLines =
+    page === "porch"
+      ? porch.seats.length
+        ? porch.seats.map(
+            (seat) =>
+              `${seat.self ? ">" : " "} ${(seat.name || "Rider").slice(0, 14).padEnd(14)} ${seat.handle ? `@${seat.handle.replace(/^@/, "")}` : ""}  ${seat.screen}`,
+          )
+        : [`Live stools ${porch.live}/${porch.max}`, porch.full ? "THE PORCH HOLDS TEN. WAIT." : "No other riders on the wire."]
+      : [];
 
   useEffect(() => {
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight, behavior: "smooth" });
-  }, [hack?.log.length]);
+  }, [output.length, page]);
+
+  const run = (choice: TermChoice) => {
+    unlockAudio();
+    sfx.termType(Math.max(3, choice.label.length));
+    const result = pick(choice);
+    if (result === "logoff") {
+      sfx.machine();
+      return;
+    }
+    if (result === "breach") {
+      const message = breach();
+      if (message) sfx.deny();
+      else sfx.hack();
+      return;
+    }
+    if (result === "nav") sfx.click();
+  };
 
   useEffect(() => {
-    if (!hack) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") close();
+      if (event.repeat) return;
+      if (event.key === "Escape") {
+        event.preventDefault();
+        if (page === "home" || page === "boot") close();
+        else go("home");
+        sfx.termKey();
+        return;
+      }
+      const hit = choices.find((choice) => choice.id === event.key);
+      if (hit) {
+        event.preventDefault();
+        run(hit);
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [hack, close]);
+  });
 
-  if (!hack) return null;
+  return (
+    <div ref={logRef} className="term-phosphor ms-scroll flex h-full flex-col overflow-y-auto px-5 py-4 font-mono text-[13px] leading-relaxed text-ember-bright">
+      <div className="text-ember">{BOOT_LINES[0]}</div>
+      <div className="text-ember/80">{BOOT_LINES[1]}</div>
+      <div className="mb-3 text-ember/70">{BOOT_LINES[2]}</div>
+      {body.map((line, i) => (
+        <div key={`b-${i}`}>{line || "\u00a0"}</div>
+      ))}
+      {porchLines.map((line, i) => (
+        <div key={`p-${i}`} className="whitespace-pre">
+          {line}
+        </div>
+      ))}
+      {output.length ? <div className="mt-3 text-ember/70">{output.slice(-6).map((line, i) => <div key={`o-${i}`}>{line}</div>)}</div> : null}
+      <div className="term-prompt mt-3 text-ember">{">"}</div>
+      <FileList choices={choices} onPick={run} />
+      <span className="term-cursor mt-2" />
+    </div>
+  );
+}
+
+function DumpView({ hack }: { hack: EliteHack }) {
+  const close = useGame((store) => store.closeTerminal);
+  const go = useGame((store) => store.termGo);
+  const pick = useGame((store) => store.hackPick);
+  const bracket = useGame((store) => store.hackBracket);
+  const logRef = useRef<HTMLDivElement>(null);
   const elite = typeof hack.difficulty === "number";
   const difficulty = hack.difficulty ?? 1;
   const trace = hack.trace ?? 0;
@@ -330,94 +543,175 @@ export function EliteTerminalOverlay() {
   const guessed = hack.guessed ?? [];
   const rows = elite
     ? hack.dumpRows
-    : hack.words.map((word, i) => ({ address: `0x${(0xf100 + i * 13).toString(16).toUpperCase()}`, prefix: garbage(8), word, suffix: garbage(8) }));
+    : hack.words.map((word, i) => ({
+        address: `0x${(0xf100 + i * 13).toString(16).toUpperCase()}`,
+        prefix: garbage(8),
+        word,
+        suffix: garbage(8),
+      }));
+
+  useEffect(() => {
+    logRef.current?.scrollTo({ top: logRef.current.scrollHeight, behavior: "smooth" });
+  }, [hack.log.length]);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        sfx.termKey();
+        go("home");
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [go]);
 
   const choose = (word: string) => {
     if (hack.won || hack.locked || guessed.includes(word)) return;
     unlockAudio();
     navigator.vibrate?.(8);
     sfx.hack();
+    sfx.termType(word.length);
     const result = pick(word);
     if (result === "won") sfx.unlock();
     else if (result === "denied" || result === "lock") sfx.deny();
   };
 
   return (
-    <div
-      className="fixed inset-0 z-[110] flex items-end justify-center bg-black/90 p-2 backdrop-blur-sm md:items-center md:p-4"
-      data-terminal-session={hack.sessionId ?? "legacy"}
-      data-terminal-difficulty={difficulty}
-    >
-      <div className="term-screen relative flex h-[min(96dvh,820px)] w-full max-w-2xl flex-col overflow-hidden rounded-[var(--radius-lg)] border border-ember/30 shadow-2xl">
-        <div className="crt-scan pointer-events-none absolute inset-0 opacity-45" />
-        <header className="relative z-[1] border-b border-ember/25 bg-ink/85 px-4 py-3">
-          <div className="flex items-start gap-3">
-            <span className="mt-0.5 flex size-9 items-center justify-center rounded border border-ember/30 bg-ember/5 text-ember"><Terminal className="size-4" /></span>
-            <div className="min-w-0 flex-1">
-              <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-ember">S.Y.N.A.P.S.E // BLACK CHANNEL</div>
-              <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 font-mono text-[11px] text-ember-bright">
-                <span>DEPTH {difficulty}/5</span>
-                <span>{hack.password.length}-CHAR TOKEN</span>
-                <span>{hack.won ? "ACCESS GRANTED" : hack.locked ? "HARD LOCK" : `${hack.tries}/${hack.triesMax} PROBES`}</span>
-              </div>
+    <div className="flex h-full min-h-0 flex-col" data-terminal-difficulty={difficulty} data-hack-session={hack.sessionId ?? "legacy"}>
+      <div className="relative z-[1] border-b border-ember/20 px-4 py-3">
+        <div className="flex items-start gap-3">
+          <span className="mt-0.5 flex size-9 items-center justify-center rounded border border-ember/30 bg-ember/5 text-ember">
+            <Terminal className="size-4" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-ember">S.Y.N.A.P.S.E // BLACK CHANNEL</div>
+            <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 font-mono text-[11px] text-ember-bright">
+              <span>DEPTH {difficulty}/5</span>
+              <span>{hack.password.length}-CHAR TOKEN</span>
+              <span>{hack.won ? "ACCESS GRANTED" : hack.locked ? "HARD LOCK" : `${hack.tries}/${hack.triesMax} PROBES`}</span>
             </div>
-            <button type="button" aria-label="Jack out" onClick={close} className="flex size-10 items-center justify-center rounded border border-ember/20 text-ember/70 hover:text-ember"><X className="size-4" /></button>
           </div>
-          <div className="mt-3 flex items-center gap-3">
-            <ShieldAlert className="size-3.5 text-ember" />
-            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-ink shadow-inner">
-              <div className="h-full bg-ember transition-[width] duration-500" style={{ width: `${trace}%` }} />
-            </div>
-            <span className="w-20 text-right font-mono text-[10px] text-ember">TRACE {trace}%</span>
+        </div>
+        <div className="mt-3 flex items-center gap-3">
+          <ShieldAlert className="size-3.5 text-ember" />
+          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-ink shadow-inner">
+            <div className="h-full bg-ember transition-[width] duration-500" style={{ width: `${trace}%` }} />
           </div>
-        </header>
+          <span className="w-20 text-right font-mono text-[10px] text-ember">TRACE {trace}%</span>
+        </div>
+      </div>
 
-        <div ref={logRef} className="relative z-[1] max-h-44 overflow-y-auto border-b border-ember/15 bg-black/25 px-4 py-3 font-mono text-[11px] leading-relaxed text-ember-bright ms-scroll">
-          {hack.log.map((line, index) => <div key={`${index}-${line}`}>{line}</div>)}
-          <span className="term-cursor" />
+      <div ref={logRef} className="relative z-[1] max-h-40 overflow-y-auto border-b border-ember/15 bg-ink/30 px-4 py-3 font-mono text-[11px] leading-relaxed text-ember-bright ms-scroll">
+        {hack.log.map((line, index) => (
+          <div key={`${index}-${line}`}>{line}</div>
+        ))}
+        <span className="term-cursor" />
+      </div>
+
+      <div className="relative z-[1] min-h-0 flex-1 overflow-y-auto p-3 ms-scroll">
+        <div className="grid gap-1.5 sm:grid-cols-2">
+          {rows.map((row) => {
+            const disabled = hack.won || hack.locked || guessed.includes(row.word) || !hack.words.includes(row.word);
+            return (
+              <button
+                key={`${row.address}-${row.word}`}
+                type="button"
+                disabled={disabled}
+                data-terminal-token={row.word}
+                onClick={() => choose(row.word)}
+                className="group grid min-h-12 grid-cols-[4.5rem_1fr] items-center gap-2 rounded border border-ember/15 bg-ink/20 px-2 text-left font-mono transition-colors hover:border-ember/45 hover:bg-ember/10 disabled:opacity-35"
+              >
+                <span className="text-[9px] text-ember/55">{row.address}</span>
+                <span className="min-w-0 overflow-hidden whitespace-nowrap text-[10px] tracking-[0.08em] text-ember/50">
+                  {row.prefix}
+                  <strong className="mx-1 text-xs tracking-[0.15em] text-ember-bright group-hover:text-paper">{row.word}</strong>
+                  {row.suffix}
+                </span>
+              </button>
+            );
+          })}
         </div>
 
-        <div className="relative z-[1] min-h-0 flex-1 overflow-y-auto p-3 ms-scroll">
-          <div className="grid gap-1.5 sm:grid-cols-2">
-            {rows.map((row) => {
-              const disabled = hack.won || hack.locked || guessed.includes(row.word) || !hack.words.includes(row.word);
-              return (
-                <button
-                  key={`${row.address}-${row.word}`}
-                  type="button"
-                  disabled={disabled}
-                  data-terminal-token={row.word}
-                  onClick={() => choose(row.word)}
-                  className="group grid min-h-12 grid-cols-[4.5rem_1fr] items-center gap-2 rounded border border-ember/15 bg-black/20 px-2 text-left font-mono transition-colors hover:border-ember/45 hover:bg-ember/10 disabled:opacity-35"
-                >
-                  <span className="text-[9px] text-ember/55">{row.address}</span>
-                  <span className="min-w-0 overflow-hidden whitespace-nowrap text-[10px] tracking-[0.08em] text-ember/50">
-                    {row.prefix}<strong className="mx-1 text-xs tracking-[0.15em] text-ember-bright group-hover:text-paper">{row.word}</strong>{row.suffix}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-
+        <button
+          type="button"
+          disabled={hack.won || hack.locked || brackets <= 0}
+          onClick={() => {
+            navigator.vibrate?.(6);
+            sfx.termKey();
+            const message = bracket();
+            if (message) useGame.setState((store) => ({ s: { ...store.s, toast: message } }));
+            else sfx.hack();
+          }}
+          className="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded border border-ember/20 bg-ember/5 font-mono text-[10px] uppercase tracking-[0.18em] text-ember transition-colors hover:bg-ember/10 disabled:opacity-35"
+        >
+          <Cpu className="size-3.5" /> Exploit delimiter · {brackets} remaining
+        </button>
+        <p className="mt-3 text-center font-mono text-[9px] uppercase tracking-[0.14em] text-ember/55">
+          Tokens are synthesized per breach. No static password dictionary is loaded.
+        </p>
+        <div className="mt-3 grid grid-cols-2 gap-2">
           <button
             type="button"
-            disabled={hack.won || hack.locked || brackets <= 0}
             onClick={() => {
-              navigator.vibrate?.(6);
-              sfx.click();
-              const message = bracket();
-              if (message) useGame.setState((store) => ({ s: { ...store.s, toast: message } }));
-              else sfx.hack();
+              sfx.termType(4);
+              go("home");
             }}
-            className="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded border border-ember/20 bg-ember/5 font-mono text-[10px] uppercase tracking-[0.18em] text-ember transition-colors hover:bg-ember/10 disabled:opacity-35"
+            className="flex min-h-11 items-center justify-center rounded border border-ember/20 font-mono text-[10px] uppercase tracking-[0.16em] text-ember"
           >
-            <Cpu className="size-3.5" /> Exploit delimiter · {brackets} remaining
+            Return to root
           </button>
-          <p className="mt-3 text-center font-mono text-[9px] uppercase tracking-[0.14em] text-ember/55">
-            Tokens are synthesized per breach. No static password dictionary is loaded.
-          </p>
+          <button
+            type="button"
+            onClick={() => {
+              sfx.machine();
+              close();
+            }}
+            className="flex min-h-11 items-center justify-center rounded border border-ember/20 font-mono text-[10px] uppercase tracking-[0.16em] text-ember"
+          >
+            Log off
+          </button>
         </div>
       </div>
     </div>
+  );
+}
+
+export function EliteTerminalOverlay() {
+  const term = useGame((store) => store.s.term);
+  const hack = useGame((store) => store.s.hack) as EliteHack | null;
+  const close = useGame((store) => store.closeTerminal);
+  const go = useGame((store) => store.termGo);
+
+  if (!term && !hack) return null;
+
+  const session = term?.sessionId ?? hack?.sessionId ?? "legacy";
+  const page = term?.page ?? "lock";
+  const jackOut = () => {
+    unlockAudio();
+    sfx.machine();
+    close();
+  };
+
+  if (page === "boot" && term && !term.booted) {
+    return (
+      <CrtShell session={session} page="boot" onClose={jackOut}>
+        <BootView onDone={() => go("home")} />
+      </CrtShell>
+    );
+  }
+
+  if ((page === "lock" || !term) && hack) {
+    return (
+      <CrtShell session={hack.sessionId ?? session} page="dump" onClose={jackOut}>
+        <DumpView hack={hack} />
+      </CrtShell>
+    );
+  }
+
+  return (
+    <CrtShell session={session} page={page} onClose={jackOut}>
+      <ShellView page={page === "boot" ? "home" : page} />
+    </CrtShell>
   );
 }

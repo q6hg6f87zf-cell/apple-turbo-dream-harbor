@@ -14,22 +14,66 @@ export interface FieldCard {
 const WHO = "Tyrone Bot";
 
 export const TALK: Record<string, TalkLine[]> = {
+  wake: [
+    {
+      who: WHO,
+      text: "Hey. Hey, partner. There you are. {name}. Well I'll be damned. I was starting to think I'd hauled a corpse halfway across the Hollow.",
+    },
+    {
+      who: WHO,
+      text: "Easy now. Don't try standing up just yet. Name's Tyrone. Tyrone Bot, model T-0880 if we're being formal.",
+    },
+    {
+      who: WHO,
+      text: "I found you about three miles east of the old highway. Facedown in the dirt. No supplies. No weapon. Not a clue how you got there, partner.",
+    },
+    {
+      who: WHO,
+      text: "Funny thing is, there weren't any tracks leading to you. No caravan. No footprints. No vehicle marks. Just you. Naturally I considered leaving you there. Then you started breathing.",
+    },
+    {
+      who: WHO,
+      text: "So against my better judgment, here we are. You're inside an old shelter now. Roof leaks. Door sticks. Something has been scratching at the eastern wall since sundown. I call it Vault 13.",
+    },
+    {
+      who: WHO,
+      text: "Outside that door is the Hollow Realm. Ironclad lies west. Slag Town burns beyond the southern ridge. Brasswater sits along the flooded lowlands. Veyra shines somewhere past the horizon. And Blackspire… we'll talk about Blackspire another time.",
+    },
+    {
+      who: WHO,
+      text: "For now, the important things. Can you stand? Do you remember your name? The file says {name}. And do you remember what happened to the world? No? Yeah. I was afraid you'd say that.",
+    },
+    {
+      who: WHO,
+      text: "Come on, wanderer. Let's figure out who you are before the Hollow Realm decides for us. I keep a radio on that porch. When I finish talking, you tap the chip with the waveform. That is how you change the air in here.",
+    },
+  ],
+  welcome: [
+    {
+      who: WHO,
+      text: "On your feet, {name}. This is Vault 13. I hold the CRT. You hold the squad. The glowing box is S.Y.N.A.P.S.E. I surely did not tell you that.",
+    },
+    {
+      who: WHO,
+      text: "Ironclad is west. East highway is where I found you. Under the Iron Gate is the Moon Squad Market — that is where we buy now. Relay Tower Three talks over it. Climb it when the board says listen.",
+    },
+    {
+      who: WHO,
+      text: "That chip with the waveform is the radio. Tap it when you want to change the air. Original tapes. ICR buys a minute between songs — you cannot request those. That is the point.",
+    },
+    {
+      who: WHO,
+      text: "First job is a resident. The Machine Shop is waiting. Tap the question mark if you get lost. After you, partner.",
+    },
+  ],
   briefing: [
     {
       who: WHO,
-      text: "Howdy, partner. Name's Tyrone. S.Y.N.A.P.S.E unit T-0880. Welcome to Vault 13. I live here too, so try not to break anything I cannot weld back together.",
+      text: "This is Vault 13, {name}. Home is a generous word, but it is ours. I hold the CRT. You hold the squad. The word on that glowing box is S.Y.N.A.P.S.E. I surely did not tell you that.",
     },
     {
       who: WHO,
-      text: "This whole world is the Hollow Realm. Vault 13 sits outside Ironclad, buried into the ridge where the old rail line gives up. Everyone on this file starts here. Home is a generous word, but it is ours.",
-    },
-    {
-      who: WHO,
-      text: "I hold the CRT. You hold the squad. The word is S.Y.N.A.P.S.E. Unit name, chest plate, and the password on that glowing box. Seven letters. I surely did not tell you that.",
-    },
-    {
-      who: WHO,
-      text: "Here is how Vault 13 runs. You forge an operative. First one's on the house. You send them beyond Ironclad, bring back caps and salvage, and keep this place alive another day.",
+      text: "Here is how a day works. Dawn, I post a board. Six watches. Most jobs are decisions — who you send, what you say, which crate you open, which site you work. The sortie is the one that still uses a die. You do not sleep until the shift is done.",
     },
     {
       who: WHO,
@@ -37,7 +81,23 @@ export const TALK: Record<string, TalkLine[]> = {
     },
     {
       who: WHO,
+      text: "The Exchange at Vault 13 is closed. We buy at the Moon Squad Market under the Iron Gate. Limited crates. Dawn reprints them. Every third morning a special merchant sits the high table — Marrow, Cinder Bess, Nine-Lift, Salt Wren, White Glove. The black card pays. The vault drawer does not.",
+    },
+    {
+      who: WHO,
+      text: "Relay Tower Three is the iron spine over the Gate. Climb it. Listen. Kane frequencies, visiting stalls, sites the board has not named yet. A day with one dice roll is a simulation. Work the ground.",
+    },
+    {
+      who: WHO,
       text: "If somebody goes down, get them into the Med Bay before dawn. Without one running, downed residents may not wake up. I would hate to put that on your first incident report.",
+    },
+    {
+      who: WHO,
+      text: "That chip under my portrait is the radio. Six original tapes. Keep the Radio On is the porch. The Stranger is Ironclad. Glowin' is Slag Town. Meet Me in Veyra is the last lamp. Don't Look Up is Blackspire. Brasswater Keeps Rollin' is the river.",
+    },
+    {
+      who: WHO,
+      text: "Tap a tape when you want one. Follow the Hollow and I change the bed with the room. ICR 88 buys a minute between songs — Moon Squad Marketplace, Relay Tower Three. You cannot request those. That is the point. They are not on the deck.",
     },
     {
       who: WHO,
@@ -45,7 +105,11 @@ export const TALK: Record<string, TalkLine[]> = {
     },
     {
       who: WHO,
-      text: "Your first operative is waiting in the Machine Shop. Every resident is Ironclad-born. The Hollow decides the rest. Name them like you mean it. Let's get a file stamped.",
+      text: "Your first operative is waiting in the Machine Shop. Every resident is Ironclad-born. The Hollow decides the rest. Name them like you mean it.",
+    },
+    {
+      who: WHO,
+      text: "I am a T-0880. Dr. Vesper Kane signed the shutdown order for my line, then built AEGIS 2753 — human pilots in super suits — to do the job cleaner. I walked off that scrap list. Kane wants the Hollow. Ironclad, Slag Town, Blackspire, Brasswater, then Veyra City last. Pick a site. Do not make it a simulation. Make it a job.",
     },
   ],
   resume: [
@@ -73,7 +137,7 @@ export const TALK: Record<string, TalkLine[]> = {
     },
     {
       who: WHO,
-      text: "Discord cannot name a click all by itself. Tyrone stamps a personal URL: your snowflake, your handle, your arcade totals. That link sits you on the black card. Same resident, same file.",
+      text: "Discord cannot name a click all by itself. Tyrone stamps a personal URL: your snowflake, your handle. The card waits for the name you choose. Then your Discord handle sits under it.",
     },
   ],
   menu: [
@@ -93,7 +157,7 @@ export const TALK: Record<string, TalkLine[]> = {
     },
     {
       who: WHO,
-      text: "Resident Quarters give us beds. Med Bay keeps the bleeding alive. Perimeter Control sees trouble coming. Quartermaster Exchange keeps supplies and caps moving.",
+      text: "Resident Quarters give us beds. Med Bay keeps the bleeding alive. Perimeter Control sees trouble coming. The Market under the Iron Gate keeps the crates moving. Relay Tower Three talks if you climb it.",
     },
     {
       who: WHO,
@@ -135,11 +199,11 @@ export const TALK: Record<string, TalkLine[]> = {
   deploy: [
     {
       who: WHO,
-      text: "This is the Hollow Realm, partner. Ironclad is home territory. Beyond it are Slag Town, Blackspire, Brasswater and Veyra City. Pick a region and decide how badly you want to know what is there.",
+      text: "This is the Hollow Realm, partner. Ironclad, Slag Town, Blackspire, Brasswater, Veyra City last. Tap a town, open its map, pin a site. Market stalls, radio towers, salvage yards and the loud jobs all live on that ground.",
     },
     {
       who: WHO,
-      text: "Pick a region, pick a party of idle residents, pick a job. Scout walks the edges. Forage takes what the land offers. Raid kicks a door. Trade finds a merchant. Bounty hunts a name.",
+      text: "Scout and salvage spend a watch and mark the next pin. Listen on Relay Tower Three. Shop under the Gate. Ghost slips the wire. Standard is a job. Breach kicks the door and Kane hears it.",
     },
     {
       who: WHO,
@@ -147,7 +211,7 @@ export const TALK: Record<string, TalkLine[]> = {
     },
     {
       who: WHO,
-      text: "Intel from scouts and Perimeter Control unlocks nastier names. Do not send a fresh resident into a boss fight unless you dislike their bunk being occupied.",
+      text: "Dr. Vesper Kane wants this whole map for an intergalactic-travel program. Do not make it a simulation. Make it a job.",
     },
   ],
   vault: [
@@ -161,17 +225,17 @@ export const TALK: Record<string, TalkLine[]> = {
     },
     {
       who: WHO,
-      text: "Weapons and salvage live here until you issue them to a resident. Repairs happen in the Machine Shop.",
+      text: "Weapons and salvage live here until you issue them to a resident. Rifles eat magazines. Optics, muzzles, barrels, mags, stocks, grips, receivers — one per slot. Strip them at the Machine Shop. Repairs happen there too.",
     },
   ],
   ledger: [
     {
       who: WHO,
-      text: "Welcome to the Quartermaster Exchange. Vault 13 keeps the shared stores. The black card belongs to whoever is seated: their name, Discord handle and personal caps.",
+      text: "The black card takes the name you stamped. Discord sits underneath as the handle. Same resident, same file. Caps you win here land in the treasury, and a cut hits that plate.",
     },
     {
       who: WHO,
-      text: "Drag the card. Pinch or wheel to zoom. Double-tap to flip it. Deposit and withdraw at the desk. Purchases still come out of Vault 13's shared supply unless the card says otherwise.",
+      text: "The Exchange stall is closed. Walk the Moon Squad Market under the Iron Gate when you need a crate. The card pays there. Deposit and withdraw still happen at this desk.",
     },
     {
       who: WHO,
@@ -180,6 +244,20 @@ export const TALK: Record<string, TalkLine[]> = {
     {
       who: WHO,
       text: "The bounty board sits here too. A named target, a DC and a payout. Hunt it when you are ready to make the Med Bay earn its keep.",
+    },
+  ],
+  market: [
+    {
+      who: WHO,
+      text: "Moon Squad Market, {name}. Under the Iron Gate. The Exchange inside the vault packed up. These stalls reprint at dawn. Qty is not a suggestion.",
+    },
+    {
+      who: WHO,
+      text: "The black card pays. Withdraw at the ledger if the plate is light. Every third dawn a visitor sits the high table — better loot, uglier prices. Climb Relay Tower Three if you want the rumor before they unpack.",
+    },
+    {
+      who: WHO,
+      text: "Buy what you can carry. Stalls try to seat a gun, a part and a box of ammo every dawn. It stamps into the Salvage Depot. Then get back on the board. Six watches. The ground is the rest of the day.",
     },
   ],
   squad: [
@@ -209,11 +287,37 @@ export const TALK: Record<string, TalkLine[]> = {
   dawn: [
     {
       who: WHO,
-      text: "Dawn of day {day}. Clocks refill at midnight Mountain. The Quartermaster rotates stock. Gifts reset. I held Vault 13 together all night. You still have to win today.",
+      text: "Dawn of day {day}. I posted {jobs}. Six watches. Call the jobs. Walk the Market. Climb the tower. Do not just roll a die at the map and call it a day.",
     },
     {
       who: WHO,
-      text: "If anybody was downed and the Med Bay was offline, they may not have made it. Keep the room powered. Vault 13 remembers every empty bunk.",
+      text: "Required jobs have teeth. Sleep on them and Kane, the leak, or the wounded will finish the paperwork. Rest is for Night, partner.",
+    },
+  ],
+  shift: [
+    {
+      who: WHO,
+      text: "That is today's board. Tap a job. Crates, visitors, AEGIS knocks and med passes are choices. The Market and the tower are ground. The scout is the one with the die.",
+    },
+    {
+      who: WHO,
+      text: "Six watches. Spend them. Then rest. A day with one mission is a simulation. We do not run simulations.",
+    },
+  ],
+  night: [
+    {
+      who: WHO,
+      text: "That's a shift. Rest when you are ready. I have the CRT. Dawn reprints the board — new visitors, new heat, new ways to get this wrong.",
+    },
+  ],
+  arcade: [
+    {
+      who: WHO,
+      text: "This glass is the Thirty-Eight. I am T-0880. The floor is T-0888. Slots take the black card. Knowledge still feeds the treasury, and a cut hits the plate.",
+    },
+    {
+      who: WHO,
+      text: "Pit tables first: Trivia, True / False, Unscramble, Word search, Plains Cree. Machines along the wall: Slots, Lockpick, SYNAPSE. How to play lives inside each game. The floor does not lecture.",
     },
   ],
   synapse: [
@@ -242,15 +346,40 @@ export const TALK: Record<string, TalkLine[]> = {
       text: "Scout is intel. Raid is a door and a fight. If a name surfaces, that is a boss. Bring a party. I will be waiting at Vault 13 when you get back.",
     },
   ],
+  companion: [
+    {
+      who: WHO,
+      text: "{line}",
+    },
+  ],
   rules: [
     {
       who: WHO,
       text: "This whole page is me talking, partner. Scroll it. The question mark on every other screen is the shorter Vault 13 briefing.",
     },
   ],
+  radio: [
+    {
+      who: WHO,
+      text: "That is my radio, partner. Six original tapes. Keep the Radio On is the porch. The Stranger is Ironclad. Glowin' is Slag Town on a Friday. Meet Me in Veyra is the last lamp. Don't Look Up is Blackspire. Brasswater Keeps Rollin' is the river.",
+    },
+    {
+      who: WHO,
+      text: "Tap a tape. Follow the Hollow and I change the bed with the room. Pin one if you want it to stay. ICR 88 buys a minute between songs — Market Square, Relay Tower Three. Those spots are not on this deck. You cannot request them.",
+    },
+  ],
 };
 
 export const MANUAL: Record<string, FieldCard> = {
+  wake: {
+    title: "Found you",
+    blurb: "Tyrone hauled you off the east highway. No tracks. Vault 13. Listen first.",
+    tips: [
+      "This talk cannot be skipped.",
+      "Your name is already on the file if you sat the card.",
+      "Ironclad west. Slag Town south. Brasswater on the water. Veyra last. Blackspire later.",
+    ],
+  },
   briefing: {
     title: "Vault 13 orientation",
     blurb: "Tyrone walks you through the shelter before the Hollow Realm opens up. Tap his panel to continue. The first briefing cannot be skipped.",
@@ -259,6 +388,15 @@ export const MANUAL: Record<string, FieldCard> = {
       "Forge an operative. First one is free.",
       "Deploy them. Caps and salvage come home, or they do not.",
       "Keep the Med Bay online before you rest the downed.",
+    ],
+  },
+  welcome: {
+    title: "Vault 13",
+    blurb: "The porch is behind you. This is the shelter. Short walk, then the Machine Shop.",
+    tips: [
+      "The radio chip changes the air. Tap the waveform.",
+      "SYNAPSE is the glowing box. I did not tell you that.",
+      "Forge the first resident. Then the Hollow Realm opens.",
     ],
   },
   resume: {
@@ -281,22 +419,23 @@ export const MANUAL: Record<string, FieldCard> = {
   },
   menu: {
     title: "Vault 13 terminal",
-    blurb: "Resume a file, start a new one, or read the rules before heading into the Hollow Realm.",
+    blurb: "Stamp a name before anything else. That is the file Tyrone talks to.",
     tips: [
-      "Squad mode resumes day, caps, roster and salvage.",
-      "New file resets this CRT save.",
-      "The glowing box is the SYNAPSE terminal. Hack it from a live file.",
-      "Link a Discord resident if you have a stamped URL.",
+      "A display name is required. Handle is optional.",
+      "Wake up only after the file is stamped.",
+      "Returning files keep Assume command, New file, the radio and SYNAPSE.",
     ],
   },
   hq: {
     title: "Vault 13",
     blurb: "Home on the outskirts of Ironclad. Upgrade rooms, recover, manage residents and prepare for the Hollow Realm.",
     tips: [
+      "Dawn posts a board. Six watches. Most jobs are decisions, not dice.",
+      "Required jobs bite if you sleep on them. Kane, leaks, the wounded, the Market, the tower.",
+      "Walk the Moon Squad Market. Climb Relay Tower Three. Work a site on the ground map.",
       "Resident Quarters add beds. Med Bay keeps downed residents alive at dawn.",
-      "Perimeter Control lowers mission DCs. Quartermaster Exchange improves daily stock.",
-      "Machine Shop repairs gear. Salvage Depot stores what comes home.",
-      "Rest until dawn resets gifts and heals when the Med Bay is online.",
+      "Rest until dawn reprints the board. Do the shift first.",
+      "Tyrone's radio sits under the cabinet. Follow the Hollow or pin a tape.",
     ],
   },
   roster: {
@@ -323,9 +462,10 @@ export const MANUAL: Record<string, FieldCard> = {
     title: "Hollow Realm",
     blurb: "Leave Vault 13, choose a region, send a party and see what comes home.",
     tips: [
-      "Ironclad is home territory. Slag Town, Blackspire, Brasswater and Veyra City lie beyond it.",
-      "Scout first. Raid when you are greedy. Boss when a name surfaces.",
-      "Only idle Vault 13 residents can deploy. Send at least one.",
+      "Ironclad is home territory. Then Slag Town, Blackspire, Brasswater, Veyra City.",
+      "Enter Region, pin a site. Shop, listen, salvage or scout it. Then Ghost / Standard / Breach for the loud jobs.",
+      "Dawn resets the stalls. Qty is not a suggestion. Expect a gun, a part and a box of ammo if the region has them.",
+      "Scout marks the next site. Raid and breach raise Kane heat. AEGIS 2753 starts hunting.",
       "d20: 1 fumble · 2–4 fail · 5–9 weak · 10–14 success · 15–19 strong · 20 crit.",
     ],
   },
@@ -337,16 +477,29 @@ export const MANUAL: Record<string, FieldCard> = {
       "Stimpak stands the dying up. Mentats fatten the next loot roll.",
       "Bobby pins and probe kits belong to the SYNAPSE terminal.",
       "Issue stored gear to an idle resident.",
+      "Rifles, attachments and ammo boxes live here now. Seat parts. Do not drink the 9mm.",
     ],
   },
   ledger: {
     title: "Quartermaster Exchange",
-    blurb: "Personal black card plus Vault 13's shared supply and daily stock.",
+    blurb: "Personal black card plus Vault 13's shared supply. Gear moved to the Moon Squad Market.",
     tips: [
       "Drag the card to rotate. Pinch or wheel to zoom. Double-tap or Flip to see the back.",
       "Deposit from Vault 13's supply. Withdraw to the resident card.",
       "Twenty percent of a clean sortie lands on the seated resident's card.",
-      "Bargain, essential, artifact: one of each per day. Quartermaster tier 3 grants a discount.",
+      "The Exchange stall is closed. Gear is the Moon Squad Market under the Iron Gate.",
+      "Quartermaster tier 3 still grants the 15% Moon Squad cut.",
+    ],
+  },
+  market: {
+    title: "Moon Squad Market",
+    blurb: "Stalls under the Iron Gate. Limited stock. Dawn reset. The black card pays.",
+    tips: [
+      "The Exchange at Vault 13 is closed. This is where gear is bought.",
+      "Daily crates are short. Sold out means wait for dawn.",
+      "Every third dawn a visiting merchant sits the high table with higher loot.",
+      "Relay Tower Three talks over the yard. Climb it for rumors.",
+      "Quartermaster 3 still cuts the price 15%.",
     ],
   },
   codex: {
@@ -373,6 +526,16 @@ export const MANUAL: Record<string, FieldCard> = {
     tips: [
       "Downed residents can die at dawn without the Med Bay.",
       "Keep the room online before you rest.",
+    ],
+  },
+  arcade: {
+    title: "The Thirty-Eight",
+    blurb: "T-0888's penthouse floor. Pit tables and machines. How to play lives inside the game you sit down at.",
+    tips: [
+      "The floor shows names, not lectures.",
+      "Trivia files retire when dealt. Slots can take the bet.",
+      "Caps land in Vault 13. A cut hits the black card.",
+      "A clean floor win closes the T-0888 job on today's board.",
     ],
   },
   synapse: {
@@ -404,12 +567,32 @@ export const MANUAL: Record<string, FieldCard> = {
       "If the party is down, return to Vault 13.",
     ],
   },
+  companion: {
+    title: "Tyrone is on the line",
+    blurb: "He is in Vault 13, watching the CRT. Ask about the roll, the Raid Matrix, a name on the roster, or a promise you made.",
+    tips: [
+      "He only quotes live rules. He will not invent a DC.",
+      "Assistance off means he stays quiet unless you ask.",
+      "Turn numbers off if you want the check described, not counted.",
+    ],
+  },
   rules: {
     title: "How you play",
     blurb: "Vault 13 orientation in long form. The question mark on other screens is the short version.",
     tips: [
       "Forge. Deploy. Salvage. Recover. Repeat.",
       "The world is the Hollow Realm. Home is Vault 13.",
+    ],
+  },
+  radio: {
+    title: "Tyrone's radio",
+    blurb: "Original Hollow Realm tapes. Follow the Hollow and the bed changes with the room. Pin a tape to hold it. Station breaks are not on the deck.",
+    tips: [
+      "Keep the Radio On is the porch and Vault 13.",
+      "The Stranger of Ironclad walks the east wall and the orbit.",
+      "Glowin' in Slag Town is Friday night and the Thirty-Eight.",
+      "Meet Me in Veyra, Don't Look Up at Blackspire, Brasswater Keeps Rollin' — one town each.",
+      "ICR 88 ads play between songs only. You cannot request them.",
     ],
   },
 };
@@ -421,32 +604,42 @@ export const SCREEN_SCRIPT: Partial<Record<Screen, string>> = {
   map: "deploy",
   vault: "vault",
   ledger: "ledger",
+  market: "market",
   squad: "squad",
   codex: "codex",
+  arcade: "arcade",
 };
 
-const LOCKED_UNTIL_SEEN = new Set(["briefing", "resume"]);
-const PREGAME = new Set(["briefing", "resume"]);
+const LOCKED_UNTIL_SEEN = new Set(["wake", "welcome", "briefing", "resume"]);
+const PREGAME = new Set(["wake"]);
 
 export function scriptForScreen(state: GameState): string {
   if (state.hack) return "synapse";
   if (state.combat) return "combat";
   if (state.mission) return "mission";
+  if (state.talk?.script === "wake") return "wake";
+  if (state.talk?.script === "welcome") return "welcome";
   if (state.screen === "title") return "menu";
-  if (state.screen === "briefing") return "briefing";
+  if (state.screen === "briefing") return "wake";
   if (state.screen === "rules") return "rules";
   return SCREEN_SCRIPT[state.screen] ?? "hq";
 }
 
 export function renderTalk(text: string, state: GameState): string {
   const roster = state.operatives.filter((o) => o.status !== "dead").length;
-  const name = state.discordName?.trim() || "partner";
+  const name = state.playerName?.trim() || state.discordName?.trim() || "partner";
   return text
     .replaceAll("{day}", String(state.day))
     .replaceAll("{caps}", state.coins.toLocaleString())
     .replaceAll("{name}", name)
     .replaceAll("{roster}", String(roster))
-    .replaceAll("{level}", String(state.level));
+    .replaceAll("{level}", String(state.level))
+    .replaceAll("{watch}", state.shift?.watch ?? "dawn")
+    .replaceAll(
+      "{jobs}",
+      (state.shift?.board.filter((t) => t.status === "open").map((t) => t.title).slice(0, 3).join(", ") || "the board"),
+    )
+    .replaceAll("{line}", state.tyrone?.utterance ?? "Yeah. I remember.");
 }
 
 export function isTalkLocked(state: GameState): boolean {
@@ -463,7 +656,11 @@ export function isPregameTalk(state: GameState): boolean {
 export function queueTalk(state: GameState, script: string, force = false) {
   if (!TALK[script]) return;
   if (!force && state.seenTalk.includes(script)) return;
-  if (state.combat || state.mission) return;
+  if (state.combat) return;
+  if (state.mission) {
+    if (script !== "companion") return;
+    if (!state.mission.waiting) return;
+  }
   if (state.talk) {
     if (force) {
       state.talk = { script, i: 0 };
@@ -486,7 +683,16 @@ export function advanceTalk(state: GameState): "next" | "done" | "idle" {
     if (!state.seenTalk.includes(t.script)) state.seenTalk = [...state.seenTalk, t.script];
     const script = t.script;
     state.talk = null;
-    if (script === "briefing") {
+    if (script === "wake") {
+      state.screen = "hq";
+      state.tutorial = "forge";
+      if (!state.seenTalk.includes("welcome") && !state.seenTalk.includes("briefing")) {
+        queueTalk(state, "welcome", true);
+      } else if (state.operatives.length === 0) {
+        state.screen = "forge";
+        queueTalk(state, "forge");
+      }
+    } else if (script === "welcome" || script === "briefing") {
       state.screen = "forge";
       state.tutorial = "forge";
       queueTalk(state, "forge");

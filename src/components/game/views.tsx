@@ -3,19 +3,15 @@ import {
   BASE_ROOMS,
   CLASS_LORE,
   CLASSES,
-  DESTINY,
-  ENCHANTS,
   NPCS,
   ORIGINS,
   QUARTERS,
   RACES,
-  REP,
   RESIDENT_ROLES,
-  SHADOW,
-  SIGNATURE,
   VILLAINS,
   WORLD,
   locById,
+  regionById,
 } from "@/game/data";
 import {
   computeStats,
@@ -31,14 +27,15 @@ import {
 } from "@/game/engine";
 import { sfx, unlockAudio } from "@/game/audio";
 import { useGame } from "@/game/store";
-import { ARC_ORDER, currentArcLoc, isVacant, seatedMember } from "@/game/squad";
-import type { ClassName, LocationId, MissionKind, RoomId } from "@/game/types";
+import { currentArcLoc, isVacant, seatedMember } from "@/game/squad";
+import type { ClassName, LocationId, LocationProgress, MissionApproach, MissionKind, RoomId } from "@/game/types";
 import { cn } from "@/lib/cn";
 import {
   Archive,
   BedDouble,
   Crosshair,
   Eye,
+  Globe2,
   Hammer,
   HeartPulse,
   Landmark,
@@ -50,8 +47,9 @@ import {
   Skull,
   Swords,
   Users,
+  Radio,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Chip,
   ClassGlyph,
@@ -64,10 +62,22 @@ import {
   SectionLabel,
   StatusPill,
 } from "./primitives";
-import { TerminalCard, TitleBackdrop, TyroneHandshake } from "./menu";
-import { WorldAtlas } from "./atlas";
+import { TerminalCard, TyroneHandshake } from "./menu";
+import { WakeScene } from "./wake-scene";
+import { PorchStrip } from "./porch-presence";
+import { useOpeningBeat } from "@/game/opening";
+import { RadioChip } from "./radio-deck";
 import { Dice20 } from "./dice";
+import { ForgeBody } from "./forge-body";
 import { MoonCard } from "./card";
+import { regionThumb } from "@/game/art";
+import { CALIBER_ROSTER, ARC_OPEN, campaignOpenRegions } from "@/game/arsenal";
+import { APPROACHES, KANE_STAKES, defaultPoi, kaneBand, knownPois, locationToRegion } from "@/game/field-ops";
+import { WATCH_LABEL } from "@/game/shift";
+import { className, displayRace } from "@/game/presentation";
+import { FATE_COPY, FATE_KEYS, STAT_ORDER, fateLanding } from "@/game/stats-copy";
+import { punchClick, shockwaveAt } from "@/game/juice";
+import { OrbitTheater, RegionMapOverlay } from "./orbit-theater";
 
 function err(msg: string | null) {
   if (!msg) {
@@ -76,6 +86,67 @@ function err(msg: string | null) {
   }
   sfx.hurt();
   useGame.setState((st) => ({ s: { ...st.s, toast: msg } }));
+}
+
+function DayBoard() {
+  const s = useGame((g) => g.s);
+  const openTask = useGame((g) => g.openTask);
+  const rest = useGame((g) => g.rest);
+  const board = s.shift?.board ?? [];
+  const left = s.shift?.watchesLeft ?? 6;
+  const watch = s.shift?.watch ?? "dawn";
+  if (!board.length) return null;
+  return (
+    <div className="mt-4 rounded-[var(--radius-md)] bg-ink/55 p-3">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <div className="font-display text-[10px] uppercase tracking-[0.2em] text-ember">Today's board</div>
+          <p className="mt-0.5 text-sm text-moon">
+            {WATCH_LABEL[watch]} · {left} watch{left === 1 ? "" : "es"} left
+          </p>
+        </div>
+        {left <= 0 ? (
+          <Button size="sm" variant="ember" onClick={() => rest()}>
+            Rest
+          </Button>
+        ) : null}
+      </div>
+      <div className="mt-3 space-y-2">
+        {board.map((task) => {
+          const closed = task.status === "done" || task.status === "failed";
+          return (
+            <button
+              key={task.id}
+              type="button"
+              disabled={closed || left < task.watchCost}
+              onClick={(e) => {
+                punchClick(e.clientX, e.clientY);
+                const msg = openTask(task.id);
+                if (msg) err(msg);
+              }}
+              className={cn(
+                "flex min-h-14 w-full items-center justify-between gap-3 rounded-[var(--radius-sm)] px-3 py-2 text-left",
+                closed ? "bg-surface/40 text-muted" : "bg-surface/90 shadow-[var(--shadow-border)]",
+                task.required && !closed && "shadow-[var(--shadow-border-hover)]",
+              )}
+            >
+              <span className="min-w-0">
+                <span className="block truncate font-display text-sm text-paper">{task.title}</span>
+                <span className="block truncate text-[11px] text-muted">
+                  {task.required ? "Required · " : ""}
+                  {task.watchCost}w · {task.kind}
+                  {task.report ? ` · ${task.report}` : ""}
+                </span>
+              </span>
+              <span className="shrink-0 font-display text-[10px] uppercase tracking-[0.14em] text-ember">
+                {closed ? task.status : "Take"}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 const ROOM_ICON: Record<RoomId, typeof Hammer> = {
@@ -88,12 +159,21 @@ const ROOM_ICON: Record<RoomId, typeof Hammer> = {
 };
 
 const KIND_HELP: Record<MissionKind, string> = {
-  scout: "Walk the edges. Intel, low blood.",
-  forage: "Take what the land offers. Caps, ore, scraps.",
-  raid: "Kick a door. Combat likely. Better loot.",
-  trade: "Find the regional merchant and pay their price.",
-  bounty: "Hunt a named target. The board pays.",
-  boss: "The name that surfaced. Bring a party.",
+  scout: "Walk the edges. You mark sites on the ground map and come home with intel, not a body count. Low blood. Kane is slower to notice. This is how a new region opens.",
+  forage: "Take what the land already dropped. Caps, ore, scraps, the odd crate. Combat is rare. The haul is thinner than a raid, and you keep your name off AEGIS paper.",
+  raid: "Kick a door. Combat is likely. Better loot, more heat. Kane's people hear it. Bring someone who can take a hit and do not go alone.",
+  trade: "Find this region's merchant and pay their price. No dice for blood. Caps in, goods out. Daily stalls live at the Moon Squad Market. This button is the region's own trader.",
+  bounty: "Hunt the named target Tyrone posted on today's board. Combat is the point. The card pays if they drop. Fail and the name walks.",
+  boss: "The name that surfaced for this arc. Not a daily job. Bring a party of three if you have them. Win and the region closes that chapter.",
+};
+
+const KIND_TAG: Record<MissionKind, string> = {
+  scout: "Intel, low blood",
+  forage: "Salvage, rare fights",
+  raid: "Combat, richer haul",
+  trade: "Caps for goods",
+  bounty: "Named hunt",
+  boss: "Arc closer",
 };
 
 export { MainMenu as TitleScreen } from "./menu";
@@ -101,36 +181,171 @@ export { MainMenu as TitleScreen } from "./menu";
 export function Briefing() {
   const go = useGame((g) => g.finishBriefing);
   const talk = useGame((g) => g.s.talk);
+  const beat = useOpeningBeat();
+  const [curtain, setCurtain] = useState(true);
+  const wakeLine = talk?.script === "wake" ? talk.i : 0;
+
+  useEffect(() => {
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const hold = beat === "wake" && !reduced ? 420 : reduced ? 80 : 280;
+    const t = window.setTimeout(() => setCurtain(false), hold);
+    return () => window.clearTimeout(t);
+  }, [beat]);
+
   return (
-    <div className="ms-grain relative flex h-dvh flex-col justify-end overflow-hidden px-5 py-8">
-      <TitleBackdrop className="opacity-70" />
-      <div className="crt-scan absolute inset-0" />
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,color-mix(in_oklab,var(--color-ember)_16%,transparent),transparent_55%)]" />
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,transparent,color-mix(in_oklab,var(--color-ink)_82%,transparent)_70%,var(--color-ink))]" />
-      <div className="relative z-[1] mx-auto mb-36 w-full max-w-xl">
-        <p className="font-display text-[11px] uppercase tracking-[0.42em] text-ember">S.Y.N.A.P.S.E · T-0880</p>
-        <h2 className="mt-2 font-display text-4xl text-paper">The porch.</h2>
-        <p className="mt-3 max-w-md text-sm leading-relaxed text-moon">
-          Tyrone talks first. No shortcuts. Tap his panel until the ranch opens.
-        </p>
+    <div className="relative flex h-dvh flex-col justify-end overflow-hidden bg-ink px-5 py-8" data-briefing="1">
+      <WakeScene line={wakeLine} />
+      <div
+        className={cn("ms-opening-curtain", !curtain && "is-up")}
+        data-opening={curtain ? "black" : "wake"}
+        aria-hidden
+      />
+      <div className="relative z-[2] mx-auto mb-36 w-full max-w-xl">
         {!talk ? (
-          <Button
-            className="mt-8 w-full sm:w-auto"
-            variant="ember"
-            onClick={() => {
-              sfx.click();
-              go();
-            }}
-          >
-            Forge the first
-          </Button>
+          <>
+            <p className="font-display text-[11px] uppercase tracking-[0.42em] text-ember">S.Y.N.A.P.S.E · T-0880</p>
+            <h2 className="mt-2 font-display text-4xl text-paper">On your feet.</h2>
+            <p className="mt-3 max-w-md text-sm leading-relaxed text-moon">
+              He found you three miles east of the old highway. Vault 13 is waiting.
+            </p>
+            <Button
+              className="mt-8 w-full sm:w-auto"
+              variant="ember"
+              onClick={() => {
+                sfx.click();
+                go();
+              }}
+            >
+              Forge the first
+            </Button>
+          </>
         ) : null}
       </div>
     </div>
   );
 }
 
+function PlateClock() {
+  const me = useGame((g) => seatedMember(g.s));
+  const tapped = useGame((g) => g.s.clocks?.cardTap ?? 0);
+  const clock = useGame((g) => g.clockPlate);
+  const setScreen = useGame((g) => g.setScreen);
+  const vacant = isVacant(me);
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        if (vacant) {
+          sfx.hurt();
+          setScreen("ledger");
+          return;
+        }
+        const msg = clock();
+        if (msg) sfx.hurt();
+        else {
+          sfx.swipe();
+          sfx.coin();
+        }
+      }}
+      className="mt-3 flex min-h-14 w-full items-center justify-between gap-3 rounded-[var(--radius-md)] bg-ink/55 px-3 py-2 text-left shadow-[var(--shadow-border)]"
+    >
+      <span className="min-w-0">
+        <span className="flex items-center gap-2 font-display text-[10px] uppercase tracking-[0.18em] text-ember">
+          Black card
+        </span>
+        <span className="mt-0.5 block font-display text-sm text-paper">
+          {vacant ? "Stamp a plate to clock in" : tapped ? `${me.name} already clocked` : `Clock ${me.name}'s plate`}
+        </span>
+        <span className="block truncate text-[11px] text-muted">
+          Daily personal caps. Slots buy in from this plate.
+        </span>
+      </span>
+      <span className="shrink-0 text-right">
+        <span className="block font-display text-base tabular-nums text-ember">{me.personalCaps.toLocaleString()}</span>
+        <span className="font-display text-[10px] uppercase tracking-[0.14em] text-ember">
+          {vacant ? "Stamp" : tapped ? "Done" : "Clock"}
+        </span>
+      </span>
+    </button>
+  );
+}
+
+
+const EMPTY_PROGRESS: LocationProgress = {
+  unlocked: false,
+  intel: 0,
+  missions: 0,
+  bossUnlocked: false,
+  bossDefeated: false,
+  discoveredPois: [],
+};
+
+class MapErrorBoundary extends Component<{ children: ReactNode; onReset?: () => void }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  componentDidCatch(error: Error) {
+    console.warn("hollow map", error);
+  }
+  render() {
+    if (this.state.failed) {
+      return (
+        <Panel className="bg-raised">
+          <p className="text-sm text-muted">The map blinked. Use the list until the CRT settles.</p>
+          <Button
+            className="mt-3"
+            variant="ghost"
+            onClick={() => {
+              this.setState({ failed: false });
+              this.props.onReset?.();
+            }}
+          >
+            Dismiss
+          </Button>
+        </Panel>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+function SquadWing() {
+  return (
+    <div className="space-y-5" data-moon-squad="1">
+      <div className="relative min-h-40 overflow-hidden rounded-[var(--radius-xl)] shadow-[var(--shadow-border)]">
+        <img src="/art/rooms/squad.jpg" alt="" className="absolute inset-0 size-full object-cover object-center" />
+        <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/60 to-ink/25" />
+        <div className="relative px-5 py-6">
+          <SectionLabel>Vault 13 · briefing</SectionLabel>
+          <h2 className="mt-1 font-display text-2xl text-paper">Moon Squad</h2>
+          <p className="mt-1 max-w-xl text-sm text-moon">The briefing room. Roster and the rider file live here now — not a dock tab.</p>
+        </div>
+      </div>
+      <RosterView />
+      <SquadView />
+    </div>
+  );
+}
+
 export function HQView() {
+  const [pane, setPane] = useState<"compound" | "squad">("compound");
+  return (
+    <div className="space-y-5 pb-4" data-hq-pane={pane}>
+      <div className="flex flex-wrap gap-2" data-hq-tabs="1">
+        <Chip active={pane === "compound"} onClick={() => setPane("compound")}>
+          Compound
+        </Chip>
+        <Chip active={pane === "squad"} onClick={() => setPane("squad")}>
+          Moon Squad
+        </Chip>
+      </div>
+      {pane === "squad" ? <SquadWing /> : <CompoundWing />}
+    </div>
+  );
+}
+
+function CompoundWing() {
   const s = useGame((g) => g.s);
   const upgradeRoom = useGame((g) => g.upgradeRoom);
   const upgradeQuarter = useGame((g) => g.upgradeQuarter);
@@ -174,6 +389,34 @@ export function HQView() {
             <p className="mt-1 text-sm italic text-moon">{s.nightNote}</p>
           </div>
         ) : null}
+
+        <DayBoard />
+
+        <PorchStrip />
+
+        <PlateClock />
+
+        <button
+          type="button"
+          onClick={(e) => {
+            punchClick(e.clientX, e.clientY);
+            setScreen("arcade");
+          }}
+          className="mt-3 flex min-h-14 w-full items-center justify-between gap-3 rounded-[var(--radius-md)] bg-ink/55 px-3 py-2 text-left shadow-[var(--shadow-border)]"
+        >
+          <span className="min-w-0">
+            <span className="flex items-center gap-2 font-display text-[10px] uppercase tracking-[0.18em] text-ember">
+              <Radio className="size-3.5" /> T-0888
+            </span>
+            <span className="mt-0.5 block font-display text-sm text-paper">Sit the cabinet</span>
+            <span className="block truncate text-[11px] text-muted">Buy-in is the black card. House takes a rake.</span>
+          </span>
+          <span className="shrink-0 font-display text-[10px] uppercase tracking-[0.14em] text-ember">Play</span>
+        </button>
+
+        <div className="mt-3">
+          <RadioChip />
+        </div>
 
         <div className="mt-4 grid gap-2 sm:grid-cols-2 md:grid-cols-3">
           {(Object.keys(BASE_ROOMS) as RoomId[]).map((id) => {
@@ -416,7 +659,7 @@ export function RosterView() {
                   <div>
                     <div className="font-display text-base">{op.name}</div>
                     <div className="text-xs text-muted">
-                      {op.cls} · {op.race} · {op.repTitle}
+                      {className(op.cls)} · {displayRace(op.race)} · {op.repTitle}
                     </div>
                   </div>
                 </div>
@@ -446,13 +689,16 @@ export function RosterView() {
 export function ForgeView() {
   const s = useGame((g) => g.s);
   const forge = useGame((g) => g.forge);
-  const [step, setStep] = useState(0);
-  const [name, setName] = useState(() => randomName());
+  const stamped = (s.playerName ?? "").trim();
+  const nameLocked = Boolean(stamped);
+  const [step, setStep] = useState(() => (nameLocked && s.operatives.length === 0 ? 2 : 0));
+  const [name, setName] = useState(() => stamped || randomName());
   const [cls, setCls] = useState<ClassName>("Warrior");
   const [race, setRace] = useState(Object.keys(RACES)[0]);
   const [origin, setOrigin] = useState(ORIGINS[0]);
   const lineages = Object.keys(RACES[race].lineage);
   const [lineage, setLineage] = useState(lineages[0]);
+  const [bodyI, setBodyI] = useState(0);
   const [rolls, setRolls] = useState<Record<string, number>>({});
   const [spinKey, setSpinKey] = useState<string | null>(null);
   const [spinAll, setSpinAll] = useState(false);
@@ -478,15 +724,18 @@ export function ForgeView() {
     sfx.dice();
     setSpinAll(true);
     window.setTimeout(() => {
-      setRolls({
+      const next: Record<string, number> = {
         rep: d20(),
         trait: d20(),
         skill: d20(),
         shadow: d20(),
         enchant: d20(),
         destiny: d20(),
-      });
+      };
+      for (const k of STAT_ORDER) next[k] = d20();
+      setRolls(next);
       setSpinAll(false);
+      setBodyI(7);
     }, 980);
   };
 
@@ -498,7 +747,7 @@ export function ForgeView() {
     const linKeys = Object.keys(RACES[nextRace].lineage);
     const nextLin = wild ? linKeys[Math.floor(Math.random() * linKeys.length)] : lineage;
     const nextOrigin = wild ? ORIGINS[Math.floor(Math.random() * ORIGINS.length)] : origin;
-    const next = {
+    const next: Record<string, number> = {
       rep: d20(),
       trait: d20(),
       skill: d20(),
@@ -506,39 +755,35 @@ export function ForgeView() {
       enchant: d20(),
       destiny: d20(),
     };
+    for (const k of STAT_ORDER) next[k] = d20();
     setCls(nextCls);
     setRaceAndLine(nextRace);
     setLineage(nextLin);
     setOrigin(nextOrigin);
     setRolls(next);
-    const msg = forge({
-      name: name || randomName(),
-      cls: nextCls,
-      race: nextRace,
-      lineage: nextLin,
-      origin: nextOrigin,
-      rolls: next,
-    });
-    err(msg);
+    setStep(2);
+    setBodyI(7);
+    useGame.setState((st) => ({
+      s: { ...st.s, toast: wild ? "Tyrone picked the whole card. Read the recap, then stamp." : "Tyrone rolled the thirteen. Read them. Then stamp." },
+    }));
   };
 
-  const preview = (
-    table: { r: [number, number]; title?: string; name?: string; thread?: string }[],
-    n?: number,
-  ) => {
-    if (!n) return "—";
-    const hit = table.find((t) => n >= t.r[0] && n <= t.r[1]);
-    return hit?.title || hit?.name || hit?.thread || "—";
-  };
-
-  const canForge = name.trim() && Object.keys(rolls).length >= 6;
+  const canForge =
+    Boolean((nameLocked ? stamped : name).trim()) &&
+    FATE_KEYS.every((k) => typeof rolls[k] === "number") &&
+    STAT_ORDER.every((k) => typeof rolls[k] === "number");
 
   return (
     <div className="space-y-4 pb-8">
       <SectionLabel>Character Forge</SectionLabel>
-      <h2 className="font-display text-2xl">Make them real</h2>
+      <h2 className="font-display text-2xl">{nameLocked && s.operatives.length === 0 ? "Roll their fate" : "Make them real"}</h2>
       <p className="text-sm text-muted">
-        {cost === 0 ? "First operative is a gift of the moon." : <>Next forge costs <Coin n={cost} />.</>} Three steps. Six rolls. One life.
+        {nameLocked && s.operatives.length === 0
+          ? `${stamped} is already on the black card. Class and blood can wait. The body dice do not.`
+          : cost === 0
+            ? "First operative is a gift of the moon."
+            : <>Next forge costs <Coin n={cost} />.</>}{" "}
+        {!(nameLocked && s.operatives.length === 0) ? "Three steps. Body and fate. Thirteen dice. One life." : "Seven body dice. Six fate dice. One life."}
       </p>
 
       <div className="flex gap-2">
@@ -562,6 +807,14 @@ export function ForgeView() {
 
       {step === 0 ? (
         <Panel className="bg-raised">
+          {nameLocked ? (
+            <div className="rounded-[var(--radius-sm)] bg-ink px-3 py-3 shadow-[var(--shadow-border)]">
+              <p className="font-display text-[10px] uppercase tracking-wider text-ember">Stamped name</p>
+              <p className="mt-1 font-display text-lg text-paper">{stamped}</p>
+              <p className="mt-1 text-xs text-muted">Tyrone already has this from the black card. The dice do the rest.</p>
+            </div>
+          ) : (
+            <>
           <label className="font-display text-[10px] uppercase tracking-wider text-ember">Name</label>
           <div className="mt-1 flex gap-2">
             <input
@@ -574,6 +827,8 @@ export function ForgeView() {
               Random
             </Button>
           </div>
+            </>
+          )}
           <label className="mt-5 block font-display text-[10px] uppercase tracking-wider text-ember">Class</label>
           <div className="mt-2 grid grid-cols-2 gap-2">
             {CLASSES.map((c) => (
@@ -590,7 +845,7 @@ export function ForgeView() {
                 )}
               >
                 <span className="flex items-center gap-2 font-display text-sm">
-                  <ClassGlyph cls={c} className="text-ember" /> {c}
+                  <ClassGlyph cls={c} className="text-ember" /> {className(c)}
                 </span>
                 <p className="mt-1 line-clamp-2 text-[11px] text-muted">{CLASS_LORE[c].tagline}</p>
               </button>
@@ -642,7 +897,7 @@ export function ForgeView() {
           <div className="mt-2 flex flex-wrap gap-2">
             {ORIGINS.map((o) => (
               <Chip key={o} active={origin === o} onClick={() => setOrigin(o)}>
-                {o.replace("Dark Enchanted ", "").replace("The ", "")}
+                {o}
               </Chip>
             ))}
           </div>
@@ -659,58 +914,65 @@ export function ForgeView() {
 
       {step === 2 ? (
         <>
+          <ForgeBody
+            cls={cls}
+            raceStats={raceDef.stats}
+            rolls={rolls}
+            spinKey={spinKey}
+            spinAll={spinAll}
+            bodyI={bodyI}
+            setBodyI={setBodyI}
+            onRoll={rollOne}
+            onRollAll={rollAll}
+          />
+          {bodyI >= STAT_ORDER.length ? (
+            <>
+          <div data-forge-fate="1">
           <Panel className="bg-raised">
-            <div className="flex items-center justify-between">
-              <SectionLabel>The six rolls</SectionLabel>
-              <Button size="sm" variant="ghost" onClick={rollAll}>
-                Roll all
-              </Button>
-            </div>
-            {(
-              [
-                ["rep", "Reputation", REP[cls]],
-                [
-                  "trait",
-                  "Trait",
-                  [
-                    { r: [1, 4] as [number, number], title: "Weakened" },
-                    { r: [5, 9], title: "Standard" },
-                    { r: [10, 14], title: "Strong" },
-                    { r: [15, 19], title: "Exceptional" },
-                    { r: [20, 20], title: "Legendary" },
-                  ],
-                ],
-                ["skill", "Signature", SIGNATURE[cls]],
-                ["shadow", "Shadow", SHADOW[cls]],
-                ["enchant", "Enchantment", ENCHANTS[cls]],
-                ["destiny", "Destiny", DESTINY[cls]],
-              ] as const
-            ).map(([k, label, table]) => (
+            <SectionLabel>Fate · six rolls</SectionLabel>
+            <p className="mt-2 text-sm leading-relaxed text-moon">
+              These stamp who they were. Each die lands a real bonus, penalty, or thread — not flavor. Read the buff before you stamp.
+            </p>
+            {FATE_KEYS.map((k) => {
+              const n = rolls[k];
+              const landing = fateLanding(cls, k, n ?? 0);
+              return (
               <button
                 key={k}
                 type="button"
+                data-fate-key={k}
                 onClick={() => rollOne(k)}
-                className="mt-2 flex w-full min-h-16 items-center gap-3 rounded-[var(--radius-md)] bg-ink px-3 py-2 text-left shadow-[var(--shadow-border)] hover:shadow-[var(--shadow-border-hover)]"
+                className="mt-2 flex w-full min-h-16 items-start gap-3 rounded-[var(--radius-md)] bg-ink px-3 py-2.5 pr-14 text-left shadow-[var(--shadow-border)] hover:shadow-[var(--shadow-border-hover)]"
               >
-                <Dice20
-                  value={rolls[k]}
-                  spinning={spinAll || spinKey === k}
-                  size={52}
-                />
+                <Dice20 value={rolls[k]} spinning={spinAll || spinKey === k} size={52} />
                 <span className="min-w-0 flex-1">
-                  <span className="block font-display text-[10px] uppercase tracking-wider text-muted">{label}</span>
-                  <span className="block truncate text-sm">{preview(table as never, rolls[k])}</span>
+                  <span className="block font-display text-[10px] uppercase tracking-wider text-muted">
+                    {FATE_COPY[k].label}
+                  </span>
+                  <span className="mt-0.5 block text-sm leading-snug text-paper">{n ? landing.title : "Tap to roll"}</span>
+                  {n ? (
+                    <>
+                      <span className="mt-1 block text-[12px] leading-relaxed text-paper">{landing.buff}</span>
+                      <span className="mt-1.5 block font-display text-[9px] uppercase tracking-[0.12em] text-ember">
+                        d20 {n} · {landing.band.label}
+                      </span>
+                      <span className="mt-0.5 block text-[11px] leading-relaxed text-moon">{landing.band.meaning}</span>
+                    </>
+                  ) : (
+                    <span className="mt-1 block text-[11px] leading-relaxed text-moon">{FATE_COPY[k].does}</span>
+                  )}
                 </span>
-                <span className="font-display text-[10px] uppercase tracking-wider text-muted">d20</span>
               </button>
-            ))}
+              );
+            })}
           </Panel>
+          </div>
           <div className="flex flex-col gap-2">
             <Button
               className="w-full"
               variant="ember"
               disabled={!canForge}
-              onClick={() => err(forge({ name, cls, race, lineage, origin, rolls }))}
+              onClick={() => err(forge({ name: (nameLocked ? stamped : name) || randomName(), cls, race, lineage, origin, rolls }))}
             >
               {cost === 0 ? "Forge" : <>Forge · <Coin n={cost} /></>}
             </Button>
@@ -721,6 +983,8 @@ export function ForgeView() {
               Back
             </Button>
           </div>
+            </>
+          ) : null}
         </>
       ) : null}
     </div>
@@ -730,16 +994,26 @@ export function ForgeView() {
 export function MapView() {
   const s = useGame((g) => g.s);
   const selectLoc = useGame((g) => g.selectLoc);
+  const selectPoi = useGame((g) => g.selectPoi);
   const deploy = useGame((g) => g.deploy);
-  const loc = s.selectedLoc ?? "ironclad";
+  const openRegionMap = useGame((g) => g.openRegionMap);
+  const closeRegionMap = useGame((g) => g.closeRegionMap);
+  const loc = s.selectedLoc && s.selectedLoc !== "hq" ? s.selectedLoc : "ironclad";
   const L = locById(loc);
   const idle = idleAtHq(s);
   const [party, setParty] = useState<string[]>([]);
   const [kind, setKind] = useState<MissionKind>("scout");
+  const [approach, setApproach] = useState<MissionApproach>("standard");
+  const [orbit, setOrbit] = useState(false);
   const touched = useRef(false);
-  const progress = s.locations[loc];
+  const progress = s.locations[loc] ?? EMPTY_PROGRESS;
   const merchant = NPCS.find((n) => n.loc === loc);
   const buy = useGame((g) => g.buyNpc);
+  const regionId = locationToRegion(loc) ?? "ironclad";
+  const stake = KANE_STAKES[regionId];
+  const sites = knownPois(s, loc);
+  const poi = defaultPoi(s, loc);
+  const mapOpen = !!s.regionMapOpen;
 
   const idleIds = idle.map((o) => o.id).join(",");
   const lastPartyKey = (s.lastParty ?? []).join(",");
@@ -784,85 +1058,148 @@ export function MapView() {
   };
 
   const dangerTone = ["text-ok", "text-ok", "text-ember", "text-danger", "text-danger"][Math.max(0, L.danger - 1)];
+  const heat = kaneBand(s.kaneHeat ?? 0);
 
   return (
     <div className="space-y-4 pb-8">
       <div>
         <SectionLabel>The Hollow Realm</SectionLabel>
-        <h2 className="font-display text-2xl">Deploy</h2>
+        <h2 className="font-display text-2xl">World</h2>
+        <p className="mt-1 text-sm text-muted">Pick a region. Orbit is the planet. Ground is the job.</p>
       </div>
 
-      <WorldAtlas loc={loc} onSelect={(id) => s.locations[id].unlocked && selectLoc(id)} />
-
-      <div className="flex gap-1 overflow-x-auto pb-1">
-        {ARC_ORDER.map((id, i) => {
-          const w = locById(id);
-          const p = s.locations[id];
-          const here = currentArcLoc(s) === id;
+      <div className="grid grid-cols-1 gap-2">
+        {WORLD.filter((w) => w.id !== "hq").map((w) => {
+          const unlocked = !!s.locations[w.id]?.unlocked;
+          const rid = locationToRegion(w.id) ?? "ironclad";
+          const here = loc === w.id;
           return (
-            <span
-              key={id}
+            <button
+              key={w.id}
+              type="button"
+              disabled={!unlocked}
+              onClick={(e) => {
+                if (!unlocked) return;
+                punchClick(e.clientX, e.clientY);
+                shockwaveAt(e.clientX, e.clientY);
+                sfx.click();
+                selectLoc(w.id as LocationId);
+              }}
               className={cn(
-                "shrink-0 rounded-full px-2.5 py-1 font-display text-[10px] uppercase tracking-[0.14em]",
-                p.bossDefeated ? "bg-ok/15 text-ok" : here ? "bg-ember/15 text-ember" : "bg-ink text-muted",
+                "flex min-h-[4.75rem] items-center gap-3 overflow-hidden rounded-[var(--radius-lg)] text-left shadow-[var(--shadow-border)] disabled:opacity-45",
+                here ? "bg-ink shadow-[var(--shadow-border-hover)] ring-1 ring-ember/40" : "bg-ink/92",
               )}
             >
-              {i + 1}. {w.short}
-            </span>
-          );
-        })}
-      </div>
-      {s.arc && s.squad.length > 1 ? (
-        <Panel className="glass-strong bg-transparent">
-          <p className="font-display text-[10px] uppercase tracking-[0.2em] text-ember">
-            Main ARC · turn {s.arc.turn} · {s.squad.find((m) => m.id === s.arc?.turnMemberId)?.name}
-          </p>
-          <p className="mt-1 text-sm text-moon">
-            Raid, bounty, and boss in {locById(currentArcLoc(s)).short} wait on that rider. Scout and forage stay open.
-          </p>
-        </Panel>
-      ) : null}
-
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        {WORLD.filter((w) => w.id !== "hq").map((w) => {
-          const unlocked = s.locations[w.id].unlocked;
-          return (
-            <Chip
-              key={w.id}
-              active={loc === w.id}
-              disabled={!unlocked}
-              onClick={() => unlocked && selectLoc(w.id as LocationId)}
-            >
-              {!unlocked ? <Lock className="mr-1 inline size-3" /> : null}
-              {w.short}
-            </Chip>
+              <img src={regionThumb(rid)} alt="" className="h-[4.75rem] w-[5.6rem] shrink-0 object-cover" loading="lazy" decoding="async" />
+              <span className="min-w-0 flex-1 py-2 pr-3">
+                <span className="flex items-center gap-2 font-display text-[11px] uppercase tracking-[0.18em] text-ember">
+                  {!unlocked ? <Lock className="size-3.5" /> : null}
+                  {w.short}
+                </span>
+                <span className="mt-0.5 block text-sm leading-snug text-moon">
+                  {unlocked ? w.desc : "Sealed · finish the last arc"}
+                </span>
+              </span>
+            </button>
           );
         })}
       </div>
 
-      <Panel className="bg-raised">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h3 className="font-display text-lg">{L.name}</h3>
-            <p className="text-sm text-muted">{L.desc}</p>
-            <p className={cn("mt-1 font-display text-[10px] uppercase tracking-[0.16em]", dangerTone)}>
-              Danger {L.danger} · intel {progress.intel} · sorties {progress.missions}
+      <Button
+        variant="ember"
+        className="w-full min-h-14"
+        onClick={(e) => {
+          punchClick(e.clientX, e.clientY);
+          shockwaveAt(e.clientX, e.clientY);
+          sfx.whoosh();
+          closeRegionMap();
+          setOrbit(true);
+        }}
+      >
+        <Globe2 className="size-4" /> Orbit the Hollow
+      </Button>
+
+      <Panel className="bg-ink/92">
+        <div>
+          <p className="font-display text-[10px] uppercase tracking-[0.2em] text-ember">{regionById(regionId).continent}</p>
+          <h3 className="font-display text-lg">{L.name}</h3>
+          <p className="text-sm text-muted">{L.desc}</p>
+          {stake ? (
+            <p className="mt-2 text-sm text-ember">
+              Kane wants {stake.resource}. {stake.why}
             </p>
-          </div>
+          ) : null}
+          <p className={cn("mt-1 font-display text-[10px] uppercase tracking-[0.16em]", dangerTone)}>
+            Danger {L.danger} · intel {progress.intel} · sorties {progress.missions}
+            <span className={cn("ml-2", heat.tone)}>{heat.label}</span>
+          </p>
         </div>
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {L.features.map((f) => (
-            <span key={f} className="rounded-full bg-ink px-2 py-1 text-[11px] text-muted">
-              {f}
-            </span>
-          ))}
-        </div>
-        {loc === "hq" ? (
-          <p className="mt-3 text-sm text-muted">HQ is rest, not a sortie. Pick a region.</p>
-        ) : !progress.unlocked ? (
+
+        {sites.length ? (
+          <>
+            <SectionLabel>Site</SectionLabel>
+            <div className="flex flex-wrap gap-1.5">
+              {sites.map((site) => (
+                <Chip
+                  key={site.id}
+                  active={poi?.id === site.id}
+                  onClick={() => {
+                    sfx.click();
+                    selectPoi(site.id);
+                  }}
+                >
+                  {site.name}
+                </Chip>
+              ))}
+            </div>
+            {poi ? <p className="mt-2 text-xs text-muted">{poi.description}</p> : null}
+            {poi ? (
+              <Button
+                variant="ember"
+                className="mt-3 w-full min-h-12"
+                data-poi-act={poi.id}
+                onClick={() => {
+                  sfx.unlock();
+                  const act = poi.action ?? poi.kind;
+                  if (act === "shop" || poi.id.includes("market")) {
+                    useGame.getState().openMarket();
+                    return;
+                  }
+                  const msg = useGame.getState().workSite(poi.id);
+                  if (msg) err(msg);
+                }}
+              >
+                {poi.action === "shop" || poi.kind === "merchant"
+                  ? "Open stalls"
+                  : poi.action === "listen" || poi.kind === "radio"
+                    ? "Climb and listen"
+                    : poi.action === "home"
+                      ? "Return to Vault 13"
+                      : poi.action === "boss"
+                        ? "This hill has a name"
+                        : poi.action === "salvage"
+                          ? "Salvage this site · 1 watch"
+                          : "Scout this site · 1 watch"}
+              </Button>
+            ) : null}
+          </>
+        ) : null}
+
+        {!progress.unlocked ? (
           <p className="mt-3 text-sm text-muted">Sealed. Survive more days.</p>
         ) : (
           <>
+            <Button
+              variant="ghost"
+              className="mt-3 w-full"
+              onClick={(e) => {
+                punchClick(e.clientX, e.clientY);
+                sfx.unlock();
+                openRegionMap();
+              }}
+            >
+              Open ground map
+            </Button>
             <div className="mt-4 grid grid-cols-3 gap-2">
               {kinds.map((k) => {
                 const Icon = KIND_ICON[k.id];
@@ -871,7 +1208,8 @@ export function MapView() {
                     key={k.id}
                     type="button"
                     disabled={k.locked}
-                    onClick={() => {
+                    onClick={(e) => {
+                      punchClick(e.clientX, e.clientY);
                       sfx.click();
                       setKind(k.id);
                     }}
@@ -885,11 +1223,14 @@ export function MapView() {
                     <span className="flex items-center gap-1.5 font-display text-[11px] uppercase tracking-wider">
                       <Icon className="size-3.5 text-ember" /> {k.label}
                     </span>
-                    <span className="mt-1 line-clamp-2 text-[11px] text-muted">{KIND_HELP[k.id]}</span>
+                    <span className="mt-1 text-[11px] leading-snug text-muted">{KIND_TAG[k.id]}</span>
                   </button>
                 );
               })}
             </div>
+            <p className="mt-3 text-sm leading-relaxed text-moon" data-kind-help={kind}>
+              {KIND_HELP[kind]}
+            </p>
             {kind === "bounty" && s.bounty ? (
               <p className="mt-3 text-sm text-moon">
                 {s.bounty.name} · DC {s.bounty.dc} · {s.bounty.reward}
@@ -898,6 +1239,30 @@ export function MapView() {
             {kind === "boss" ? (
               <p className="mt-3 text-sm text-ember">{VILLAINS.find((v) => v.loc === loc)?.tagline}</p>
             ) : null}
+
+            <SectionLabel>Approach</SectionLabel>
+            <div className="grid grid-cols-3 gap-2">
+              {APPROACHES.map((a) => (
+                <button
+                  key={a.id}
+                  type="button"
+                  onClick={(e) => {
+                    punchClick(e.clientX, e.clientY);
+                    sfx.click();
+                    setApproach(a.id);
+                  }}
+                  className={cn(
+                    "min-h-16 rounded-[var(--radius-md)] px-2.5 py-2 text-left",
+                    approach === a.id
+                      ? "bg-ember/15 shadow-[var(--shadow-border-hover)]"
+                      : "bg-ink shadow-[var(--shadow-border)]",
+                  )}
+                >
+                  <span className="block font-display text-[11px] uppercase tracking-wider">{a.label}</span>
+                  <span className="mt-1 block text-[11px] leading-snug text-muted">{a.blurb}</span>
+                </button>
+              ))}
+            </div>
 
             <SectionLabel>Party · max 3</SectionLabel>
             {idle.length === 0 ? (
@@ -910,7 +1275,8 @@ export function MapView() {
                     <button
                       key={op.id}
                       type="button"
-                      onClick={() => {
+                      onClick={(e) => {
+                        punchClick(e.clientX, e.clientY);
                         sfx.click();
                         toggle(op.id);
                       }}
@@ -922,13 +1288,33 @@ export function MapView() {
                       <Portrait op={op} size={32} />
                       <span className="text-left">
                         <span className="block font-display text-sm">{op.name}</span>
-                        <span className="block text-[11px] text-muted">{op.cls}</span>
+                        <span className="block text-[11px] text-muted">{className(op.cls)}</span>
                       </span>
                     </button>
                   );
                 })}
               </div>
             )}
+
+            <Button
+              className={cn("mt-4 w-full", s.tutorial === "sortie" && "ms-nudge")}
+              variant="ember"
+              sound="none"
+              disabled={!party.length}
+              onClick={(e) => {
+                const msg = deploy(loc, kind, party, { poiId: poi?.id, approach });
+                if (msg) err(msg);
+                else {
+                  punchClick(e.clientX, e.clientY);
+                  shockwaveAt(e.clientX, e.clientY);
+                  sfx.deploy();
+                  touched.current = false;
+                  setParty([]);
+                }
+              }}
+            >
+              Deploy {party.length ? `· ${party.length} to ${L.short}` : "— pick who walks"}
+            </Button>
           </>
         )}
       </Panel>
@@ -952,26 +1338,19 @@ export function MapView() {
         </Panel>
       ) : null}
 
-      {loc !== "hq" && progress.unlocked ? (
-        <div className="sticky bottom-20 z-10 -mx-4 bg-gradient-to-t from-ink via-ink/95 to-transparent px-4 pt-8 pb-1 md:bottom-4 md:mx-0 md:px-0">
-          <Button
-            className={cn("w-full", s.tutorial === "sortie" && "ms-nudge")}
-            variant="ember"
-            sound="none"
-            disabled={!party.length}
-            onClick={() => {
-              const msg = deploy(loc, kind, party);
-              if (msg) err(msg);
-              else {
-                sfx.deploy();
-                touched.current = false;
-                setParty([]);
-              }
-            }}
-          >
-            Deploy {party.length ? `· ${party.length} to ${L.short}` : "— pick who walks"}
-          </Button>
-        </div>
+      {orbit ? (
+        <MapErrorBoundary onReset={() => setOrbit(false)}>
+          <OrbitTheater
+            loc={loc}
+            onClose={() => setOrbit(false)}
+            onSelect={(id) => { if (s.locations[id]?.unlocked) selectLoc(id); }}
+          />
+        </MapErrorBoundary>
+      ) : null}
+      {mapOpen ? (
+        <MapErrorBoundary onReset={closeRegionMap}>
+          <RegionMapOverlay />
+        </MapErrorBoundary>
       ) : null}
     </div>
   );
@@ -988,11 +1367,9 @@ const KIND_ICON: Record<MissionKind, typeof Eye> = {
 
 export function LedgerView() {
   const s = useGame((g) => g.s);
-  const buy = useGame((g) => g.buyOffer);
   const deposit = useGame((g) => g.depositCard);
   const withdraw = useGame((g) => g.withdrawCard);
   const register = useGame((g) => g.registerRider);
-  const shop = s.shop;
   const me = seatedMember(s);
   const [amt, setAmt] = useState("100");
   const [plateName, setPlateName] = useState(isVacant(me) ? "" : me.name);
@@ -1009,8 +1386,8 @@ export function LedgerView() {
       <SectionLabel>The Ledger</SectionLabel>
       <h2 className="font-display text-2xl">Personal balance</h2>
       <p className="text-sm text-muted">
-        Compound vault is shared. The black card is whoever is seated. Stamp a name and handle — a new rider gets their
-        own plate.
+        Compound vault is shared. The black card is whoever is seated. Chosen name on the plate. Discord handle
+        underneath.
       </p>
 
       <MoonCard member={me} />
@@ -1078,37 +1455,23 @@ export function LedgerView() {
         </Button>
       </div>
 
-      <h3 className="font-display text-xl">Daily stock</h3>
-      <p className="text-sm text-muted">Pays from the compound vault. Refreshes at dawn. Ledger 3 grants a discount.</p>
-      {!shop ? (
-        <Panel>
-          <p className="text-sm">No stock until you assume command.</p>
-        </Panel>
-      ) : (
-        (["bargain", "essential", "artifact"] as const).map((tier) => {
-          const o = shop[tier];
-          const sold = shop.bought?.[tier];
-          const disc = s.rooms.ledger >= 3 ? 0.85 : 1;
-          const price = Math.round(o.price * disc);
-          return (
-            <Panel key={tier} className="bg-raised">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-display text-[10px] uppercase tracking-[0.2em] text-ember">{tier}</span>
-                    <RarityMark rarity={o.rarity} />
-                  </div>
-                  <div className="mt-1 font-display text-lg">{o.name}</div>
-                  <p className="text-sm text-muted">{o.effect}</p>
-                </div>
-                <Button variant="ghost" onClick={() => err(buy(tier))} disabled={sold || s.coins < price}>
-                  {sold ? "Sold" : <Coin n={price} />}
-                </Button>
-              </div>
-            </Panel>
-          );
-        })
-      )}
+      <h3 className="font-display text-xl">The Exchange is closed</h3>
+      <Panel className="bg-raised">
+        <p className="text-sm text-moon">
+          Vault 13 does not keep a daily stall anymore. Caps walk to the Moon Squad Market under the Iron Gate.
+          Limited inventory. Dawn reset. Visiting merchants sit the high table. The black card pays.
+        </p>
+        <Button
+          className="mt-3 w-full min-h-12"
+          variant="ember"
+          onClick={() => {
+            sfx.unlock();
+            useGame.getState().openMarket();
+          }}
+        >
+          Walk the Market
+        </Button>
+      </Panel>
       <Panel>
         <SectionLabel>Treasury</SectionLabel>
         <p className="mt-1 text-sm text-muted">
@@ -1133,6 +1496,129 @@ export function LedgerView() {
           ))}
         </div>
       </Panel>
+    </div>
+  );
+}
+
+export function MarketView() {
+  const s = useGame((g) => g.s);
+  const buyLot = useGame((g) => g.buyLot);
+  const setScreen = useGame((g) => g.setScreen);
+  const me = seatedMember(s);
+  const market = s.market;
+  const disc = s.rooms.ledger >= 3 ? 0.85 : 1;
+  const visitor = market?.visitor ?? null;
+  const stalls = (market?.lots ?? []).filter((l) => !l.visitor);
+  const guests = (market?.lots ?? []).filter((l) => l.visitor);
+  const left = s.shift?.watchesLeft ?? 0;
+
+  return (
+    <div className="space-y-4 pb-8" data-market="1">
+      <SectionLabel>Ironclad · under the Gate</SectionLabel>
+      <h2 className="font-display text-2xl">Moon Squad Market</h2>
+      <p className="text-sm text-muted">
+        Limited stalls. Dawn reprint. The black card pays — not the vault drawer. Tyrone keeps a radio over this yard:
+        Relay Tower Three.
+      </p>
+      <p className="text-sm text-moon">
+        {left} watch{left === 1 ? "" : "es"} left · plate <Coin n={me.personalCaps} />
+      </p>
+
+      {visitor ? (
+        <Panel className="bg-ember/10" data-market-visitor={visitor.id}>
+          <SectionLabel>Visiting stall</SectionLabel>
+          <h3 className="font-display text-lg">{visitor.name}</h3>
+          <p className="text-[11px] uppercase tracking-[0.16em] text-ember">{visitor.title}</p>
+          <p className="mt-2 text-sm text-moon">{visitor.blurb}</p>
+          <div className="mt-3 space-y-2">
+            {guests.map((lot) => {
+              const price = Math.round(lot.price * disc);
+              const sold = lot.qty <= 0;
+              return (
+                <div
+                  key={lot.id}
+                  data-lot={lot.id}
+                  className="flex items-start justify-between gap-3 rounded-[var(--radius-sm)] bg-ink/60 px-3 py-3"
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <RarityMark rarity={lot.rarity} />
+                      <span className="font-display text-sm text-paper">{lot.name}</span>
+                    </div>
+                    <p className="mt-1 text-xs text-muted">{lot.effect}</p>
+                    <p className="mt-1 text-[11px] text-moon">{sold ? "Gone" : `${lot.qty} left`}</p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="ember"
+                    disabled={sold || me.personalCaps < price}
+                    onClick={() => err(buyLot(lot.id))}
+                  >
+                    {sold ? "Sold" : <Coin n={price} />}
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+        </Panel>
+      ) : (
+        <Panel>
+          <p className="text-sm text-muted">
+            No visiting merchant today. They sit every third dawn — Marrow, Cinder Bess, Nine-Lift, Salt Wren, White
+            Glove. Climb the tower if you want the rumor first.
+          </p>
+        </Panel>
+      )}
+
+      <SectionLabel>Daily stalls</SectionLabel>
+      {!stalls.length ? (
+        <Panel>
+          <p className="text-sm">Stalls are dark until you assume command.</p>
+        </Panel>
+      ) : (
+        stalls.map((lot) => {
+          const price = Math.round(lot.price * disc);
+          const sold = lot.qty <= 0;
+          return (
+            <Panel key={lot.id} className="bg-raised">
+              <div className="flex items-start justify-between gap-3" data-lot={lot.id}>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <RarityMark rarity={lot.rarity} />
+                    <span className="font-display text-[10px] uppercase tracking-[0.16em] text-muted">
+                      {lot.sourceRegion}
+                    </span>
+                  </div>
+                  <div className="mt-1 font-display text-lg">{lot.name}</div>
+                  <p className="text-sm text-muted">{lot.effect}</p>
+                  <p className="mt-1 text-[11px] text-moon">{sold ? "Sold out until dawn" : `${lot.qty} in crate`}</p>
+                </div>
+                <Button variant="ghost" onClick={() => err(buyLot(lot.id))} disabled={sold || me.personalCaps < price}>
+                  {sold ? "Sold" : <Coin n={price} />}
+                </Button>
+              </div>
+            </Panel>
+          );
+        })
+      )}
+
+      <div className="grid grid-cols-2 gap-2">
+        <Button variant="ghost" className="min-h-12" onClick={() => setScreen("map")}>
+          Ground map
+        </Button>
+        <Button
+          variant="ghost"
+          className="min-h-12"
+          onClick={() => {
+            useGame.getState().selectLoc("ironclad");
+            useGame.getState().selectPoi("ironclad-tower");
+            useGame.getState().setScreen("map");
+            useGame.getState().openRegionMap();
+          }}
+        >
+          Relay Tower
+        </Button>
+      </div>
     </div>
   );
 }
@@ -1314,7 +1800,10 @@ export function SquadView() {
 }
 
 export function CodexView() {
-  const [tab, setTab] = useState<"arcs" | "races" | "rules">("arcs");
+  const day = useGame((g) => g.s.day);
+  const locations = useGame((g) => g.s.locations);
+  const open = campaignOpenRegions(day, locations);
+  const [tab, setTab] = useState<"arcs" | "races" | "rules" | "rifles">("arcs");
   const how = useMemo(
     () => [
       {
@@ -1334,8 +1823,16 @@ export function CodexView() {
         d: "Weapons degrade Pristine → Worn → Damaged → Broken. Broken deals nothing. Pay the Forge.",
       },
       {
+        t: "Rifles",
+        d: "Real models, real chambers. M4 and M16 take 5.56. M94 and M336 take .30-30. M700 takes .270. M70 Springfield takes .30-06. M14, M10 and M24 take .308. M70 Magnum takes .300. Calibers do not mix. Improved loads (AP, Match, Soft Point, Hot, Bonded) stamp the mag when you reload.",
+      },
+      {
+        t: "Lasers",
+        d: "Not a week-one stall. L4 pulse after Blackspire (Arc III). L6 carbine after Brasswater (Arc IV). L8 and L9 after Veyra opens — and Veyra waits on the Sink. Coil cells will not seat. Powered plate and AEGIS take coherent light personally.",
+      },
+      {
         t: "Arcs",
-        d: "Ironclad first, then Kingdom, Caverns, Library, Veyra City last. Raid, bounty, and the chapter boss wait on the rider whose turn it is.",
+        d: "Ironclad first, then Slag Town, Blackspire, Brasswater, Veyra City last. Raid, bounty, and the chapter boss wait on the rider whose turn it is.",
       },
       {
         t: "Moon Squad",
@@ -1348,8 +1845,8 @@ export function CodexView() {
     <div className="space-y-4 pb-8">
       <SectionLabel>Codex</SectionLabel>
       <h2 className="font-display text-2xl">What the Hollow remembers</h2>
-      <div className="flex gap-2">
-        {(["arcs", "races", "rules"] as const).map((t) => (
+      <div className="flex flex-wrap gap-2">
+        {(["arcs", "races", "rules", "rifles"] as const).map((t) => (
           <Chip key={t} active={tab === t} onClick={() => setTab(t)}>
             {t}
           </Chip>
@@ -1385,6 +1882,34 @@ export function CodexView() {
           ))}
         </Panel>
       )}
+      {tab === "rifles" &&
+        CALIBER_ROSTER.map((row) => {
+          const locked = row.unlockRegion ? !open.includes(row.unlockRegion) : false;
+          const gate = row.unlockRegion ? ARC_OPEN[row.unlockRegion] : null;
+          return (
+            <Panel key={row.model} className="bg-raised">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="font-display text-[10px] uppercase tracking-[0.2em] text-ember">
+                    {row.ammo} · {row.family}
+                  </div>
+                  <h3 className="mt-1 font-display text-lg text-paper">{row.model}</h3>
+                </div>
+                <span className="font-display text-[10px] uppercase tracking-[0.14em] text-muted">
+                  {locked ? gate?.label ?? "Later" : row.unlockRegion ? "Unlocked" : "Issue"}
+                </span>
+              </div>
+              <p className="mt-2 text-sm text-moon">{row.note}</p>
+              {locked ? (
+                <p className="mt-2 text-xs text-muted">
+                  {row.unlockRegion === "veyra"
+                    ? "Veyra waits on the Sink. Not a ten-day walk."
+                    : `Locked until ${gate?.label ?? "the next arc"}. Play the region. Resting will not skip it.`}
+                </p>
+              ) : null}
+            </Panel>
+          );
+        })}
     </div>
   );
 }

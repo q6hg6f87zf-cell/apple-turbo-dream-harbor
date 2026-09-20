@@ -14,7 +14,7 @@ const REGION_TO_LOCATION: Record<RegionId, LocationId> = {
 };
 
 const DEG = Math.PI / 180;
-const MIN_ZOOM = 0.82;
+const MIN_ZOOM = 0.46;
 const MAX_ZOOM = 1.78;
 
 type Camera = {
@@ -30,7 +30,7 @@ type Camera = {
 
 type Point3 = { x: number; y: number; z: number };
 type MarkerHit = { id: RegionId; x: number; y: number; radius: number; z: number; unlocked: boolean };
-type Star = { x: number; y: number; depth: number; size: number; phase: number };
+type Star = { x: number; y: number; depth: number; size: number; phase: number; hot: boolean };
 type Meteor = { x: number; y: number; vx: number; vy: number; life: number; ttl: number; size: number };
 type TerrainPoint = { region: RegionId; lat: number; lon: number; size: number; tone: number };
 
@@ -39,26 +39,27 @@ function seeded(n: number) {
   return v - Math.floor(v);
 }
 
-const STARS: Star[] = Array.from({ length: 260 }, (_, i) => ({
+const STARS: Star[] = Array.from({ length: 720 }, (_, i) => ({
   x: seeded(i * 7 + 1),
   y: seeded(i * 7 + 2),
-  depth: 0.18 + seeded(i * 7 + 3) * 0.82,
-  size: 0.35 + seeded(i * 7 + 4) * 1.65,
+  depth: 0.12 + seeded(i * 7 + 3) * 0.88,
+  size: 0.2 + seeded(i * 7 + 4) * (seeded(i * 7 + 6) > 0.94 ? 1.15 : 0.55),
   phase: seeded(i * 7 + 5) * Math.PI * 2,
+  hot: seeded(i * 7 + 8) > 0.96,
 }));
 
 const TERRAIN: TerrainPoint[] = CANONICAL_REGION_IDS.flatMap((region, ri) => {
   const marker = regionById(region).marker;
-  return Array.from({ length: 64 }, (_, i) => {
+  return Array.from({ length: 28 }, (_, i) => {
     const a = seeded(ri * 1000 + i * 13 + 1) * Math.PI * 2;
-    const radial = Math.sqrt(seeded(ri * 1000 + i * 13 + 2));
-    const latSpread = region === "blackspire" ? 19 : region === "brasswater" ? 16 : 21;
-    const lonSpread = region === "veyra" ? 24 : 31;
+    const radial = Math.sqrt(seeded(ri * 1000 + i * 13 + 2)) * 0.72;
+    const latSpread = region === "blackspire" ? 9 : region === "brasswater" ? 8 : 11;
+    const lonSpread = region === "veyra" ? 12 : 14;
     return {
       region,
       lat: marker.lat + Math.sin(a) * radial * latSpread,
       lon: marker.lon + Math.cos(a) * radial * lonSpread,
-      size: 0.45 + seeded(ri * 1000 + i * 13 + 3) * 1.35,
+      size: 0.35 + seeded(ri * 1000 + i * 13 + 3) * 0.9,
       tone: seeded(ri * 1000 + i * 13 + 4),
     };
   });
@@ -74,6 +75,27 @@ const CITY_LIGHTS = CANONICAL_REGION_IDS.flatMap((region, ri) => {
     strength: 0.35 + seeded(ri * 2200 + i * 5 + 3) * 0.65,
   }));
 });
+
+const REGION_BITMAPS: Partial<Record<RegionId, HTMLImageElement>> = {};
+let bitmapsRequested = false;
+
+export function requestRegionBitmaps() {
+  if (bitmapsRequested || typeof Image === "undefined") return;
+  bitmapsRequested = true;
+  for (const id of CANONICAL_REGION_IDS) {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.decoding = "async";
+    img.src = `/map/regions/thumbs/${id}.jpg`;
+    img.onload = () => {
+      REGION_BITMAPS[id] = img;
+    };
+  }
+}
+
+export function regionBitmap(id: RegionId) {
+  return REGION_BITMAPS[id] ?? null;
+}
 
 const TERRAIN_TONES: Record<RegionId, [string, string, string]> = {
   ironclad: ["#8b7058", "#aa8968", "#66584b"],
@@ -99,7 +121,7 @@ function shortestAngle(from: number, to: number) {
 
 function targetForRegion(id: RegionId) {
   const m = regionById(id).marker;
-  return { yaw: -m.lon * DEG, pitch: m.lat * DEG, zoom: 1.12 };
+  return { yaw: -m.lon * DEG, pitch: m.lat * DEG, zoom: 0.98 };
 }
 
 function project(lat: number, lon: number, camera: Camera): Point3 {
@@ -125,6 +147,11 @@ function project(lat: number, lon: number, camera: Camera): Point3 {
 }
 
 function openRegionMap(regionId: RegionId) {
+  const store = useGame.getState();
+  const location = REGION_TO_LOCATION[regionId];
+  if (!store.s.locations[location]?.unlocked) return;
+  store.selectLoc(location);
+  store.openRegionMap();
   window.dispatchEvent(new CustomEvent("hollow:open-region-map", { detail: { regionId } }));
 }
 
@@ -139,7 +166,15 @@ function roundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: num
   ctx.closePath();
 }
 
-export function HollowGlobeAAA({ loc, onSelect }: { loc: LocationId; onSelect: (id: LocationId) => void }) {
+export function HollowGlobeAAA({
+  loc,
+  onSelect,
+  theater = false,
+}: {
+  loc: LocationId;
+  onSelect: (id: LocationId) => void;
+  theater?: boolean;
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const locations = useGame((g) => g.s.locations);
@@ -185,7 +220,7 @@ export function HollowGlobeAAA({ loc, onSelect }: { loc: LocationId; onSelect: (
     const c = camera.current;
     c.targetYaw = c.yaw + shortestAngle(c.yaw, t.yaw);
     c.targetPitch = t.pitch;
-    c.targetZoom = 1.18;
+    c.targetZoom = 1.05;
     c.yawVelocity = 0;
     c.pitchVelocity = 0;
     setSelected(id);
@@ -205,7 +240,7 @@ export function HollowGlobeAAA({ loc, onSelect }: { loc: LocationId; onSelect: (
     const c = camera.current;
     c.targetYaw = c.yaw + shortestAngle(c.yaw, t.yaw);
     c.targetPitch = t.pitch;
-    c.targetZoom = 1.12;
+    c.targetZoom = 0.98;
     c.yawVelocity = 0;
     c.pitchVelocity = 0;
     setHint("Camera recentered");
@@ -219,6 +254,7 @@ export function HollowGlobeAAA({ loc, onSelect }: { loc: LocationId; onSelect: (
     if (!stage || !canvas) return;
     const ctx = canvas.getContext("2d", { alpha: false });
     if (!ctx) return;
+    requestRegionBitmaps();
 
     let width = 1;
     let height = 1;
@@ -276,13 +312,36 @@ export function HollowGlobeAAA({ loc, onSelect }: { loc: LocationId; onSelect: (
 
       const c = camera.current;
       for (const star of STARS) {
-        const px = ((star.x * width + c.yaw * width * star.depth * 0.022) % width + width) % width;
-        const py = ((star.y * height + c.pitch * height * star.depth * 0.018) % height + height) % height;
-        const flicker = reduced ? 0.65 : 0.52 + Math.sin(now * 0.0013 + star.phase) * 0.22;
-        ctx.fillStyle = `rgba(226,232,241,${flicker * star.depth})`;
+        const px = ((star.x * width + c.yaw * width * star.depth * 0.028) % width + width) % width;
+        const py = ((star.y * height + c.pitch * height * star.depth * 0.02) % height + height) % height;
+        const flicker = reduced ? 0.72 : 0.46 + Math.sin(now * (0.0009 + star.depth * 0.0008) + star.phase) * 0.38
+          + Math.sin(now * (0.0032 + star.phase * 0.15) + star.x * 12.0) * 0.12;
+        const r = star.size * (0.28 + star.depth * 0.55);
+        const glow = r * (star.hot ? 2.1 : 1.25);
+        const g = ctx.createRadialGradient(px, py, 0, px, py, glow);
+        if (star.hot) {
+          g.addColorStop(0, `rgba(255,236,210,${0.95 * flicker})`);
+          g.addColorStop(0.18, `rgba(255,214,160,${0.38 * flicker})`);
+          g.addColorStop(1, "rgba(255,214,160,0)");
+        } else {
+          g.addColorStop(0, `rgba(236,242,255,${(0.55 + star.depth * 0.4) * flicker})`);
+          g.addColorStop(0.28, `rgba(186,206,238,${0.16 * flicker})`);
+          g.addColorStop(1, "rgba(186,206,238,0)");
+        }
+        ctx.fillStyle = g;
         ctx.beginPath();
-        ctx.arc(px, py, star.size * (0.42 + star.depth * 0.52), 0, Math.PI * 2);
+        ctx.arc(px, py, glow, 0, Math.PI * 2);
         ctx.fill();
+        if (star.hot && !reduced) {
+          ctx.strokeStyle = `rgba(255,220,170,${0.14 * flicker})`;
+          ctx.lineWidth = 0.45;
+          ctx.beginPath();
+          ctx.moveTo(px - r * 3.2, py);
+          ctx.lineTo(px + r * 3.2, py);
+          ctx.moveTo(px, py - r * 3.2);
+          ctx.lineTo(px, py + r * 3.2);
+          ctx.stroke();
+        }
       }
 
       // Distant moon with a soft terminator.
@@ -322,29 +381,95 @@ export function HollowGlobeAAA({ loc, onSelect }: { loc: LocationId; onSelect: (
       ctx.clip();
 
       const ocean = ctx.createRadialGradient(cx - radius * 0.42, cy - radius * 0.48, radius * 0.04, cx, cy, radius * 1.06);
-      ocean.addColorStop(0, "#476d7a");
-      ocean.addColorStop(0.28, "#2f5962");
-      ocean.addColorStop(0.67, "#1e3a3e");
-      ocean.addColorStop(1, "#111a1d");
+      ocean.addColorStop(0, "#3e7c86");
+      ocean.addColorStop(0.28, "#215a66");
+      ocean.addColorStop(0.67, "#123740");
+      ocean.addColorStop(1, "#071416");
       ctx.fillStyle = ocean;
       ctx.fillRect(cx - radius, cy - radius, radius * 2, radius * 2);
 
-      // Region-authored terrain granulation. Projecting hundreds of tiny land
-      // cells gives the globe irregular coast texture without a heavyweight 3D lib.
+      requestRegionBitmaps();
+      for (const id of CANONICAL_REGION_IDS) {
+        const region = regionById(id);
+        const p = project(region.marker.lat, region.marker.lon, c);
+        if (p.z <= 0.02) continue;
+        const x = cx + p.x * radius;
+        const y = cy - p.y * radius;
+        const scale = 0.72 + p.z * 0.28;
+        const rx = radius * (id === "veyra" ? 0.22 : 0.175) * scale;
+        const ry = radius * (id === "brasswater" ? 0.12 : 0.14) * scale;
+        const rot = (region.marker.lon + region.marker.lat) * DEG * 0.12;
+        ctx.save();
+        ctx.beginPath();
+        ctx.ellipse(x, y, rx, ry, rot, 0, Math.PI * 2);
+        ctx.clip();
+        const img = REGION_BITMAPS[id];
+        const pal = TERRAIN_TONES[id];
+        if (img) {
+          ctx.globalAlpha = 0.62 + p.z * 0.32;
+          ctx.drawImage(img, x - rx, y - ry, rx * 2, ry * 2);
+          const fade = ctx.createRadialGradient(x, y, rx * 0.42, x, y, rx);
+          fade.addColorStop(0, "rgba(0,0,0,0)");
+          fade.addColorStop(1, pal[0]);
+          ctx.globalAlpha = 0.55;
+          ctx.fillStyle = fade;
+          ctx.fillRect(x - rx, y - ry, rx * 2, ry * 2);
+        } else {
+          ctx.fillStyle = pal[0];
+          ctx.globalAlpha = 0.92;
+          ctx.fill();
+        }
+        ctx.restore();
+        ctx.save();
+        ctx.strokeStyle = "rgba(186, 214, 206, 0.38)";
+        ctx.lineWidth = Math.max(1.1, radius * 0.007);
+        ctx.beginPath();
+        ctx.ellipse(x, y, rx * 1.015, ry * 1.02, rot, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.strokeStyle = "rgba(12, 22, 24, 0.35)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.ellipse(x, y, rx * 0.97, ry * 0.96, rot, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+
       for (const t of TERRAIN) {
         const p = project(t.lat, t.lon, c);
         if (p.z <= -0.015) continue;
         const edge = clamp((p.z + 0.04) / 0.28, 0, 1);
         const palette = TERRAIN_TONES[t.region];
         const color = t.tone > 0.68 ? palette[1] : t.tone < 0.28 ? palette[2] : palette[0];
-        const size = radius * 0.034 * t.size * (0.68 + p.z * 0.32);
-        ctx.globalAlpha = edge * (0.24 + t.tone * 0.23);
+        const size = radius * 0.02 * t.size * (0.68 + p.z * 0.32);
+        ctx.globalAlpha = edge * (0.16 + t.tone * 0.16);
         ctx.fillStyle = color;
         ctx.beginPath();
         ctx.ellipse(cx + p.x * radius, cy - p.y * radius, size * 1.25, size * 0.72, (t.lon + t.lat) * DEG, 0, Math.PI * 2);
         ctx.fill();
       }
       ctx.globalAlpha = 1;
+
+      const RAILS: [RegionId, RegionId][] = [
+        ["ironclad", "slagtown"],
+        ["slagtown", "blackspire"],
+        ["blackspire", "brasswater"],
+        ["brasswater", "veyra"],
+      ];
+      ctx.save();
+      ctx.strokeStyle = "rgba(214, 176, 96, 0.28)";
+      ctx.lineWidth = Math.max(1, radius * 0.006);
+      ctx.setLineDash([5, 7]);
+      for (const [a, b] of RAILS) {
+        const pa = project(regionById(a).marker.lat, regionById(a).marker.lon, c);
+        const pb = project(regionById(b).marker.lat, regionById(b).marker.lon, c);
+        if (pa.z <= 0.04 || pb.z <= 0.04) continue;
+        ctx.beginPath();
+        ctx.moveTo(cx + pa.x * radius, cy - pa.y * radius);
+        ctx.lineTo(cx + pb.x * radius, cy - pb.y * radius);
+        ctx.stroke();
+      }
+      ctx.restore();
+      ctx.setLineDash([]);
 
       // Fine projected latitude/longitude instrument lines.
       ctx.strokeStyle = "rgba(224,218,193,.045)";
@@ -467,8 +592,8 @@ export function HollowGlobeAAA({ loc, onSelect }: { loc: LocationId; onSelect: (
         const y = cy - p.y * radius;
         const depth = clamp((p.z - 0.02) / 0.65, 0.18, 1);
         const active = id === selected;
-        const markerRadius = (active ? 7.5 : 5.5) + depth * 2;
-        markers.current.push({ id, x, y, z: p.z, radius: 30, unlocked });
+        const markerRadius = ((active ? 4.2 : 3.1) + depth * 1.1) * (theater ? 1.05 : 1);
+        markers.current.push({ id, x, y, z: p.z, radius: theater ? 26 : 20, unlocked });
 
         ctx.save();
         ctx.globalAlpha = unlocked ? 0.55 + depth * 0.45 : 0.33;
@@ -482,12 +607,12 @@ export function HollowGlobeAAA({ loc, onSelect }: { loc: LocationId; onSelect: (
         ctx.shadowBlur = 0;
         ctx.lineWidth = 1.2;
         ctx.beginPath();
-        ctx.arc(x, y, markerRadius + 7, 0, Math.PI * 2);
+        ctx.arc(x, y, markerRadius + 4, 0, Math.PI * 2);
         ctx.stroke();
         ctx.restore();
 
         const label = unlocked ? region.name : "SEALED";
-        ctx.font = `${active ? 600 : 500} ${active ? 11 : 10}px ui-monospace, SFMono-Regular, Menlo, monospace`;
+        ctx.font = `${active ? 600 : 500} ${theater ? (active ? 15 : 13) : active ? 11 : 10}px ui-monospace, SFMono-Regular, Menlo, monospace`;
         const tw = ctx.measureText(label).width;
         const bx = clamp(x - tw / 2 - 8, 5, width - tw - 21);
         const by = y + markerRadius + 12;
@@ -589,7 +714,7 @@ export function HollowGlobeAAA({ loc, onSelect }: { loc: LocationId; onSelect: (
       cancelAnimationFrame(raf);
       ro.disconnect();
     };
-  }, [locations, selected]);
+  }, [locations, selected, theater]);
 
   useEffect(() => {
     const stage = stageRef.current;
@@ -680,8 +805,18 @@ export function HollowGlobeAAA({ loc, onSelect }: { loc: LocationId; onSelect: (
 
     const wheel = (e: WheelEvent) => {
       e.preventDefault();
-      zoomBy(e.deltaY > 0 ? 0.92 : 1.09);
-      setHint(`Orbital zoom ${camera.current.targetZoom.toFixed(2)}×`);
+      const c = camera.current;
+      if (e.ctrlKey || e.metaKey) {
+        zoomBy(e.deltaY > 0 ? 0.92 : 1.09);
+        setHint(`Orbital zoom ${c.targetZoom.toFixed(2)}×`);
+        return;
+      }
+      c.targetPitch -= e.deltaY * 0.0024;
+      c.targetYaw -= e.deltaX * 0.0024;
+      c.pitchVelocity = 0;
+      c.yawVelocity = 0;
+      lastInteraction.current = performance.now();
+      setHint("Grab the planet · scroll follows the ground");
     };
 
     stage.addEventListener("pointerdown", down);
@@ -696,14 +831,18 @@ export function HollowGlobeAAA({ loc, onSelect }: { loc: LocationId; onSelect: (
       stage.removeEventListener("pointercancel", up);
       stage.removeEventListener("wheel", wheel);
     };
-  }, [locations, selected]);
+  }, [locations, selected, theater]);
 
   const region = regionById(selected);
   const location = REGION_TO_LOCATION[selected];
   const unlocked = !!locations[location]?.unlocked;
 
   return (
-    <div className="overflow-hidden rounded-[var(--radius-xl)] border border-line/70 bg-[#030407] shadow-[0_24px_80px_rgba(0,0,0,.45)]">
+    <div className={theater
+      ? "relative h-full min-h-0 overflow-hidden bg-[#030407]"
+      : "overflow-hidden rounded-[var(--radius-xl)] border border-line/70 bg-[#030407] shadow-[0_24px_80px_rgba(0,0,0,.45)]"
+    }>
+      {theater ? null : (
       <div className="flex items-center justify-between gap-3 border-b border-line/60 bg-surface/75 px-3 py-2.5 backdrop-blur-md">
         <div className="min-w-0">
           <div className="font-display text-[9px] uppercase tracking-[0.22em] text-ember">Hollow Realm · Orbital Command</div>
@@ -715,24 +854,36 @@ export function HollowGlobeAAA({ loc, onSelect }: { loc: LocationId; onSelect: (
           <GlobeButton label="Recenter" onClick={reset}><RotateCcw className="size-4" /></GlobeButton>
         </div>
       </div>
+      )}
 
       <div
         ref={stageRef}
         tabIndex={0}
-        className={`relative h-[min(64vh,620px)] min-h-[410px] w-full touch-none select-none outline-none ${dragging ? "cursor-grabbing" : "cursor-grab"}`}
+        className={`relative w-full touch-none select-none outline-none ${
+          theater ? "h-full min-h-0" : "h-[12rem] min-h-[12rem] md:h-[min(42vh,360px)] md:min-h-[240px]"
+        } ${dragging ? "cursor-grabbing" : "cursor-grab"}`}
         aria-label="Interactive 3D-style Hollow Realm globe. Drag to rotate and pinch to zoom."
       >
         <canvas ref={canvasRef} className="absolute inset-0 size-full" />
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/25 to-transparent" />
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-36 bg-gradient-to-t from-black/55 to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-black/20 to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/35 to-transparent" />
+        {theater ? (
+          <div className="absolute right-3 top-[max(0.75rem,env(safe-area-inset-top))] z-30 flex items-center gap-1">
+            <GlobeButton label="Zoom out" onClick={() => zoomBy(0.9)}><Minus className="size-4" /></GlobeButton>
+            <GlobeButton label="Zoom in" onClick={() => zoomBy(1.1)}><Plus className="size-4" /></GlobeButton>
+            <GlobeButton label="Recenter" onClick={reset}><RotateCcw className="size-4" /></GlobeButton>
+          </div>
+        ) : null}
 
-        <div className="absolute bottom-3 left-3 right-3 flex items-end justify-between gap-3">
+        <div className={`absolute left-3 right-3 flex items-end justify-between gap-3 ${theater ? "bottom-[max(1rem,env(safe-area-inset-bottom))]" : "bottom-3"}`}>
           <div className="max-w-[68%] rounded-[var(--radius-lg)] border border-line/60 bg-ink/78 px-3 py-2.5 shadow-xl backdrop-blur-md">
             <div className="flex items-center gap-2">
               <Compass className="size-4 shrink-0 text-ember" />
               <div className="min-w-0">
-                <div className="truncate font-display text-sm text-paper">{region.name}</div>
+                <div className={`truncate font-display text-paper ${theater ? "text-base" : "text-sm"}`}>{region.name}</div>
+                <div className="truncate font-display text-[10px] uppercase tracking-[0.16em] text-ember">{region.continent}</div>
                 <div className="truncate text-[11px] text-muted">{unlocked ? `Danger ${region.danger} · ${region.biome.replaceAll("-", " ")}` : "SEALED · preceding boss must fall"}</div>
+                {theater ? <div className="mt-1 truncate text-[11px] text-moon">Drag to orbit · pinch to zoom</div> : null}
               </div>
             </div>
           </div>
@@ -744,7 +895,9 @@ export function HollowGlobeAAA({ loc, onSelect }: { loc: LocationId; onSelect: (
               sfx.deploy();
               openRegionMap(selected);
             }}
-            className="min-h-12 shrink-0 rounded-[var(--radius-md)] border border-ember/55 bg-ember/15 px-4 font-display text-[10px] uppercase tracking-[0.15em] text-ember shadow-xl backdrop-blur-md disabled:border-line disabled:bg-ink/70 disabled:text-muted"
+            className={`shrink-0 rounded-[var(--radius-md)] border border-ember/55 bg-ember/15 font-display uppercase tracking-[0.15em] text-ember shadow-xl backdrop-blur-md disabled:border-line disabled:bg-ink/70 disabled:text-muted ${
+              theater ? "min-h-14 px-5 text-xs" : "min-h-12 px-4 text-[10px]"
+            }`}
           >
             {unlocked ? "Enter Region" : "Sealed"}
           </button>

@@ -1,7 +1,9 @@
-import { SAVE_KEY, SAVE_VERSION } from "./data";
+import { SAVE_KEY, SAVE_VERSION, resolveLineage, resolveRaceName } from "./data";
 import { applyFloor, readWho, saveKeyFor, writeWho, type DiscordIdentity } from "./discord";
 import { defaultState } from "./engine";
 import { seedPackIfNeeded } from "./inventory";
+import { restoreHack, restoreTalk, restoreTerm } from "./terminal";
+import { restoreTyrone } from "./tyrone-mind";
 import { ensureSquad } from "./squad";
 import type { GameState, LocationId, LocationProgress, Operative } from "./types";
 
@@ -66,7 +68,11 @@ export function loadSave(): GameState {
     merged.combat = parsed.combat ?? null;
     merged.mission = parsed.mission ?? null;
     merged.toast = null;
-    merged.hack = null;
+    merged.hack = restoreHack(parsed.hack);
+    merged.term = restoreTerm((parsed as GameState).term);
+    if (merged.hack && !merged.term) {
+      merged.term = restoreTerm({ page: "lock", booted: true, output: [], sessionId: "restored" });
+    }
     merged.lastParty = parsed.lastParty ?? [];
     merged.xp = parsed.xp ?? 0;
     merged.level = parsed.level ?? 1;
@@ -77,17 +83,45 @@ export function loadSave(): GameState {
     merged.terminalLockDay = parsed.terminalLockDay ?? 0;
     merged.discordId = parsed.discordId ?? activeId;
     merged.discordName = parsed.discordName ?? readWho()?.name ?? null;
-    merged.talk = null;
+    merged.playerName = parsed.playerName ?? merged.discordName ?? readWho()?.name ?? null;
+    merged.playerHandle = parsed.playerHandle ?? null;
+    merged.talk = restoreTalk(parsed.talk);
     merged.seenTalk = parsed.seenTalk ?? [];
-    merged.talkQueue = [];
+    merged.talkQueue = Array.isArray(parsed.talkQueue)
+      ? parsed.talkQueue.filter((id): id is string => typeof id === "string")
+      : [];
     merged.selectedLoc = migrateLoc((parsed.selectedLoc as string) || "ironclad");
-    merged.operatives = (parsed.operatives ?? []).map((o: Operative) => ({
-      ...o,
-      location: migrateLoc(o.location),
-    }));
+    merged.operatives = (parsed.operatives ?? []).map((o: Operative) => {
+      const race = resolveRaceName(o.race);
+      return {
+        ...o,
+        location: migrateLoc(o.location),
+        race,
+        lineage: resolveLineage(race, o.lineage),
+      };
+    });
     merged.squad = parsed.squad ?? [];
     merged.activeMemberId = parsed.activeMemberId ?? null;
     merged.arc = parsed.arc ?? null;
+    merged.kaneHeat = parsed.kaneHeat ?? 0;
+    merged.selectedPoiId = parsed.selectedPoiId ?? null;
+    merged.regionMapOpen = false;
+    merged.openedFrom = null;
+    merged.market = (parsed as GameState).market && (parsed as GameState).market?.lots
+      ? (parsed as GameState).market
+      : base.market;
+    merged.poiWatch = (parsed as GameState).poiWatch ?? { day: merged.day, used: [] };
+    merged.shift = parsed.shift && parsed.shift.day === merged.day ? parsed.shift : merged.shift;
+    merged.arcade = {
+      ...base.arcade,
+      ...(parsed as GameState).arcade,
+      earned: { ...base.arcade.earned, ...(parsed as GameState).arcade?.earned },
+      triviaSeen: (parsed as GameState).arcade?.triviaSeen ?? [],
+      tfSeen: (parsed as GameState).arcade?.tfSeen ?? [],
+      scrambleSeen: (parsed as GameState).arcade?.scrambleSeen ?? [],
+      creeRead: (parsed as GameState).arcade?.creeRead ?? [],
+    };
+    merged.tyrone = restoreTyrone((parsed as GameState).tyrone);
     seedPackIfNeeded(merged);
     ensureSquad(merged);
     return merged;
@@ -101,9 +135,13 @@ export function writeSave(state: GameState) {
     const slim: GameState = {
       ...state,
       toast: null,
-      hack: null,
+      openedFrom: null,
+      hack: state.hack,
+      term: state.term,
       talk: state.talk,
+      talkQueue: state.talkQueue,
       combat: state.combat,
+      mission: state.mission,
     };
     const k = key();
     localStorage.setItem(k, JSON.stringify(slim));

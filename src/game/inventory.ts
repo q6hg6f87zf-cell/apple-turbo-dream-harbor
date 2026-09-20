@@ -25,7 +25,7 @@ export const PACK_CATALOG: Record<
     useName: "bobby_pin",
     rarity: "Common",
     blurb: "Old lockpick leftover. New files start with 3.",
-    use: "Lockpick is gone. Flavor until we retie it.",
+    use: "Spend on the T-0888 lockpick cabinet. Miss and it snaps.",
     usable: true,
   },
   stimpak: {
@@ -71,9 +71,9 @@ export const PACK_CATALOG: Record<
 };
 
 const BOBBY_LINES = [
-  "You bend it. It doesn't pick anything. Yet.",
-  "Lockpick's gone. You just spent a pin on the aesthetic.",
-  "Three was the starter kit. You're down one. Tyrone shrugs.",
+  "Seat it in the T-0888 lockpick cabinet. The sweet spot is mean.",
+  "Pins live on the glass now. Don't snap the last one.",
+  "Three was the starter kit. The cabinet is why.",
 ];
 
 const STIMPAK_LINES = [
@@ -146,14 +146,30 @@ export function mountainDateKey(d = new Date()): string {
 }
 
 export function freshClocks(dateKey = mountainDateKey()) {
-  return { dateKey, triviaLives: 3, tfLives: 3, unscramble: 10 };
+  return {
+    dateKey,
+    triviaLives: 3,
+    tfLives: 3,
+    unscramble: 3,
+    knowledgeDraws: 0,
+    lockpicks: 4,
+    slots: 8,
+    cardTap: 0,
+  };
 }
 
 export function ensureClocks(state: GameState): void {
   const key = mountainDateKey();
   if (!state.clocks || state.clocks.dateKey !== key) {
     state.clocks = freshClocks(key);
+    return;
   }
+  const c = state.clocks;
+  if (typeof c.knowledgeDraws !== "number") c.knowledgeDraws = 0;
+  if (typeof c.lockpicks !== "number") c.lockpicks = 4;
+  if (typeof c.slots !== "number") c.slots = 8;
+  if (typeof c.unscramble !== "number") c.unscramble = 3;
+  if (typeof c.cardTap !== "number") c.cardTap = 0;
 }
 
 export function addPack(state: GameState, key: PackKey, n = 1): void {
@@ -275,7 +291,7 @@ export function openHack(state: GameState): string | null {
     log: [
       "SYNAPSE TERMINAL · T-0880",
       extra ? `PROBE KIT SEATED · ${triesMax} ATTEMPT(S) LEFT` : `${triesMax} ATTEMPT(S) LEFT`,
-      "S.Y.N.A.P.S.E TERMLINK PROTOCOL",
+      "S.Y.N.A.P.S.E ACCESS PROTOCOL",
       "Enter password now.",
     ],
     lastLikeness: null,

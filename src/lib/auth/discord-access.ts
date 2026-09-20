@@ -13,6 +13,7 @@ export type DiscordAccess = {
   stage?: "discord" | "tyrone" | "ready";
   discordId?: string;
   name?: string;
+  handle?: string;
   error?: string;
 };
 
@@ -51,6 +52,7 @@ export async function fetchDiscordAccess(): Promise<DiscordAccess> {
     stage: body.stage,
     discordId: body.discordId,
     name: body.name,
+    handle: body.handle,
     error: body.error,
   };
 }

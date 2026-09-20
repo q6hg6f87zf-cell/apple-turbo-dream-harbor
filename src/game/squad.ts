@@ -1,4 +1,6 @@
 import { locById } from "./data";
+import { ensureClocks } from "./inventory";
+import { CARD_CLOCK_BASE, STARTER_PLATE } from "./rooms";
 import type { GameState, LocationId, MissionKind, SquadMember } from "./types";
 
 function nid(prefix: string) {
@@ -7,15 +9,34 @@ function nid(prefix: string) {
 
 export const ARC_ORDER: LocationId[] = ["ironclad", "kingdom", "caverns", "library", "veyra"];
 
-const VACANT_NAMES = /^(commander|unclaimed|rider)$/i;
+export const VACANT_NAMES = /^(commander|unclaimed|rider)$/i;
 
 export function isVacant(m: SquadMember | null | undefined): boolean {
   if (!m) return false;
-  if (m.discordId) return false;
-  const handle = (m.discordHandle ?? "").replace(/^@/, "");
-  if (handle && !VACANT_NAMES.test(handle)) return false;
   return VACANT_NAMES.test(m.name);
 }
+
+export function normalizeHandle(raw?: string | null): string | null {
+  const h = (raw ?? "").trim().replace(/^@/, "").replace(/\s+/g, "").slice(0, 24);
+  if (h.length < 2) return null;
+  if (/\s/.test((raw ?? "").trim())) return null;
+  return h;
+}
+
+export function looksLikeHandle(raw?: string | null): boolean {
+  const t = (raw ?? "").trim().replace(/^@/, "");
+  return /^[a-z0-9._]{2,32}$/i.test(t) || /^.+#\d{4}$/.test(t);
+}
+
+export function plateHandle(m: SquadMember | null | undefined): string {
+  if (!m) return "unlinked rider";
+  const hid = normalizeHandle(m.discordHandle);
+  if (hid) return `@${hid}`;
+  if (m.discordId) return "linked rider";
+  if (isVacant(m)) return "claim this plate";
+  return "unlinked rider";
+}
+
 
 export function makeMember(opts: {
   name: string;
@@ -24,18 +45,14 @@ export function makeMember(opts: {
   day: number;
   personalCaps?: number;
 }): SquadMember {
-  const handle = opts.discordHandle?.trim()
-    ? opts.discordHandle.trim().replace(/^@/, "")
-    : opts.discordId
-      ? opts.discordId
-      : null;
+  const handle = normalizeHandle(opts.discordHandle);
   const rawName = (opts.name || "").trim();
   const vacant = !rawName || VACANT_NAMES.test(rawName);
   return {
     id: opts.discordId?.trim() || nid("sq"),
-    name: vacant && !opts.discordId ? "Unclaimed" : (rawName || "Rider").slice(0, 24),
+    name: vacant ? "Unclaimed" : rawName.slice(0, 24),
     discordId: opts.discordId ?? null,
-    discordHandle: handle ? `@${handle.replace(/^@/, "").slice(0, 24)}` : null,
+    discordHandle: handle ? `@${handle}` : null,
     personalCaps: opts.personalCaps ?? 0,
     xp: 0,
     note: "",
@@ -45,21 +62,61 @@ export function makeMember(opts: {
 }
 
 function paintChair(m: SquadMember, name: string, handle?: string | null, discordId?: string | null) {
-  const hid = (handle || "").trim().replace(/^@/, "").slice(0, 24);
+  const hid = normalizeHandle(handle);
   const did = discordId?.trim() || null;
   m.name = name.trim().slice(0, 24);
   if (did) m.discordId = did;
   if (hid) m.discordHandle = `@${hid}`;
-  else if (did && !m.discordHandle) m.discordHandle = `@${name.replace(/^@/, "").slice(0, 24)}`;
 }
+
+export function stampSeatedPlate(state: GameState): string | null {
+  ensureSquad(state);
+  const name = (state.playerName ?? "").trim();
+  if (name.length < 2) return "Stamp a name first.";
+  const handle = normalizeHandle(state.playerHandle) ?? normalizeHandle(state.discordName);
+  const msg = registerMember(state, name, handle, state.discordId);
+  const me = seatedMember(state);
+  if (!msg && me.personalCaps === 0 && me.joinedDay === state.day) me.personalCaps = STARTER_PLATE;
+  return msg;
+}
+
+export function clockPlate(state: GameState): string | null {
+  ensureSquad(state);
+  ensureClocks(state);
+  const me = seatedMember(state);
+  if (isVacant(me)) return "Stamp the black card first.";
+  if (state.clocks.cardTap) return "Plate already clocked this Mountain day.";
+  const pay = CARD_CLOCK_BASE + Math.max(0, state.level) * 8;
+  state.clocks.cardTap = 1;
+  me.personalCaps += pay;
+  state.toast = `${me.name} clocked the plate. +${pay} personal caps.`;
+  return null;
+}
+
+export function bindDiscordIdentity(state: GameState, id: string, handle?: string | null) {
+  const snow = id.trim().replace(/[^\w.-]/g, "").slice(0, 32);
+  let hid = normalizeHandle(handle);
+  if (hid && /^\d{17,22}$/.test(hid)) hid = null;
+  if (snow.length < 2 && !hid) return;
+  if (snow.length >= 2) state.discordId = snow;
+  if (hid) {
+    state.discordName = hid;
+    if (!normalizeHandle(state.playerHandle)) state.playerHandle = hid;
+  }
+  const seated = ensureSquad(state);
+  if (snow.length >= 2 && !seated.discordId) seated.discordId = snow;
+  if (hid) seated.discordHandle = `@${hid}`;
+  if (state.playerName?.trim()) stampSeatedPlate(state);
+}
+
 
 export function ensureSquad(state: GameState): SquadMember {
   if (!state.squad) state.squad = [];
   if (state.squad.length === 0) {
     const m = makeMember({
-      name: state.discordName || "Unclaimed",
+      name: state.playerName || "Unclaimed",
       discordId: state.discordId,
-      discordHandle: state.discordName,
+      discordHandle: state.playerHandle || state.discordName,
       day: state.day,
     });
     state.squad = [m];
@@ -75,8 +132,13 @@ export function ensureSquad(state: GameState): SquadMember {
     if (isVacant(m) && m.name === "Commander") m.name = "Unclaimed";
   }
   const first = state.squad[0];
-  if (first && isVacant(first) && state.discordName && !VACANT_NAMES.test(state.discordName)) {
-    paintChair(first, state.discordName, state.discordName, state.discordId);
+  if (first) {
+    if (state.discordId && !first.discordId) first.discordId = state.discordId;
+    const hid = normalizeHandle(state.playerHandle) ?? normalizeHandle(state.discordName);
+    if (hid && !normalizeHandle(first.discordHandle)) first.discordHandle = `@${hid}`;
+    if (isVacant(first) && state.playerName?.trim()) {
+      paintChair(first, state.playerName.trim(), hid, state.discordId);
+    }
   }
   if (!state.activeMemberId || !state.squad.some((m) => m.id === state.activeMemberId)) {
     state.activeMemberId = state.squad[0].id;
@@ -96,17 +158,33 @@ export function ensureSquad(state: GameState): SquadMember {
   return state.squad.find((m) => m.id === state.activeMemberId)!;
 }
 
+const EMPTY_PLATE: SquadMember = {
+  id: "plate-empty",
+  name: "Unclaimed",
+  discordId: null,
+  discordHandle: null,
+  personalCaps: 0,
+  xp: 0,
+  note: "",
+  joinedDay: 1,
+  lastTurnDay: 0,
+};
+
 export function seatedMember(state: GameState): SquadMember {
-  return (
-    state.squad?.find((m) => m.id === state.activeMemberId) ??
-    state.squad?.[0] ??
-    makeMember({
-      name: state.discordName || "Unclaimed",
-      discordId: state.discordId,
-      discordHandle: state.discordName,
-      day: state.day,
-    })
-  );
+  return state.squad?.find((m) => m.id === state.activeMemberId) ?? state.squad?.[0] ?? EMPTY_PLATE;
+}
+
+/** The plate the HUD and the floor both spend. Never invent a fresh 0-cap rider. */
+export function plateMember(state: GameState): SquadMember {
+  const seated = seatedMember(state);
+  if (!state.squad?.length) return seated;
+  if (!isVacant(seated) && (Number(seated.personalCaps) || 0) > 0) return seated;
+  const named = (state.playerName ?? "").trim().toLowerCase();
+  const stamped = state.squad.filter((m) => !isVacant(m));
+  const match = named ? stamped.find((m) => m.name.toLowerCase() === named) : undefined;
+  if (match) return match;
+  const richest = [...stamped].sort((a, b) => (b.personalCaps || 0) - (a.personalCaps || 0))[0];
+  return richest ?? seated;
 }
 
 export function currentArcLoc(state: GameState): LocationId {
@@ -161,7 +239,7 @@ export function registerMember(
   ensureSquad(state);
   const cleanName = name.trim().replace(/^@/, "").slice(0, 24);
   if (cleanName.length < 2) return "They need a name on the card.";
-  const hid = (handle || "").trim().replace(/^@/, "").slice(0, 24);
+  const hid = normalizeHandle(handle);
   const did = discordId?.trim() || null;
   const exists = state.squad.find(
     (m) =>
@@ -177,7 +255,7 @@ export function registerMember(
   }
   const vacant = state.squad.find(isVacant);
   if (vacant) {
-    paintChair(vacant, cleanName, hid || did, did);
+    paintChair(vacant, cleanName, hid, did);
     switchMember(state, vacant.id);
     return null;
   }
@@ -198,7 +276,8 @@ export function switchMember(state: GameState, id: string) {
   state.activeMemberId = id;
   const m = state.squad.find((x) => x.id === id)!;
   if (m.discordId) state.discordId = m.discordId;
-  state.discordName = m.name;
+  const hid = normalizeHandle(m.discordHandle);
+  if (hid) state.discordName = hid;
 }
 
 export function giftCaps(state: GameState, toId: string, amount: number): string | null {

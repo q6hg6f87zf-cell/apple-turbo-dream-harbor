@@ -89,13 +89,21 @@ async function migrationStatus(userId: string): Promise<MigrationRow | null> {
 function rowJson(row: ItemRow) {
   const template = authorityTemplateByKey(row.template_key);
   if (!template) return null;
-  const enchantments = (row.enchantments ?? []).map(authorityTemplateByKey).filter((x): x is AuthorityItemTemplate => !!x);
+  const keys = row.enchantments ?? [];
+  const enchantKeys = keys.filter((k) => !k.startsWith("attach:"));
+  const attachKeys = keys
+    .filter((k) => k.startsWith("attach:"))
+    .map((k) => k.split(":").slice(2).join(":"))
+    .filter(Boolean);
+  const enchantments = enchantKeys.map(authorityTemplateByKey).filter((x): x is AuthorityItemTemplate => !!x);
+  const attachments = attachKeys.map(authorityTemplateByKey).filter((x): x is AuthorityItemTemplate => !!x);
   return {
     item: itemFromAuthorityTemplate(template, row.instance_id, {
       condition: row.condition,
       equipped: row.equipped,
       discoveredDay: row.discovered_day,
       enchantments,
+      attachments,
     }),
     ownerType: row.owner_type,
     residentId: row.owner_resident_id,
@@ -260,9 +268,29 @@ async function attach(userId: string, requestId: string, enchantId: string, targ
   const target = await visibleItem(userId, targetId);
   const enchantTemplate = enchant ? authorityTemplateByKey(enchant.template_key) : null;
   const targetTemplate = target ? authorityTemplateByKey(target.template_key) : null;
-  if (!enchant || enchantTemplate?.kind !== "enchantment") return { error: "Enchanting component not found.", status: 404 };
-  if (!target || target.owner_user_id !== userId || target.owner_resident_id !== residentId || !targetTemplate?.slot) return { error: "Target gear is not owned by that resident.", status: 409 };
-  if ((target.enchantments ?? []).length >= socketCapacity(targetTemplate)) return { error: `${targetTemplate.name} has no resonance sockets left.`, status: 409 };
+  if (!enchant || !enchantTemplate) return { error: "Component not found.", status: 404 };
+  if (!target || target.owner_user_id !== userId || target.owner_resident_id !== residentId || !targetTemplate) {
+    return { error: "Target gear is not owned by that resident.", status: 409 };
+  }
+  if (enchantTemplate.kind === "attachment") {
+    if (targetTemplate.kind !== "weapon") return { error: "Attachments seat on firearms.", status: 409 };
+    const slot = enchantTemplate.attachmentSlot;
+    if (!slot) return { error: "That part has no slot stamped.", status: 409 };
+    const existing = (target.enchantments ?? []).some((k) => k.startsWith(`attach:${slot}:`));
+    if (existing) return { error: `${slot} already holds a part. Strip it at the Machine Shop.`, status: 409 };
+    if (!(await guard(userId, requestId, "inventory_attach"))) return { duplicate: true };
+    const sql = await getSql();
+    const payload = JSON.stringify([`attach:${slot}:${enchantTemplate.key}`]);
+    await sql`update hollow_item_instance set enchantments=enchantments || ${payload}::jsonb, revision=revision+1, updated_at=now() where instance_id=${targetId}`;
+    await sql`update hollow_item_instance set destroyed_at=now(), equipped=false, revision=revision+1, updated_at=now() where instance_id=${enchantId} and destroyed_at is null`;
+    await mastery(enchantId, residentId, "enchant", 8);
+    return {};
+  }
+  if (enchantTemplate.kind !== "enchantment") return { error: "Enchanting component not found.", status: 404 };
+  if (!targetTemplate.slot) return { error: "Target gear is not owned by that resident.", status: 409 };
+  if ((target.enchantments ?? []).filter((k) => !k.startsWith("attach:")).length >= socketCapacity(targetTemplate)) {
+    return { error: `${targetTemplate.name} has no resonance sockets left.`, status: 409 };
+  }
   if (!(await guard(userId, requestId, "inventory_attach"))) return { duplicate: true };
   const sql = await getSql();
   const payload = JSON.stringify([enchantTemplate.key]);

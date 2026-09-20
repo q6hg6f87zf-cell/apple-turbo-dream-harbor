@@ -1,7 +1,9 @@
 import { Button } from "@/components/ui/button";
 import { sfx } from "@/game/audio";
 import { TALK, MANUAL, isPregameTalk, isTalkLocked, renderTalk, scriptForScreen } from "@/game/talk";
+import { isTaskScreen } from "@/game/shell";
 import { useGame } from "@/game/store";
+import type { TyroneAssist } from "@/game/types";
 import { cn } from "@/lib/cn";
 import { CircleHelp, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -88,7 +90,7 @@ export function TalkOverlay() {
   return (
     <>
       {pregame ? (
-        <div className="fixed inset-0 z-[44] bg-ink/50" aria-hidden />
+        <div className={cn("fixed inset-0 z-[44]", talk.script === "wake" ? "bg-ink/20" : "bg-ink/50")} aria-hidden />
       ) : null}
       <div
         className={cn(
@@ -98,12 +100,16 @@ export function TalkOverlay() {
       >
         <button
           type="button"
-          className="mx-auto flex w-full max-w-2xl items-end gap-3 rounded-[var(--radius-xl)] bg-ink/92 p-3 text-left shadow-[var(--shadow-border-hover)] backdrop-blur-md md:p-4"
+          className={cn(
+            "mx-auto flex w-full max-w-2xl items-end gap-3 rounded-[var(--radius-xl)] bg-ink/92 p-3 text-left shadow-[var(--shadow-border-hover)] backdrop-blur-md md:p-4",
+            talk.script === "wake" && "ms-wake-card",
+          )}
           onClick={revealOrAdvance}
         >
           <img
-            src="/art/tyrone.jpg"
+            src={talk.script === "wake" ? "/art/tyrone-wake.jpg" : "/art/tyrone.jpg"}
             alt=""
+            data-wake-portrait={talk.script === "wake" ? "1" : undefined}
             className="size-16 shrink-0 rounded-[var(--radius-md)] object-cover shadow-[var(--shadow-border)] md:size-20"
           />
           <div className="min-w-0 flex-1">
@@ -130,7 +136,11 @@ export function TalkOverlay() {
             </div>
             <p className="mt-2 font-display text-[10px] uppercase tracking-[0.18em] text-muted">
               {locked && last
-                ? "Tap to enter the ranch"
+                ? talk.script === "wake"
+                  ? "Tap to keep walking"
+                  : talk.script === "welcome"
+                    ? "Tap to enter the Machine Shop"
+                    : "Tap to enter the ranch"
                 : last
                   ? "Tap to close"
                   : locked
@@ -145,11 +155,7 @@ export function TalkOverlay() {
               Skip
             </Button>
           </div>
-        ) : (
-          <p className="mx-auto mt-2 w-full max-w-2xl text-right font-display text-[10px] uppercase tracking-[0.18em] text-muted">
-            First porch talk · no shortcuts
-          </p>
-        )}
+        ) : null}
       </div>
     </>
   );
@@ -159,9 +165,13 @@ export function HelpFab() {
   const talk = useGame((g) => g.s.talk);
   const screen = useGame((g) => g.s.screen);
   const overlay = useGame((g) => !!g.s.combat || !!g.s.mission);
+  const named = useGame((g) => Boolean(g.s.playerName?.trim()));
+  const started = useGame((g) => g.s.started);
   const open = useGame((g) => g.openGuide);
   if (talk) return null;
   if (screen === "rules") return null;
+  if (isTaskScreen(screen)) return null;
+  if (!started && !named) return null;
   const porch = screen === "title" || screen === "briefing";
   return (
     <button
@@ -174,7 +184,7 @@ export function HelpFab() {
       }}
       className={cn(
         "ms-help fixed z-[42] inline-flex size-12 touch-manipulation items-center justify-center rounded-full bg-ink text-ember",
-        porch ? "left-3 top-3 md:right-6 md:top-36" : "right-3 bottom-[5.5rem] md:right-6 md:bottom-6",
+        porch ? "left-3 top-3 md:left-6 md:top-36" : "right-3 bottom-[5.5rem] md:right-6 md:bottom-6",
         !porch && !overlay && "md:hidden",
       )}
     >
@@ -187,8 +197,14 @@ export function FieldManual() {
   const open = useGame((g) => g.guideOpen);
   const close = useGame((g) => g.closeGuide);
   const ask = useGame((g) => g.askTyrone);
+  const askLine = useGame((g) => g.askTyroneLine);
+  const setAssist = useGame((g) => g.setTyroneAssist);
+  const toggleNumbers = useGame((g) => g.toggleTyroneNumbers);
   const state = useGame((g) => g.s);
-  const combat = !!state.combat || !!state.mission;
+  const combat = !!state.combat || (!!state.mission && !state.mission.waiting);
+  const [question, setQuestion] = useState("");
+  const assist = state.tyrone?.settings.assist ?? "normal";
+  const numbers = state.tyrone?.settings.showNumbers !== false;
 
   useEffect(() => {
     if (!open) return;
@@ -203,8 +219,31 @@ export function FieldManual() {
   }, [open, close]);
 
   if (!open) return null;
-  const id = scriptForScreen(state);
+  if (isPregameTalk(state) && isTalkLocked(state)) return null;
+  const id = state.talk?.script === "wake" ? "wake" : scriptForScreen(state);
   const card = MANUAL[id] ?? MANUAL.hq;
+
+  const submitAsk = () => {
+    const text = question.trim();
+    if (!text) {
+      if (combat) {
+        close();
+        return;
+      }
+      ask(id);
+      return;
+    }
+    close();
+    askLine(text);
+    setQuestion("");
+  };
+
+  const cycleAssist = () => {
+    const order: TyroneAssist[] = ["off", "minimal", "normal", "helpful", "high"];
+    const i = order.indexOf(assist);
+    setAssist(order[(i + 1) % order.length]!);
+    sfx.click();
+  };
 
   return (
     <div
@@ -249,19 +288,49 @@ export function FieldManual() {
             </li>
           ))}
         </ul>
+        <label className="mt-5 block">
+          <span className="font-display text-[10px] uppercase tracking-[0.18em] text-muted">Ask him</span>
+          <textarea
+            value={question}
+            onChange={(e) => setQuestion(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                submitAsk();
+              }
+            }}
+            rows={2}
+            maxLength={180}
+            placeholder="What do I roll? Can we take the boss? What happened to…"
+            className="mt-2 min-h-16 w-full rounded-[var(--radius-sm)] bg-ink px-3 py-2 text-sm text-paper shadow-[var(--shadow-border)] outline-none"
+          />
+        </label>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={cycleAssist}
+            className="min-h-11 rounded-[var(--radius-sm)] bg-ink px-3 font-display text-[10px] uppercase tracking-[0.16em] text-ember shadow-[var(--shadow-border)]"
+          >
+            Assist · {assist}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              sfx.click();
+              toggleNumbers();
+            }}
+            className="min-h-11 rounded-[var(--radius-sm)] bg-ink px-3 font-display text-[10px] uppercase tracking-[0.16em] text-muted shadow-[var(--shadow-border)]"
+          >
+            Numbers · {numbers ? "on" : "off"}
+          </button>
+        </div>
         <div className="mt-5 flex flex-col gap-2">
           <Button
             variant="ember"
             className="w-full"
-            onClick={() => {
-              if (combat) {
-                close();
-                return;
-              }
-              ask(id);
-            }}
+            onClick={submitAsk}
           >
-            {combat ? "Understood" : "Walk me through it"}
+            {combat ? "Understood" : question.trim() ? "Ask Tyrone" : "Walk me through it"}
           </Button>
           <Button variant="quiet" className="w-full" onClick={close}>
             Close

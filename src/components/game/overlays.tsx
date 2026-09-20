@@ -1,9 +1,13 @@
 import { Button } from "@/components/ui/button";
-import { CLASS_GIFT, COMPANIONS, PRIMARY_STAT, locById, villainById } from "@/game/data";
-import { BAND_COPY, combatActor, computeStats, healCost } from "@/game/engine";
+import { CLASS_GIFT, COMPANIONS, PRIMARY_STAT, locById, villainById, WORLD } from "@/game/data";
+import { className, displayLineage, displayRace } from "@/game/presentation";
+import { BAND_COPY, combatActor, computeStats, equippedWeapon, healCost } from "@/game/engine";
+import { magLine, isAmmoConsumable } from "@/game/weapon-ops";
+import { restPenalties, WATCH_LABEL } from "@/game/shift";
 import { sfx, rumble } from "@/game/audio";
 import { useGame } from "@/game/store";
 import type { Operative } from "@/game/types";
+import { STAT_COPY, STAT_ORDER } from "@/game/stats-copy";
 import { cn } from "@/lib/cn";
 import {
   ClassGlyph,
@@ -31,8 +35,8 @@ export function ToastHost() {
   }, [toast, clear]);
   if (!toast) return null;
   return (
-    <div className="pointer-events-none fixed bottom-32 left-1/2 z-50 w-[min(92vw,420px)] -translate-x-1/2 md:bottom-20">
-      <div className="ms-rise ms-shake rounded-[var(--radius-md)] bg-panel px-4 py-3 text-center text-sm text-paper shadow-[var(--shadow-border-hover)]">
+    <div className="ms-toast" data-toast="1">
+      <div className="ms-rise ms-shake rounded-[var(--radius-md)] bg-panel px-4 py-3 text-center text-body text-paper shadow-[var(--shadow-border-hover)]">
         {toast}
       </div>
     </div>
@@ -44,6 +48,7 @@ export function MissionOverlay() {
   const combat = useGame((g) => g.s.combat);
   const ops = useGame((g) => g.s.operatives);
   const rollBeat = useGame((g) => g.rollBeat);
+  const pickTactic = useGame((g) => g.pickTactic);
   const cont = useGame((g) => g.continueMission);
   const [spin, setSpin] = useState(false);
   const waiting = !!mission?.waiting;
@@ -52,6 +57,8 @@ export function MissionOverlay() {
   const onRoll = () => {
     const m = useGame.getState().s.mission;
     if (!m?.waiting || spin) return;
+    const current = m.beats[m.beatIndex];
+    if (current?.tactics && !current.tacticId) return;
     setSpin(true);
     sfx.dice();
     rumble(10);
@@ -77,6 +84,7 @@ export function MissionOverlay() {
       if (t?.closest("input, textarea, select")) return;
       if (e.key === " " || e.key === "Enter") {
         e.preventDefault();
+        if (useGame.getState().s.talk) return;
         if (waiting) onRoll();
         else {
           sfx.click();
@@ -105,7 +113,7 @@ export function MissionOverlay() {
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="font-display text-[10px] uppercase tracking-[0.22em] text-ember">
-              {loc.short} · {mission.kind} · beat {mission.beatIndex + 1}/{mission.beats.length}
+              {loc.short} · {mission.approach ?? "standard"} · {mission.kind} · beat {mission.beatIndex + 1}/{mission.beats.length}
             </div>
             <h2 className="mt-1 font-display text-xl">{beat?.title ?? "Return"}</h2>
           </div>
@@ -136,7 +144,7 @@ export function MissionOverlay() {
         </div>
 
         <p className="mt-4 text-[15px] leading-relaxed text-moon">{beat?.prompt}</p>
-        {beat && lead ? (
+        {beat && lead && beat.tacticId ? (
           <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-wider text-muted">
             <span className="rounded-full bg-ink px-2 py-1 text-ember">
               {beat.stat} {leadStats ? leadStats[beat.stat] : ""} · DC {beat.dc}
@@ -145,6 +153,26 @@ export function MissionOverlay() {
           </div>
         ) : null}
 
+        {mission.waiting && beat?.tactics && !beat.tacticId ? (
+          <div className="mt-4 space-y-2">
+            <p className="font-display text-[10px] uppercase tracking-[0.16em] text-ember">Call it</p>
+            {beat.tactics.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => {
+                  sfx.click();
+                  pickTactic(t.id);
+                }}
+                className="flex min-h-14 w-full flex-col items-start justify-center rounded-[var(--radius-md)] bg-ink px-3 py-2 text-left shadow-[var(--shadow-border)]"
+              >
+                <span className="font-display text-sm text-paper">{t.label}</span>
+                <span className="mt-0.5 text-[12px] text-muted">{t.blurb}</span>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <>
         <div className="mt-5 flex justify-center">
           <DiceFace value={mission.lastRoll?.value} band={mission.lastRoll?.band} spinning={spin} size={128} />
         </div>
@@ -190,6 +218,8 @@ export function MissionOverlay() {
             </Button>
           )}
         </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -205,11 +235,11 @@ const ACT_SHORT = {
 } as const;
 
 const ACT_HELP = {
-  strike: "d20 + primary vs DC. Steel talks.",
+  strike: "d20 + primary vs DC. Magazines matter. Dry click is half damage and a -4.",
   guard: "Hold. +2 DEF this round.",
   skill: "Signature. The thing they are known for.",
   gift: "Once per day. Do not waste it.",
-  item: "Burn a consumable from the rucksack.",
+  item: "Burn a consumable from the rucksack. Ammo is not a drink.",
   flee: "SPD check. Shame is cheaper than a grave.",
 } as const;
 
@@ -338,7 +368,7 @@ export function CombatOverlay() {
       if (!a) return;
       e.preventDefault();
       if (a === "gift" && actorNow.giftUsed) return;
-      if (a === "item" && !actorNow.inventory.some((i) => i.kind === "consumable")) return;
+      if (a === "item" && !actorNow.inventory.some((i) => i.kind === "consumable" && !isAmmoConsumable(i))) return;
       setHelp(a);
       go(a);
     };
@@ -354,7 +384,8 @@ export function CombatOverlay() {
   const v = combat.bossId ? villainById(combat.bossId) : null;
   const phase = v && enemy ? v.phases[Math.min(enemy.phase ?? 0, v.phases.length - 1)] : null;
 
-  const hasItem = !!actor?.inventory.some((i) => i.kind === "consumable");
+  const hasItem = !!actor?.inventory.some((i) => i.kind === "consumable" && !isAmmoConsumable(i));
+  const actorGun = actor ? equippedWeapon(actor) : undefined;
   const actions: { id: keyof typeof ACT_HELP; label: string; icon: typeof Swords; variant: "ember" | "ghost" | "quiet" | "danger"; disabled?: boolean }[] = actor
     ? [
         { id: "strike", label: "Strike", icon: Swords, variant: "ember" },
@@ -388,9 +419,14 @@ export function CombatOverlay() {
             <p className="mt-1 font-display text-[10px] uppercase tracking-wider text-ember">{phase.name}</p>
           ) : null}
           <p className="mt-2 text-sm italic text-moon">{enemy?.flavor}</p>
-          {enemy ? <HpBar hp={enemy.hp} max={enemy.maxHp} className="mt-3 h-2.5" /> : null}
+          {enemy ? <HpBar hp={enemy.hp} max={enemy.maxHp} className="mt-3" label="Hull" /> : null}
+          {combat.incomingSoft ? (
+            <p className="mt-1 font-display text-[10px] uppercase tracking-[0.16em] text-ember">Bracing · next hit lands softer</p>
+          ) : null}
           <div className="mt-1 text-xs tabular-nums text-muted">
-            {enemy?.hp}/{enemy?.maxHp} · DC {enemy?.dc}
+            DC {enemy?.dc}
+            {enemy?.armorClass ? ` · ${enemy.armorClass}` : ""}
+            {enemy?.preferredRange ? ` · ${enemy.preferredRange}` : ""}
             {combat.enemies.length > 1
               ? ` · ${combat.enemies.filter((e) => e.hp > 0).length}/${combat.enemies.length} standing`
               : ""}
@@ -417,11 +453,11 @@ export function CombatOverlay() {
                       <span className="ml-2 font-display text-[9px] uppercase tracking-wider text-ember">acting</span>
                     ) : null}
                   </span>
-                  <span className="tabular-nums text-muted">
-                    {op.hp}/{op.maxHp}
-                  </span>
                 </div>
                 <HpBar hp={op.hp} max={op.maxHp} className="mt-1" />
+                {actor?.id === op.id && actorGun ? (
+                  <p className="mt-1 font-display text-[9px] uppercase tracking-[0.14em] text-ember">{magLine(actorGun)}</p>
+                ) : null}
               </div>
             </div>
           ))}
@@ -523,11 +559,11 @@ export function OperativeSheet() {
             <Portrait op={op} size={52} />
             <div>
               <div className="flex items-center gap-2 font-display text-[10px] uppercase tracking-[0.2em] text-ember">
-                <ClassGlyph cls={op.cls} /> {op.cls}
+                <ClassGlyph cls={op.cls} /> {className(op.cls)}
               </div>
               <h2 className="mt-1 font-display text-2xl">{op.name}</h2>
               <p className="text-sm text-muted">
-                {op.race} · {op.lineage} · {op.origin}
+                {displayRace(op.race)} · {displayLineage(op.race, op.lineage)} · {op.origin}
               </p>
             </div>
           </div>
@@ -543,7 +579,7 @@ export function OperativeSheet() {
         </div>
         <HpBar hp={op.hp} max={op.maxHp} className="mt-2 h-2" />
         <div className="mt-4">
-          <StatGrid stats={stats} primary={PRIMARY_STAT[op.cls]} />
+          <StatGrid stats={stats} primary={PRIMARY_STAT[op.cls]} dice={op.statDice} />
         </div>
 
         <div className="mt-4 grid grid-cols-3 gap-2">
@@ -590,6 +626,29 @@ export function OperativeSheet() {
 
         {tab === "soul" ? (
           <div className="mt-4 space-y-3">
+            <Panel className="bg-raised">
+              <SectionLabel>Body · seven scores</SectionLabel>
+              <p className="text-sm leading-relaxed text-moon">
+                Tap a score above. These are the numbers every check uses. A class primary is the one this rider lives on.
+              </p>
+              <div className="mt-3 space-y-2">
+                {STAT_ORDER.map((k) => {
+                  const copy = STAT_COPY[k];
+                  const roll = op.statDice?.[k];
+                  return (
+                    <p key={k} className="text-xs leading-relaxed">
+                      <span className="font-display uppercase tracking-wider text-ember">{k}</span>
+                      <span className="text-paper"> {copy.name}</span>
+                      <span className="text-muted"> — {copy.short}. </span>
+                      <span className="text-moon">{copy.does}</span>
+                      {typeof roll === "number" ? (
+                        <span className="mt-0.5 block text-[11px] text-ember">Body die {roll}.</span>
+                      ) : null}
+                    </p>
+                  );
+                })}
+              </div>
+            </Panel>
             <Panel className="bg-raised">
               <SectionLabel>Gift · {CLASS_GIFT[op.cls].name}</SectionLabel>
               <p className="text-sm text-moon">
@@ -703,13 +762,13 @@ export function RestConfirm() {
   const cancel = useGame((g) => g.cancelRest);
   const select = useGame((g) => g.selectOp);
   const setScreen = useGame((g) => g.setScreen);
-  const downedNames = useGame((g) =>
-    g.s.operatives
-      .filter((o) => o.status === "downed")
-      .map((o) => o.name)
-      .join(", "),
-  );
-  const downedId = useGame((g) => g.s.operatives.find((o) => o.status === "downed")?.id ?? null);
+  const s = useGame((g) => g.s);
+  const downedNames = s.operatives
+    .filter((o) => o.status === "downed")
+    .map((o) => o.name)
+    .join(", ");
+  const downedId = s.operatives.find((o) => o.status === "downed")?.id ?? null;
+  const penalties = restPenalties(s);
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -723,11 +782,23 @@ export function RestConfirm() {
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/70 p-4 md:items-center">
       <div className="ms-pop w-full max-w-md rounded-[var(--radius-xl)] bg-surface p-5 shadow-[var(--shadow-border)]">
-        <h2 className="font-display text-xl">Dawn is a decision</h2>
-        <p className="mt-3 text-sm leading-relaxed text-moon">
-          {downedNames || "Someone"} {many ? "are" : "is"} downed. Resting without an Infirmary kills them for good.
-          Treat them from the dossier, or raise an Infirmary, before you sleep.
-        </p>
+        <h2 className="font-display text-xl">{downedNames ? "Dawn is a decision" : "Turn the shift in?"}</h2>
+        {downedNames ? (
+          <p className="mt-3 text-sm leading-relaxed text-moon">
+            {downedNames} {many ? "are" : "is"} downed. Resting without an Infirmary kills them for good.
+          </p>
+        ) : null}
+        {penalties.length ? (
+          <ul className="mt-3 space-y-1.5 text-sm text-ember">
+            {penalties.map((p) => (
+              <li key={p}>{p}</li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-3 text-sm leading-relaxed text-moon">
+            Open jobs will lapse. Kane does not wait. Rest reprints the board at dawn.
+          </p>
+        )}
         <div className="mt-5 flex gap-2">
           <Button
             variant="danger"
@@ -743,17 +814,174 @@ export function RestConfirm() {
             Hold
           </Button>
         </div>
-        <Button
-          variant="ember"
-          className="mt-2 w-full"
-          onClick={() => {
-            cancel();
-            if (downedId) select(downedId);
-            setScreen("roster");
-          }}
-        >
-          Treat the downed
-        </Button>
+        {downedId ? (
+          <Button
+            variant="ember"
+            className="mt-2 w-full"
+            onClick={() => {
+              cancel();
+              select(downedId);
+              setScreen("roster");
+            }}
+          >
+            Treat the downed
+          </Button>
+        ) : (
+          <Button
+            variant="ember"
+            className="mt-2 w-full"
+            onClick={() => {
+              cancel();
+              setScreen("hq");
+            }}
+          >
+            Back to the board
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export function ShiftSheet() {
+  const s = useGame((g) => g.s);
+  const close = useGame((g) => g.closeTask);
+  const resolve = useGame((g) => g.resolveTask);
+  const task = s.shift?.board.find((t) => t.id === s.shift.activeId);
+  const idle = s.operatives.filter((o) => o.status === "idle" && o.hp > 0);
+  const wounded = s.operatives.filter((o) => o.status === "downed" || (o.hp < o.maxHp && o.status !== "dead"));
+  if (!task || task.kind === "sortie" || task.kind === "cabinet") return null;
+  if (s.combat || s.mission) return null;
+
+  const go = (payload: Parameters<typeof resolve>[0]) => {
+    sfx.click();
+    const msg = resolve(payload);
+    if (msg) sfx.hurt();
+    else rumble(8);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[45] flex items-end justify-center bg-ink/80 p-3 md:items-center">
+      <div className="ms-pop max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-[var(--radius-xl)] bg-surface p-5 shadow-[var(--shadow-border)] ms-scroll">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="font-display text-[10px] uppercase tracking-[0.2em] text-ember">
+              {WATCH_LABEL[s.shift.watch]} · {task.watchCost} watch{task.watchCost > 1 ? "es" : ""}
+              {task.required ? " · required" : ""}
+            </p>
+            <h2 className="mt-1 font-display text-xl">{task.title}</h2>
+          </div>
+          <button
+            type="button"
+            aria-label="Close job"
+            onClick={() => {
+              sfx.click();
+              close();
+            }}
+            className="flex size-11 items-center justify-center rounded-lg border border-line text-moon"
+          >
+            <X className="size-5" />
+          </button>
+        </div>
+        <p className="mt-3 text-[15px] leading-relaxed text-moon">{task.brief}</p>
+        <p className="mt-2 text-sm text-muted">{task.why}</p>
+
+        {task.kind === "crates" && task.crates ? (
+          <div className="mt-5 space-y-2">
+            {task.crates.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => go({ crateId: c.id })}
+                className="flex min-h-14 w-full items-center rounded-[var(--radius-md)] bg-ink px-3 py-3 text-left shadow-[var(--shadow-border)]"
+              >
+                <span className="font-display text-sm text-paper">{c.label}</span>
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        {task.kind === "treat" ? (
+          <div className="mt-5 space-y-2">
+            {wounded.length === 0 ? <p className="text-sm text-muted">Nobody needs the needle.</p> : null}
+            {wounded.map((op) => (
+              <button
+                key={op.id}
+                type="button"
+                onClick={() => go({ opId: op.id })}
+                className="flex min-h-14 w-full items-center gap-3 rounded-[var(--radius-md)] bg-ink px-3 py-3 text-left shadow-[var(--shadow-border)]"
+              >
+                <Portrait op={op} size={36} />
+                <span>
+                  <span className="block font-display text-sm">{op.name}</span>
+                  <span className="text-[11px] text-muted">
+                    {op.status} · {op.hp}/{op.maxHp}
+                  </span>
+                </span>
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        {task.kind === "run" ? (
+          <div className="mt-5 space-y-2">
+            {idle.length === 0 ? <p className="text-sm text-muted">Nobody idle to send.</p> : null}
+            {idle.map((op) => (
+              <button
+                key={op.id}
+                type="button"
+                onClick={() => go({ opId: op.id })}
+                className="flex min-h-14 w-full items-center gap-3 rounded-[var(--radius-md)] bg-ink px-3 py-3 text-left shadow-[var(--shadow-border)]"
+              >
+                <Portrait op={op} size={36} />
+                <span>
+                  <span className="block font-display text-sm">{op.name}</span>
+                  <span className="text-[11px] text-muted">{className(op.cls)} walks. You get the report.</span>
+                </span>
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        {task.kind === "scan" ? (
+          <div className="mt-5 space-y-2">
+            {WORLD.filter((w) => w.id !== "hq" && s.locations[w.id]?.unlocked).map((w) => (
+              <button
+                key={w.id}
+                type="button"
+                onClick={() => go({ loc: w.id })}
+                className="flex min-h-14 w-full flex-col items-start justify-center rounded-[var(--radius-md)] bg-ink px-3 py-3 text-left shadow-[var(--shadow-border)]"
+              >
+                <span className="font-display text-sm">{w.name}</span>
+                <span className="text-[12px] text-muted">Intel {s.locations[w.id].intel}</span>
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        {task.kind === "repair" ? (
+          <div className="mt-5 space-y-2">
+            <Button className="w-full" variant="ember" onClick={() => go({})}>
+              Work the line
+            </Button>
+          </div>
+        ) : null}
+
+        {task.choices?.length && task.kind !== "crates" && task.kind !== "treat" && task.kind !== "run" && task.kind !== "scan" ? (
+          <div className="mt-5 space-y-2">
+            {task.choices.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => go({ choiceId: c.id })}
+                className="flex min-h-14 w-full flex-col items-start justify-center rounded-[var(--radius-md)] bg-ink px-3 py-3 text-left shadow-[var(--shadow-border)]"
+              >
+                <span className="font-display text-sm text-paper">{c.label}</span>
+                <span className="mt-0.5 text-[12px] text-muted">{c.blurb}</span>
+              </button>
+            ))}
+          </div>
+        ) : null}
       </div>
     </div>
   );

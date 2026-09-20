@@ -1,15 +1,19 @@
 import { Button } from "@/components/ui/button";
-import { ARMOR, LEDGER_POOLS, WEAPONS, regionById } from "@/game/data";
+import { ARMOR, LEDGER_POOLS, WEAPONS, makeItemFromArmor, makeItemFromWeapon, regionById } from "@/game/data";
 import { cloneState } from "@/game/engine";
-import { HOLLOW_CATALOG } from "@/game/hollow-catalog";
+import { HOLLOW_CATALOG, type CatalogItem } from "@/game/hollow-catalog";
+import { TREASURE_CATALOG } from "@/game/treasure-catalog";
 import { attachEnchantment, supportedConsumableSummary, useConsumable, type ItemSource } from "@/game/inventory-ops";
 import { PACK_CATALOG, PACK_KEYS } from "@/game/inventory";
-import { CLASS_PRESENTATION, ITEM_KIND_PRESENTATION, classLabel, itemEmoji } from "@/game/presentation";
+import { CALIBERS, INVENTORY_FILTERS, WEAPON_LANES, matchesCaliber, matchesInventoryCategory, matchesWeaponLane, type WeaponLane } from "@/game/inventory-filters";
+import { itemArt, itemThumbUrl, preloadItemArt } from "@/game/item-art";
+import { AMMO_GRADE_META, gradeFromLoad, gradeLabel } from "@/game/ammo-matrix";
+import { CLASS_PRESENTATION, ITEM_KIND_PRESENTATION, classLabel } from "@/game/presentation";
 import { grantItemMastery, previewItem, residentProgress, residentPower } from "@/game/resident-progression";
 import { useGame } from "@/game/store";
+import { magLine } from "@/game/weapon-ops";
 import type {
   ClassName,
-  Condition,
   InventoryCategory,
   Item,
   ItemKind,
@@ -26,13 +30,15 @@ import {
   PackageCheck,
   Search,
   Sparkles,
-  UserRound,
   Wrench,
   X,
   Zap,
 } from "lucide-react";
-import { useMemo, useState } from "react";
-import { Coin, Panel, RarityMark, SectionLabel } from "./primitives";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Panel, RarityMark, SectionLabel } from "./primitives";
+import { ItemThumb } from "./item-thumb";
+import { ItemInspectShell } from "./item-inspect";
+import { ChipScroller, FilterChip, InventoryFrame, InventoryRow } from "./inventory-chrome";
 
 type Mode = "owned" | "catalogue";
 type Source = "vault" | "operative" | "pack" | "catalogue";
@@ -56,7 +62,6 @@ type Row = {
   sourceRegion?: RegionId;
 };
 
-const CATEGORIES: InventoryCategory[] = ["all", "weapon", "armor", "trinket", "consumable", "enchantment", "material", "special"];
 const RARITY_RANK: Record<Rarity, number> = { Common: 0, Uncommon: 1, Rare: 2, Legendary: 3, Mythic: 4, Cursed: 5 };
 const PACK_KIND: Record<PackKey, ItemKind> = {
   bobby_pin: "trinket",
@@ -93,6 +98,32 @@ function rowFromItem(item: Item, source: "vault" | "operative", owner: string, o
   };
 }
 
+function catalogueItem(x: CatalogItem): Item {
+  return {
+    id: `cat:${x.name}`,
+    name: x.name,
+    kind: x.kind,
+    rarity: x.rarity,
+    condition: "Pristine",
+    effect: x.effect,
+    lore: x.lore,
+    value: x.value,
+    equipped: false,
+    classHint: x.classHint,
+    sourceRegion: x.sourceRegion,
+    weaponFamily: x.weaponFamily,
+    ammoType: x.ammoType,
+    magSize: x.magSize,
+    mag: x.mag,
+    rangeBand: x.rangeBand,
+    ap: x.ap,
+    accuracy: x.accuracy,
+    recoil: x.recoil,
+    ammoCount: x.ammoCount,
+    ammoGrade: x.ammoGrade,
+  };
+}
+
 function setToast(message: string) {
   useGame.setState((store) => ({ s: { ...store.s, toast: message } }));
 }
@@ -122,12 +153,12 @@ function tyroneCopy(row: Row, target: Operative | null, mode: HelpMode) {
     if (!item.classHint) return `${row.name} is universal kit. ${target.name} can use it without fighting the design.`;
     const meta = CLASS_PRESENTATION[item.classHint];
     return item.classHint === target.cls
-      ? `${row.name} was built for ${meta.emoji} ${meta.name}. ${target.name} is the right set of hands.`
-      : `${row.name} favors ${meta.emoji} ${meta.name}. ${target.name} can still carry it, but the fit is not ideal.`;
+      ? `${row.name} was built for ${meta.name}. ${target.name} is the right set of hands.`
+      : `${row.name} favors ${meta.name}. ${target.name} can still carry it, but the fit is not ideal.`;
   }
   if (mode === "action") {
     if (row.kind === "weapon" || row.kind === "armor" || row.kind === "trinket") return "Preview the power change, then Equip. If it is in Vault 13, Issue & Equip does both steps at once.";
-    if (row.kind === "consumable") return item ? supportedConsumableSummary(item) : "Consumables are one-use tools. Pick who needs it before burning the dose.";
+    if (row.kind === "consumable") return item?.ammoType ? `Ammunition. ${item.ammoCount ?? "?"} rounds of ${item.ammoType}. Issue it to the shooter. Do not drink it.` : item ? supportedConsumableSummary(item) : "Consumables are one-use tools. Pick who needs it before burning the dose.";
     if (row.kind === "enchantment") return "Enchantments are not worn by themselves. Pick a resident, choose one piece of gear, then Attach. The enchantment is consumed into that item.";
     if (row.kind === "material") return "Material stays in Vault 13. Expansion Protocol consumes the right regional stock automatically when you build.";
     return "Special items are keys, relics, records or future system pieces. Keep them unless a screen specifically asks for one.";
@@ -153,6 +184,8 @@ export function InventoryFast() {
 
   const [mode, setMode] = useState<Mode>("owned");
   const [category, setCategory] = useState<InventoryCategory>("all");
+  const [lane, setLane] = useState<WeaponLane>("all");
+  const [caliber, setCaliber] = useState<(typeof CALIBERS)[number] | "all">("all");
   const [query, setQuery] = useState("");
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [targetOpId, setTargetOpId] = useState("");
@@ -187,14 +220,74 @@ export function InventoryFast() {
     return rows;
   }, [state.vault, state.operatives, state.pack]);
 
+  useEffect(() => {
+    preloadItemArt(
+      owned.map((row) =>
+        itemThumbUrl(
+          itemArt({
+            kind: row.kind,
+            name: row.name,
+            ammoType: row.item?.ammoType,
+            weaponFamily: row.item?.weaponFamily,
+          }),
+        ),
+      ),
+    );
+  }, [owned]);
+
   const catalogue = useMemo<Row[]>(() => {
     const rows: Row[] = [];
-    for (const w of WEAPONS) rows.push({ key: `cw:${w.name}`, source: "catalogue", name: w.name, kind: "weapon", rarity: w.rarity, value: w.value, effect: w.effect, lore: w.lore, owner: "Field catalogue", classHint: w.cls });
-    for (const a of ARMOR) rows.push({ key: `ca:${a.name}`, source: "catalogue", name: a.name, kind: "armor", rarity: a.rarity, value: a.value, effect: a.effect, lore: "Vault 13 armor record.", owner: "Field catalogue", classHint: a.cls });
+    for (const w of WEAPONS) {
+      const item = { ...makeItemFromWeapon(w), id: `cat:${w.name}` };
+      rows.push({
+        key: `cw:${w.name}`,
+        source: "catalogue",
+        name: w.name,
+        kind: "weapon",
+        rarity: w.rarity,
+        value: w.value,
+        effect: w.effect,
+        lore: w.lore,
+        owner: "Field catalogue",
+        classHint: w.cls,
+        item,
+      });
+    }
+    for (const a of ARMOR) {
+      const item = { ...makeItemFromArmor(a), id: `cat:${a.name}` };
+      rows.push({
+        key: `ca:${a.name}`,
+        source: "catalogue",
+        name: a.name,
+        kind: "armor",
+        rarity: a.rarity,
+        value: a.value,
+        effect: a.effect,
+        lore: "Vault 13 armor record.",
+        owner: "Field catalogue",
+        classHint: a.cls,
+        item,
+      });
+    }
     for (const tier of Object.values(LEDGER_POOLS)) {
       for (const x of tier) rows.push({ key: `cl:${x.name}`, source: "catalogue", name: x.name, kind: x.kind, rarity: x.rarity, value: x.price, effect: x.effect, lore: "Quartermaster Exchange record.", owner: "Exchange catalogue" });
     }
-    for (const x of HOLLOW_CATALOG) rows.push({ key: `ch:${x.sourceRegion}:${x.name}`, source: "catalogue", name: x.name, kind: x.kind, rarity: x.rarity, value: x.value, effect: x.effect, lore: x.lore, owner: `${regionById(x.sourceRegion).name} record`, classHint: x.classHint, sourceRegion: x.sourceRegion });
+    for (const x of [...HOLLOW_CATALOG, ...TREASURE_CATALOG]) {
+      rows.push({
+        key: `ch:${x.sourceRegion}:${x.name}`,
+        source: "catalogue",
+        name: x.name,
+        kind: x.kind,
+        rarity: x.rarity,
+        value: x.value,
+        effect: x.effect,
+        lore: x.lore,
+        owner: `${regionById(x.sourceRegion).name} record`,
+        classHint: x.classHint,
+        sourceRegion: x.sourceRegion,
+        item: catalogueItem(x),
+      });
+    }
     const seen = new Set<string>();
     return rows.filter((row) => {
       const id = `${row.kind}:${row.name.toLowerCase()}`;
@@ -209,7 +302,9 @@ export function InventoryFast() {
     const q = query.trim().toLowerCase();
     return base
       .filter((row) => {
-        if (category !== "all" && row.kind !== category) return false;
+        if (!matchesInventoryCategory(row.kind, row.item?.ammoType, category)) return false;
+        if (category === "weapon" && !matchesWeaponLane({ name: row.name, weaponFamily: row.item?.weaponFamily, ammoType: row.item?.ammoType }, lane)) return false;
+        if (category === "ammo" && !matchesCaliber(row.item?.ammoType, caliber)) return false;
         if (!q) return true;
         return [row.name, row.effect, row.owner, row.rarity, row.kind, row.classHint ? classLabel(row.classHint) : "", row.sourceRegion ? regionById(row.sourceRegion).name : ""]
           .join(" ")
@@ -217,7 +312,7 @@ export function InventoryFast() {
           .includes(q);
       })
       .sort((a, b) => RARITY_RANK[b.rarity] - RARITY_RANK[a.rarity] || b.value - a.value);
-  }, [base, category, query]);
+  }, [base, category, query, lane, caliber]);
 
   const selected = base.find((row) => row.key === selectedKey) ?? null;
   const selectedOwner = selected?.ownerId ? state.operatives.find((op) => op.id === selected.ownerId) ?? null : null;
@@ -271,54 +366,100 @@ export function InventoryFast() {
     setSelectedKey(null);
   };
 
+  const selectedArt = selected
+    ? itemArt({
+        kind: selected.kind,
+        name: selected.name,
+        ammoType: selected.item?.ammoType,
+        weaponFamily: selected.item?.weaponFamily,
+      })
+    : null;
+
   return (
-    <div className="space-y-4 pb-8">
-      <div className="flex items-end justify-between gap-3">
-        <div>
-          <SectionLabel>Vault 13 · quick loadout</SectionLabel>
-          <h2 className="font-display text-2xl">Inventory</h2>
-          <p className="mt-1 text-sm text-muted">Tap item → preview → act. No crate-diving required.</p>
-        </div>
-        <button type="button" onClick={() => setHelpMode("explain")} className="flex min-h-11 items-center gap-2 rounded-[var(--radius-sm)] border border-ember/40 bg-ember/10 px-3 font-display text-[10px] uppercase tracking-[0.13em] text-ember">
-          <CircleHelp className="size-4" /> Tyrone
-        </button>
-      </div>
+    <InventoryFrame
+      header={
+        <>
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <SectionLabel>Vault 13 · loadout</SectionLabel>
+              <h2 className="font-display text-xl">Inventory</h2>
+            </div>
+            <button type="button" onClick={() => setHelpMode("explain")} className="flex size-11 shrink-0 items-center justify-center rounded-full border border-ember/40 bg-ember/10 text-ember" aria-label="Ask Tyrone">
+              <CircleHelp className="size-4" />
+            </button>
+          </div>
 
-      {helpMode && !selected ? (
-        <TyronePanel text="Inventory is simple: Owned is what Vault 13 actually has. Catalogue is what we know exists. Tap gear to compare it against a resident before you equip anything. Materials stay in the Vault. Enchantments attach to gear. Consumables disappear when used. I put the important button at the bottom." onClose={() => setHelpMode(null)} />
-      ) : null}
+          {helpMode && !selected ? (
+            <TyronePanel text="Owned is what you actually have. Catalogue is the record. Weapons split into rifles, melee, sidearms, shotguns, energy, heavy. Tap a row. Act at the bottom." onClose={() => setHelpMode(null)} />
+          ) : null}
 
-      <div className="grid grid-cols-2 gap-2">
-        <ModeButton active={mode === "owned"} onClick={() => setMode("owned")} title="🎒 Owned" sub={`${owned.length} items in play`} />
-        <ModeButton active={mode === "catalogue"} onClick={() => setMode("catalogue")} title="📚 Catalogue" sub={`${catalogue.length} known records`} />
-      </div>
+          <div className="grid grid-cols-2 gap-1 rounded-[var(--radius-md)] border border-line bg-ink/50 p-1">
+            <ModeButton active={mode === "owned"} onClick={() => setMode("owned")} title="Owned" sub={`${owned.length} in play`} />
+            <ModeButton active={mode === "catalogue"} onClick={() => setMode("catalogue")} title="Catalogue" sub={`${catalogue.length} records`} />
+          </div>
 
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        {CATEGORIES.map((id) => {
-          const meta = id === "all" ? { emoji: "🧰", plural: "All" } : ITEM_KIND_PRESENTATION[id];
-          return (
-            <button key={id} type="button" onClick={() => setCategory(id)} className={cn("shrink-0 rounded-full border px-3 py-2 font-display text-[10px] uppercase tracking-[0.11em]", category === id ? "border-ember bg-ember/15 text-ember" : "border-line bg-ink/60 text-muted")}>{meta.emoji} {meta.plural}</button>
-          );
-        })}
-      </div>
+          <ChipScroller>
+            {INVENTORY_FILTERS.map((chip) => (
+              <FilterChip
+                key={chip.id}
+                active={category === chip.id}
+                onClick={() => {
+                  setCategory(chip.id);
+                  if (chip.id !== "weapon") setLane("all");
+                  if (chip.id !== "ammo") setCaliber("all");
+                }}
+              >
+                {chip.label}
+              </FilterChip>
+            ))}
+          </ChipScroller>
 
-      <label className="relative block">
-        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
-        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search gear, effect, class, region..." className="min-h-12 w-full rounded-[var(--radius-md)] bg-raised pl-10 pr-3 text-sm text-paper shadow-[var(--shadow-border)] outline-none" />
-      </label>
+          {category === "weapon" ? (
+            <ChipScroller>
+              {WEAPON_LANES.map((chip) => (
+                <FilterChip key={chip.id} compact active={lane === chip.id} onClick={() => setLane(chip.id)}>
+                  {chip.label}
+                </FilterChip>
+              ))}
+            </ChipScroller>
+          ) : null}
 
-      <div className="grid gap-2 md:grid-cols-2">
+          {category === "ammo" ? (
+            <ChipScroller>
+              <FilterChip compact active={caliber === "all"} onClick={() => setCaliber("all")}>Any cartridge</FilterChip>
+              {CALIBERS.map((id) => (
+                <FilterChip key={id} compact active={caliber === id} onClick={() => setCaliber(id)}>
+                  {id}
+                </FilterChip>
+              ))}
+            </ChipScroller>
+          ) : null}
+
+          <label className="relative block">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
+            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search gear…" className="min-h-11 w-full rounded-[var(--radius-md)] bg-raised pl-10 pr-3 text-sm text-paper shadow-[var(--shadow-border)] outline-none" />
+          </label>
+        </>
+      }
+    >
+      <div className="grid gap-1.5 pb-4 md:grid-cols-2">
         {filtered.map((row) => {
           const equipped = !!row.item?.equipped;
+          const chamber = row.item ? magLine(row.item) : "";
           return (
-            <button key={row.key} type="button" onClick={() => choose(row)} className="flex min-h-[6.5rem] items-start gap-3 rounded-[var(--radius-lg)] border border-line/80 bg-raised p-3 text-left shadow-[var(--shadow-border)] transition active:scale-[0.99] hover:border-ember/50">
-              <span className="flex size-12 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-ink text-2xl shadow-[inset_0_0_0_1px_var(--color-line)]">{itemEmoji(row.kind)}</span>
-              <span className="min-w-0 flex-1">
-                <span className="flex items-start justify-between gap-2"><span className="truncate font-display text-sm text-paper">{row.name}</span><RarityMark rarity={row.rarity} /></span>
-                <span className="mt-1 block line-clamp-2 text-xs leading-relaxed text-moon">{row.effect}</span>
-                <span className="mt-2 flex items-center justify-between gap-2 text-[11px] text-muted"><span className="truncate">{row.owner}{equipped ? " · EQUIPPED" : ""}</span>{row.quantity && row.quantity > 1 ? <span className="text-ember">×{row.quantity}</span> : null}</span>
+            <InventoryRow key={row.key} onOpen={() => choose(row)} className="flex min-h-14 min-w-0 items-center gap-2.5 overflow-hidden rounded-[var(--radius-md)] border border-line/80 bg-raised px-2.5 py-2 text-left shadow-[var(--shadow-border)] hover:border-ember/50">
+              <ItemThumb kind={row.kind} name={row.name} ammoType={row.item?.ammoType} weaponFamily={row.item?.weaponFamily} size="sm" />
+              <span className="min-w-0 flex-1 overflow-hidden">
+                <span className="flex min-w-0 items-center justify-between gap-2">
+                  <span className="min-w-0 truncate font-display text-sm text-paper">{row.name}</span>
+                  <RarityMark rarity={row.rarity} />
+                </span>
+                {chamber && chamber !== "melee" ? <span className="mt-0.5 block min-w-0 truncate font-display text-[9px] uppercase tracking-[0.08em] text-ember">{chamber}</span> : null}
+                {row.item?.ammoType && row.kind === "consumable" ? <span className="mt-0.5 block truncate font-display text-[9px] uppercase tracking-[0.14em] text-ember">{row.item.ammoType} · {gradeLabel(row.item.ammoGrade ?? gradeFromLoad(row.item.ammoLoad ?? row.item.name))}</span> : null}
+                <span className="mt-0.5 block min-w-0 truncate text-xs text-moon">{row.effect}</span>
+                <span className="mt-0.5 block min-w-0 truncate text-[10px] text-muted">{row.owner}{equipped ? " · EQUIPPED" : ""}{row.quantity && row.quantity > 1 ? " · ×" + row.quantity : ""}</span>
               </span>
-            </button>
+            </InventoryRow>
           );
         })}
       </div>
@@ -326,15 +467,40 @@ export function InventoryFast() {
       {!filtered.length ? <Panel><p className="text-sm text-muted">Nothing matches. Tyrone recommends fewer filters and more scavenging.</p></Panel> : null}
 
       {selected ? (
-        <div className="fixed inset-0 z-[70] flex items-end bg-ink/75 p-3 backdrop-blur-sm md:items-center md:justify-center" onClick={() => setSelectedKey(null)}>
-          <div className="ms-pop max-h-[90vh] w-full overflow-y-auto rounded-[var(--radius-xl)] border border-line bg-surface p-4 shadow-2xl md:max-w-xl md:p-5 ms-scroll" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-start gap-3">
-              <span className="flex size-14 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-ink text-3xl shadow-[inset_0_0_0_1px_var(--color-line)]">{itemEmoji(selected.kind)}</span>
-              <div className="min-w-0 flex-1"><SectionLabel>{ITEM_KIND_PRESENTATION[selected.kind].label}</SectionLabel><h3 className="font-display text-xl text-paper">{selected.name}</h3><div className="mt-1 flex items-center gap-2"><RarityMark rarity={selected.rarity} />{selected.item?.condition ? <span className="text-xs text-muted">{selected.item.condition}</span> : null}{selected.item?.equipped ? <span className="text-[10px] font-display uppercase text-ok">Equipped</span> : null}</div></div>
-              <button type="button" onClick={() => setSelectedKey(null)} className="flex size-10 items-center justify-center rounded-full border border-line text-muted"><X className="size-4" /></button>
-            </div>
-
-            <Panel className="mt-4 bg-raised p-3"><p className="text-sm leading-relaxed text-paper">{selected.effect}</p><p className="mt-2 text-xs italic leading-relaxed text-moon">{selected.lore}</p></Panel>
+        <ItemInspectShell
+          onClose={() => setSelectedKey(null)}
+          heroSrc={selectedArt}
+          hero={<ItemThumb kind={selected.kind} name={selected.name} ammoType={selected.item?.ammoType} weaponFamily={selected.item?.weaponFamily} size="hero" />}
+          eyebrow={<SectionLabel>{ITEM_KIND_PRESENTATION[selected.kind].label}</SectionLabel>}
+          title={<h3 className="font-display text-xl text-paper">{selected.name}</h3>}
+          badges={
+            <>
+              <RarityMark rarity={selected.rarity} />
+              {selected.item?.condition ? <span className="text-xs text-muted">{selected.item.condition}</span> : null}
+              {selected.item?.equipped ? <span className="font-display text-[10px] uppercase text-ok">Equipped</span> : null}
+            </>
+          }
+          actions={
+            <>
+              {selected.source === "operative" && selected.item?.slot && selected.ownerId ? (
+                <Button variant={selected.item.equipped ? "quiet" : "ember"} className="w-full" onClick={() => { equip(selected.ownerId!, selected.item!.id); if (!selected.item!.equipped) awardMastery(selected.ownerId!, selected.item!.id); else setToast(`${selected.name} unequipped.`); setSelectedKey(null); }}>
+                  {selected.item.equipped ? <><Check className="size-4" /> Unequip</> : <><Zap className="size-4" /> Equip</>}
+                </Button>
+              ) : null}
+              {selected.source === "vault" && selected.item?.slot && target ? <Button variant="ember" className="w-full" onClick={() => issueAndEquip(target.id, selected.item!)}><PackageCheck className="size-4" /> Issue & Equip to {target.name}</Button> : null}
+              {(selected.source === "vault" || selected.source === "operative") && selected.item?.kind === "consumable" && target ? <Button variant="ember" className="w-full" onClick={() => useNormalConsumable(selected, target.id)}><Zap className="size-4" /> Use on {target.name}</Button> : null}
+              {(selected.source === "vault" || selected.source === "operative") && selected.item?.kind === "enchantment" && target && resolvedTargetGearId ? <Button variant="ember" className="w-full" onClick={() => attach(selected, target.id, resolvedTargetGearId)}><Sparkles className="size-4" /> Attach to gear</Button> : null}
+              {selected.source === "pack" && selected.packKey ? <Button variant="ember" className="w-full" onClick={() => { const msg = usePack(selected.packKey!); if (msg) setToast(msg); setSelectedKey(null); }}><Zap className="size-4" /> Use {selected.name}</Button> : null}
+              {(selected.source === "vault" || selected.source === "operative") && selected.item && selected.item.condition !== "Pristine" ? <Button variant="ghost" className="w-full" onClick={() => { const msg = repair(selected.source === "vault" ? "vault" : selected.ownerId!, selected.item!.id); if (msg) setToast(msg); }}><Wrench className="size-4" /> Repair</Button> : null}
+              {selected.source === "operative" && selected.item && selected.ownerId && !selected.item.equipped ? <Button variant="quiet" className="w-full" onClick={() => { const msg = stash(selected.ownerId!, selected.item!.id); if (msg) setToast(msg); else { setToast(`${selected.name} moved to Vault 13.`); setSelectedKey(null); } }}><Archive className="size-4" /> Move to Vault 13</Button> : null}
+              {(selected.kind === "material" || selected.kind === "special") && selected.source !== "catalogue" ? <div className="rounded-[var(--radius-md)] border border-line bg-ink/45 px-3 py-3 text-sm text-muted">{selected.kind === "material" ? "Stored. Vault 13 construction will consume this when the correct expansion asks for it." : "Key/relic item. Keep it until a system specifically requests it."}</div> : null}
+              {selected.source === "catalogue" ? <div className="rounded-[var(--radius-md)] border border-line bg-ink/45 px-3 py-3 text-sm text-muted">Catalogue only. Find it in the Hollow Realm before Tyrone lets you touch the buttons.</div> : null}
+            </>
+          }
+        >
+            <Panel className="bg-raised p-3"><p className="text-sm leading-relaxed text-paper">{selected.effect}</p><p className="mt-2 text-xs italic leading-relaxed text-moon">{selected.lore}</p></Panel>
+            {selected.item && magLine(selected.item) && magLine(selected.item) !== "melee" ? <p className="mt-3 min-w-0 break-words font-display text-[10px] uppercase tracking-[0.08em] text-ember">{magLine(selected.item)}</p> : null}
+            {selected.item?.ammoType && selected.kind === "consumable" ? <p className="mt-2 text-xs text-muted">Ammunition. {selected.item.ammoCount ?? "?"} rounds of {selected.item.ammoType} · {gradeLabel(selected.item.ammoGrade ?? gradeFromLoad(selected.item.name))}. {AMMO_GRADE_META[selected.item.ammoGrade ?? gradeFromLoad(selected.item.name)].blurb} Do not drink it.</p> : null}
 
             {selected.source !== "catalogue" && selected.source !== "pack" && residents.length && selected.source !== "operative" ? (
               <select value={selectedTargetId} onChange={(e) => { setTargetOpId(e.target.value); setTargetGearId(""); }} className="mt-4 min-h-12 w-full rounded-[var(--radius-sm)] bg-ink px-3 text-sm text-paper shadow-[var(--shadow-border)] outline-none">
@@ -342,8 +508,8 @@ export function InventoryFast() {
               </select>
             ) : null}
 
-            {target && selected.item ? (
-              <div className="mt-3 grid grid-cols-3 gap-2">
+            {target && selected.item && selected.source !== "catalogue" ? (
+              <div className="mt-3 grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-3">
                 <Metric label="Resident" value={`${target.name} · Lv ${preview?.currentLevel ?? 1}${preview && preview.projectedLevel > preview.currentLevel ? ` → ${preview.projectedLevel}` : ""}`} />
                 <Metric label="Power" value={<span className={powerTone(preview?.powerDelta ?? 0)}>{preview?.currentPower ?? residentPower(target)}{preview?.powerDelta ? ` → ${preview.projectedPower}` : ""}</span>} />
                 <Metric label="Mastery" value={preview?.masteryXp ? `+${preview.masteryXp} XP` : "Known"} />
@@ -360,51 +526,26 @@ export function InventoryFast() {
             ) : null}
 
             {helpMode ? <div className="mt-3"><TyronePanel text={tyroneCopy(selected, target ?? null, helpMode)} onClose={() => setHelpMode(null)} /></div> : null}
-            <div className="mt-3 grid grid-cols-3 gap-2">
+            <div className="mt-3 grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-3">
               <HelpButton active={helpMode === "explain"} onClick={() => setHelpMode("explain")}>Explain</HelpButton>
               <HelpButton active={helpMode === "fit"} onClick={() => setHelpMode("fit")}>Best fit</HelpButton>
               <HelpButton active={helpMode === "action"} onClick={() => setHelpMode("action")}>How to use</HelpButton>
             </div>
-
-            <div className="mt-4 space-y-2">
-              {selected.source === "operative" && selected.item?.slot && selected.ownerId ? (
-                <Button variant={selected.item.equipped ? "quiet" : "ember"} className="w-full" onClick={() => { equip(selected.ownerId!, selected.item!.id); if (!selected.item!.equipped) awardMastery(selected.ownerId!, selected.item!.id); else setToast(`${selected.name} unequipped.`); setSelectedKey(null); }}>
-                  {selected.item.equipped ? <><Check className="size-4" /> Unequip</> : <><Zap className="size-4" /> Equip</>}
-                </Button>
-              ) : null}
-
-              {selected.source === "vault" && selected.item?.slot && target ? <Button variant="ember" className="w-full" onClick={() => issueAndEquip(target.id, selected.item!)}><PackageCheck className="size-4" /> Issue & Equip to {target.name}</Button> : null}
-
-              {(selected.source === "vault" || selected.source === "operative") && selected.item?.kind === "consumable" && target ? <Button variant="ember" className="w-full" onClick={() => useNormalConsumable(selected, target.id)}><Zap className="size-4" /> Use on {target.name}</Button> : null}
-
-              {(selected.source === "vault" || selected.source === "operative") && selected.item?.kind === "enchantment" && target && resolvedTargetGearId ? <Button variant="ember" className="w-full" onClick={() => attach(selected, target.id, resolvedTargetGearId)}><Sparkles className="size-4" /> Attach to gear</Button> : null}
-
-              {selected.source === "pack" && selected.packKey ? <Button variant="ember" className="w-full" onClick={() => { const msg = usePack(selected.packKey!); if (msg) setToast(msg); setSelectedKey(null); }}><Zap className="size-4" /> Use {selected.name}</Button> : null}
-
-              {(selected.source === "vault" || selected.source === "operative") && selected.item && selected.item.condition !== "Pristine" ? <Button variant="ghost" className="w-full" onClick={() => { const msg = repair(selected.source === "vault" ? "vault" : selected.ownerId!, selected.item!.id); if (msg) setToast(msg); }}><Wrench className="size-4" /> Repair</Button> : null}
-
-              {selected.source === "operative" && selected.item && selected.ownerId && !selected.item.equipped ? <Button variant="quiet" className="w-full" onClick={() => { const msg = stash(selected.ownerId!, selected.item!.id); if (msg) setToast(msg); else { setToast(`${selected.name} moved to Vault 13.`); setSelectedKey(null); } }}><Archive className="size-4" /> Move to Vault 13</Button> : null}
-
-              {(selected.kind === "material" || selected.kind === "special") && selected.source !== "catalogue" ? <div className="rounded-[var(--radius-md)] border border-line bg-ink/45 px-3 py-3 text-sm text-muted">{selected.kind === "material" ? "Stored. Vault 13 construction will consume this when the correct expansion asks for it." : "Key/relic item. Keep it until a system specifically requests it."}</div> : null}
-
-              {selected.source === "catalogue" ? <div className="rounded-[var(--radius-md)] border border-line bg-ink/45 px-3 py-3 text-sm text-muted">Catalogue only. Find it in the Hollow Realm before Tyrone lets you touch the buttons.</div> : null}
-            </div>
-          </div>
-        </div>
+        </ItemInspectShell>
       ) : null}
-    </div>
+    </InventoryFrame>
   );
 }
 
 function ModeButton({ active, onClick, title, sub }: { active: boolean; onClick: () => void; title: string; sub: string }) {
-  return <button type="button" onClick={onClick} className={cn("min-h-14 rounded-[var(--radius-md)] border px-3 text-left", active ? "border-ember bg-ember/10 text-paper" : "border-line bg-raised text-muted")}><span className="block font-display text-xs uppercase tracking-[0.13em]">{title}</span><span className="mt-0.5 block text-[11px]">{sub}</span></button>;
+  return <button type="button" onClick={onClick} className={cn("min-h-11 rounded-[var(--radius-sm)] px-3 text-left", active ? "bg-ember/15 text-paper" : "text-muted")}><span className="block font-display text-[10px] uppercase tracking-[0.13em]">{title}</span><span className="mt-0.5 block truncate text-[11px]">{sub}</span></button>;
 }
 
-function Metric({ label, value }: { label: string; value: React.ReactNode }) {
-  return <div className="rounded-[var(--radius-sm)] bg-ink p-2.5"><p className="font-display text-[8px] uppercase tracking-[0.16em] text-muted">{label}</p><div className="mt-1 text-xs font-medium text-paper">{value}</div></div>;
+function Metric({ label, value }: { label: string; value: ReactNode }) {
+  return <div className="min-w-0 overflow-hidden rounded-[var(--radius-sm)] bg-ink p-2.5"><p className="font-display text-[8px] uppercase tracking-[0.16em] text-muted">{label}</p><div className="mt-1 break-words text-xs font-medium text-paper">{value}</div></div>;
 }
 
-function HelpButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+function HelpButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
   return <button type="button" onClick={onClick} className={cn("min-h-10 rounded-[var(--radius-sm)] border px-2 font-display text-[9px] uppercase tracking-[0.1em]", active ? "border-ember bg-ember/10 text-ember" : "border-line text-muted")}>{children}</button>;
 }
 

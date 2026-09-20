@@ -16,7 +16,7 @@ import { useGame } from "@/game/store";
 import type { QuarterId, RoomId } from "@/game/types";
 import { cn } from "@/lib/cn";
 import { ChevronRight, LockKeyhole, ShieldCheck, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Coin, Panel, SectionLabel } from "./primitives";
 
 const ROOMS = Object.keys(BASE_ROOMS) as RoomId[];
@@ -29,6 +29,15 @@ export function CampaignBalancePanel() {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    const onOpen = () => {
+      setOpen(true);
+      setError(null);
+    };
+    window.addEventListener("hollow:open-raid-matrix", onOpen);
+    return () => window.removeEventListener("hollow:open-raid-matrix", onOpen);
+  }, []);
+
   if (s.screen !== "hq" && s.screen !== "map") return null;
 
   const selected = s.selectedLoc ?? "ironclad";
@@ -38,18 +47,20 @@ export function CampaignBalancePanel() {
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => {
-          sfx.click();
-          setOpen(true);
-          setError(null);
-        }}
-        className="fixed bottom-[5.8rem] right-3 z-30 flex min-h-12 items-center gap-2 rounded-full border border-ember/45 bg-surface/95 px-4 font-display text-[10px] uppercase tracking-[0.14em] text-ember shadow-xl backdrop-blur-md md:bottom-5 md:right-5"
-      >
-        {s.screen === "hq" ? <LockKeyhole className="size-4" /> : <ShieldCheck className="size-4" />}
-        {s.screen === "hq" ? "Expansion Board" : `Raid Matrix ${readiness}`}
-      </button>
+      {s.screen === "hq" ? (
+        <button
+          type="button"
+          onClick={() => {
+            sfx.click();
+            setOpen(true);
+            setError(null);
+          }}
+          className="fixed bottom-[5.8rem] right-3 z-30 flex min-h-12 items-center gap-2 rounded-full border border-ember/45 bg-surface/95 px-4 font-display text-[10px] uppercase tracking-[0.14em] text-ember shadow-xl backdrop-blur-md md:bottom-5 md:right-5"
+        >
+          <LockKeyhole className="size-4" />
+          Expansion Board
+        </button>
+      ) : null}
 
       {open ? (
         <div className="fixed inset-0 z-[90] flex items-end bg-ink/80 p-3 backdrop-blur-md md:items-center md:justify-center" onClick={() => setOpen(false)}>

@@ -10,11 +10,13 @@ import type {
   RollEntry,
   Bounty,
   ShopOffer,
+  ArmorClass,
+  RangeBand,
 } from "./types";
 
 export const TICK_SECONDS = 1.4;
 export const SAVE_KEY = "synaps-t0880-v1";
-export const SAVE_VERSION = 5;
+export const SAVE_VERSION = 10;
 
 export const CLASSES: ClassName[] = [
   "Warrior",
@@ -54,15 +56,15 @@ export const PRIMARY_STAT: Record<ClassName, StatKey> = {
 
 export const CLASS_GIFT: Record<ClassName, { name: string; desc: string }> = {
   Warrior: {
-    name: "Shield Block",
+    name: "Plate Wall",
     desc: "Absorb incoming damage for the squad this round. Once per day.",
   },
   Wizard: {
-    name: "Arcane Surge",
+    name: "Rift Surge",
     desc: "Double the effect of the next roll. Once per day.",
   },
   Rogue: {
-    name: "Shadow Step",
+    name: "Ghost Step",
     desc: "Avoid one consequence entirely. Once per day.",
   },
   Healer: {
@@ -74,7 +76,7 @@ export const CLASS_GIFT: Record<ClassName, { name: string; desc: string }> = {
     desc: "Pull one mid-sortie item from a contact. Once per day.",
   },
   Bard: {
-    name: "Encore",
+    name: "Broadcast",
     desc: "Re-roll any failed check. Once per day.",
   },
 };
@@ -88,15 +90,15 @@ export const CLASS_LORE: Record<
     playstyle: "Anchor the party. Take the hit. Hold the line.",
   },
   Wizard: {
-    tagline: "Magic in the Hollow is not a skill. It is a conversation.",
-    playstyle: "Change what is possible. Do not take the hit.",
+    tagline: "SYNAPSE in the Hollow is not a skill. It is a conversation.",
+    playstyle: "Bend the rift. Do not take the hit.",
   },
   Rogue: {
-    tagline: "Rogues exist in the space between things.",
+    tagline: "Ghostrunners live in the gap between a lock and a body.",
     playstyle: "Do not fight fair. Use the exit, the dark, the other people.",
   },
   Healer: {
-    tagline: "They have seen the worst the Hollow can do. They came back anyway.",
+    tagline: "Sawbones have seen the worst the Hollow can do. They came back anyway.",
     playstyle: "Win days that should have ended.",
   },
   Merchant: {
@@ -119,10 +121,10 @@ export const TRAIT_TIERS = [
 
 export const ORIGINS = [
   "Ironclad",
-  "Crumbling Kingdom",
-  "Underground Caverns",
+  "Slag Town",
+  "Blackspire",
   "Veyra City",
-  "Sunken Library",
+  "Brasswater",
 ];
 
 export const FIRST_NAMES = [
@@ -291,16 +293,16 @@ export const SIGNATURE: Record<ClassName, RollEntry[]> = {
     { r: [20, 20], name: "THE HOLLOW'S BLADE", desc: "On a Critical, the effect lingers into next day." },
   ],
   Wizard: [
-    { r: [1, 2], name: "Volatile Casting", desc: "Spells hit harder. 1-in-6 unexpected side effect." },
+    { r: [1, 2], name: "Volatile Rift", desc: "Rift charges hit harder. 1-in-6 unexpected side effect." },
     { r: [3, 4], name: "Forbidden Indexing", desc: "Attempt any knowledge roll regardless of subject." },
-    { r: [5, 6], name: "Spell Dampening", desc: "Halve an incoming magical effect. Once/day." },
+    { r: [5, 6], name: "Signal Dampening", desc: "Halve an incoming SYNAPSE pulse. Once/day." },
     { r: [7, 8], name: "Rune Reading", desc: "+2 to decipher inscriptions and Hollow markings." },
-    { r: [9, 10], name: "Projection", desc: "Cast a minor illusion without a roll. Once/day." },
-    { r: [11, 12], name: "Arcane Diagnosis", desc: "Identify any magical effect by touch. No roll." },
-    { r: [13, 14], name: "Counter-Spell", desc: "Interrupt enemy magic. INT vs difficulty." },
-    { r: [15, 16], name: "Hollow Channelling", desc: "Once/arc, cast beyond normal tier." },
-    { r: [17, 18], name: "Memory Casting", desc: "Replicate any spell witnessed. +1 to copies." },
-    { r: [19, 19], name: "The Eye", desc: "See through one illusion or hidden thing per day." },
+    { r: [9, 10], name: "Holo-Flicker", desc: "Cast a minor projection without a roll. Once/day." },
+    { r: [11, 12], name: "Signal Diagnosis", desc: "Identify any SYNAPSE or 2753 effect by touch. No roll." },
+    { r: [13, 14], name: "Counter-Pulse", desc: "Interrupt enemy signal. INT vs difficulty." },
+    { r: [15, 16], name: "Hollow Channelling", desc: "Once/arc, push a rift charge beyond normal tier." },
+    { r: [17, 18], name: "Memory Protocol", desc: "Replicate any pulse witnessed. +1 to copies." },
+    { r: [19, 19], name: "The Eye", desc: "See through one projection or hidden thing per day." },
     { r: [20, 20], name: "THE HOLLOW'S TONGUE", desc: "Once/arc, ask the Hollow anything. It answers." },
   ],
   Rogue: [
@@ -313,7 +315,7 @@ export const SIGNATURE: Record<ClassName, RollEntry[]> = {
     { r: [13, 14], name: "Escape Artist", desc: "Cannot stay restrained more than one round." },
     { r: [15, 16], name: "Rooftop Navigation", desc: "Full speed across vertical terrain." },
     { r: [17, 18], name: "Dead Drop Network", desc: "Once/arc, retrieve intel from a hidden cache." },
-    { r: [19, 19], name: "Ghost Entry", desc: "Enter any non-magical location. Leaves no trace." },
+    { r: [19, 19], name: "Ghost Entry", desc: "Enter any unsealed location. Leaves no trace." },
     { r: [20, 20], name: "THE HOLLOW'S SHADOW", desc: "Functionally invisible for one full scene." },
   ],
   Healer: [
@@ -365,7 +367,7 @@ export const SHADOW: Record<ClassName, RollEntry[]> = {
     { r: [7, 8], name: "The Blood Debt", desc: "Owes a life. The creditor hasn't collected yet." },
     { r: [9, 10], name: "The Haunted Blade", desc: "Weapon carries a death. Once/arc it reacts." },
     { r: [11, 12], name: "The War Fatigue", desc: "Extended combat: -1 cumulative after day 3." },
-    { r: [13, 14], name: "The Fallen Banner", desc: "-1 trust with Kingdom remnants." },
+    { r: [13, 14], name: "The Fallen Banner", desc: "-1 trust with Slag Town remnants." },
     { r: [15, 16], name: "The Unnecessary Death", desc: "Someone died because of their choice." },
     { r: [17, 18], name: "The Pride", desc: "Cannot accept help at full HP. Must attempt alone first." },
     { r: [19, 20], name: "The Hollow's Claim", desc: "The Hollow marked them. It is owed a service." },
@@ -570,85 +572,138 @@ export interface RaceDef {
 }
 
 export const RACES: Record<string, RaceDef> = {
-  "Dust-Walker": {
-    name: "Dust-Walker",
-    tagline: "Nomads of the Edge. They walked too close to the void, and the void walked back.",
-    stats: { STR: 0, DEF: 0, INT: 0, WIS: 2, SPD: 1, CHA: -2, LCK: 0 },
-    ability: "Void-Scarred — Once per day, ignore a magical attack or curse entirely.",
-    kit: ["Scavenged Breathing Mask", "Dried Void-Moss x3"],
-    lineage: {
-      "Ash-Stalker": "+2 stealth in grey environments. Starts with a serrated bone-knife.",
-      "Void-Oracle": "+2 WIS. Can read an object's history by touch, at a cost of 1 HP.",
-    },
-    vulnerability: "Fragile Mind: -2 vs psychic or mind-control.",
-    desc: "Lean, weathered, violet-eyed. Layered dusters and wide-brimmed hats. Photosensitive skin; perfect night vision.",
-  },
-  "Garrison-Born": {
-    name: "Garrison-Born",
-    tagline: "The stubborn descendants of a ruined empire.",
+  "Ironclad-born": {
+    name: "Ironclad-born",
+    tagline: "The first gate. Rail steel in the blood. Checkpoint kids who learned to stand still under a gun.",
     stats: { STR: 1, DEF: 2, INT: 0, WIS: 0, SPD: -1, CHA: 0, LCK: 0 },
     ability: "Iron Discipline — Immune to Fear. +1 combat when fighting beside an ally.",
-    kit: ["Dented Sigil Ring", "Standard Issue Whetstone", "Ration Tin"],
+    kit: ["Dented Gate Sigil", "Standard Issue Whetstone", "Ration Tin"],
     lineage: {
-      "Iron-Guard": "+3 DEF when standing still. Starts with a heavy tower shield.",
-      "Vanguard-Scout": "+2 SPD. Ignore difficult terrain when moving toward an enemy.",
+      "Gate-Warden": "+3 DEF when standing still. Starts with a heavy tower shield.",
+      "Rail-Scout": "+2 SPD. Ignore wreckage when moving toward an enemy.",
     },
-    vulnerability: "Heavy-Footed: -4 stealth on water or metal flooring. Cannot swim.",
-    desc: "Dense bone, rigid posture, battered plate over utilitarian coats. Relics of authority in a world that forgot the lease.",
+    vulnerability: "Heavy-Footed: -4 stealth on catwalks or wet steel. Cannot swim.",
+    desc: "Dense bone, rigid posture, patched plate over work coats. They hold Ironclad because someone has to.",
   },
-  "The Sunken": {
-    name: "The Sunken",
-    tagline: "Information is a currency, and they run the mint.",
+  "Slag-blood": {
+    name: "Slag-blood",
+    tagline: "Furnace streets of Slag Town. Heat-scarred, dust-masked, they walk the roads Kane wants priced.",
+    stats: { STR: 0, DEF: 0, INT: 0, WIS: 2, SPD: 1, CHA: -2, LCK: 0 },
+    ability: "Heat-Scarred — Once per day, ignore a fire, gas, or radiation hit entirely.",
+    kit: ["Scavenged Breathing Mask", "Dried Slag-Moss x3"],
+    lineage: {
+      "Furnace-Runner": "+2 stealth in ash and grey streets. Starts with a serrated slag-knife.",
+      "Heat-Reader": "+2 WIS. Can read a machine's last hours by touch, at a cost of 1 HP.",
+    },
+    vulnerability: "Fragile Lungs: -2 vs gas, smoke, or sealed-room toxin.",
+    desc: "Lean, weathered, furnace-eyed. Layered dusters and wide-brimmed hats. Photosensitive skin; perfect night vision.",
+  },
+  "Tide-hem": {
+    name: "Tide-hem",
+    tagline: "Brasswater docks. Information is caps, and they run the mint.",
     stats: { STR: -1, DEF: 0, INT: 2, WIS: 0, SPD: 0, CHA: 2, LCK: 1 },
     ability: "Silver Tongue — Start with a Black Ledger. 10% off black-market trades.",
-    kit: ["Encoded Ledger", "Silver Pocket Watch", "Fine Silk Handkerchief"],
+    kit: ["Encoded Ledger", "Brass Pocket Watch", "Fine Silk Handkerchief"],
     lineage: {
-      "Guild-Broker": "Starts with 500 extra coins and a Favour token.",
-      "Inksmith": "Can craft a one-time Living Tattoo buff.",
+      "Dock-Broker": "Starts with 500 extra caps and a Favour token.",
+      "Tide-Scribe": "Can craft a one-time living mark that buys a rumour.",
     },
-    vulnerability: "Dehydrated: exhaustion stacks twice as fast away from humidity.",
-    desc: "Sleek, damp-hemmed coats, oxidized silver. Recessed gills. Aristocrats of the underworld.",
+    vulnerability: "Dehydrated: exhaustion stacks twice as fast away from the waterline.",
+    desc: "Sleek, damp-hemmed coats, oxidized brass. Recessed gills. Aristocrats of the underworld docks.",
   },
-  "Deep-Claimed": {
-    name: "Deep-Claimed",
-    tagline: "Trapped in the dark, they became harder than the stone.",
+  "Deepworks": {
+    name: "Deepworks",
+    tagline: "Blackspire shafts. Trapped in the dark until they became harder than the stone.",
     stats: { STR: 2, DEF: 1, INT: -1, WIS: 0, SPD: 0, CHA: -1, LCK: 0 },
     ability: "Stonebreaker — Mine Hollow Ore without tools. Detect structural traps in the dark.",
     kit: ["Heavy Work Gloves", "Glowing Ore Fragment", "Chisel"],
     lineage: {
-      "Bedrock-Bulwark": "Cannot be knocked down or pushed back.",
-      "Ore-Seer": "Can smell precious metals through five feet of stone.",
+      "Shaft-Bulwark": "Cannot be knocked down or pushed back.",
+      "Vein-Seer": "Can smell precious metals through five feet of stone.",
     },
-    vulnerability: "Light-Blinded: -3 to all rolls for an hour after bright light.",
+    vulnerability: "Light-Blinded: -3 to all rolls for an hour after flood lamps.",
     desc: "Hulking, ore-veined, pale. Mining tools as weapons. The mountain gives nothing; you take it.",
   },
-  "Aether-Kith": {
-    name: "Aether-Kith",
-    tagline: "Remnants of the high-culture, drifting between states of matter.",
+  "Signal-marked": {
+    name: "Signal-marked",
+    tagline: "Veyra City test-bed. Kane tagged them for AEGIS 2753 — successors to T-0880, not wizards.",
     stats: { STR: -2, DEF: -1, INT: 1, WIS: 1, SPD: 0, CHA: 1, LCK: 3 },
-    ability: "Phase Shift — Once per combat, move through a solid object or enemy.",
-    kit: ["Glass Vial of Essence", "Translucent Cape", "Ancient Map Fragment"],
+    ability: "Suit-Sync — Once per combat, ghost-step through a bulkhead or enemy using a 2753 pulse.",
+    kit: ["Signal Vial", "Translucent Visor Film", "AEGIS Map Fragment"],
     lineage: {
-      "Wisp-Kin": "Hover over gaps or pressure plates without triggering them.",
-      "Spark-Weaver": "Generate small electrical charges to power relics or shock.",
+      "Suit-Ghost": "Hover over gaps or pressure plates without triggering them.",
+      "2753-Weaver": "Generate small charges to power relics or shock a lock.",
     },
-    vulnerability: "Disrupted Form: 1d4 damage each turn inside anti-magic fields.",
-    desc: "Translucent, weightless, prism-haze outlines. Form is temporary; energy is eternal.",
+    vulnerability: "EMP-sick: 1d4 damage each turn inside a jammer field.",
+    desc: "Clean lines, visor haze, a faint chassis shimmer. Form is hardware; the signal is the person.",
   },
-  "Hollow-Touched": {
-    name: "Hollow-Touched",
-    tagline: "Marked by the void.",
+  "Vault-scarred": {
+    name: "Vault-scarred",
+    tagline: "Vault 13 and the T-0880 shutdown. Marked when Tyrone walked out and Kane sealed the rest.",
     stats: { STR: 1, DEF: 0, INT: 1, WIS: 0, SPD: 0, CHA: -1, LCK: 3 },
-    ability: "Void Resonance — Once per day, reroll a failed Hollow-related check. The Hollow notices.",
-    kit: ["Void-Stained Cloth", "Unlabeled Vial"],
+    ability: "Chassis Resonance — Once per day, reroll a failed Vault or SYNAPSE check. The chassis notices.",
+    kit: ["Vault-Stained Cloth", "Unlabeled Stim"],
     lineage: {
-      "Rift-Born": "+1 LCK. Once per arc, ignore a fumble in a Hollow location.",
-      "Echo-Walker": "+1 INT. Sense nearby Hollow entities without a roll.",
+      "Chassis-Born": "+1 LCK. Once per arc, ignore a fumble in a Vault or Hollow site.",
+      "Protocol-Walker": "+1 INT. Sense nearby T-0880 or AEGIS signatures without a roll.",
     },
     vulnerability: "Hollow Hunger: after a fumble in a Hollow location, lose 1 HP as the void drinks.",
     desc: "Ordinary until the light hits wrong. A faint inner absence. People step aside without knowing why.",
   },
 };
+
+export const LEGACY_RACE_MAP: Record<string, string> = {
+  "Dust-Walker": "Slag-blood",
+  "Dust Walker": "Slag-blood",
+  "Garrison-Born": "Ironclad-born",
+  "Garrison Born": "Ironclad-born",
+  "The Sunken": "Tide-hem",
+  Sunken: "Tide-hem",
+  "Deep-Claimed": "Deepworks",
+  "Deep Claimed": "Deepworks",
+  "Aether-Kith": "Signal-marked",
+  "Aether Kith": "Signal-marked",
+  Aether: "Signal-marked",
+  "Hollow-Touched": "Vault-scarred",
+  "Hollow Touched": "Vault-scarred",
+};
+
+export const LEGACY_LINEAGE_MAP: Record<string, string> = {
+  "Ash-Stalker": "Furnace-Runner",
+  "Void-Oracle": "Heat-Reader",
+  "Iron-Guard": "Gate-Warden",
+  "Vanguard-Scout": "Rail-Scout",
+  "Guild-Broker": "Dock-Broker",
+  "Inksmith": "Tide-Scribe",
+  "Bedrock-Bulwark": "Shaft-Bulwark",
+  "Ore-Seer": "Vein-Seer",
+  "Wisp-Kin": "Suit-Ghost",
+  "Spark-Weaver": "2753-Weaver",
+  "Rift-Born": "Chassis-Born",
+  "Echo-Walker": "Protocol-Walker",
+};
+
+export function resolveRaceName(name: string): string {
+  if (!name || name.startsWith("__stack_")) return name;
+  if (RACES[name]) return name;
+  const mapped = LEGACY_RACE_MAP[name] ?? LEGACY_RACE_MAP[name.trim()];
+  if (mapped && RACES[mapped]) return mapped;
+  const lower = name.trim().toLowerCase();
+  for (const [k, v] of Object.entries(LEGACY_RACE_MAP)) {
+    if (k.toLowerCase() === lower && RACES[v]) return v;
+  }
+  for (const key of Object.keys(RACES)) {
+    if (key.toLowerCase() === lower) return key;
+  }
+  return Object.keys(RACES)[0];
+}
+
+export function resolveLineage(raceName: string, lineage: string): string {
+  const race = RACES[resolveRaceName(raceName)];
+  if (!race) return lineage;
+  const mapped = LEGACY_LINEAGE_MAP[lineage] ?? lineage;
+  return race.lineage[mapped] ? mapped : Object.keys(race.lineage)[0];
+}
 
 export interface CompanionDef {
   name: string;
@@ -690,7 +745,7 @@ export const COMPANIONS: Record<string, CompanionDef> = {
     active: "Mobile Barricade — Locks joints. +2 DEF cover. Cannot move while locked.",
     passive: "Tireless Hauler — +5 inventory slots.",
     maintenance: "Needs scrap and oil. At 0 HP it dumps cargo.",
-    desc: "Headless iron bulldog. Kingdom crests faded on its flanks. Always ticking.",
+    desc: "Headless iron bulldog. Slag Town crests faded on its flanks. Always ticking.",
   },
   "Mender Sprite": {
     name: "Mender Sprite",
@@ -749,12 +804,12 @@ export const WORLD: WorldLoc[] = [
     hollow: false,
     unlockDay: 1,
     bossId: "gravenor",
-    bossAfter: 3,
+    bossAfter: 5,
   },
   {
     id: "kingdom",
-    name: "The Crumbling Kingdom",
-    short: "Kingdom",
+    name: "Slag Town",
+    short: "Slag Town",
     x: 50,
     y: 18,
     danger: 2,
@@ -762,14 +817,14 @@ export const WORLD: WorldLoc[] = [
     features: ["Garrison footlockers", "Throne room", "Military remnants"],
     connectedTo: ["hq", "ironclad", "caverns", "library"],
     hollow: false,
-    unlockDay: 2,
+    unlockDay: 8,
     bossId: "valdris",
-    bossAfter: 4,
+    bossAfter: 6,
   },
   {
     id: "caverns",
-    name: "Underground Caverns",
-    short: "Caverns",
+    name: "Blackspire",
+    short: "Blackspire",
     x: 24,
     y: 80,
     danger: 3,
@@ -777,14 +832,14 @@ export const WORLD: WorldLoc[] = [
     features: ["Hollow ore deposits", "Mushroom clusters", "Unmapped deep"],
     connectedTo: ["hq", "kingdom", "library"],
     hollow: true,
-    unlockDay: 3,
+    unlockDay: 16,
     bossId: "thessaly",
-    bossAfter: 4,
+    bossAfter: 6,
   },
   {
     id: "library",
-    name: "The Sunken Library",
-    short: "Library",
+    name: "Brasswater",
+    short: "Brasswater",
     x: 78,
     y: 82,
     danger: 2,
@@ -792,9 +847,9 @@ export const WORLD: WorldLoc[] = [
     features: ["Scholar cases", "Restricted archive", "The Sink below"],
     connectedTo: ["hq", "kingdom", "caverns", "veyra"],
     hollow: true,
-    unlockDay: 4,
+    unlockDay: 28,
     bossId: "sink",
-    bossAfter: 4,
+    bossAfter: 6,
   },
   {
     id: "veyra",
@@ -807,9 +862,9 @@ export const WORLD: WorldLoc[] = [
     features: ["Rift markets", "The Null Warden", "Time keeps bad hours"],
     connectedTo: ["hq", "ironclad", "library"],
     hollow: true,
-    unlockDay: 6,
+    unlockDay: 36,
     bossId: "warden",
-    bossAfter: 3,
+    bossAfter: 5,
   },
 ];
 
@@ -828,6 +883,12 @@ export interface VillainDef {
   dc: number;
   phases: { name: string; at: number; desc: string }[];
   lootName: string;
+  armorClass?: ArmorClass;
+  preferredRange?: RangeBand;
+  resist?: string[];
+  weakness?: string[];
+  resistAmt?: number;
+  signatureLoot?: string[];
 }
 
 export const VILLAINS: VillainDef[] = [
@@ -839,98 +900,125 @@ export const VILLAINS: VillainDef[] = [
     arc: "Arc I — Ironclad",
     threat: "Extreme",
     tagline: "He was a man once. The Hollow made him something more useful.",
-    lore: "A Warrior stationed at the Ironclad gate. His unit did not come back. He did. He leads the Ashen Pack by agreement, not command. Patient. Not cruel. Worse.",
-    hp: 28,
+    lore: "An Ironbound stationed at the Ironclad gate. His unit did not come back. He did. He leads the Ashen Pack by agreement, not command. Patient. Not cruel. Worse.",
+    hp: 32,
     atk: 6,
-    def: 4,
+    def: 5,
     dc: 14,
     phases: [
-      { name: "The Watcher", at: 28, desc: "Observes. Tests. Will speak if approached with respect." },
-      { name: "The Hunter", at: 18, desc: "Targets whoever hurt his pack. Precise." },
+      { name: "The Watcher", at: 32, desc: "Observes. Tests. Will speak if approached with respect." },
+      { name: "The Hunter", at: 20, desc: "Targets whoever hurt his pack. Precise." },
       { name: "The Feral", at: 10, desc: "The man recedes. Reckless, devastating." },
       { name: "The Reckoning", at: 0, desc: "One round of lucidity. He speaks." },
     ],
     lootName: "Ashen Fang",
+    armorClass: "beast",
+    preferredRange: "close",
+    resist: ["melee"],
+    weakness: ["shotgun", "rifle"],
+    signatureLoot: ["Pack-Tooth Scattergun", "Pack Muzzle Brake"],
   },
   {
     id: "valdris",
     name: "Valdris the Unmourned",
     title: "Last Chancellor",
     loc: "kingdom",
-    arc: "Arc II — The Kingdom's Debt",
+    arc: "Arc II — Slag Town",
     threat: "High",
-    tagline: "The Kingdom fell. He did not have the decency to go with it.",
-    lore: "He facilitated collapse with leverage. The Hollow noticed the accounting. He cannot leave the throne room. He cannot die. He cannot settle what he owes.",
-    hp: 24,
+    tagline: "Slag Town fell. He did not have the decency to go with it.",
+    lore: "Valdris kept the furnace ledgers while the city burned its own future for fuel. Kane's buyers still honor his chits. He cannot leave the Furnace Court. He cannot die. He cannot settle what he owes.",
+    hp: 28,
     atk: 5,
-    def: 3,
+    def: 5,
     dc: 15,
     phases: [
-      { name: "The Chancellor", at: 24, desc: "Diplomatic. Helpful. Building trust to spend later." },
-      { name: "The Negotiator", at: 14, desc: "Offers improve. Costs worsen." },
+      { name: "The Chancellor", at: 28, desc: "Diplomatic. Helpful. Building trust to spend later." },
+      { name: "The Negotiator", at: 16, desc: "Offers improve. Costs worsen." },
       { name: "The Unmourned", at: 6, desc: "Drops the facade. Uses every piece of leverage." },
     ],
-    lootName: "Kingdom Vault Key",
+    lootName: "Furnace Court Key",
+    armorClass: "plate",
+    preferredRange: "mid",
+    resist: ["pistol", "rifle"],
+    weakness: ["energy"],
+    signatureLoot: ["Furnace Court M14"],
   },
   {
     id: "thessaly",
     name: "Thessaly Vane",
     title: "The Burned Cartographer",
     loc: "caverns",
-    arc: "Arc IV — The Unmapped",
+    arc: "Arc III — Blackspire",
     threat: "High",
-    tagline: "She mapped the Hollow Realm. Then she started making changes.",
-    lore: "Her maps are used by every faction. What she makes now describes changes she made to the Hollow itself. The changes are real.",
-    hp: 26,
+    tagline: "She mapped Blackspire. Then she started selling the veins to Kane.",
+    lore: "Thessaly's maps are used by every faction on the mountain. What she draws now describes changes she made so Kane's ore trains can run. The changes are real. The mountain is not happy about it.",
+    hp: 30,
     atk: 5,
-    def: 3,
+    def: 4,
     dc: 15,
     phases: [
-      { name: "The Guide", at: 26, desc: "Presents as a resource. Her help always serves the project." },
-      { name: "The Architect", at: 16, desc: "Stops pretending. Starts explaining." },
+      { name: "The Guide", at: 30, desc: "Presents as a resource. Her help always serves the project." },
+      { name: "The Architect", at: 18, desc: "Stops pretending. Starts explaining." },
       { name: "The Burned", at: 8, desc: "Project near completion." },
     ],
     lootName: "Master Cavern Map",
+    armorClass: "machine",
+    preferredRange: "long",
+    resist: ["energy"],
+    weakness: ["ap-rifle"],
+    resistAmt: 2,
+    signatureLoot: ["Vein-Survey Marksman", "Nine-Lift Match Barrel"],
   },
   {
     id: "sink",
     name: "The Sink",
     title: "What Lives at the Bottom",
     loc: "library",
-    arc: "Arc III — The Drowned Archive",
+    arc: "Arc IV — Brasswater",
     threat: "Unknown",
-    tagline: "It did not sink the Library. It was why the Library was built there.",
-    lore: "Proximity made knowledge more accessible. Nobody confirmed what the original negotiation cost. The record is in the flooded sections.",
-    hp: 32,
+    tagline: "It did not drown Brasswater. It was why the archive was built there.",
+    lore: "The Drowned Archive sits on something that answers questions. Kane wants the jump tables in the flooded stacks. The Sink wants to know why she thinks stars are a door.",
+    hp: 36,
     atk: 4,
-    def: 5,
+    def: 6,
     dc: 16,
     phases: [
-      { name: "The Archive", at: 32, desc: "Passive. Answers questions. Always truly." },
-      { name: "The Collector", at: 20, desc: "The Pull intensifies. You are being read." },
+      { name: "The Archive", at: 36, desc: "Passive. Answers questions. Always truly." },
+      { name: "The Collector", at: 22, desc: "The Pull intensifies. You are being read." },
       { name: "The Answer", at: 8, desc: "Asks each character one question about their Destiny Thread." },
     ],
     lootName: "Founding Document",
+    armorClass: "machine",
+    preferredRange: "close",
+    resist: ["ballistic"],
+    weakness: ["energy"],
+    signatureLoot: ["Archive Flood-Lance", "Dockcoil Tide-Choke"],
   },
   {
     id: "warden",
-    name: "The Null Warden",
-    title: "Keeper of Veyra",
+    name: "AEGIS Warden 2753",
+    title: "Kane's Successor",
     loc: "veyra",
     arc: "Arc V — Veyra City",
     threat: "Absolute",
-    tagline: "It does not keep Veyra to keep things out. It keeps things in.",
-    lore: "Before it arrived, things moved between the Hollow and the beyond without restriction. It established the last city as a boundary. It answers direct questions.",
-    hp: 40,
-    atk: 7,
-    def: 6,
-    dc: 17,
+    tagline: "A human in a successor-suit. Kane built them to replace the T-0880 line. I declined the appointment.",
+    lore: "Dr. Vesper Kane designed AEGIS 2753 after the T-0880 shutdown order — Halo-grade super suits flown by elite human combat specialists. She wants every Hollow Realm resource for a classified intergalactic-travel program. The Warden is her door at the city boundary. Tyrone is the unit that walked off the scrap list.",
+    hp: 48,
+    atk: 8,
+    def: 7,
+    dc: 18,
     phases: [
-      { name: "The Boundary", at: 40, desc: "Felt as directional wrongness. Observes." },
-      { name: "The Warden", at: 24, desc: "Tests each character against Shadow or Destiny." },
-      { name: "The Keeper", at: 10, desc: "If you engaged honestly, it becomes a presence you can speak with." },
+      { name: "Lockstep", at: 48, desc: "The suit moves like a T-0880. The pilot inside is still learning fear." },
+      { name: "Directive", at: 28, desc: "Kane speaks through the visor. Resource acquisition is not a request." },
+      { name: "Successor", at: 12, desc: "The frame overclocks. The human almost keeps up." },
     ],
     lootName: "Moon Squad Challenge Coin",
+    armorClass: "powered",
+    preferredRange: "mid",
+    resist: ["ballistic"],
+    weakness: ["energy", "rail", "laser"],
+    resistAmt: 2,
+    signatureLoot: ["Kane-Pattern 2753", "Kane-Pattern Coherent", "Surplus 2753 Heavy Receiver"],
   },
 ];
 
@@ -943,16 +1031,19 @@ export const NPCS = [
     stock: [
       { name: "Pure Void-Essence", price: 2000, rarity: "Rare" as Rarity },
       { name: "Rift Shard", price: 800, rarity: "Uncommon" as Rarity },
+      { name: "Surplus 2753 Coil Pistol", price: 2320, rarity: "Rare" as Rarity },
     ],
   },
   {
     name: "Quartermaster Rudge",
-    title: "Kingdom Gate",
+    title: "Slag Town Gate",
     loc: "kingdom" as LocationId,
     quote: "Show your identification, or pay the outlander tax.",
     stock: [
       { name: "Standard Rations", price: 150, rarity: "Common" as Rarity },
       { name: "Garrison Whetstone", price: 220, rarity: "Common" as Rarity },
+      { name: "Union Forge M4 Carbine", price: 810, rarity: "Uncommon" as Rarity },
+      { name: "Watchworks 5.56 Box", price: 140, rarity: "Common" as Rarity },
     ],
   },
   {
@@ -971,8 +1062,10 @@ export const NPCS = [
     loc: "ironclad" as LocationId,
     quote: "Do not bring that filth into my chapel unless you are ready to bleed for it.",
     stock: [
-      { name: "Aether Bandages", price: 250, rarity: "Uncommon" as Rarity },
+      { name: "Field Gel", price: 250, rarity: "Uncommon" as Rarity },
       { name: "Holy Salt", price: 500, rarity: "Uncommon" as Rarity },
+      { name: "Watchworks Service Pistol", price: 240, rarity: "Common" as Rarity },
+      { name: "Watchworks Iron Sight", price: 120, rarity: "Common" as Rarity },
     ],
   },
   {
@@ -1090,7 +1183,7 @@ export const RESIDENT_ROLES = {
 } as const;
 
 export const BOUNTIES: Bounty[] = [
-  { id: "b1", name: "The Ashen Deserter", type: "Rogue Warrior", reward: "5,000 coins", rewardCoins: 900, location: "ironclad", dc: 14, hp: 14 },
+  { id: "b1", name: "The Ashen Deserter", type: "Ghostrunner · Ironbound", reward: "5,000 coins", rewardCoins: 900, location: "ironclad", dc: 14, hp: 14 },
   { id: "b2", name: "Void-Touched Smuggler", type: "Corrupted Merchant", reward: "Rare weapon", rewardCoins: 700, location: "caverns", dc: 15, hp: 12 },
   { id: "b3", name: "The Mad Alchemist", type: "Rogue Healer", reward: "Legendary enchantment", rewardCoins: 1100, location: "kingdom", dc: 16, hp: 16 },
   { id: "b4", name: "Cultist of the Sink", type: "Zealot", reward: "8,000 coins", rewardCoins: 1200, location: "library", dc: 15, hp: 15 },
@@ -1101,23 +1194,26 @@ export const LEDGER_POOLS: Record<"bargain" | "essential" | "artifact", ShopOffe
   bargain: [
     { name: "Iron Rations x3", price: 180, kind: "consumable", rarity: "Common", effect: "Restore 2 HP in the field." },
     { name: "Healing Salve", price: 220, kind: "consumable", rarity: "Common", effect: "Restore 3 HP." },
-    { name: "Lockpicks", price: 160, kind: "trinket", rarity: "Common", effect: "+1 lockpicking." },
-    { name: "Torch Bundle", price: 90, kind: "consumable", rarity: "Common", effect: "Ignore darkness penalties one sortie." },
-    { name: "Common Dagger", price: 240, kind: "weapon", rarity: "Common", effect: "1d4. Last resort." },
+    { name: "Watchworks 9mm Box", price: 80, kind: "consumable", rarity: "Common", effect: "24 rounds of 9mm. Load a pistol or SMG.", ammoType: "9mm", ammoCount: 24 },
+    { name: "Watchworks Iron Sight", price: 120, kind: "attachment", rarity: "Common", effect: "Optic. +1 accuracy.", attachmentSlot: "optic" },
+    { name: "Watchworks M94 Lever", price: 740, kind: "weapon", rarity: "Common", effect: "M94 lever. Tube mag. Close and mid are home.", damage: "1d8+1", weaponFamily: "rifle", ammoType: ".30-30", rangeBand: "mid", accuracy: 1, magSize: 7, mag: 7 },
+    { name: "Watchworks Service Pistol", price: 240, kind: "weapon", rarity: "Common", effect: "Sidearm. +1 accuracy at mid.", damage: "1d6", weaponFamily: "pistol", ammoType: "9mm", rangeBand: "mid", accuracy: 1, magSize: 8, mag: 8 },
   ],
   essential: [
     { name: "Hollow Ore x2", price: 700, kind: "material", rarity: "Uncommon", effect: "Forge fuel. Required for socketing." },
+    { name: "Watchworks .30-30 Box", price: 150, kind: "consumable", rarity: "Common", effect: "20 rounds of .30-30. M94 and M336 levers feed.", ammoType: ".30-30", ammoCount: 20 },
+    { name: "Watchworks 5.56 Box", price: 140, kind: "consumable", rarity: "Common", effect: "30 rounds of 5.56. M4, M16 and SAW feed.", ammoType: "5.56", ammoCount: 30 },
+    { name: "Watchworks Reflex", price: 420, kind: "attachment", rarity: "Uncommon", effect: "Optic. +2 accuracy.", attachmentSlot: "optic" },
+    { name: "Union Forge M4 Carbine", price: 810, kind: "weapon", rarity: "Uncommon", effect: "M4 pattern. Short 5.56. Handy in alleys.", damage: "1d8", weaponFamily: "rifle", ammoType: "5.56", rangeBand: "close", accuracy: 1, recoil: 1, magSize: 20, mag: 20 },
     { name: "Enchanted Bandage", price: 480, kind: "consumable", rarity: "Uncommon", effect: "Restore 5 HP. Clears bleed." },
-    { name: "Stealth Cloak", price: 900, kind: "armor", rarity: "Uncommon", effect: "+1 stealth." },
-    { name: "Scout's Compass", price: 620, kind: "trinket", rarity: "Uncommon", effect: "+1 tracking." },
-    { name: "Alchemist's Flask", price: 540, kind: "consumable", rarity: "Uncommon", effect: "2d4 fire, one use." },
   ],
   artifact: [
+    { name: "Dockcoil Compensator", price: 330, kind: "attachment", rarity: "Uncommon", effect: "Muzzle. -2 recoil.", attachmentSlot: "muzzle" },
+    { name: "Surplus 2753 Coil Pistol", price: 2320, kind: "weapon", rarity: "Rare", effect: "AP 1 energy. Plate shrugs unless charged.", damage: "1d8", weaponFamily: "energy", ammoType: "cell", rangeBand: "mid", ap: 1, accuracy: 1, magSize: 12, mag: 12 },
+    { name: "Watchworks .308 AP Box", price: 420, kind: "consumable", rarity: "Rare", effect: "10 AP .308. +2 AP when spent from this box.", ammoType: ".308", ammoCount: 10, ap: 2 },
+    { name: "Watchworks M14 Battle", price: 1400, kind: "weapon", rarity: "Rare", effect: "M14 battle. .308. AP 1. Punches plate if you sit still.", damage: "1d10", weaponFamily: "rifle", ammoType: ".308", rangeBand: "mid", ap: 1, recoil: 2, magSize: 10, mag: 10 },
     { name: "Void-Touched Coin", price: 2200, kind: "trinket", rarity: "Rare", effect: "+1 LCK. Slight Hollow attention." },
-    { name: "Ashen Fang Shard", price: 2600, kind: "material", rarity: "Rare", effect: "Socket for +1 slashing." },
-    { name: "Library Access Key", price: 3000, kind: "trinket", rarity: "Rare", effect: "Unlocks restricted archive checks." },
     { name: "Veyra Fragment", price: 3400, kind: "material", rarity: "Legendary", effect: "Mythic craft component." },
-    { name: "Drowned Archive Text", price: 2800, kind: "trinket", rarity: "Rare", effect: "+2 knowledge in the Library." },
   ],
 };
 
@@ -1133,7 +1229,7 @@ export interface WeaponDef {
 }
 
 export const WEAPONS: WeaponDef[] = [
-  { name: "Ironhide Broadsword", cls: "Warrior", type: "Slashing", rarity: "Common", damage: "1d8", effect: "None.", lore: "Dull edge, heavy swing.", value: 120 },
+  { name: "Ironhide Broadsword", cls: "Warrior", type: "Slashing", rarity: "Common", damage: "1d8", effect: "Close slash. 1d8. Heavy swing, no chamber.", lore: "Dull edge, heavy swing.", value: 120 },
   { name: "Rusted Garrison Mace", cls: "Warrior", type: "Blunt", rarity: "Common", damage: "1d6", effect: "+1 vs armored.", lore: "A crude tool for crude work.", value: 90 },
   { name: "Reinforced Halberd", cls: "Warrior", type: "Reach", rarity: "Uncommon", damage: "1d10", effect: "Strike from second rank.", lore: "Keeps monsters at arm's length.", value: 320 },
   { name: "Ash-Tempered Cleaver", cls: "Warrior", type: "Heavy", rarity: "Uncommon", damage: "1d8+1", effect: "Won't break on a fumble.", lore: "Blackened by fire, sharpened by bone.", value: 400 },
@@ -1164,7 +1260,7 @@ export const WEAPONS: WeaponDef[] = [
 ];
 
 export const ARMOR: { name: string; cls: ClassName; rarity: Rarity; defense: number; effect: string; value: number }[] = [
-  { name: "Leather Tunic", cls: "Warrior", rarity: "Common", defense: 1, effect: "None.", value: 80 },
+  { name: "Leather Tunic", cls: "Warrior", rarity: "Common", defense: 1, effect: "Soft hide. +1 Defense. No plate.", value: 80 },
   { name: "Ironhide Brigandine", cls: "Warrior", rarity: "Uncommon", defense: 2, effect: "First damage each day -1.", value: 340 },
   { name: "Hollow-Steel Cuirass", cls: "Warrior", rarity: "Rare", defense: 3, effect: "Immune to crits from standard weapons.", value: 1600 },
   { name: "Prowler's Leathers", cls: "Rogue", rarity: "Uncommon", defense: 1, effect: "+1 urban stealth.", value: 300 },
@@ -1190,24 +1286,24 @@ export const ENEMIES: Record<
     { name: "Ashen Briar", hp: 8, atk: 3, def: 3, dc: 12, flavor: "The walls remember knives." },
   ],
   kingdom: [
-    { name: "Garrison Remnant", hp: 10, atk: 4, def: 3, dc: 12, flavor: "Still following orders that no longer exist." },
-    { name: "Debt Shade", hp: 8, atk: 3, def: 2, dc: 13, flavor: "It knows what you owe." },
-    { name: "Throne Guard", hp: 12, atk: 5, def: 4, dc: 14, flavor: "Armor older than the walls." },
+    { name: "Furnace Debtman", hp: 10, atk: 4, def: 3, dc: 12, flavor: "Still collecting a tithe nobody voted for." },
+    { name: "Slag Bruiser", hp: 11, atk: 5, def: 3, dc: 13, flavor: "Hot rivets. Hotter temper." },
+    { name: "Kane Buyer", hp: 9, atk: 4, def: 2, dc: 13, flavor: "Pays in refined ore. Collects in blood if the ledger is short." },
   ],
   caverns: [
-    { name: "Ore-Leech", hp: 6, atk: 3, def: 2, dc: 12, flavor: "It drinks metal." },
-    { name: "Cave Horror", hp: 14, atk: 5, def: 3, dc: 14, flavor: "Too many joints." },
-    { name: "Mapped Wrong", hp: 9, atk: 4, def: 2, dc: 13, flavor: "The corridor was not here yesterday." },
+    { name: "Ore-Leech", hp: 6, atk: 3, def: 2, dc: 12, flavor: "It drinks metal. Kane would bottle it." },
+    { name: "Lift-Cage Horror", hp: 14, atk: 5, def: 3, dc: 14, flavor: "Too many joints for a miner." },
+    { name: "Survey Shade", hp: 9, atk: 4, def: 2, dc: 13, flavor: "Thessaly redrew this tunnel. It noticed." },
   ],
   library: [
     { name: "Drowned Page", hp: 7, atk: 3, def: 1, dc: 12, flavor: "It wants to be read. That is not a kindness." },
-    { name: "Archive Warden", hp: 12, atk: 4, def: 3, dc: 14, flavor: "Silence is policy." },
-    { name: "Memory That Bites", hp: 9, atk: 4, def: 2, dc: 13, flavor: "Someone else's worst day." },
+    { name: "Tide Warden", hp: 12, atk: 4, def: 3, dc: 14, flavor: "Silence is policy below the waterline." },
+    { name: "Kane Diver", hp: 10, atk: 4, def: 2, dc: 14, flavor: "Here for jump tables. Not here to share." },
   ],
   veyra: [
-    { name: "Null-Spawn", hp: 10, atk: 5, def: 2, dc: 15, flavor: "It is the absence of a creature." },
-    { name: "Static Walker", hp: 12, atk: 5, def: 3, dc: 16, flavor: "The hum arrives first." },
-    { name: "Unbound Echo", hp: 16, atk: 6, def: 4, dc: 16, flavor: "A person-shaped hole in the air." },
+    { name: "AEGIS Specialist", hp: 14, atk: 6, def: 4, dc: 16, flavor: "Human. Super suit. Kane's doctrine in a visor." },
+    { name: "2753 Frame", hp: 16, atk: 7, def: 5, dc: 16, flavor: "Successor to the T-0880 line. The pilot still bleeds." },
+    { name: "Spire Interceptor", hp: 12, atk: 6, def: 3, dc: 15, flavor: "Kane's people do not knock. They lock the street." },
   ],
 };
 
@@ -1252,6 +1348,10 @@ export function makeItemFromWeapon(w: WeaponDef): Omit<Item, "id"> {
     lore: w.lore,
     equipped: false,
     value: w.value,
+    weaponFamily: "melee",
+    rangeBand: "close",
+    mag: 0,
+    magSize: 0,
   };
 }
 

@@ -9,6 +9,7 @@ import {
   grantItemMastery,
   type ActiveItemEffect,
 } from "./resident-progression";
+import { isAmmoConsumable } from "./weapon-ops";
 
 export type ItemSource =
   | { kind: "vault" }
@@ -72,6 +73,7 @@ export function useConsumable(
   const op = state.operatives.find((x) => x.id === targetOpId);
   if (!item || !op) return "Tyrone cannot find that item or resident.";
   if (item.kind !== "consumable") return "That is not a consumable.";
+  if (isAmmoConsumable(item)) return "Load it through the rifle. That is not a sandwich.";
   if (op.status === "dead") return "That file is closed. Consumables cannot change it.";
 
   const p = ensureResidentProgress(op);

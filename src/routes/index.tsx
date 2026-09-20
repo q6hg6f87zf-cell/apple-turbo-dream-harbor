@@ -10,6 +10,7 @@ import { SecureGameApp } from "@/components/game/secure-game-app";
 import { ServerEconomyRuntime } from "@/components/game/server-economy-runtime";
 import { ServerInventoryRuntime } from "@/components/game/server-inventory-runtime";
 import { ServerProgressionRuntime } from "@/components/game/server-progression-runtime";
+import { TyroneDebugPanel } from "@/components/game/tyrone-debug";
 import { bootstrapCampaignBalance } from "@/game/balance-bootstrap";
 import { bootstrapTyroneHelp } from "@/game/tyrone-help-bootstrap";
 import { createFileRoute } from "@tanstack/react-router";
@@ -34,6 +35,7 @@ function Home() {
       <LoadoutEffectsRuntime />
       <InteractionPolishRuntime />
       <CampaignBalancePanel />
+      <TyroneDebugPanel />
     </>
   );
 }
