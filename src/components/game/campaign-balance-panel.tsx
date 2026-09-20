@@ -16,7 +16,7 @@ import { useGame } from "@/game/store";
 import type { QuarterId, RoomId } from "@/game/types";
 import { cn } from "@/lib/cn";
 import { ChevronRight, LockKeyhole, ShieldCheck, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Coin, Panel, SectionLabel } from "./primitives";
 
 const ROOMS = Object.keys(BASE_ROOMS) as RoomId[];
@@ -28,15 +28,6 @@ export function CampaignBalancePanel() {
   const upgradeQuarter = useGame((g) => g.upgradeQuarter);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const onOpen = () => {
-      setOpen(true);
-      setError(null);
-    };
-    window.addEventListener("hollow:open-raid-matrix", onOpen);
-    return () => window.removeEventListener("hollow:open-raid-matrix", onOpen);
-  }, []);
 
   if (s.screen !== "hq" && s.screen !== "map") return null;
 

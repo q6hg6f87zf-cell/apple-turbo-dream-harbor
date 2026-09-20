@@ -1,19 +1,35 @@
+import { inventorySession, rememberInventory } from "@/game/inventory-session";
 import { cn } from "@/lib/cn";
-import type { ReactNode } from "react";
+import { useLayoutEffect, useRef, type ReactNode } from "react";
 
 export function InventoryFrame({
   header,
   children,
+  sessionId,
 }: {
   header: ReactNode;
   children: ReactNode;
+  sessionId?: string;
 }) {
+  const list = useRef<HTMLDivElement>(null);
+
+  // The frame owns the scroller, so it owns putting the player back where they
+  // were when they return from World.
+  useLayoutEffect(() => {
+    const el = list.current;
+    if (!el || !sessionId) return;
+    const top = inventorySession(sessionId).scrollTop;
+    if (top) el.scrollTop = top;
+    return () => rememberInventory(sessionId, { scrollTop: el.scrollTop });
+  }, [sessionId]);
+
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden" data-inventory="1">
       <div className="shrink-0 space-y-3 pb-3" data-inventory-header="1">
         {header}
       </div>
       <div
+        ref={list}
         className="ms-inv-list ms-scroll min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain"
         data-inventory-list="1"
       >

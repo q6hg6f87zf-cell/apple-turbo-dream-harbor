@@ -71,8 +71,12 @@ export function GameApp() {
     };
   }, []);
 
+  // The shell owns arriving at a screen: drop focus, start at the top. The
+  // Inventory scroller is separate and keeps its own place on purpose.
   useEffect(() => {
-    document.querySelector("main")?.scrollTo({ top: 0 });
+    const active = document.activeElement as HTMLElement | null;
+    if (active && active !== document.body) active.blur?.();
+    document.querySelector("main")?.scrollTo({ top: 0, behavior: "auto" });
   }, [screen]);
 
   useEffect(() => {

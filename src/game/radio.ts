@@ -704,7 +704,7 @@ export function bedFromGame(input: {
   if (input.combat || input.mission) return "mission";
   if (input.screen === "title" || input.screen === "rules" || input.screen === "briefing") return "title";
   if (input.screen === "arcade") return "arcade";
-  if (input.screen === "map" || input.screen === "world") {
+  if (input.screen === "map") {
     if (input.region) return input.region;
     if (input.loc && input.loc in FALLBACK_TAPE) return input.loc as RadioBed;
     return "orbit";

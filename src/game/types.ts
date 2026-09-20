@@ -239,7 +239,6 @@ export type Screen =
   | "title"
   | "briefing"
   | "hq"
-  | "world"
   | "inventory"
   | "more"
   | "roster"

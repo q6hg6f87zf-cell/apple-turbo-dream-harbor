@@ -31,9 +31,12 @@ import { cn } from "@/lib/cn";
 import { Archive, Check, CircleHelp, Crosshair, PackageCheck, Search, Sparkles, Wrench, X, Zap } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { ItemThumb } from "./item-thumb";
+import { inventorySession, rememberInventory } from "@/game/inventory-session";
 import { ItemInspectShell } from "./item-inspect";
 import { ChipScroller, FilterChip, InventoryFrame, InventoryRow } from "./inventory-chrome";
 import { Panel, RarityMark, SectionLabel } from "./primitives";
+
+const SESSION_ID = "inventory-server";
 
 type Mode = "owned" | "catalogue";
 type Row = {
@@ -105,18 +108,23 @@ function chamberLine(item: Item): string | null {
 
 export function ServerInventoryView() {
   const state = useGame((g) => g.s);
-  const [mode, setMode] = useState<Mode>("owned");
-  const [category, setCategory] = useState<InventoryCategory>("all");
-  const [lane, setLane] = useState<WeaponLane>("all");
-  const [caliber, setCaliber] = useState<AmmoType | "all">("all");
-  const [region, setRegion] = useState<RegionId | "all">("all");
-  const [query, setQuery] = useState("");
+  const session = inventorySession(SESSION_ID);
+  const [mode, setMode] = useState<Mode>(session.mode);
+  const [category, setCategory] = useState<InventoryCategory>(session.category);
+  const [lane, setLane] = useState<WeaponLane>(session.lane);
+  const [caliber, setCaliber] = useState<AmmoType | "all">(session.caliber);
+  const [region, setRegion] = useState<RegionId | "all">(session.region);
+  const [query, setQuery] = useState(session.query);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [targetId, setTargetId] = useState("");
   const [targetGearId, setTargetGearId] = useState("");
   const [pending, setPending] = useState(false);
   const [help, setHelp] = useState(false);
   const showCaliber = category === "ammo";
+
+  useEffect(() => {
+    rememberInventory(SESSION_ID, { mode, category, lane, caliber, region, query });
+  }, [mode, category, lane, caliber, region, query]);
 
   const residents = state.operatives.filter((op) => op.status !== "dead" && op.location === "hq");
   const owned = useMemo<Row[]>(() => [
@@ -220,6 +228,7 @@ export function ServerInventoryView() {
 
   return (
     <InventoryFrame
+      sessionId={SESSION_ID}
       header={
         <>
           <div className="flex items-center justify-between gap-3">

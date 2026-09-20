@@ -48,6 +48,7 @@ import {
   finishCombat,
 } from "./engine";
 import { hackDud, hackGuess, openHack, seedPackIfNeeded, usePackItem } from "./inventory";
+import { forgetInventorySessions } from "./inventory-session";
 import {
   closeTermSession,
   emptyTerm,
@@ -275,6 +276,7 @@ export const useGame = create<Store>((set, get) => ({
     const prevName = get().s.playerName;
     const prevHandle = get().s.playerHandle;
     clearSave();
+    forgetInventorySessions();
     const next = defaultState();
     const who = readWho();
     if (who) {

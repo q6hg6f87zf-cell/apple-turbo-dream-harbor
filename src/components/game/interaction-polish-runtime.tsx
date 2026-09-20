@@ -44,7 +44,6 @@ function clickTopDismissibleBackdrop() {
 }
 
 export function InteractionPolishRuntime() {
-  const screen = useGame((store) => store.s.screen);
   const selectedId = useGame((store) => store.s.selectedId);
   const guideOpen = useGame((store) => store.guideOpen);
   const confirmRest = useGame((store) => store.confirmRest);
@@ -57,12 +56,6 @@ export function InteractionPolishRuntime() {
     document.getElementById("hollow-aaa-interactions")?.remove();
     document.getElementById("hollow-aaa-interactions-v2")?.remove();
   }, []);
-
-  useEffect(() => {
-    const active = document.activeElement as HTMLElement | null;
-    if (active && active !== document.body) active.blur?.();
-    document.querySelector("main")?.scrollTo({ top: 0, behavior: "auto" });
-  }, [screen]);
 
   useEffect(() => {
     const locked = selectedId || guideOpen || confirmRest || hackOpen || termOpen || missionOpen || combatOpen;
@@ -123,7 +116,6 @@ export function InteractionPolishRuntime() {
         return;
       }
       event.preventDefault();
-      document.dispatchEvent(new CustomEvent("hollow:dismiss-ui"));
       if (!clickTopDismissibleBackdrop()) dismissStoreChrome();
     };
 

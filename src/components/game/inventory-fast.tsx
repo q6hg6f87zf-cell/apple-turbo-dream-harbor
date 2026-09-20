@@ -37,8 +37,11 @@ import {
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Panel, RarityMark, SectionLabel } from "./primitives";
 import { ItemThumb } from "./item-thumb";
+import { inventorySession, rememberInventory } from "@/game/inventory-session";
 import { ItemInspectShell } from "./item-inspect";
 import { ChipScroller, FilterChip, InventoryFrame, InventoryRow } from "./inventory-chrome";
+
+const SESSION_ID = "inventory-fast";
 
 type Mode = "owned" | "catalogue";
 type Source = "vault" | "operative" | "pack" | "catalogue";
@@ -182,15 +185,20 @@ export function InventoryFast() {
   const repair = useGame((g) => g.repairItem);
   const usePack = useGame((g) => g.usePack);
 
-  const [mode, setMode] = useState<Mode>("owned");
-  const [category, setCategory] = useState<InventoryCategory>("all");
-  const [lane, setLane] = useState<WeaponLane>("all");
-  const [caliber, setCaliber] = useState<(typeof CALIBERS)[number] | "all">("all");
-  const [query, setQuery] = useState("");
+  const session = inventorySession(SESSION_ID);
+  const [mode, setMode] = useState<Mode>(session.mode);
+  const [category, setCategory] = useState<InventoryCategory>(session.category);
+  const [lane, setLane] = useState<WeaponLane>(session.lane);
+  const [caliber, setCaliber] = useState<(typeof CALIBERS)[number] | "all">(session.caliber);
+  const [query, setQuery] = useState(session.query);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [targetOpId, setTargetOpId] = useState("");
   const [targetGearId, setTargetGearId] = useState("");
   const [helpMode, setHelpMode] = useState<HelpMode | null>(null);
+
+  useEffect(() => {
+    rememberInventory(SESSION_ID, { mode, category, lane, caliber, query });
+  }, [mode, category, lane, caliber, query]);
 
   const residents = state.operatives.filter((op) => op.status !== "dead" && op.location === "hq");
 
@@ -377,6 +385,7 @@ export function InventoryFast() {
 
   return (
     <InventoryFrame
+      sessionId={SESSION_ID}
       header={
         <>
           <div className="flex items-center justify-between gap-3">
