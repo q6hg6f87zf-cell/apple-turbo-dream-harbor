@@ -1,10 +1,13 @@
 import { chromium } from "playwright";
+// Sandboxes whose baked Chromium predates the installed Playwright can point
+// this at the binary they do have.
+const executablePath = process.env.HOLLOW_QA_CHROMIUM || undefined;
 import { mkdirSync, writeFileSync } from "node:fs";
 
 const url = "http://127.0.0.1:8080";
-mkdirSync("/workspace/screenshots", { recursive: true });
+mkdirSync("screenshots", { recursive: true });
 
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({ headless: true, executablePath });
 const context = await browser.newContext({
   viewport: { width: 390, height: 844 },
   hasTouch: true,
@@ -80,7 +83,7 @@ const before = await page.evaluate(() => {
   };
 });
 
-await page.screenshot({ path: "/workspace/screenshots/chrome-before-hub.png" });
-writeFileSync("/workspace/screenshots/chrome-before.json", JSON.stringify(before, null, 2));
+await page.screenshot({ path: "screenshots/chrome-before-hub.png" });
+writeFileSync("screenshots/chrome-before.json", JSON.stringify(before, null, 2));
 console.log(JSON.stringify(before, null, 2));
 await browser.close();

@@ -1,8 +1,11 @@
 import { chromium } from "playwright";
+// Sandboxes whose baked Chromium predates the installed Playwright can point
+// this at the binary they do have.
+const executablePath = process.env.HOLLOW_QA_CHROMIUM || undefined;
 import { mkdirSync, writeFileSync } from "node:fs";
 
 const url = "http://127.0.0.1:8080";
-mkdirSync("/workspace/screenshots", { recursive: true });
+mkdirSync("screenshots", { recursive: true });
 
 function seedSave() {
   try {
@@ -173,14 +176,14 @@ function measureScript() {
   };
 }
 
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({ headless: true, executablePath });
 const results = {};
 const errors = [];
 
 async function shot(page, name) {
   const m = await page.evaluate(measureScript);
   results[name] = m;
-  await page.screenshot({ path: `/workspace/screenshots/${name}.png`, fullPage: false });
+  await page.screenshot({ path: `screenshots/${name}.png`, fullPage: false });
 }
 
 {
@@ -270,7 +273,7 @@ async function shot(page, name) {
   await context.close();
 }
 
-writeFileSync("/workspace/screenshots/hub-task-chrome-qa.json", JSON.stringify({ results, errors }, null, 2));
+writeFileSync("screenshots/hub-task-chrome-qa.json", JSON.stringify({ results, errors }, null, 2));
 console.log(JSON.stringify({ results, errors }, null, 2));
 
 const hub = results["chrome-after-hub-quiet"];

@@ -1,8 +1,11 @@
 import { chromium } from "playwright";
+// Sandboxes whose baked Chromium predates the installed Playwright can point
+// this at the binary they do have.
+const executablePath = process.env.HOLLOW_QA_CHROMIUM || undefined;
 import { mkdirSync, writeFileSync } from "node:fs";
 
 const url = "http://127.0.0.1:8080";
-mkdirSync("/workspace/screenshots", { recursive: true });
+mkdirSync("screenshots", { recursive: true });
 
 function seedSave() {
   try {
@@ -107,7 +110,7 @@ async function dismissTalk(page) {
   }
 }
 
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({ headless: true, executablePath });
 const context = await browser.newContext({
   viewport: { width: 390, height: 844 },
   hasTouch: true,
@@ -174,12 +177,12 @@ await swipeOn(row, -420);
 await page.waitForTimeout(500);
 const afterSwipe = await list.evaluate((el) => el.scrollTop);
 const inspectAfterSwipe = await page.locator("[data-item-inspect]").count();
-await page.screenshot({ path: "/workspace/screenshots/inventory-touch-scroll.png" });
+await page.screenshot({ path: "screenshots/inventory-touch-scroll.png" });
 
 await page.locator("[data-inventory-row]").nth(1).click();
 await page.waitForTimeout(300);
 const inspectAfterTap = await page.locator("[data-item-inspect]").count();
-await page.screenshot({ path: "/workspace/screenshots/inventory-touch-tap.png" });
+await page.screenshot({ path: "screenshots/inventory-touch-tap.png" });
 await page.getByRole("button", { name: /Close item/i }).click().catch(async () => {
   await page.locator("[data-item-inspect]").click({ position: { x: 8, y: 8 } });
 });
@@ -207,7 +210,7 @@ const result = {
   rowCount: await page.locator("[data-inventory-row]").count(),
   errors,
 };
-writeFileSync("/workspace/screenshots/inventory-touch-qa.json", JSON.stringify(result, null, 2));
+writeFileSync("screenshots/inventory-touch-qa.json", JSON.stringify(result, null, 2));
 console.log(JSON.stringify(result, null, 2));
 
 const ok =

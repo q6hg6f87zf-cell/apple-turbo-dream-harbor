@@ -127,6 +127,16 @@ export function itemArt(input: {
   }
   if (input.kind === "enchantment") return ART.coil;
   if (input.kind === "trinket" || input.kind === "special") return ART.trinket;
+
+  // Attachments and materials have no art of their own yet, and a line icon
+  // beside a photographed rifle is the tell that breaks the shelf. Stand them
+  // in on the nearest still until they are drawn.
+  if (input.kind === "attachment") return ART.coil;
+  if (input.kind === "material") {
+    if (/cell|capacitor|signal|vial|salt|charge/.test(n)) return ART.cell;
+    return ART.whetstone;
+  }
+
   if (input.kind !== "weapon") return null;
 
   if (/\bl8\b/.test(n)) return ART.l8;

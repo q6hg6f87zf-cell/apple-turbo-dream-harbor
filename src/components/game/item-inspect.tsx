@@ -1,6 +1,7 @@
 import { X } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { useDialogFocus } from "./use-dialog-focus";
 
 export function ItemInspectShell({
   onClose,
@@ -22,6 +23,7 @@ export function ItemInspectShell({
   actions?: ReactNode;
 }) {
   const [zoom, setZoom] = useState(false);
+  const focus = useDialogFocus<HTMLDivElement>();
 
   // Rendered out of the inventory list on purpose: inside it, the sheet was a
   // "fixed" element within a transformed scroll container, and its commit
@@ -34,6 +36,7 @@ export function ItemInspectShell({
       role="presentation"
     >
       <div
+        ref={focus}
         className="relative mx-auto flex h-dvh min-h-0 w-full min-w-0 max-w-full flex-col overflow-hidden bg-surface md:h-auto md:max-h-[min(92dvh,52rem)] md:max-w-lg md:rounded-[var(--radius-xl)] md:shadow-2xl"
         onClick={(e) => e.stopPropagation()}
         role="dialog"

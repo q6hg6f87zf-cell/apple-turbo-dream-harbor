@@ -6,6 +6,7 @@ import { ChevronLeft } from "lucide-react";
 import { useEffect, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { CommandBar } from "./encounter-scene";
+import { useDialogFocus } from "./use-dialog-focus";
 
 /**
  * Briefing a sortie, over the region chooser rather than below it.
@@ -39,11 +40,19 @@ export function RegionSheet({
     return () => window.removeEventListener("keydown", onKey, true);
   }, [onClose]);
 
+  const focus = useDialogFocus<HTMLDivElement>();
   const region = locationToRegion(locationId);
   const art = (region && REGION_STREET[region]) || roomArtFor("map");
 
   const sheet = (
-    <div className="fixed inset-0 z-[60] flex flex-col bg-ink" data-region-sheet={locationId}>
+    <div
+      ref={focus}
+      role="dialog"
+      aria-modal="true"
+      aria-label={`${title} briefing`}
+      className="fixed inset-0 z-[60] flex flex-col bg-ink"
+      data-region-sheet={locationId}
+    >
       <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
         <img src={art} alt="" decoding="async" className="ms-scene-photo absolute inset-0 size-full object-cover" />
         <div className="ms-encounter-veil absolute inset-0" />

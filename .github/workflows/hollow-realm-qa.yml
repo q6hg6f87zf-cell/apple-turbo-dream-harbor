@@ -101,6 +101,29 @@ jobs:
           HOLLOW_QA_URL: http://127.0.0.1:8080
         run: node scripts/hollow-realm-smoke.mjs
 
+      - name: Hub/Task chrome budget
+        env:
+          HOLLOW_QA_URL: http://127.0.0.1:8080
+        run: node scripts/hub-task-chrome-qa.mjs
+
+      - name: Inventory touch scrolling
+        env:
+          HOLLOW_QA_URL: http://127.0.0.1:8080
+        run: node scripts/inventory-touch-qa.mjs
+
+      - name: UX pass surfaces
+        env:
+          HOLLOW_QA_URL: http://127.0.0.1:8080
+        run: node scripts/hollow-ux-passes-qa.mjs
+
+      - name: Upload UX screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hollow-realm-ux-qa
+          path: screenshots
+          if-no-files-found: ignore
+
       - name: Upload QA screenshot
         if: always()
         uses: actions/upload-artifact@v4
