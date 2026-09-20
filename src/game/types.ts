@@ -250,7 +250,8 @@ export type Screen =
   | "rules"
   | "vault"
   | "squad"
-  | "market";
+  | "market"
+  | "gallery";
 
 export type MissionKind =
   | "scout"

@@ -72,9 +72,9 @@ import {
   type HandshakeDelta,
 } from "./discord";
 import { sfx } from "./audio";
-import { playFoundYou, armIntro } from "./radio";
+import { playFoundYou, armIntro, startPorchRadio } from "./radio";
 import { enterWake } from "./opening";
-import { advanceTalk as stepTalk, queueTalk, skipTalk as skipTalkFn, SCREEN_SCRIPT, scriptForScreen } from "./talk";
+import { advanceTalk as stepTalk, queueTalk, skipTalk as skipTalkFn, SCREEN_SCRIPT, scriptForScreen, TALK } from "./talk";
 import { considerTyroneHint, speakTyrone, answerTyroneQuestion } from "./tyrone-voice";
 import { ingestTyrone, snapshotTyrone } from "./tyrone-mind";
 import {
@@ -178,6 +178,8 @@ interface Store {
   hackBracket: () => string | null;
   advanceTalk: () => void;
   skipTalk: () => void;
+  syncWakeLine: (i: number) => void;
+  finishWakeReel: () => void;
   resumeSession: () => void;
   askTyrone: (script?: string) => void;
   askTyroneLine: (text: string) => void;
@@ -1016,14 +1018,34 @@ export const useGame = create<Store>((set, get) => ({
     return msg;
   },
   advanceTalk: () => {
+    let leftWake = false;
     mutate(set, (st) => {
-      stepTalk(st);
+      const was = st.talk?.script;
+      const result = stepTalk(st);
+      if (was === "wake" && result === "done") leftWake = true;
     });
+    if (leftWake) void startPorchRadio();
   },
-  skipTalk: () =>
+  skipTalk: () => {
+    let leftWake = false;
     mutate(set, (st) => {
+      const was = st.talk?.script;
       skipTalkFn(st);
+      if (was === "wake" && st.talk?.script !== "wake") leftWake = true;
+    });
+    if (leftWake) void startPorchRadio();
+  },
+  syncWakeLine: (i) =>
+    mutate(set, (st) => {
+      if (st.talk?.script !== "wake") return;
+      const max = Math.max(0, (TALK.wake?.length ?? 1) - 1);
+      const next = Math.max(0, Math.min(max, Math.floor(i)));
+      if (st.talk.i === next) return;
+      st.talk.i = next;
     }),
+  finishWakeReel: () => {
+    get().skipTalk();
+  },
   registerRider: (name, handle, discordId) => {
     let msg: string | null = null;
     mutate(set, (st) => {

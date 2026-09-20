@@ -7,6 +7,7 @@ import {
   BookOpen,
   Bot,
   CreditCard,
+  Film,
   Hammer,
   IdCard,
   ScrollText,
@@ -31,6 +32,13 @@ const TOOLS: {
     eyebrow: "Holotape deck",
     desc: "Keep the Radio On. Ironclad dust. Slag Town neon. Original tapes, more coming.",
     icon: AudioLines,
+  },
+  {
+    screen: "gallery",
+    name: "Vault Reels",
+    eyebrow: "Media",
+    desc: "Rewatch the opening. Title plate. Stills from the east highway. It is not dead after the first play.",
+    icon: Film,
   },
   {
     screen: "ledger",

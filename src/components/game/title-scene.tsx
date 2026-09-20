@@ -7,80 +7,12 @@ import {
   enterPorch,
   useOpeningBeat,
 } from "@/game/opening";
+import { TITLE_REEL } from "@/game/opening-reel";
+import { armScore, getRadioSnapshot, playScore, resumeRadio } from "@/game/radio";
 import { preloadRoomArt } from "@/game/rooms";
 import { useGame } from "@/game/store";
 import { cn } from "@/lib/cn";
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
-
-function gearPath(teeth: number, outer = 46, inner = 34, hole = 11, depth = 7) {
-  const tw = Math.PI / teeth;
-  const pts: string[] = [];
-  for (let i = 0; i < teeth; i++) {
-    const a = i * 2 * tw - Math.PI / 2;
-    const polar = (r: number, ang: number) => `${(50 + r * Math.cos(ang)).toFixed(2)},${(50 + r * Math.sin(ang)).toFixed(2)}`;
-    pts.push(polar(outer, a - tw * 0.32));
-    pts.push(polar(outer + depth, a - tw * 0.16));
-    pts.push(polar(outer + depth, a + tw * 0.16));
-    pts.push(polar(outer, a + tw * 0.32));
-  }
-  return `M ${pts.join(" L ")} Z M ${50 + hole},50 A ${hole} ${hole} 0 1 0 ${50 - hole},50 A ${hole} ${hole} 0 1 0 ${50 + hole},50 Z`;
-}
-
-const GEARS = [
-  { teeth: 16, size: "42vmin", left: "18%", top: "40%", duration: "36s", reverse: false, opacity: 0.42 },
-  { teeth: 12, size: "22vmin", left: "42%", top: "52%", duration: "22s", reverse: true, opacity: 0.38 },
-  { teeth: 10, size: "14vmin", left: "12%", top: "22%", duration: "14s", reverse: true, opacity: 0.34 },
-  { teeth: 8, size: "11vmin", left: "58%", top: "44%", duration: "11s", reverse: false, opacity: 0.3 },
-  { teeth: 9, size: "13vmin", left: "34%", top: "68%", duration: "18s", reverse: true, opacity: 0.28 },
-];
-
-function GearField() {
-  const paths = useMemo(() => {
-    const cache = new Map<number, string>();
-    return GEARS.map((g) => {
-      let d = cache.get(g.teeth);
-      if (!d) {
-        d = gearPath(g.teeth);
-        cache.set(g.teeth, d);
-      }
-      return { ...g, d };
-    });
-  }, []);
-
-  return (
-    <div className="pointer-events-none absolute inset-0 z-[1] overflow-hidden" data-gears="1" aria-hidden>
-      {paths.map((g, i) => (
-        <svg
-          key={i}
-          viewBox="0 0 100 100"
-          className={cn("ms-gear absolute", g.reverse && "ms-gear-rev")}
-          style={{
-            width: g.size,
-            height: g.size,
-            left: g.left,
-            top: g.top,
-            opacity: g.opacity,
-            animationDuration: g.duration,
-          }}
-        >
-          <path d={g.d} fill="currentColor" fillRule="evenodd" />
-          <circle cx="50" cy="50" r="6.5" fill="none" stroke="currentColor" strokeWidth="2.2" />
-        </svg>
-      ))}
-      <div className="ms-title-lamps absolute inset-0" />
-    </div>
-  );
-}
-
-function DustField() {
-  return (
-    <div className="pointer-events-none absolute inset-0 z-[2] overflow-hidden" aria-hidden>
-      {Array.from({ length: 14 }).map((_, i) => (
-        <span key={i} className="ms-dust" style={{ "--dust-i": String(i) } as CSSProperties} />
-      ))}
-    </div>
-  );
-}
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 export function TitleBackdrop({
   className,
@@ -89,18 +21,77 @@ export function TitleBackdrop({
   className?: string;
   live?: boolean;
 }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [reduced, setReduced] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setReduced(mq.matches);
+    const onChange = () => setReduced(mq.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+
+  useEffect(() => {
+    if (!live) return;
+    armScore("title");
+    void playScore("title");
+  }, [live]);
+
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el || reduced || !live) return;
+    el.muted = true;
+    el.defaultMuted = true;
+    el.playsInline = true;
+    const kick = () => {
+      void el.play().catch(() => {});
+      const snap = getRadioSnapshot();
+      if (snap.mode === "score" && !snap.playing) void resumeRadio();
+    };
+    kick();
+    document.addEventListener("pointerdown", kick);
+    document.addEventListener("touchstart", kick, { passive: true });
+    return () => {
+      document.removeEventListener("pointerdown", kick);
+      document.removeEventListener("touchstart", kick);
+    };
+  }, [live, reduced]);
+
+  const still = failed || reduced || !live;
+
   return (
     <div className={cn("absolute inset-0 overflow-hidden bg-ink", className)} data-title-scene="1">
-      <img src="/art/title-plate.jpg" alt="" aria-hidden className="title-fill absolute inset-0 size-full" />
       <img
-        src="/art/title-plate.jpg"
+        src={TITLE_REEL.poster}
+        alt=""
+        aria-hidden
+        className="title-fill absolute inset-0 size-full"
+      />
+      <img
+        src={TITLE_REEL.poster}
         alt="The Hollow Realm"
         fetchPriority="high"
         decoding="async"
-        className="title-plate-hero absolute inset-0 size-full"
+        className="title-plate-hero absolute inset-0 size-full object-cover object-[center_28%] md:object-contain"
       />
-      {live ? <GearField /> : null}
-      {live ? <DustField /> : null}
+      {!still ? (
+        <video
+          ref={videoRef}
+          src={TITLE_REEL.src}
+          poster={TITLE_REEL.poster}
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="auto"
+          data-title-reel="1"
+          className="absolute inset-0 size-full object-cover object-[center_28%] md:object-contain"
+          onError={() => setFailed(true)}
+          onCanPlay={() => void videoRef.current?.play().catch(() => {})}
+        />
+      ) : null}
     </div>
   );
 }
@@ -182,7 +173,9 @@ export function OpeningBoot({
 
   const open = () => {
     try {
+      armScore("title");
       unlockAudio();
+      void playScore("title");
       startAmbient();
       sfx.machine();
     } finally {

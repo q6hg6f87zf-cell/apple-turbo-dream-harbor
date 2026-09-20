@@ -224,7 +224,7 @@ export const REGIONS: RegionDefinition[] = [
     id: "ironclad",
     name: "Ironclad",
     short: "Ironclad",
-    continent: "Hollowstead",
+    continent: "Pacific Coast",
     biome: "industrial-frontier",
     description:
       "A hard northern frontier of iron ridges, rail cuts and fortress works. Vault 13 is buried into the ridgeline beyond the outer rail. The Exchange inside the vault is closed. Caps walk to the Moon Squad Market under the Iron Gate. Relay Tower Three still talks, if you climb it.",
@@ -386,7 +386,7 @@ export const REGIONS: RegionDefinition[] = [
     id: "slagtown",
     name: "Slag Town",
     short: "Slag Town",
-    continent: "Cinderlands",
+    continent: "Amazon Basin",
     biome: "slag-wastes",
     description:
       "A furnace settlement spread across red waste and cooling slag fields. Pipes cross the streets overhead. Kane's buyers take anything that still burns hot enough to feed a jump stack.",
@@ -483,7 +483,7 @@ export const REGIONS: RegionDefinition[] = [
     id: "blackspire",
     name: "Blackspire",
     short: "Blackspire",
-    continent: "Highspine",
+    continent: "Western Alps",
     biome: "volcanic-highlands",
     description:
       "A black mountain range punched through by mines, lift cages and impossible survey lines. Hollow ore from the Deepworks is the resource Kane needs for intergalactic travel. She will not ask politely.",
@@ -580,7 +580,7 @@ export const REGIONS: RegionDefinition[] = [
     id: "brasswater",
     name: "Brasswater",
     short: "Brasswater",
-    continent: "Tidefold",
+    continent: "Mozambique Channel",
     biome: "metallic-wetlands",
     description:
       "A drowned industrial coast where brass towers rise from dark water and entire streets continue below the tide line. The Drowned Archive still holds pre-collapse jump tables. Kane's divers work at night.",
@@ -677,7 +677,7 @@ export const REGIONS: RegionDefinition[] = [
     id: "veyra",
     name: "Veyra City",
     short: "Veyra",
-    continent: "Veyra",
+    continent: "Sulu Sea",
     biome: "city",
     description:
       "Human city of AEGIS 2753 super suits — Halo-grade combat frames piloted by elite specialists. Dr. Vesper Kane built them as successors to the T-0880 robots after the shutdown order. Her classified mission is intergalactic travel. The Hollow Realm is the last resource map she does not yet own.",

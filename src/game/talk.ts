@@ -375,9 +375,9 @@ export const MANUAL: Record<string, FieldCard> = {
     title: "Found you",
     blurb: "Tyrone hauled you off the east highway. No tracks. Vault 13. Listen first.",
     tips: [
-      "This talk cannot be skipped.",
-      "Your name is already on the file if you sat the card.",
-      "Ironclad west. Slag Town south. Brasswater on the water. Veyra last. Blackspire later.",
+      "Lines follow the tape. You do not tap to continue.",
+      "Skip if you already know the porch.",
+      "Rewatch it later under More · Vault Reels.",
     ],
   },
   briefing: {
@@ -716,9 +716,10 @@ export function advanceTalk(state: GameState): "next" | "done" | "idle" {
 }
 
 export function skipTalk(state: GameState) {
-  if (isTalkLocked(state)) return;
   const t = state.talk;
   if (!t) return;
+  // First wake is locked so they hear it — unless they choose Skip.
+  if (isTalkLocked(state) && t.script !== "wake") return;
   t.i = (TALK[t.script]?.length ?? 1) - 1;
   advanceTalk(state);
 }

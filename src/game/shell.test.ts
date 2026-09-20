@@ -81,6 +81,7 @@ describe("chromeKind", () => {
     assert.equal(chromeKind("codex"), "task");
     assert.equal(chromeKind("title"), "none");
     assert.equal(chromeKind("briefing"), "none");
+    assert.equal(chromeKind("gallery"), "none");
   });
 });
 

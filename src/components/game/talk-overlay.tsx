@@ -1,5 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { sfx } from "@/game/audio";
+import { wakeLineAt } from "@/game/opening-reel";
+import { getRadioSnapshot, subscribeRadio } from "@/game/radio";
 import { TALK, MANUAL, isPregameTalk, isTalkLocked, renderTalk, scriptForScreen } from "@/game/talk";
 import { useGame } from "@/game/store";
 import type { TyroneAssist } from "@/game/types";
@@ -12,6 +14,7 @@ export function TalkOverlay() {
   const state = useGame((g) => g.s);
   const advance = useGame((g) => g.advanceTalk);
   const skip = useGame((g) => g.skipTalk);
+  const syncWakeLine = useGame((g) => g.syncWakeLine);
   const line = talk ? TALK[talk.script]?.[talk.i] : null;
   const [shown, setShown] = useState("");
   const shownRef = useRef("");
@@ -19,10 +22,12 @@ export function TalkOverlay() {
   const full = line ? renderTalk(line.text, state) : "";
   const locked = isTalkLocked(state);
   const pregame = isPregameTalk(state);
+  const liveWake = talk?.script === "wake";
   const total = talk ? (TALK[talk.script]?.length ?? 1) : 1;
   shownRef.current = shown;
 
   const revealOrAdvance = () => {
+    if (liveWake) return;
     if (shownRef.current.length < full.length) {
       skipType.current = true;
       setShown(full);
@@ -34,11 +39,27 @@ export function TalkOverlay() {
   };
 
   useEffect(() => {
+    if (!liveWake) return;
+    const push = () => {
+      const snap = getRadioSnapshot();
+      if (snap.mode !== "intro") return;
+      syncWakeLine(wakeLineAt(snap.currentTime));
+    };
+    push();
+    return subscribeRadio(push);
+  }, [liveWake, syncWakeLine]);
+
+  useEffect(() => {
     if (!full) {
       setShown("");
       return;
     }
     skipType.current = false;
+    if (liveWake) {
+      setShown(full);
+      shownRef.current = full;
+      return;
+    }
     setShown("");
     shownRef.current = "";
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -60,7 +81,7 @@ export function TalkOverlay() {
       if (i >= full.length) window.clearInterval(id);
     }, 16);
     return () => window.clearInterval(id);
-  }, [full, talk?.script, talk?.i]);
+  }, [full, talk?.script, talk?.i, liveWake]);
 
   useEffect(() => {
     if (!talk) return;
@@ -70,6 +91,10 @@ export function TalkOverlay() {
       if (t?.closest("input, textarea, select")) return;
       if (e.key === "Escape") {
         e.preventDefault();
+        if (liveWake) {
+          skip();
+          return;
+        }
         if (shown.length < full.length) setShown(full);
         else if (!locked) skip();
         return;
@@ -81,7 +106,7 @@ export function TalkOverlay() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [talk, shown, full, advance, skip, locked]);
+  }, [talk, shown, full, advance, skip, locked, liveWake]);
 
   if (!talk || !line) return null;
   const last = talk.i >= total - 1;
@@ -103,7 +128,8 @@ export function TalkOverlay() {
             "mx-auto flex w-full max-w-2xl items-end gap-3 rounded-[var(--radius-xl)] bg-ink/92 p-3 text-left shadow-[var(--shadow-border-hover)] backdrop-blur-md md:p-4",
             talk.script === "wake" && "ms-wake-card",
           )}
-          onClick={revealOrAdvance}
+          onClick={liveWake ? undefined : revealOrAdvance}
+          data-wake-auto={liveWake ? "1" : undefined}
         >
           <img
             src={talk.script === "wake" ? "/art/tyrone-wake.jpg" : "/art/tyrone.jpg"}
@@ -134,21 +160,23 @@ export function TalkOverlay() {
               ))}
             </div>
             <p className="mt-2 font-display text-[10px] uppercase tracking-[0.18em] text-muted">
-              {locked && last
-                ? talk.script === "wake"
-                  ? "Tap to keep walking"
-                  : talk.script === "welcome"
+              {liveWake
+                ? last
+                  ? "The reel finishes on its own"
+                  : "Listening"
+                : locked && last
+                  ? talk.script === "welcome"
                     ? "Tap to enter the Machine Shop"
                     : "Tap to enter the ranch"
-                : last
-                  ? "Tap to close"
-                  : locked
-                    ? "Tap to continue · listen"
-                    : "Tap to continue"}
+                  : last
+                    ? "Tap to close"
+                    : locked
+                      ? "Tap to continue · listen"
+                      : "Tap to continue"}
             </p>
           </div>
         </button>
-        {!locked ? (
+        {!locked || liveWake ? (
           <div className="mx-auto mt-2 flex w-full max-w-2xl justify-end">
             <Button size="sm" variant="quiet" onClick={() => skip()}>
               Skip

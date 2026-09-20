@@ -237,7 +237,6 @@ export function MainMenu() {
   const linkDiscord = useGame((g) => g.linkDiscord);
   const talking = useGame((g) => !!g.s.talk);
   const talkScript = useGame((g) => g.s.talk?.script);
-  const talkLine = useGame((g) => g.s.talk?.i ?? 0);
   const named = useGame((g) => hasPlayerProfile(g.s));
   const playerName = useGame((g) => g.s.playerName);
   const beat = useOpeningBeat();
@@ -273,7 +272,7 @@ export function MainMenu() {
 
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden bg-ink text-paper" data-ready="1">
-      {waking ? <WakeScene line={talkScript === "wake" ? talkLine : 0} /> : <TitleBackdrop />}
+      {waking ? <WakeScene /> : <TitleBackdrop />}
       {waking ? null : <div className="title-veil pointer-events-none absolute inset-0 z-[1]" />}
       <OpeningBoot>
       <div className={cn("relative z-[2] flex min-h-0 flex-1 flex-col justify-end px-4 pb-8 pt-16 md:px-10 md:pb-10", waking && "pointer-events-none opacity-0")}>

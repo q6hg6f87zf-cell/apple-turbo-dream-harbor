@@ -5,7 +5,7 @@ import { useGame } from "@/game/store";
 import type { LocationId, RegionId } from "@/game/types";
 import { Compass, Minus, Plus, RotateCcw } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { HollowGlobeAAA, regionBitmap, requestRegionBitmaps } from "./globe-aaa";
+import { HollowGlobeAAA } from "./globe-aaa";
 
 const REGION_TO_LOCATION: Record<RegionId, LocationId> = {
   ironclad: "ironclad",
@@ -98,16 +98,18 @@ uniform float u_yaw;
 uniform float u_pitch;
 uniform float u_zoom;
 uniform vec3 u_regionDir[5];
-uniform vec3 u_regionColor[5];
-uniform sampler2D u_tex0;
-uniform sampler2D u_tex1;
-uniform sampler2D u_tex2;
-uniform sampler2D u_tex3;
-uniform sampler2D u_tex4;
-uniform float u_texReady;
 uniform sampler2D u_bakeA;
 uniform sampler2D u_bakeB;
 uniform float u_bakeReady;
+uniform sampler2D u_earth;
+uniform sampler2D u_clouds;
+uniform sampler2D u_night;
+uniform sampler2D u_water;
+uniform float u_mapsReady;
+uniform sampler2D u_galaxy;
+uniform sampler2D u_moon;
+uniform float u_spaceReady;
+uniform float u_moonReady;
 ${TERRAIN_NOISE_GLSL}
 vec3 rotateX(vec3 v, float a) {
   float c = cos(a), s = sin(a);
@@ -130,14 +132,27 @@ vec3 drawSpace(vec2 uv) {
   p.x *= aspect;
   vec2 drift = vec2(u_yaw * 0.035, u_pitch * 0.02);
 
-  vec2 neb = p - vec2(0.55, 0.46) + drift * 0.4;
-  float stripe = exp(-pow(abs(neb.y * 1.05 + neb.x * 0.28), 2.0) * 22.0);
-  float galaxyNoise = fbm(vec3((p + drift) * 2.1, 2.7 + u_time * 0.012));
-  float dust = fbm(vec3((p - drift) * 4.4, 8.1));
-  color += vec3(0.14, 0.09, 0.16) * stripe * (0.22 + galaxyNoise * 0.85);
-  color += vec3(0.22, 0.16, 0.07) * stripe * stripe * (0.35 + dust * 0.4);
-  color += vec3(0.04, 0.07, 0.05) * dust * 0.22;
+  if (u_spaceReady > 0.5) {
+    float imgAspect = 9.0 / 16.0;
+    vec2 cover = (uv + drift * 0.08 - 0.5) * 0.94 + 0.5;
+    if (aspect > imgAspect) {
+      cover.y = (cover.y - 0.5) * (imgAspect / aspect) + 0.5;
+    } else {
+      cover.x = (cover.x - 0.5) * (aspect / imgAspect) + 0.5;
+    }
+    cover = clamp(cover, 0.0, 1.0);
+    color = pow(max(texture(u_galaxy, cover).rgb, vec3(0.0)), vec3(0.92)) * 1.06;
+  } else {
+    vec2 neb = p - vec2(0.55, 0.46) + drift * 0.4;
+    float stripe = exp(-pow(abs(neb.y * 1.05 + neb.x * 0.28), 2.0) * 22.0);
+    float galaxyNoise = fbm(vec3((p + drift) * 2.1, 2.7 + u_time * 0.012));
+    float dust = fbm(vec3((p - drift) * 4.4, 8.1));
+    color += vec3(0.14, 0.09, 0.16) * stripe * (0.22 + galaxyNoise * 0.85);
+    color += vec3(0.22, 0.16, 0.07) * stripe * stripe * (0.35 + dust * 0.4);
+    color += vec3(0.04, 0.07, 0.05) * dust * 0.22;
+  }
 
+  float starGain = u_spaceReady > 0.5 ? 0.72 : 1.0;
   for (int layer = 0; layer < 4; layer++) {
     float density = 11.0 + float(layer) * 10.0;
     vec2 field = uv + drift * (0.07 + float(layer) * 0.05);
@@ -160,11 +175,11 @@ vec3 drawSpace(vec2 uv) {
       vec3 tint = mix(vec3(0.74, 0.84, 1.0), vec3(1.0, 0.88, 0.66), step(0.55, n3));
       tint = mix(tint, vec3(1.0, 0.62, 0.48), step(0.93, n2));
       float bright = (0.16 + mag * 1.7) * tw * (layer == 0 ? 1.05 : 0.58);
-      color += tint * (core + halo) * bright;
+      color += tint * (core + halo) * bright * starGain;
       if (mag > 0.55 && dist < 0.16) {
         float sx = pow(max(0.0, 1.0 - abs(f.x) * 36.0), 12.0);
         float sy = pow(max(0.0, 1.0 - abs(f.y) * 36.0), 12.0);
-        color += tint * (sx + sy) * tw * mag * 0.32;
+        color += tint * (sx + sy) * tw * mag * 0.32 * starGain;
       }
     }
   }
@@ -172,13 +187,20 @@ vec3 drawSpace(vec2 uv) {
   vec2 moonPoint = uv - vec2(0.14, 0.81) + drift * 0.15;
   moonPoint.x *= aspect;
   float moonDistance = length(moonPoint);
-  if (moonDistance < 0.042) {
-    float craters = smoothstep(0.35, 0.82, hash21(floor(moonPoint * 160.0)));
-    float lit = smoothstep(-0.03, 0.02, moonPoint.x + moonPoint.y * 0.32);
-    float rim = smoothstep(0.042, 0.028, moonDistance);
-    float glow = smoothstep(0.09, 0.042, moonDistance) * 0.18;
-    color += vec3(0.45, 0.4, 0.3) * glow;
-    color = mix(color, vec3(0.66, 0.6, 0.48) * (0.2 + lit * 0.82) * (1.0 - craters * 0.3), rim);
+  float moonR = 0.062;
+  color += vec3(0.42, 0.36, 0.26) * smoothstep(moonR * 1.85, moonR * 0.92, moonDistance) * 0.1;
+  if (moonDistance < moonR) {
+    float rim = smoothstep(moonR, moonR * 0.97, moonDistance);
+    vec3 moonCol;
+    if (u_moonReady > 0.5) {
+      vec2 mu = clamp(moonPoint / (moonR * 2.0) + 0.5, 0.0, 1.0);
+      moonCol = pow(max(texture(u_moon, mu).rgb, vec3(0.0)), vec3(1.35)) * vec3(0.86, 0.80, 0.68);
+    } else {
+      float craters = fbm(vec3(moonPoint * 42.0, 2.2));
+      float lit = smoothstep(-0.04, 0.05, moonPoint.x + moonPoint.y * 0.28);
+      moonCol = vec3(0.72, 0.66, 0.52) * (0.22 + lit * 0.82) * (0.82 + craters * 0.22);
+    }
+    color = mix(color, moonCol, rim);
   }
 
   vec2 moon2 = uv - vec2(0.84, 0.18) + drift * 0.1;
@@ -205,20 +227,8 @@ vec3 drawSpace(vec2 uv) {
   return color;
 }
 
-vec2 regionUV(vec3 nrm, vec3 dir) {
-  vec3 up = abs(dir.y) > 0.92 ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0);
-  vec3 t = normalize(cross(up, dir));
-  vec3 b = normalize(cross(dir, t));
-  float d = max(0.16, dot(nrm, dir));
-  return vec2(dot(nrm, t), dot(nrm, b)) / d * 0.52 + 0.5;
-}
-
-vec3 samplePaint(sampler2D tex, vec3 nrm, vec3 dir, float weight) {
-  if (weight < 0.04) return vec3(0.0);
-  vec2 uv = regionUV(nrm, dir);
-  if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) return vec3(0.0);
-  float edge = smoothstep(0.0, 0.16, uv.x) * smoothstep(1.0, 0.84, uv.x) * smoothstep(0.0, 0.16, uv.y) * smoothstep(1.0, 0.84, uv.y);
-  return texture(tex, uv).rgb * weight * edge;
+vec2 equirect(vec3 nrm) {
+  return vec2(atan(nrm.x, nrm.z) / (2.0 * PI) + 0.5, asin(clamp(nrm.y, -1.0, 1.0)) / PI + 0.5);
 }
 
 void main() {
@@ -234,9 +244,9 @@ void main() {
 
   if (h < 0.0) {
     float closest = length(originToCenter - ray * dot(originToCenter, ray));
-    float halo = smoothstep(1.48, 1.15, closest) * smoothstep(1.08, 1.22, closest);
-    float outer = smoothstep(1.72, 1.34, closest) * 0.22;
-    outColor = vec4(background + vec3(0.16, 0.48, 0.72) * halo * 0.55 + vec3(0.4, 0.22, 0.08) * outer, 1.0);
+    float halo = smoothstep(1.52, 1.16, closest) * smoothstep(1.10, 1.24, closest);
+    float outer = smoothstep(1.82, 1.36, closest) * 0.28;
+    outColor = vec4(background + vec3(0.22, 0.52, 0.92) * halo * 0.85 + vec3(0.55, 0.72, 1.0) * outer * 0.18, 1.0);
     return;
   }
 
@@ -249,133 +259,113 @@ void main() {
   vec3 normal = normalize(ray * t - center);
   vec3 worldNormal = rotateY(rotateX(normal, u_pitch), u_yaw);
   vec3 nrm = worldNormal;
-  float rough = fbm(nrm * 5.4 + vec3(2.2, 7.1, 13.4));
-  float fine = fbm(nrm * 18.0 + vec3(3.1, 7.9, 2.4));
-  float mountains = pow(ridge(nrm * 6.8 + 1.6), 2.35);
   float latitude = asin(clamp(nrm.y, -1.0, 1.0));
-  float polar = smoothstep(0.78, 1.05, abs(latitude));
-  float tropic = 1.0 - smoothstep(0.0, 0.52, abs(latitude));
+  float absLat = abs(latitude);
+  float tropic = 1.0 - smoothstep(0.0, 0.48, absLat);
+  float polar = smoothstep(0.72, 0.96, absLat);
 
-  float influence[5];
-  float island = 0.0;
-  vec3 landColor = vec3(0.32, 0.3, 0.24);
-  vec3 painted = vec3(0.0);
-  float paintWeight = 0.0;
-  float archNoise;
-  if (u_bakeReady > 0.5) {
-    // Continent shape does not move, so it is baked once into an equirect pair
-    // and read back here. Six octaves of noise per region, per pixel, per frame
-    // bought nothing but heat.
-    vec2 buv = vec2(atan(nrm.x, nrm.z) / (2.0 * PI) + 0.5, latitude / PI + 0.5);
-    vec4 packA = texture(u_bakeA, buv);
-    vec4 packB = texture(u_bakeB, buv);
-    influence[0] = packA.r;
-    influence[1] = packA.g;
-    influence[2] = packA.b;
-    influence[3] = packA.a;
-    influence[4] = packB.r;
-    archNoise = packB.g;
+  vec2 buv = equirect(nrm);
+  float landMask = 0.0;
+  float height = 0.0;
+  float moisture = 0.5;
+  float waterMask = 1.0;
+  vec3 albedo = vec3(0.015, 0.07, 0.16);
+
+  if (u_mapsReady > 0.5) {
+    albedo = pow(max(texture(u_earth, buv).rgb, vec3(0.0)), vec3(0.92)) * 1.08;
+    float specMap = texture(u_water, buv).r;
+    float oceanHue = albedo.b - max(albedo.r, albedo.g);
+    float ice = smoothstep(0.66, 0.88, (albedo.r + albedo.g + albedo.b) * 0.333) * polar;
+    waterMask = max(specMap, smoothstep(0.012, 0.11, oceanHue) * (1.0 - ice));
+    landMask = 1.0 - smoothstep(0.16, 0.52, waterMask);
+    height = max(albedo.g - albedo.b * 0.35, 0.0) * landMask;
+    moisture = clamp(albedo.g - albedo.r * 0.35, 0.0, 1.0);
+  } else if (u_bakeReady > 0.5) {
+    vec4 pack = texture(u_bakeA, buv);
+    landMask = pack.r;
+    height = pack.g;
+    moisture = pack.b;
+    waterMask = 1.0 - landMask;
   } else {
-    for (int i = 0; i < 5; i++) {
-      float ang = acos(clamp(dot(nrm, u_regionDir[i]), -1.0, 1.0));
-      float coast = (fbm(nrm * 7.4 + vec3(float(i) * 2.7, 1.4, 4.1)) - 0.5) * 0.18;
-      influence[i] = smoothstep(0.7, 0.2, ang + coast);
-    }
-    archNoise = smoothstep(0.74, 0.88, fbm(nrm * 9.2 + vec3(4.0, 1.0, 9.0)));
-  }
-  for (int i = 0; i < 5; i++) {
-    if (influence[i] > island) {
-      island = influence[i];
-      landColor = u_regionColor[i];
-    }
-  }
-  painted += samplePaint(u_tex0, nrm, u_regionDir[0], influence[0]);
-  painted += samplePaint(u_tex1, nrm, u_regionDir[1], influence[1]);
-  painted += samplePaint(u_tex2, nrm, u_regionDir[2], influence[2]);
-  painted += samplePaint(u_tex3, nrm, u_regionDir[3], influence[3]);
-  painted += samplePaint(u_tex4, nrm, u_regionDir[4], influence[4]);
-  paintWeight = influence[0] + influence[1] + influence[2] + influence[3] + influence[4];
-  if (paintWeight > 0.001 && u_texReady > 0.5) {
-    landColor = mix(landColor, painted / max(0.001, paintWeight), 0.72);
+    vec3 warped = nrm + vec3(fbm(nrm * 1.7 + 2.1) - 0.5, fbm(nrm * 1.7 + 7.4) - 0.5, fbm(nrm * 1.7 + 4.8) - 0.5) * 0.42;
+    float n = fbm(warped * 2.05) + fbm(warped * 5.3) * 0.34 + fbm(warped * 11.0) * 0.12;
+    float land = n - 0.47 + nrm.y * 0.09;
+    land += smoothstep(-0.70, -0.96, nrm.y) * 0.48;
+    land += smoothstep(0.86, 0.99, nrm.y) * 0.16;
+    landMask = smoothstep(0.02, 0.12, land);
+    height = clamp((land - 0.03) * 1.35 + ridge(nrm * 7.1) * 0.3 * landMask, 0.0, 1.0);
+    moisture = fbm(nrm * 3.3 + 8.6);
+    waterMask = 1.0 - landMask;
   }
 
-  float archipelago = archNoise * tropic * 0.28;
-  float landMask = max(max(island, polar * 0.62), archipelago);
-  float rivers = smoothstep(0.012, 0.0, abs(fbm(nrm * 12.2) - 0.47));
-  landMask *= 1.0 - rivers * (1.0 - polar) * 0.55;
+  vec3 surface;
+  if (u_mapsReady > 0.5) {
+    surface = albedo;
+  } else {
+    float desertBand = smoothstep(0.10, 0.26, absLat) * (1.0 - smoothstep(0.36, 0.54, absLat));
+    float temperate = smoothstep(0.22, 0.48, absLat) * (1.0 - smoothstep(0.68, 0.84, absLat));
+    vec3 oceanDeep = vec3(0.015, 0.07, 0.16);
+    vec3 oceanShallow = vec3(0.04, 0.28, 0.40);
+    float wave = fbm(vec3(worldNormal.x * 26.0, worldNormal.z * 26.0, u_time * 0.10));
+    vec3 ocean = mix(oceanDeep, oceanShallow, clamp(0.22 + (1.0 - landMask) * 0.2 + wave * 0.12, 0.0, 1.0));
+    ocean = mix(ocean, vec3(0.12, 0.42, 0.46), tropic * (1.0 - landMask) * 0.22);
+    vec3 sand = vec3(0.72, 0.62, 0.38);
+    vec3 desert = vec3(0.62, 0.48, 0.26);
+    vec3 grass = vec3(0.20, 0.38, 0.14);
+    vec3 forest = vec3(0.07, 0.22, 0.09);
+    vec3 jungle = vec3(0.05, 0.18, 0.08);
+    vec3 rock = vec3(0.36, 0.34, 0.30);
+    vec3 tundra = vec3(0.46, 0.48, 0.40);
+    vec3 snow = vec3(0.90, 0.92, 0.94);
+    vec3 land = mix(grass, forest, smoothstep(0.35, 0.7, moisture));
+    land = mix(land, jungle, tropic * moisture);
+    land = mix(land, mix(sand, desert, 0.65), desertBand * (1.0 - moisture) * 0.92);
+    land = mix(land, tundra, temperate * (1.0 - moisture) * polar * 0.0 + smoothstep(0.58, 0.78, absLat) * 0.55);
+    land = mix(land, rock, smoothstep(0.48, 0.82, height));
+    land = mix(land, snow, max(polar, smoothstep(0.72, 0.94, height) * (1.0 - tropic)));
+    land *= 0.92 + (fbm(nrm * 16.0) - 0.5) * 0.16;
+    surface = mix(ocean, land, landMask);
+  }
 
-  vec3 oceanDeep = vec3(0.012, 0.05, 0.08);
-  vec3 oceanShallow = vec3(0.05, 0.22, 0.26);
-  float foam = smoothstep(0.32, 0.48, landMask) * (0.4 + fine);
-  float wave = fbm(vec3(worldNormal.x * 28.0, worldNormal.z * 28.0, u_time * 0.12));
-  vec3 ocean = mix(oceanDeep, oceanShallow, clamp(0.18 + rough * 0.65 + wave * 0.14, 0.0, 1.0));
-  ocean = mix(ocean, vec3(0.48, 0.66, 0.62), foam * 0.32 * tropic);
-  ocean += vec3(0.02, 0.08, 0.07) * influence[3] * (1.0 - landMask);
-
-  vec3 beach = mix(landColor, vec3(0.66, 0.54, 0.36), 0.5);
-  vec3 lowland = landColor * (0.78 + rough * 0.42);
-  vec3 highland = mix(landColor, vec3(0.18, 0.19, 0.18), 0.5);
-  float height = clamp(rough * 0.42 + mountains * 0.78 + polar * 0.22, 0.0, 1.0);
-  vec3 land = mix(beach, lowland, smoothstep(0.1, 0.3, height));
-  land = mix(land, highland, smoothstep(0.4, 0.76, height));
-  land += vec3(0.16, 0.14, 0.1) * mountains * influence[2];
-  land += vec3(0.22, 0.07, 0.03) * influence[1] * (0.35 + fine);
-  land += vec3(0.04, 0.14, 0.13) * influence[3] * (1.0 - height);
-  land += vec3(0.08, 0.16, 0.18) * influence[4] * (0.2 + 0.5 * (1.0 - height));
-  land = mix(land, vec3(0.82, 0.84, 0.86), polar * 0.9);
-  land *= 0.9 + (fine - 0.5) * 0.18;
-  float slagGlow = influence[1] * landMask * mountains * (0.4 + 0.6 * sin(u_time * 1.7 + fine * 20.0));
-  land += vec3(0.55, 0.18, 0.05) * slagGlow * 0.35;
-  vec3 surface = mix(ocean, land, landMask);
-
-  float rail = influence[0] * influence[1] + influence[1] * influence[2] + influence[2] * influence[3] + influence[3] * influence[4] + influence[0] * influence[4];
-  surface += vec3(0.62, 0.5, 0.28) * smoothstep(0.035, 0.09, rail) * landMask * 0.28;
-
-  vec3 lightDirection = normalize(vec3(-0.58, 0.48, 0.72));
-  float relief = landMask * (0.3 + mountains * 0.7 + rough * 0.18);
-  vec3 bump = normalize(normal + vec3((fine - 0.5) * 0.42 * landMask, (rough - 0.5) * 0.28 * landMask, relief * 0.55));
-  normal = normalize(mix(normal, bump, 0.62));
+  float wave = fbm(vec3(worldNormal.x * 26.0, worldNormal.z * 26.0, u_time * 0.10));
+  vec3 lightDirection = normalize(rotateY(vec3(-0.58, 0.36, 0.72), u_time * 0.028));
+  vec3 bump = normalize(normal + vec3((fbm(nrm * 18.0) - 0.5) * 0.28 * landMask, (height - 0.4) * 0.22 * landMask, landMask * height * 0.35));
+  normal = normalize(mix(normal, bump, 0.42));
   float light = dot(normal, lightDirection);
-  float daylight = smoothstep(-0.18, 0.38, light);
-  float terminator = smoothstep(-0.05, 0.18, light) * (1.0 - smoothstep(0.12, 0.4, light));
-  surface *= 0.11 + max(light, 0.0) * 0.98;
-  surface += vec3(0.58, 0.3, 0.12) * terminator * 0.28;
+  float daylight = smoothstep(-0.16, 0.36, light);
+  float terminator = smoothstep(-0.04, 0.16, light) * (1.0 - smoothstep(0.12, 0.42, light));
+  surface *= 0.07 + max(light, 0.0) * 1.12;
+  surface += vec3(0.92, 0.48, 0.18) * terminator * 0.38;
 
-  float specular = pow(max(dot(reflect(-lightDirection, normal), -ray), 0.0), 48.0 + wave * 40.0) * (1.0 - landMask);
-  surface += vec3(0.55, 0.78, 0.8) * specular * 0.85;
+  float specular = pow(max(dot(reflect(-lightDirection, normal), -ray), 0.0), 48.0 + wave * 40.0) * waterMask * daylight;
+  surface += vec3(0.78, 0.90, 0.98) * specular * 1.05;
 
-  float longitude = atan(worldNormal.x, worldNormal.z);
-  vec2 cityCell = floor(vec2(longitude * 220.0, latitude * 250.0));
-  float citySeed = hash21(cityCell);
-  float cityRegion = max(influence[4] * 2.2, max(influence[0] * 1.1, max(influence[1] * 0.7, influence[3] * 0.65)));
-  float cityLight = step(0.91, citySeed) * cityRegion * landMask * (1.0 - daylight);
-  float mega = step(0.982, citySeed) * influence[4] * landMask;
-  surface += vec3(1.0, 0.62, 0.22) * cityLight * 2.1;
-  surface += vec3(0.85, 0.95, 1.0) * mega * (0.35 + (1.0 - daylight) * 1.8);
-  vec2 grid = abs(fract(vec2(longitude, latitude) * vec2(38.0, 48.0)) - 0.5);
-  float streets = (1.0 - smoothstep(0.0, 0.045, min(grid.x, grid.y))) * influence[4] * landMask * 0.22;
-  surface += vec3(0.55, 0.72, 0.78) * streets * (0.25 + (1.0 - daylight));
+  vec3 nightCol = texture(u_night, buv).rgb;
+  surface += nightCol * nightCol * (1.0 - daylight) * 2.1;
+  for (int i = 0; i < 5; i++) {
+    float near = pow(max(0.0, dot(nrm, u_regionDir[i])), 36.0);
+    surface += vec3(1.0, 0.82, 0.38) * near * landMask * (1.0 - daylight) * 0.42;
+  }
 
-  vec3 cloudNormal = normalize(worldNormal + vec3(u_time * 0.0042, 0.0, u_time * 0.0018));
-  float cloudNoise = fbm(cloudNormal * 4.4 + vec3(u_time * 0.014, 0.0, 0.0));
-  float clouds = smoothstep(0.54, 0.8, cloudNoise) * (0.75 + tropic * 0.25);
-  float cloudShadow = smoothstep(0.5, 0.72, fbm(cloudNormal * 4.4 + vec3(0.08, 0.0, 0.0))) * landMask;
-  surface *= 1.0 - cloudShadow * 0.22 * daylight;
-  surface = mix(surface, vec3(0.86, 0.89, 0.91), clouds * (0.18 + daylight * 0.38));
+  vec2 cloudUv = buv + vec2(u_time * 0.0026, 0.0);
+  float cloudTex = u_mapsReady > 0.5 ? texture(u_clouds, cloudUv).r : 0.0;
+  float cloudNoise = fbm(normalize(worldNormal + vec3(u_time * 0.006, 0.0, u_time * 0.0024)) * 3.6);
+  float clouds = max(cloudTex, u_mapsReady > 0.5 ? 0.0 : smoothstep(0.52, 0.78, cloudNoise) * 0.7);
+  float cloudShadow = texture(u_clouds, cloudUv + vec2(0.006, 0.0)).r;
+  surface *= 1.0 - cloudShadow * 0.32 * daylight * landMask;
+  surface = mix(surface, vec3(0.93, 0.95, 0.97), clouds * (0.28 + daylight * 0.52));
 
-  float fresnel = pow(1.0 - max(dot(normal, -ray), 0.0), 2.6);
-  surface += vec3(0.16, 0.48, 0.78) * fresnel * 1.15;
-  surface += vec3(0.95, 0.62, 0.28) * pow(max(dot(normal, lightDirection), 0.0), 6.0) * fresnel * 0.22;
+  float fresnel = pow(1.0 - max(dot(normal, -ray), 0.0), 2.4);
+  surface += vec3(0.32, 0.58, 0.98) * fresnel * 1.12;
+  surface += vec3(1.0, 0.78, 0.42) * pow(max(dot(normal, lightDirection), 0.0), 8.0) * fresnel * 0.22;
   float air = pow(1.0 - max(dot(normal, -ray), 0.0), 4.2);
-  surface = mix(surface, vec3(0.25, 0.48, 0.78), air * 0.22);
-  outColor = vec4(pow(mix(background, surface, 0.985), vec3(0.88)), 1.0);
+  surface = mix(surface, vec3(0.30, 0.54, 0.94), air * 0.32);
+  outColor = vec4(pow(mix(background, surface, 0.988), vec3(0.90)), 1.0);
 }
 `;
 
 // One-time pass that writes the planet's fixed geography into two equirect
-// maps: the five region fields in A (rgba) and the fifth field plus the
-// archipelago mask in B. Everything time-varying — weather, waves, the slag
-// glow, the terminator — stays live in the main shader.
+// maps: land, height and moisture. Clouds, waves and the terminator stay live.
 const BAKE_SIZE = { width: 1024, height: 512 };
 
 const BAKE_FRAGMENT_SHADER = `#version 300 es
@@ -383,7 +373,6 @@ precision highp float;
 in vec2 v_uv;
 layout(location = 0) out vec4 outA;
 layout(location = 1) out vec4 outB;
-uniform vec3 u_regionDir[5];
 ${TERRAIN_NOISE_GLSL}
 
 void main() {
@@ -391,24 +380,19 @@ void main() {
   float lat = (v_uv.y - 0.5) * PI;
   float cosLat = cos(lat);
   vec3 nrm = normalize(vec3(cosLat * sin(lon), sin(lat), cosLat * cos(lon)));
-  float influence[5];
-  for (int i = 0; i < 5; i++) {
-    float ang = acos(clamp(dot(nrm, u_regionDir[i]), -1.0, 1.0));
-    float coast = (fbm(nrm * 7.4 + vec3(float(i) * 2.7, 1.4, 4.1)) - 0.5) * 0.18;
-    influence[i] = smoothstep(0.7, 0.2, ang + coast);
-  }
-  outA = vec4(influence[0], influence[1], influence[2], influence[3]);
-  outB = vec4(influence[4], smoothstep(0.74, 0.88, fbm(nrm * 9.2 + vec3(4.0, 1.0, 9.0))), 0.0, 1.0);
+  vec3 warped = nrm + vec3(fbm(nrm * 1.7 + 2.1) - 0.5, fbm(nrm * 1.7 + 7.4) - 0.5, fbm(nrm * 1.7 + 4.8) - 0.5) * 0.42;
+  float n = fbm(warped * 2.05) + fbm(warped * 5.3) * 0.34 + fbm(warped * 11.0) * 0.12;
+  float land = n - 0.47 + nrm.y * 0.09;
+  land += smoothstep(-0.70, -0.96, nrm.y) * 0.48;
+  land += smoothstep(0.86, 0.99, nrm.y) * 0.16;
+  land += smoothstep(0.28, 0.08, acos(clamp(dot(nrm, normalize(vec3(-0.38, 0.90, 0.18))), -1.0, 1.0))) * 0.2;
+  float landMask = smoothstep(0.02, 0.12, land);
+  float height = clamp((land - 0.03) * 1.35 + ridge(nrm * 7.1) * 0.3 * landMask, 0.0, 1.0);
+  float moisture = fbm(nrm * 3.3 + 8.6);
+  outA = vec4(landMask, height, moisture, 1.0);
+  outB = vec4(0.0, 0.0, 0.0, 1.0);
 }
 `;
-
-const REGION_COLORS: Record<RegionId, Vec3> = {
-  ironclad: [0.62, 0.46, 0.30],
-  slagtown: [0.72, 0.28, 0.12],
-  blackspire: [0.22, 0.24, 0.28],
-  brasswater: [0.18, 0.46, 0.42],
-  veyra: [0.28, 0.62, 0.68],
-};
 
 function clamp(value: number, low: number, high: number) {
   return Math.min(high, Math.max(low, value));
@@ -444,42 +428,11 @@ function targetFor(id: RegionId, theater = false) {
   const marker = regionById(id).marker;
   return { yaw: marker.lon * DEG, pitch: -marker.lat * DEG, zoom: theater ? 0.98 : 1.05 };
 }
-function makeFallbackTexture(gl: WebGL2RenderingContext, color: Vec3) {
-  const tex = gl.createTexture();
-  if (!tex) return null;
-  gl.bindTexture(gl.TEXTURE_2D, tex);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  gl.texImage2D(
-    gl.TEXTURE_2D,
-    0,
-    gl.RGBA,
-    1,
-    1,
-    0,
-    gl.RGBA,
-    gl.UNSIGNED_BYTE,
-    new Uint8Array([Math.round(color[0] * 255), Math.round(color[1] * 255), Math.round(color[2] * 255), 255]),
-  );
-  return tex;
+function earthFix(lat: number, lon: number) {
+  const ns = `${Math.abs(lat)}°${lat >= 0 ? "N" : "S"}`;
+  const ew = `${Math.abs(lon)}°${lon >= 0 ? "E" : "W"}`;
+  return `${ns} ${ew}`;
 }
-
-function uploadRegionTexture(gl: WebGL2RenderingContext, tex: WebGLTexture, image: HTMLImageElement) {
-  const size = 512;
-  const scratch = document.createElement("canvas");
-  scratch.width = size;
-  scratch.height = size;
-  const brush = scratch.getContext("2d");
-  if (!brush) return;
-  brush.drawImage(image, 0, 0, size, size);
-  gl.bindTexture(gl.TEXTURE_2D, tex);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, scratch);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
-  gl.generateMipmap(gl.TEXTURE_2D);
-}
-
 function compileShader(gl: WebGL2RenderingContext, type: number, source: string) {
   const shader = gl.createShader(type);
   if (!shader) throw new Error("Shader allocation failed.");
@@ -492,7 +445,113 @@ function compileShader(gl: WebGL2RenderingContext, type: number, source: string)
   }
   return shader;
 }
-function bakeTerrain(gl: WebGL2RenderingContext, regionDirections: Float32Array) {
+
+type EarthMaps = {
+  earth: WebGLTexture;
+  clouds: WebGLTexture;
+  night: WebGLTexture;
+  water: WebGLTexture;
+  ready: boolean;
+};
+
+type SpaceMaps = {
+  galaxy: WebGLTexture;
+  moon: WebGLTexture;
+  galaxyReady: boolean;
+  moonReady: boolean;
+};
+
+function makeColorTexture(gl: WebGL2RenderingContext, r: number, g: number, b: number) {
+  const tex = gl.createTexture();
+  if (!tex) throw new Error("Texture allocation failed.");
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([r, g, b, 255]));
+  return tex;
+}
+
+function fillGlobeTexture(gl: WebGL2RenderingContext, tex: WebGLTexture, image: HTMLImageElement) {
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 1);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+  gl.generateMipmap(gl.TEXTURE_2D);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  const aniso = gl.getExtension("EXT_texture_filter_anisotropic");
+  if (aniso) {
+    const max = gl.getParameter(aniso.MAX_TEXTURE_MAX_ANISOTROPY_EXT) as number;
+    gl.texParameterf(gl.TEXTURE_2D, aniso.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(8, max || 1));
+  }
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 0);
+}
+
+function fillSpaceTexture(gl: WebGL2RenderingContext, tex: WebGLTexture, image: HTMLImageElement) {
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 1);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+  // Full-screen plates need the top mip — mipmaps smear pinpoint stars
+  // and crater rims into a blur the 4K globe never has.
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 0);
+}
+
+function loadImage(url: string) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.crossOrigin = "anonymous";
+    image.decoding = "async";
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error(`Failed to load ${url}`));
+    image.src = url;
+  });
+}
+
+async function hydrateEarthMaps(gl: WebGL2RenderingContext, maps: EarthMaps, alive: () => boolean) {
+  const jobs: Array<[keyof Omit<EarthMaps, "ready">, string]> = [
+    ["earth", "/art/earth/day.jpg"],
+    ["clouds", "/art/earth/clouds.jpg"],
+    ["night", "/art/earth/night.jpg"],
+    ["water", "/art/earth/water.png"],
+  ];
+  await Promise.all(jobs.map(async ([key, url]) => {
+    try {
+      const image = await loadImage(url);
+      if (!alive()) return;
+      fillGlobeTexture(gl, maps[key], image);
+      if (key === "earth") maps.ready = true;
+    } catch (error) {
+      console.warn("Earth map missing", url, error);
+    }
+  }));
+}
+
+async function hydrateSpaceMaps(gl: WebGL2RenderingContext, maps: SpaceMaps, alive: () => boolean) {
+  const jobs: Array<["galaxy" | "moon", string]> = [
+    ["galaxy", "/art/space/galaxy.jpg"],
+    ["moon", "/art/space/moon.jpg"],
+  ];
+  await Promise.all(jobs.map(async ([key, url]) => {
+    try {
+      const image = await loadImage(url);
+      if (!alive()) return;
+      fillSpaceTexture(gl, maps[key], image);
+      if (key === "galaxy") maps.galaxyReady = true;
+      if (key === "moon") maps.moonReady = true;
+    } catch (error) {
+      console.warn("Space map missing", url, error);
+    }
+  }));
+}
+
+function bakeTerrain(gl: WebGL2RenderingContext) {
   let program: WebGLProgram | null = null;
   let vao: WebGLVertexArrayObject | null = null;
   let buffer: WebGLBuffer | null = null;
@@ -548,7 +607,6 @@ function bakeTerrain(gl: WebGL2RenderingContext, regionDirections: Float32Array)
     gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
 
     gl.useProgram(program);
-    gl.uniform3fv(gl.getUniformLocation(program, "u_regionDir[0]"), regionDirections);
     gl.viewport(0, 0, BAKE_SIZE.width, BAKE_SIZE.height);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     return { texA, texB };
@@ -714,36 +772,41 @@ export function HollowGlobeWebGL({
     const pitchUniform = gl.getUniformLocation(program, "u_pitch");
     const zoomUniform = gl.getUniformLocation(program, "u_zoom");
     const directionsUniform = gl.getUniformLocation(program, "u_regionDir[0]");
-    const colorsUniform = gl.getUniformLocation(program, "u_regionColor[0]");
-    const texUniforms = [0, 1, 2, 3, 4].map((i) => gl.getUniformLocation(program, `u_tex${i}`));
-    const texReadyUniform = gl.getUniformLocation(program, "u_texReady");
     const bakeAUniform = gl.getUniformLocation(program, "u_bakeA");
     const bakeBUniform = gl.getUniformLocation(program, "u_bakeB");
     const bakeReadyUniform = gl.getUniformLocation(program, "u_bakeReady");
-    requestRegionBitmaps();
-    const textures = CANONICAL_REGION_IDS.map((id) => makeFallbackTexture(gl, REGION_COLORS[id]));
-    const uploaded = new Set<number>();
-    let texReady = 0;
-    const pollTextures = window.setInterval(() => {
-      CANONICAL_REGION_IDS.forEach((id, i) => {
-        if (uploaded.has(i)) return;
-        const img = regionBitmap(id);
-        const tex = textures[i];
-        if (!img || !tex || img.naturalWidth < 8) return;
-        uploadRegionTexture(gl, tex, img);
-        uploaded.add(i);
-      });
-      texReady = uploaded.size >= 5 ? 1 : uploaded.size > 0 ? 0.5 : 0;
-      if (uploaded.size >= 5) window.clearInterval(pollTextures);
-    }, 180);
+    const earthUniform = gl.getUniformLocation(program, "u_earth");
+    const cloudsUniform = gl.getUniformLocation(program, "u_clouds");
+    const nightUniform = gl.getUniformLocation(program, "u_night");
+    const waterUniform = gl.getUniformLocation(program, "u_water");
+    const mapsReadyUniform = gl.getUniformLocation(program, "u_mapsReady");
+    const galaxyUniform = gl.getUniformLocation(program, "u_galaxy");
+    const moonUniform = gl.getUniformLocation(program, "u_moon");
+    const spaceReadyUniform = gl.getUniformLocation(program, "u_spaceReady");
+    const moonReadyUniform = gl.getUniformLocation(program, "u_moonReady");
     const regionDirections = new Float32Array(
       CANONICAL_REGION_IDS.flatMap((id) => {
         const marker = regionById(id).marker;
         return worldVector(marker.lat, marker.lon);
       }),
     );
-    const regionColors = new Float32Array(CANONICAL_REGION_IDS.flatMap((id) => REGION_COLORS[id]));
-    const baked = bakeTerrain(gl, regionDirections);
+    const baked = bakeTerrain(gl);
+    const earthMaps: EarthMaps = {
+      earth: makeColorTexture(gl, 12, 32, 70),
+      clouds: makeColorTexture(gl, 0, 0, 0),
+      night: makeColorTexture(gl, 0, 0, 0),
+      water: makeColorTexture(gl, 0, 0, 0),
+      ready: false,
+    };
+    const spaceMaps: SpaceMaps = {
+      galaxy: makeColorTexture(gl, 2, 3, 8),
+      moon: makeColorTexture(gl, 90, 82, 68),
+      galaxyReady: false,
+      moonReady: false,
+    };
+    let alive = true;
+    void hydrateEarthMaps(gl, earthMaps, () => alive);
+    void hydrateSpaceMaps(gl, spaceMaps, () => alive);
 
     let width = 1;
     let height = 1;
@@ -756,7 +819,7 @@ export function HollowGlobeWebGL({
       const rect = stage.getBoundingClientRect();
       width = Math.max(1, rect.width);
       height = Math.max(1, rect.height);
-      dpr = Math.min(width < 600 ? 1.5 : 2, window.devicePixelRatio || 1);
+      dpr = Math.min(2, window.devicePixelRatio || 1);
       for (const element of [canvas, overlay]) {
         element.width = Math.round(width * dpr);
         element.height = Math.round(height * dpr);
@@ -888,23 +951,36 @@ export function HollowGlobeWebGL({
       gl.uniform1f(pitchUniform, c.pitch);
       gl.uniform1f(zoomUniform, c.zoom);
       gl.uniform3fv(directionsUniform, regionDirections);
-      gl.uniform3fv(colorsUniform, regionColors);
-      textures.forEach((tex, i) => {
-        if (!tex) return;
-        gl.activeTexture(gl.TEXTURE0 + i);
-        gl.bindTexture(gl.TEXTURE_2D, tex);
-        gl.uniform1i(texUniforms[i], i);
-      });
-      gl.uniform1f(texReadyUniform, texReady);
       if (baked) {
-        gl.activeTexture(gl.TEXTURE5);
+        gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, baked.texA);
-        gl.uniform1i(bakeAUniform, 5);
-        gl.activeTexture(gl.TEXTURE6);
+        gl.uniform1i(bakeAUniform, 0);
+        gl.activeTexture(gl.TEXTURE1);
         gl.bindTexture(gl.TEXTURE_2D, baked.texB);
-        gl.uniform1i(bakeBUniform, 6);
+        gl.uniform1i(bakeBUniform, 1);
       }
+      gl.activeTexture(gl.TEXTURE2);
+      gl.bindTexture(gl.TEXTURE_2D, earthMaps.earth);
+      gl.uniform1i(earthUniform, 2);
+      gl.activeTexture(gl.TEXTURE3);
+      gl.bindTexture(gl.TEXTURE_2D, earthMaps.clouds);
+      gl.uniform1i(cloudsUniform, 3);
+      gl.activeTexture(gl.TEXTURE4);
+      gl.bindTexture(gl.TEXTURE_2D, earthMaps.night);
+      gl.uniform1i(nightUniform, 4);
+      gl.activeTexture(gl.TEXTURE5);
+      gl.bindTexture(gl.TEXTURE_2D, earthMaps.water);
+      gl.uniform1i(waterUniform, 5);
+      gl.activeTexture(gl.TEXTURE6);
+      gl.bindTexture(gl.TEXTURE_2D, spaceMaps.galaxy);
+      gl.uniform1i(galaxyUniform, 6);
+      gl.activeTexture(gl.TEXTURE7);
+      gl.bindTexture(gl.TEXTURE_2D, spaceMaps.moon);
+      gl.uniform1i(moonUniform, 7);
       gl.uniform1f(bakeReadyUniform, baked ? 1 : 0);
+      gl.uniform1f(mapsReadyUniform, earthMaps.ready ? 1 : 0);
+      gl.uniform1f(spaceReadyUniform, spaceMaps.galaxyReady ? 1 : 0);
+      gl.uniform1f(moonReadyUniform, spaceMaps.moonReady ? 1 : 0);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
       drawMarkers(now);
       raf = requestAnimationFrame(frame);
@@ -912,17 +988,22 @@ export function HollowGlobeWebGL({
 
     raf = requestAnimationFrame(frame);
     return () => {
+      alive = false;
       cancelAnimationFrame(raf);
-      window.clearInterval(pollTextures);
       resizeObserver.disconnect();
       if (buffer) gl.deleteBuffer(buffer);
       if (vao) gl.deleteVertexArray(vao);
       if (program) gl.deleteProgram(program);
-      for (const tex of textures) if (tex) gl.deleteTexture(tex);
       if (baked) {
         gl.deleteTexture(baked.texA);
         gl.deleteTexture(baked.texB);
       }
+      gl.deleteTexture(earthMaps.earth);
+      gl.deleteTexture(earthMaps.clouds);
+      gl.deleteTexture(earthMaps.night);
+      gl.deleteTexture(earthMaps.water);
+      gl.deleteTexture(spaceMaps.galaxy);
+      gl.deleteTexture(spaceMaps.moon);
     };
   }, [locations, selected]);
 
@@ -980,11 +1061,11 @@ export function HollowGlobeWebGL({
       const dy = event.clientY - state.y;
       const elapsed = Math.max(8, now - state.t);
       if (Math.hypot(dx, dy) > 3) state.moved = true;
-      c.yaw += dx * 0.00455;
+      c.yaw -= dx * 0.00455;
       c.pitch -= dy * 0.0037;
       c.targetYaw = c.yaw;
       c.targetPitch = c.pitch;
-      c.yawVelocity = clamp((dx / elapsed) * 4.1, -2.3, 2.3);
+      c.yawVelocity = clamp((-dx / elapsed) * 4.1, -2.3, 2.3);
       c.pitchVelocity = clamp((-dy / elapsed) * 3.2, -1.7, 1.7);
       state.x = event.clientX;
       state.y = event.clientY;
@@ -1078,7 +1159,7 @@ export function HollowGlobeWebGL({
       {theater ? null : (
         <div className="flex items-center justify-between gap-3 border-b border-line/60 bg-surface/75 px-3 py-2.5 backdrop-blur-md">
           <div className="min-w-0">
-            <div className="font-display text-[9px] uppercase tracking-[0.22em] text-ember">Hollow Realm · orbit</div>
+            <div className="font-display text-[9px] uppercase tracking-[0.22em] text-ember">Orbit</div>
             <div className="mt-0.5 truncate text-xs text-muted">{hint}</div>
           </div>
           {zoomRow}
@@ -1093,7 +1174,7 @@ export function HollowGlobeWebGL({
             ? "h-full min-h-0"
             : "h-[12rem] min-h-[12rem] md:h-[min(42vh,360px)] md:min-h-[240px]"
         } ${dragging ? "cursor-grabbing" : "cursor-grab"}`}
-        aria-label="Interactive WebGL Hollow Realm planet. Drag to orbit and pinch to zoom."
+        aria-label="Interactive WebGL world globe. Drag to orbit and pinch to zoom."
       >
         <canvas ref={webglRef} className="absolute inset-0 size-full" />
         <canvas ref={markerRef} className="pointer-events-none absolute inset-0 size-full" />
@@ -1110,9 +1191,11 @@ export function HollowGlobeWebGL({
               <Compass className="size-4 shrink-0 text-ember" />
               <div className="min-w-0">
                 <div className={`truncate font-display text-paper ${theater ? "text-base" : "text-sm"}`}>{region.name}</div>
-                <div className="truncate font-display text-[10px] uppercase tracking-[0.16em] text-ember">{region.continent}</div>
+                <div className="truncate font-display text-[10px] uppercase tracking-[0.16em] text-ember">
+                  {earthFix(region.marker.lat, region.marker.lon)}
+                </div>
                 <div className="truncate text-[11px] text-muted">
-                  {unlocked ? `Danger ${region.danger} · ${region.biome.replaceAll("-", " ")}` : "SEALED · preceding boss must fall"}
+                  {unlocked ? "Pin on the live world · drag to orbit" : "SEALED · preceding boss must fall"}
                 </div>
                 {theater ? (
                   <div className="mt-1 truncate text-[11px] text-moon">

@@ -47,10 +47,18 @@ const markers = [...data.matchAll(/marker: \{ lat: (-?[\d.]+), lon: (-?[\d.]+)/g
   lon: Number(m[2]),
 }));
 if (markers.length !== 5) throw new Error(`expected 5 region markers, found ${markers.length}`);
-const colorBlock = source.slice(source.indexOf("const REGION_COLORS"));
-const colors = [...colorBlock.slice(0, colorBlock.indexOf("};")).matchAll(/\[([\d.,\s]+)\]/g)].map((m) =>
-  m[1].split(",").map((n) => Number(n.trim())),
-);
+const colorBlockStart = source.indexOf("const REGION_COLORS");
+const colors = colorBlockStart >= 0
+  ? [...source.slice(colorBlockStart, source.indexOf("};", colorBlockStart)).matchAll(/\[([\d.,\s]+)\]/g)].map((m) =>
+    m[1].split(",").map((n) => Number(n.trim())),
+  )
+  : [
+    [0.72, 0.55, 0.22],
+    [0.55, 0.28, 0.12],
+    [0.22, 0.28, 0.38],
+    [0.18, 0.42, 0.48],
+    [0.42, 0.32, 0.55],
+  ];
 if (colors.length !== 5) throw new Error(`expected 5 region colors, found ${colors.length}`);
 
 const DEG = Math.PI / 180;
@@ -166,20 +174,39 @@ const report = await page.evaluate(
     gl.useProgram(main);
     bindQuad(main);
     const u = (n) => gl.getUniformLocation(main, n);
-    gl.uniform3fv(u("u_regionDir[0]"), new Float32Array(regionDir));
-    gl.uniform3fv(u("u_regionColor[0]"), new Float32Array(colors.flat()));
-    flat.forEach((t, i) => {
-      gl.activeTexture(gl.TEXTURE0 + i);
+    const placeholder = (r, g, b) => {
+      const t = gl.createTexture();
       gl.bindTexture(gl.TEXTURE_2D, t);
-      gl.uniform1i(u(`u_tex${i}`), i);
-    });
-    gl.uniform1f(u("u_texReady"), 0);
-    gl.activeTexture(gl.TEXTURE5);
-    gl.bindTexture(gl.TEXTURE_2D, texA);
-    gl.uniform1i(u("u_bakeA"), 5);
-    gl.activeTexture(gl.TEXTURE6);
-    gl.bindTexture(gl.TEXTURE_2D, texB);
-    gl.uniform1i(u("u_bakeB"), 6);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([r, g, b, 255]));
+      return t;
+    };
+    const setTex = (name, unit, tex) => {
+      const loc = u(name);
+      if (!loc) return;
+      gl.activeTexture(gl.TEXTURE0 + unit);
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.uniform1i(loc, unit);
+    };
+    gl.uniform3fv(u("u_regionDir[0]"), new Float32Array(regionDir));
+    setTex("u_earth", 2, placeholder(12, 32, 70));
+    setTex("u_clouds", 3, placeholder(0, 0, 0));
+    setTex("u_night", 4, placeholder(0, 0, 0));
+    setTex("u_water", 5, placeholder(0, 0, 0));
+    setTex("u_galaxy", 6, placeholder(2, 3, 8));
+    setTex("u_moon", 7, placeholder(90, 82, 68));
+    const setFloat = (name, value) => {
+      const loc = u(name);
+      if (loc) gl.uniform1f(loc, value);
+    };
+    setFloat("u_mapsReady", 0);
+    setFloat("u_spaceReady", 0);
+    setFloat("u_moonReady", 0);
+    setTex("u_bakeA", 0, texA);
+    setTex("u_bakeB", 1, texB);
     gl.viewport(0, 0, canvas.width, canvas.height);
 
     const shoot = (pose, ready) => {

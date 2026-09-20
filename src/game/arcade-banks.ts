@@ -681,16 +681,16 @@ export const SLOT_FACE: Record<SlotGlyph, string> = {
 };
 
 /**
- * Reel faces, drawn from the things these symbols actually are. MOON keeps its
- * glyph on purpose: the crest is already the right mark, and one flat symbol
- * among five photographs is easy to pick out of a spin.
+ * Reel faces, drawn from the things these symbols actually are.
+ * Moon is a brass crest. Kane is a red AEGIS chevron — not the pentagram still.
  */
-export const SLOT_ART: Partial<Record<SlotGlyph, string>> = {
+export const SLOT_ART: Record<SlotGlyph, string> = {
   CAP: "/art/items/thumbs/ammo.jpg",
   PIN: "/art/items/thumbs/bobby-pin.jpg",
   TAPE: "/art/items/thumbs/cell.jpg",
   STIM: "/art/items/thumbs/stim.jpg",
-  KANE: "/art/items/thumbs/sigil.jpg",
+  MOON: "/art/items/thumbs/moon-crest.jpg",
+  KANE: "/art/items/thumbs/kane-chevron.jpg",
 };
 
 /**

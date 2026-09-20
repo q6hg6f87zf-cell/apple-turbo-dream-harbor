@@ -9,14 +9,17 @@ import {
   pauseRadio,
   playNext,
   playPrev,
+  playScore,
   playTape,
   RADIO_TAPES,
   resumeRadio,
+  scoreCueForGame,
   seekRadio,
   setFollow,
   setRadioBed,
   setRadioMusic,
   setRadioSfx,
+  stopScore,
   subscribeRadio,
   toggleRadioMute,
   toggleRadioPlay,
@@ -58,16 +61,32 @@ export function RadioDirector() {
   const loc = useGame((g) => g.s.selectedLoc);
   const region = useGame((g) => g.s.worldView?.selectedRegion ?? (g.s.selectedLoc ? locationToRegion(g.s.selectedLoc) : null) ?? null);
   const mission = useGame((g) => !!g.s.mission);
-  const combat = useGame((g) => !!g.s.combat);
+  const combat = useGame((g) => g.s.combat);
+  const inCombat = !!combat;
+  const boss = !!(combat?.bossId || combat?.enemies.some((e) => e.isBoss || e.tags.includes("boss")));
   const watch = useGame((g) => g.s.shift?.watch);
+  useEffect(() => {
+    const cue = scoreCueForGame({ screen, boss });
+    if (cue === "hold") return;
+    if (getRadioSnapshot().mode === "intro") return;
+    if (cue === "boss") {
+      void playScore("boss");
+      return;
+    }
+    if (cue === "title") {
+      void playScore("title");
+      return;
+    }
+    stopScore({ resume: screen !== "arcade" });
+  }, [boss, screen]);
   useEffect(() => {
     if (screen === "arcade") void enterCasinoRadio();
   }, [screen]);
   useEffect(() => {
-    const next = bedFromGame({ screen, region, loc, mission, combat, watch });
+    const next = bedFromGame({ screen, region, loc, mission, combat: inCombat, watch });
     setRadioBed(next);
     if (screen !== "arcade" && isRegionBed(next)) arriveRegion(next);
-  }, [screen, region, loc, mission, combat, watch]);
+  }, [screen, region, loc, mission, inCombat, watch]);
   return null;
 }
 
@@ -172,7 +191,15 @@ export function RadioDeckSheet() {
         <div className="relative z-[1] px-4 pt-4">
           <div className="rounded-[var(--radius-lg)] bg-ink px-4 py-4 shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--color-moon)_22%,transparent)]">
             <p className="font-display text-[10px] uppercase tracking-[0.22em] text-ember">
-              {radio.mode === "spot" ? "Ironclad Civic Radio" : radio.mode === "intro" ? "T-0880" : (tape?.place ?? "Vault 13")}
+              {radio.mode === "spot"
+                ? "Ironclad Civic Radio"
+                : radio.mode === "intro"
+                  ? "T-0880"
+                  : radio.mode === "score"
+                    ? radio.score === "boss"
+                      ? "Boss fight"
+                      : "Title"
+                    : (tape?.place ?? "Vault 13")}
             </p>
             <p className="mt-1 font-display text-2xl text-paper">{radio.headline}</p>
             <p className="mt-1 text-xs text-moon">{radio.mode === "tape" ? tape?.by : radio.subline}</p>
@@ -181,7 +208,11 @@ export function RadioDeckSheet() {
                 ? "A word from Market Square. Relay Tower Three. These spots are not on the deck. You cannot request them."
                 : radio.mode === "intro"
                   ? "He found you east of the highway. Listen. Then the porch radio lights."
-                  : (tape?.blurb ?? "")}
+                  : radio.mode === "score"
+                    ? radio.score === "boss"
+                      ? "Chronicles of the Unseen. It loops until you flee the field. Not a holotape. The porch radio cannot request this."
+                      : "Chronicles of the Unseen. Title bed. The porch radio cannot request this."
+                    : (tape?.blurb ?? "")}
             </p>
 
             <input
@@ -262,10 +293,12 @@ export function RadioDeckSheet() {
           <ul className="mt-2 space-y-1.5">
             {RADIO_TAPES.map((row) => {
               const on = radio.mode === "tape" && row.id === tape?.id;
+              const locked = radio.mode === "score" && radio.score === "boss";
               return (
                 <li key={row.id}>
                   <button
                     type="button"
+                    disabled={locked}
                     onClick={() => {
                       unlockAudio();
                       sfx.click();
@@ -273,7 +306,11 @@ export function RadioDeckSheet() {
                     }}
                     className={cn(
                       "flex min-h-12 w-full items-center gap-3 rounded-[var(--radius-sm)] px-3 text-left transition-colors",
-                      on ? "bg-ember/10 text-paper" : "text-moon hover:bg-ink hover:text-paper",
+                      locked
+                        ? "cursor-not-allowed text-muted/70"
+                        : on
+                          ? "bg-ember/10 text-paper"
+                          : "text-moon hover:bg-ink hover:text-paper",
                     )}
                   >
                     <Radio className={cn("size-4 shrink-0", on && radio.playing ? "text-ember" : "text-muted")} />

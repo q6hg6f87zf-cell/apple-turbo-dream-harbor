@@ -8,7 +8,7 @@ function dismissStoreChrome() {
   if (store.guideOpen) store.closeGuide();
   if (store.confirmRest) store.cancelRest();
   if (store.s.term || store.s.hack) store.closeTerminal();
-  if (store.s.talk && !isTalkLocked(store.s)) store.skipTalk();
+  if (store.s.talk && (!isTalkLocked(store.s) || store.s.talk.script === "wake")) store.skipTalk();
   if (store.s.selectedId && !store.s.mission && !store.s.combat) store.selectOp(null);
 }
 

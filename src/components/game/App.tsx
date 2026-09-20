@@ -29,6 +29,7 @@ import {
 } from "./views";
 import { InventoryView } from "./inventory-view";
 import { MoreView } from "./more-view";
+import { GalleryView } from "./gallery-view";
 import { ArcadeView } from "./arcade-view";
 import { RadioDeckSheet, RadioDirector } from "./radio-deck";
 import { Dock, GuidanceRow, HubHeader, Rail, SceneBreath, TaskHeader } from "./chrome";
@@ -145,6 +146,14 @@ export function GameApp() {
 
   if (!hydrated || screen === "title") return <MainMenu />;
   if (screen === "rules") return <RulesView />;
+  if (screen === "gallery")
+    return (
+      <>
+        <GalleryView />
+        <RadioDirector />
+        <ToastHost />
+      </>
+    );
   if (screen === "briefing")
     return (
       <>

@@ -77,6 +77,8 @@ import { ItemThumb } from "./item-thumb";
 import { FIT_TONE, MarketLotCard, lotFit, lotSpecs } from "./market-lot";
 import { RegionSheet } from "./region-sheet";
 import { WakeScene } from "./wake-scene";
+import { wakeLineAt } from "@/game/opening-reel";
+import { getRadioSnapshot } from "@/game/radio";
 import { PorchStrip } from "./porch-presence";
 import { useOpeningBeat } from "@/game/opening";
 import { RadioChip } from "./radio-deck";
@@ -195,8 +197,9 @@ export function Briefing() {
   const go = useGame((g) => g.finishBriefing);
   const talk = useGame((g) => g.s.talk);
   const beat = useOpeningBeat();
+  const syncWakeLine = useGame((g) => g.syncWakeLine);
+  const finishWakeReel = useGame((g) => g.finishWakeReel);
   const [curtain, setCurtain] = useState(true);
-  const wakeLine = talk?.script === "wake" ? talk.i : 0;
 
   useEffect(() => {
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -207,7 +210,14 @@ export function Briefing() {
 
   return (
     <div className="relative flex h-dvh flex-col justify-end overflow-hidden bg-ink px-5 py-8" data-briefing="1">
-      <WakeScene line={wakeLine} />
+      <WakeScene
+        onTime={(t) => {
+          const radio = getRadioSnapshot();
+          if (radio.mode === "intro") return;
+          syncWakeLine(wakeLineAt(t));
+        }}
+        onEnded={() => finishWakeReel()}
+      />
       <div
         className={cn("ms-opening-curtain", !curtain && "is-up")}
         data-opening={curtain ? "black" : "wake"}
@@ -1131,7 +1141,7 @@ export function MapView() {
           setOrbit(true);
         }}
       >
-        <Globe2 className="size-4" /> Orbit the Hollow
+        <Globe2 className="size-4" /> Orbit the world
       </Button>
 
       {sheet ? (

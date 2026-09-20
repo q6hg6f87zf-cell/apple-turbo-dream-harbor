@@ -11,6 +11,7 @@ import {
   sfxMix,
   toggleMute,
 } from "./audio";
+import { SCORE } from "./opening-reel";
 import type { RegionId, Screen } from "./types";
 
 export type RadioBed =
@@ -123,7 +124,7 @@ const FALLBACK_TAPE: Record<RadioBed, string> = {
   arcade: "glowin-in-slag-town",
 };
 
-type RadioMode = "tape" | "spot" | "intro";
+type RadioMode = "tape" | "spot" | "intro" | "score";
 
 interface RadioSpot {
   id: string;
@@ -185,6 +186,8 @@ let mode: RadioMode = "tape";
 let pendingTapeId: string | null = null;
 let lastSpotId: string | null = null;
 let spotLabel = "ICR 88 · Market Square";
+let scoreReason: "title" | "boss" | null = null;
+let swapGen = 0;
 const heardPlaces = new Set<string>();
 const REGION_BEDS: RadioBed[] = ["ironclad", "slagtown", "blackspire", "brasswater", "veyra"];
 
@@ -204,7 +207,13 @@ let snapshot: RadioSnapshot = {
   mode: "tape",
   headline: RADIO_TAPES[0].title,
   subline: RADIO_TAPES[0].place,
+  score: null,
 };
+
+function applyLoop(on: boolean) {
+  if (live) live.el.loop = on;
+  if (wait) wait.el.loop = on;
+}
 
 function readSnapshot(): RadioSnapshot {
   const tape = tapeById(currentId) ?? (unlocked && mode === "tape" ? tapeForBed(bed) : RADIO_TAPES[0]);
@@ -224,6 +233,26 @@ function readSnapshot(): RadioSnapshot {
       mode,
       headline: "Tyrone",
       subline: "East of the highway",
+      score: null,
+    };
+  }
+  if (mode === "score") {
+    return {
+      tape: null,
+      bed,
+      follow,
+      playing,
+      unlocked,
+      deckOpen,
+      currentTime,
+      duration: duration || SCORE.duration,
+      muted: isMuted(),
+      music: musicMix(),
+      sfx: sfxMix(),
+      mode,
+      headline: SCORE.title,
+      subline: scoreReason === "boss" ? "Boss fight" : "Title",
+      score: scoreReason,
     };
   }
   if (mode === "spot") {
@@ -242,6 +271,7 @@ function readSnapshot(): RadioSnapshot {
       mode,
       headline: "Station break",
       subline: spotLabel,
+      score: null,
     };
   }
   return {
@@ -259,6 +289,7 @@ function readSnapshot(): RadioSnapshot {
     mode,
     headline: tape?.title ?? "Keep the Radio On",
     subline: tape?.place ?? "Vault 13 porch",
+    score: null,
   };
 }
 
@@ -293,7 +324,9 @@ export function tapeForBed(next: RadioBed) {
 
 export function subscribeRadio(fn: () => void) {
   listeners.add(fn);
-  return () => listeners.delete(fn);
+  return () => {
+    listeners.delete(fn);
+  };
 }
 
 export interface RadioSnapshot {
@@ -308,9 +341,10 @@ export interface RadioSnapshot {
   muted: boolean;
   music: number;
   sfx: number;
-  mode: "tape" | "spot" | "intro";
+  mode: "tape" | "spot" | "intro" | "score";
   headline: string;
   subline: string;
+  score: "title" | "boss" | null;
 }
 
 export function getRadioSnapshot(): RadioSnapshot {
@@ -378,12 +412,43 @@ function fadeTo(node: GainNode, value: number, seconds: number) {
   node.gain.exponentialRampToValueAtTime(Math.max(0.0001, value), c.currentTime + seconds);
 }
 
+/** Fade a deck out, then pause it — unless a later swap reused it as live. */
+function laterPause(deck: Deck | null, ms: number) {
+  if (!deck) return;
+  const el = deck.el;
+  window.setTimeout(() => {
+    if (deck === live && playing) return;
+    try {
+      el.pause();
+    } catch {
+      /* ignore */
+    }
+  }, ms);
+}
+
+async function readyDeck(el: HTMLAudioElement) {
+  if (el.readyState >= 1) return;
+  await new Promise<void>((resolve) => {
+    const done = () => resolve();
+    el.addEventListener("loadedmetadata", done, { once: true });
+    el.addEventListener("error", done, { once: true });
+    window.setTimeout(done, 1800);
+  });
+}
+
 async function startDeck(deck: Deck, src: string, volume: number, offset = 0) {
-  if (deck.el.src !== new URL(src, window.location.origin).href) {
+  const abs = new URL(src, window.location.origin).href;
+  if (deck.el.src !== abs) {
     deck.el.src = src;
   }
-  if (offset > 0) deck.el.currentTime = offset;
+  await readyDeck(deck.el);
+  try {
+    if (Number.isFinite(offset)) deck.el.currentTime = offset;
+  } catch {
+    /* ignore */
+  }
   fadeTo(deck.fade, volume, offset > 0 ? 0.08 : 0.9);
+  deck.el.loop = mode === "score";
   try {
     await deck.el.play();
   } catch {
@@ -395,6 +460,7 @@ async function swapTo(src: string, nextDuration: number, force = false) {
   const graph = ensureGraph();
   if (!graph || isMuted()) return;
   if (switching && !force) return;
+  const my = ++swapGen;
   switching = true;
   const from = live;
   const to = wait;
@@ -407,14 +473,9 @@ async function swapTo(src: string, nextDuration: number, force = false) {
   live = to;
   wait = from;
   fadeTo(from.fade, 0.0001, 1.05);
-  window.setTimeout(() => {
-    try {
-      from.el.pause();
-    } catch {
-      /* ignore */
-    }
-  }, 1100);
+  laterPause(from, 1100);
   await startDeck(to, src, 1);
+  if (my !== swapGen) return;
   duckAmbient(true);
   playing = !to.el.paused;
   unlocked = true;
@@ -449,7 +510,6 @@ async function playSpot(spot: RadioSpot) {
   mode = "spot";
   lastSpotId = spot.id;
   spotLabel = spot.label;
-  currentId = currentId;
   await swapTo(spot.src, spot.duration);
 }
 
@@ -457,7 +517,19 @@ async function onLiveEnded() {
   if (mode === "intro") {
     playing = false;
     emit();
-    await startPorchRadio();
+    return;
+  }
+  if (mode === "score") {
+    if (live?.el) {
+      try {
+        live.el.currentTime = 0;
+        await live.el.play();
+        playing = true;
+      } catch {
+        playing = false;
+      }
+      emit();
+    }
     return;
   }
   if (mode === "spot") {
@@ -478,6 +550,7 @@ async function onLiveEnded() {
 }
 
 export async function playTape(id: string, lock = true) {
+  if (mode === "score" && scoreReason === "boss") return;
   const tape = tapeById(id);
   if (!tape) return;
   if (lock) {
@@ -485,18 +558,24 @@ export async function playTape(id: string, lock = true) {
     persistFollow();
   }
   unlocked = true;
+  scoreReason = null;
+  applyLoop(false);
   mode = "tape";
   pendingTapeId = null;
   await crossfade(tape);
 }
 
 export function armIntro() {
+  applyLoop(false);
+  scoreReason = null;
   mode = "intro";
   unlocked = true;
   pendingTapeId = null;
 }
 
 export async function playFoundYou() {
+  applyLoop(false);
+  scoreReason = null;
   unlocked = true;
   mode = "intro";
   pendingTapeId = null;
@@ -506,26 +585,66 @@ export async function playFoundYou() {
 
 export function stopFoundYou() {
   if (mode !== "intro") return;
-  if (live?.el) {
-    fadeTo(live.fade, 0.0001, 0.6);
-    window.setTimeout(() => {
-      try {
-        live?.el.pause();
-      } catch {
-        /* ignore */
-      }
-    }, 650);
+  const dying = live;
+  if (dying) {
+    fadeTo(dying.fade, 0.0001, 0.6);
+    laterPause(dying, 650);
   }
   playing = false;
   mode = "tape";
   emit();
 }
 
+export function armScore(reason: "title" | "boss") {
+  mode = "score";
+  scoreReason = reason;
+  unlocked = true;
+}
+
+export function getScoreReason() {
+  return scoreReason;
+}
+
+export async function playScore(reason: "title" | "boss") {
+  if (mode === "intro") return;
+  if (mode === "score" && scoreReason === reason && playing) return;
+  scoreReason = reason;
+  mode = "score";
+  pendingTapeId = null;
+  currentId = null;
+  unlocked = true;
+  applyLoop(true);
+  await swapTo(SCORE.src, SCORE.duration, true);
+}
+
+export function stopScore(opts?: { resume?: boolean }) {
+  if (mode !== "score") return;
+  scoreReason = null;
+  applyLoop(false);
+  const dying = live;
+  if (dying) {
+    fadeTo(dying.fade, 0.0001, 0.45);
+    laterPause(dying, 500);
+  }
+  playing = false;
+  mode = "tape";
+  emit();
+  if (opts?.resume) void resumeRadio();
+}
+
 export async function startPorchRadio() {
   stopFoundYou();
+  stopScore();
   follow = true;
   persistFollow();
-  await playTape(tapeForBed("hq").id, false);
+  applyLoop(false);
+  scoreReason = null;
+  const tape = tapeForBed("hq");
+  unlocked = true;
+  mode = "tape";
+  pendingTapeId = null;
+  currentId = tape.id;
+  await swapTo(tape.src, tape.duration, true);
 }
 
 /** QA helper: treat the live cut as finished. */
@@ -555,6 +674,22 @@ export async function resumeRadio() {
     }
     return;
   }
+  if (mode === "score") {
+    if (live && live.el.src) {
+      applyLoop(true);
+      try {
+        await live.el.play();
+        playing = true;
+        duckAmbient(true);
+      } catch {
+        playing = false;
+      }
+      emit();
+    } else if (scoreReason) {
+      await playScore(scoreReason);
+    }
+    return;
+  }
   const tape = tapeById(currentId) ?? tapeForBed(bed);
   unlocked = true;
   if (live && mode === "tape" && currentId === tape.id && live.el.src) {
@@ -578,7 +713,7 @@ export function toggleRadioPlay() {
 }
 
 export async function playNext(fromEnd = false) {
-  if (mode === "intro") return;
+  if (mode === "intro" || mode === "score") return;
   if (mode === "spot") {
     const next = pendingTapeId ?? (follow ? tapeForBed(bed).id : nextTapeId());
     pendingTapeId = null;
@@ -593,7 +728,7 @@ export async function playNext(fromEnd = false) {
 }
 
 export async function playPrev() {
-  if (mode === "intro") return;
+  if (mode === "intro" || mode === "score") return;
   if (mode === "spot") {
     const tape = tapeById(currentId);
     if (tape) {
@@ -624,7 +759,7 @@ export function setRadioBed(next: RadioBed) {
 export function arriveRegion(region: RadioBed) {
   bed = region;
   emit();
-  if (mode === "intro" || mode === "spot") return;
+  if (mode === "intro" || mode === "spot" || mode === "score") return;
   if (!follow || !unlocked) return;
   if (heardPlaces.has(region)) return;
   heardPlaces.add(region);
@@ -642,7 +777,7 @@ export async function enterCasinoRadio() {
   if (!tape) return;
   bed = "arcade";
   emit();
-  if (mode === "intro") return;
+  if (mode === "intro" || mode === "score") return;
   if (currentId === tape.id && playing) return;
   unlocked = true;
   await playTape(tape.id, false);
@@ -713,13 +848,20 @@ export function bedFromGame(input: {
   return "hq";
 }
 
+/** Title and boss share one score. The porch radio never catalogs it. */
+export type ScoreCue = "title" | "boss" | "hold" | "stop";
+
+export function scoreCueForGame(input: { screen: Screen; boss: boolean }): ScoreCue {
+  if (input.boss) return "boss";
+  if (input.screen === "briefing" || input.screen === "gallery") return "hold";
+  if (input.screen === "title" || input.screen === "rules") return "title";
+  return "stop";
+}
+
 if (typeof window !== "undefined") {
   addUnlockHook(() => {
     unlocked = true;
-    if (mode === "intro") return;
-    if (playing && live?.el && !live.el.paused) return;
-    const tape = tapeById(currentId) ?? tapeForBed(bed);
-    void playTape(tape.id, false);
+    if (live?.el && playing && live.el.paused) void resumeRadio();
   });
   addMuteHook((next) => {
     if (next) {
