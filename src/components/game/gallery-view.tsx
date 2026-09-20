@@ -59,6 +59,9 @@ export function GalleryView() {
                   src={item.kind === "reel" ? item.poster : item.src}
                   alt=""
                   className="size-full object-cover object-center"
+                  onError={(e) => {
+                    e.currentTarget.style.visibility = "hidden";
+                  }}
                 />
                 <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-ink/80 px-2 py-1 font-display text-[9px] uppercase tracking-[0.16em] text-ember">
                   {item.kind === "reel" ? <Film className="size-3" /> : <ImageIcon className="size-3" />}
