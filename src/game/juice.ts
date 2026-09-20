@@ -83,7 +83,7 @@ function ensureCss() {
       position: fixed;
       z-index: 246;
       pointer-events: none;
-      font-family: Syne, ui-sans-serif, system-ui, sans-serif;
+      font-family: Cinzel, Georgia, serif;
       font-size: 18px;
       font-weight: 700;
       letter-spacing: 0.06em;

@@ -31,19 +31,19 @@ export const Route = createRootRoute({
       </head>
       <body>
         <PreviewHostBridge />
-        <div id="synapse-boot" data-synapse-boot="1" style={{ background: "#0b0f0c", color: "#e7f3ea" }}>
+        <div id="synapse-boot" data-synapse-boot="1" style={{ background: "#0b0908", color: "#f1e3c2" }}>
           <style>{`
             #synapse-boot{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;font-family:ui-sans-serif,system-ui,sans-serif;pointer-events:none;transition:opacity .7s cubic-bezier(.22,1,.36,1)}
             #synapse-boot.is-up{opacity:0;pointer-events:none}
             .synapse-boot-panel{display:flex;width:min(18rem,70vw);flex-direction:column;align-items:center;text-align:center}
-            .synapse-boot-kicker{font-size:11px;letter-spacing:.48em;text-transform:uppercase;color:#3ee07a}
+            .synapse-boot-kicker{font-size:11px;letter-spacing:.48em;text-transform:uppercase;color:#c98545}
             .synapse-boot-title{margin-top:12px;font-size:1.875rem}
-            .synapse-boot-unit{margin-top:8px;font-size:11px;letter-spacing:.28em;text-transform:uppercase;color:#3ee07a}
+            .synapse-boot-unit{margin-top:8px;font-size:11px;letter-spacing:.28em;text-transform:uppercase;color:#c98545}
             .synapse-boot-meter{width:100%;margin-top:32px}
-            .synapse-boot-track{height:7px;overflow:hidden;border-radius:999px;background:rgba(62,224,122,.14);box-shadow:inset 0 0 0 1px rgba(62,224,122,.28)}
-            .synapse-boot-fill{height:100%;width:10%;border-radius:inherit;background:#7dffb0;animation:synapse-boot-creep 14s cubic-bezier(.22,1,.36,1) forwards}
-            .synapse-boot-meta{margin-top:10px;font-family:ui-monospace,monospace;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#3ee07a}
-            .synapse-boot-hint{margin-top:16px;font-size:11px;letter-spacing:.28em;text-transform:uppercase;color:#8a9a90;opacity:0;animation:synapse-boot-hint .4s ease 12s forwards}
+            .synapse-boot-track{height:7px;overflow:hidden;border-radius:999px;background:rgba(201,133,69,.14);box-shadow:inset 0 0 0 1px rgba(201,133,69,.28)}
+            .synapse-boot-fill{height:100%;width:10%;border-radius:inherit;background:#f2bd70;animation:synapse-boot-creep 14s cubic-bezier(.22,1,.36,1) forwards}
+            .synapse-boot-meta{margin-top:10px;font-family:ui-monospace,monospace;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#c98545}
+            .synapse-boot-hint{margin-top:16px;font-size:11px;letter-spacing:.28em;text-transform:uppercase;color:#aa9075;opacity:0;animation:synapse-boot-hint .4s ease 12s forwards}
             @keyframes synapse-boot-creep{from{width:8%}to{width:88%}}
             @keyframes synapse-boot-hint{to{opacity:1}}
             @media (prefers-reduced-motion:reduce){.synapse-boot-fill,.synapse-boot-hint{animation:none!important}.synapse-boot-fill{width:42%}.synapse-boot-hint{opacity:1}}

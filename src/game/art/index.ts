@@ -1,5 +1,4 @@
 import type { RegionId } from "../types";
-export { MAIN_MENU_ART } from "./main-menu";
 
 /** Sharp painted 1600×1200 regional maps. Cache-bust kills the old aerial blur. */
 export const REGION_ART: Record<RegionId, string> = {

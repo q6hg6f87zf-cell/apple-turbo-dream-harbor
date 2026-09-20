@@ -69,12 +69,12 @@ const MESH = icosa();
 const NUMS = [20, 1, 12, 6, 8, 15, 17, 3, 9, 18, 4, 10, 7, 5, 13, 16, 2, 14, 11, 19];
 
 const GLOW: Record<RollBand, string> = {
-  fumble: "#e24b4b",
-  fail: "#e24b4b",
-  weak: "#c9b27a",
-  success: "#3ee07a",
-  strong: "#7dffb0",
-  crit: "#7dffb0",
+  fumble: "#b6523c",
+  fail: "#b6523c",
+  weak: "#c8a66a",
+  success: "#5b9c91",
+  strong: "#f2bd70",
+  crit: "#f2bd70",
 };
 
 function rot(v: number[], ax: number, ay: number, az: number) {
@@ -236,7 +236,7 @@ export function Dice20({
       ctx.fill();
       ctx.restore();
 
-      const accent = band ? GLOW[band] : "#3ee07a";
+      const accent = band ? GLOW[band] : "#c98545";
       faces.forEach((f) => {
         if (f.nz <= 0.04) return;
         const lit = Math.max(0.14, f.nx * L[0]! + f.ny * L[1]! + f.nz * L[2]!);
@@ -287,7 +287,7 @@ export function Dice20({
         ctx.miterLimit = 2;
         ctx.lineWidth = Math.max(2.2, fontPx * 0.18);
         ctx.strokeStyle = winner ? "rgba(10,16,12,0.95)" : "rgba(10,16,12,0.8)";
-        ctx.font = `800 ${fontPx}px Syne, ui-sans-serif, sans-serif`;
+        ctx.font = `800 ${fontPx}px Cinzel, Georgia, serif`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         const label = String(f.n);
