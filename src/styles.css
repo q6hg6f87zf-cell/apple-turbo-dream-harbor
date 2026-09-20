@@ -1847,3 +1847,13 @@ body[data-region-map="1"] .ms-help,
   box-shadow: 0 0 18px color-mix(in oklab, var(--color-danger) 55%, transparent);
   transition: width var(--motion-fast) var(--ease-smooth-out);
 }
+
+/* Filter rails scroll sideways and keep their scrollbar out of the layout. */
+.ms-chip-rail {
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+.ms-chip-rail::-webkit-scrollbar {
+  display: none;
+}

@@ -39,7 +39,7 @@ import { Panel, RarityMark, SectionLabel } from "./primitives";
 import { ItemThumb } from "./item-thumb";
 import { inventorySession, rememberInventory } from "@/game/inventory-session";
 import { ItemInspectShell } from "./item-inspect";
-import { ChipScroller, FilterChip, InventoryFrame, InventoryRow } from "./inventory-chrome";
+import { ChipScroller, FilterChip, InventoryFrame, InventoryRow, ModeToggle } from "./inventory-chrome";
 
 const SESSION_ID = "inventory-fast";
 
@@ -388,11 +388,17 @@ export function InventoryFast() {
       sessionId={SESSION_ID}
       header={
         <>
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <SectionLabel>Vault 13 · loadout</SectionLabel>
-              <h2 className="font-display text-xl">Inventory</h2>
-            </div>
+          {/* The dock already says Inventory; the list gets the space instead. */}
+          <div className="flex items-center gap-2">
+            <label className="relative min-w-0 flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search gear..."
+                className="min-h-11 w-full rounded-[var(--radius-sm)] bg-raised pl-9 pr-3 text-secondary text-paper shadow-[var(--shadow-border)] outline-none"
+              />
+            </label>
             <button type="button" onClick={() => setHelpMode("explain")} className="flex size-11 shrink-0 items-center justify-center rounded-full border border-ember/40 bg-ember/10 text-ember" aria-label="Ask Tyrone">
               <CircleHelp className="size-4" />
             </button>
@@ -402,10 +408,14 @@ export function InventoryFast() {
             <TyronePanel text="Owned is what you actually have. Catalogue is the record. Weapons split into rifles, melee, sidearms, shotguns, energy, heavy. Tap a row. Act at the bottom." onClose={() => setHelpMode(null)} />
           ) : null}
 
-          <div className="grid grid-cols-2 gap-1 rounded-[var(--radius-md)] border border-line bg-ink/50 p-1">
-            <ModeButton active={mode === "owned"} onClick={() => setMode("owned")} title="Owned" sub={`${owned.length} in play`} />
-            <ModeButton active={mode === "catalogue"} onClick={() => setMode("catalogue")} title="Catalogue" sub={`${catalogue.length} records`} />
-          </div>
+          <ModeToggle
+            value={mode}
+            onChange={(id) => setMode(id as Mode)}
+            options={[
+              { id: "owned", label: "Owned", count: owned.length },
+              { id: "catalogue", label: "Catalogue", count: catalogue.length },
+            ]}
+          />
 
           <ChipScroller>
             {INVENTORY_FILTERS.map((chip) => (
@@ -444,10 +454,6 @@ export function InventoryFast() {
             </ChipScroller>
           ) : null}
 
-          <label className="relative block">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
-            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search gear…" className="min-h-11 w-full rounded-[var(--radius-md)] bg-raised pl-10 pr-3 text-sm text-paper shadow-[var(--shadow-border)] outline-none" />
-          </label>
         </>
       }
     >
@@ -544,10 +550,6 @@ export function InventoryFast() {
       ) : null}
     </InventoryFrame>
   );
-}
-
-function ModeButton({ active, onClick, title, sub }: { active: boolean; onClick: () => void; title: string; sub: string }) {
-  return <button type="button" onClick={onClick} className={cn("min-h-11 rounded-[var(--radius-sm)] px-3 text-left", active ? "bg-ember/15 text-paper" : "text-muted")}><span className="block font-display text-[10px] uppercase tracking-[0.13em]">{title}</span><span className="mt-0.5 block truncate text-[11px]">{sub}</span></button>;
 }
 
 function Metric({ label, value }: { label: string; value: ReactNode }) {

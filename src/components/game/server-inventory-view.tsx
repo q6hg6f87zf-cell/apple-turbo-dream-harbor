@@ -33,7 +33,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ItemThumb } from "./item-thumb";
 import { inventorySession, rememberInventory } from "@/game/inventory-session";
 import { ItemInspectShell } from "./item-inspect";
-import { ChipScroller, FilterChip, InventoryFrame, InventoryRow } from "./inventory-chrome";
+import { ChipScroller, FilterChip, InventoryFrame, InventoryRow, ModeToggle } from "./inventory-chrome";
 import { Panel, RarityMark, SectionLabel } from "./primitives";
 
 const SESSION_ID = "inventory-server";
@@ -231,11 +231,17 @@ export function ServerInventoryView() {
       sessionId={SESSION_ID}
       header={
         <>
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <SectionLabel>Vault 13 · server loadout</SectionLabel>
-              <h2 className="font-display text-xl">Inventory</h2>
-            </div>
+          {/* The dock already says Inventory; the list gets the space instead. */}
+          <div className="flex items-center gap-2">
+            <label className="relative min-w-0 flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search gear..."
+                className="min-h-11 w-full rounded-[var(--radius-sm)] bg-raised pl-9 pr-3 text-secondary text-paper shadow-[var(--shadow-border)] outline-none"
+              />
+            </label>
             <button type="button" onClick={() => setHelp((v) => !v)} className="flex size-11 shrink-0 items-center justify-center rounded-full border border-ember/40 bg-ember/10 text-ember" aria-label="Ask Tyrone">
               <CircleHelp className="size-4" />
             </button>
@@ -243,10 +249,17 @@ export function ServerInventoryView() {
 
           {help ? <Panel className="border-ember/30 bg-ember/5"><div className="flex items-start gap-3"><img src="/art/tyrone.jpg" alt="" className="size-12 rounded-[var(--radius-sm)] object-cover" /><p className="flex-1 text-sm leading-relaxed text-moon">Owned is sealed on the server. Catalogue is the design record. Weapons split into rifles, melee, sidearms, shotguns, energy, heavy.</p><button type="button" onClick={() => setHelp(false)}><X className="size-4 text-muted" /></button></div></Panel> : null}
 
-          <div className="grid grid-cols-2 gap-1 rounded-[var(--radius-md)] border border-line bg-ink/50 p-1">
-            <button type="button" onClick={() => { setMode("owned"); setSelectedKey(null); }} className={cn("min-h-11 rounded-[var(--radius-sm)] px-3 text-left", mode === "owned" ? "bg-ember/15 text-paper" : "text-muted")}><span className="block font-display text-[10px] uppercase tracking-[0.13em]">Owned</span><span className="mt-0.5 block truncate text-[11px]">{owned.length} sealed</span></button>
-            <button type="button" onClick={() => { setMode("catalogue"); setSelectedKey(null); }} className={cn("min-h-11 rounded-[var(--radius-sm)] px-3 text-left", mode === "catalogue" ? "bg-ember/15 text-paper" : "text-muted")}><span className="block font-display text-[10px] uppercase tracking-[0.13em]">Catalogue</span><span className="mt-0.5 block truncate text-[11px]">{catalogue.length} records</span></button>
-          </div>
+          <ModeToggle
+            value={mode}
+            onChange={(id) => {
+              setMode(id as Mode);
+              setSelectedKey(null);
+            }}
+            options={[
+              { id: "owned", label: "Owned", count: owned.length },
+              { id: "catalogue", label: "Catalogue", count: catalogue.length },
+            ]}
+          />
 
           <ChipScroller>
             {INVENTORY_FILTERS.map((chip) => (
@@ -283,7 +296,6 @@ export function ServerInventoryView() {
             })}
           </ChipScroller>
 
-          <label className="flex min-h-11 items-center gap-2 rounded-[var(--radius-md)] border border-line bg-raised px-3"><Search className="size-4 text-muted" /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search gear…" className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted" /></label>
         </>
       }
     >
