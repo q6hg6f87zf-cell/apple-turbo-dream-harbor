@@ -96,7 +96,8 @@ const errors = [];
 page.on("pageerror", (error) => errors.push(`pageerror: ${error.message}`));
 page.on("console", (message) => { if (message.type() === "error") errors.push(`console: ${message.text()}`); });
 
-await page.goto(baseURL, { waitUntil: "networkidle", timeout: 60_000 });
+// Vite HMR keeps a websocket open — networkidle never settles in CI.
+await page.goto(baseURL, { waitUntil: "domcontentloaded", timeout: 60_000 });
 await page.locator('[data-ready="1"]').waitFor({ timeout: 20_000 });
 
 // Resident dossier: internal controls must not accidentally dismiss the sheet,

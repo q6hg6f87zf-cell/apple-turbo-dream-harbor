@@ -89,7 +89,8 @@ const errors = [];
 page.on("pageerror", (error) => errors.push(`pageerror: ${error.message}`));
 page.on("console", (message) => { if (message.type() === "error") errors.push(`console: ${message.text()}`); });
 
-await page.goto(baseURL, { waitUntil: "networkidle", timeout: 60_000 });
+// Vite HMR keeps a websocket open — networkidle never settles in CI.
+await page.goto(baseURL, { waitUntil: "domcontentloaded", timeout: 60_000 });
 await page.getByRole("heading", { name: "Inventory" }).waitFor({ timeout: 20_000 });
 await page.getByText(/server-sealed loadout/i).waitFor();
 await page.getByText("LOCAL MYTHIC CHEAT CANNON", { exact: true }).waitFor({ state: "detached", timeout: 10_000 });

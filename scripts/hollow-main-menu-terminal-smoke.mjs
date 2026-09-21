@@ -17,7 +17,9 @@ page.on("console", (message) => {
   if (message.type() === "error") errors.push(`console: ${message.text()}`);
 });
 
-await page.goto(baseURL, { waitUntil: "networkidle", timeout: 60_000 });
+// `domcontentloaded`, not `networkidle`: Vite keeps an HMR websocket open, so
+// networkidle never settles and would burn the whole timeout in CI.
+await page.goto(baseURL, { waitUntil: "domcontentloaded", timeout: 60_000 });
 await page.locator('[data-ready="1"]').waitFor({ timeout: 20_000 });
 
 // CI runs with auth explicitly disabled. The secure shell must still render its
