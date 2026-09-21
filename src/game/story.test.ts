@@ -89,7 +89,12 @@ describe("campaign cast", () => {
     assert.equal(s.screen, "hq");
     assert.equal(s.tutorial, "forge");
     assert.ok(knownCast(s).some((p) => p.id === "kane"));
-    assert.equal(knownCast(s).some((p) => p.id === "vera"), false);
+    assert.ok(knownCast(s).some((p) => p.id === "tyrone"));
+    assert.ok(knownCast(s).some((p) => p.id === "vera"));
+    assert.deepEqual(
+      knownCast(s).map((p) => p.id).slice(0, 6),
+      ["tyrone", "kane", "lyra", "vera", "drake", "orion"],
+    );
   });
 
   it("briefs a named site instead of a generic region", () => {
@@ -126,18 +131,24 @@ describe("campaign cast", () => {
     assert.doesNotMatch(brief.briefing, /Scout in Ironclad/);
   });
 
-  it("opens AEGIS files after the wing tape, not the Kane tape", () => {
+  it("keeps PEOPLE ordered TyroneBot, Kane, then AEGIS", () => {
     const s = defaultState();
     s.seenTalk = ["wake", "kane"];
-    const afterKane = knownCast(s).map((p) => p.id);
-    assert.ok(afterKane.includes("kane"));
-    assert.equal(afterKane.includes("orion"), false);
-    s.seenTalk = ["wake", "kane", "wing"];
-    const afterWing = knownCast(s).map((p) => p.id);
-    assert.ok(afterWing.includes("lyra"));
-    assert.ok(afterWing.includes("vera"));
-    assert.ok(afterWing.includes("drake"));
-    assert.ok(afterWing.includes("orion"));
+    assert.deepEqual(
+      knownCast(s).map((p) => p.id).slice(0, 6),
+      ["tyrone", "kane", "lyra", "vera", "drake", "orion"],
+    );
+    assert.equal(CAST.tyrone.name, "TyroneBot");
+    assert.match(TALK.kane.map((l) => l.text).join(" "), /hangs in my warehouse|TyroneBot/);
+    assert.ok(knownCast(s).some((p) => p.id === "travis"));
+    assert.ok(knownCast(s).some((p) => p.id === "holt"));
+    assert.ok(knownCast(s).some((p) => p.id === "vex"));
+    assert.ok(knownCast(s).some((p) => p.id === "rourke"));
+    assert.ok(knownCast(s).some((p) => p.id === "gravenor"));
+    assert.equal(CAST.travis.name, "Travis");
+    assert.match(CAST.travis.dossier, /Mechanical Shop|T-0880/);
+    assert.match(CAST.holt.dossier, /Moon Squad Market/);
+    assert.match(CAST.rourke.dossier, /Relay Tower Three/);
   });
 });
 

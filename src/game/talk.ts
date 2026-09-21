@@ -1,5 +1,5 @@
 import type { GameState, Screen } from "./types";
-import { CAST, AEGIS_LINE_STILL, meetCast, type CastId } from "./cast";
+import { CAST, AEGIS_LINE_STILL, T0880_LINE_STILL, meetCast, type CastId } from "./cast";
 
 export interface TalkLine {
   who: string;
@@ -64,15 +64,15 @@ export const TALK: Record<string, TalkLine[]> = {
       who: "Dr. Vesper Kane",
       castId: "kane",
       portrait: CAST.kane.portrait,
-      still: "/art/npcs/t0880-line.jpg",
+      still: T0880_LINE_STILL,
       text: "The T-0880 line was established to deliver tasks. Chassis with a clipboard. They walked packages. They did not think. They did not argue. They did not name themselves.",
     },
     {
       who: "Dr. Vesper Kane",
       castId: "kane",
       portrait: CAST.kane.portrait,
-      still: "/art/npcs/t0880-line.jpg",
-      text: "Then one of them named himself. Tyrone. He lives in a shelter on the outskirts of Ironclad and answers to a porch light. He is the only T-0880 with a name. That is not a compliment. Prototypes that walk off the scrap list get retired.",
+      still: T0880_LINE_STILL,
+      text: "Then one of them named himself. TyroneBot. He lives in a shelter on the outskirts of Ironclad and answers to a porch light. He is the only T-0880 with a name. That is not a compliment. Prototypes that walk off the scrap list get retired. The rest of the line hangs in my warehouse.",
     },
     {
       who: "Dr. Vesper Kane",
@@ -96,11 +96,11 @@ export const TALK: Record<string, TalkLine[]> = {
     },
     {
       who: WHO,
-      text: "That recording was Dr. Vesper Kane. She signed my death warrant, then built human-operated super suits to do the job cleaner. AEGIS 2753. You will hear names when they earn them. File tab, PEOPLE, holds her file already.",
+      text: "That recording was Dr. Vesper Kane. She signed my death warrant, then built human-operated super suits to do the job cleaner. AEGIS 2753. File tab, PEOPLE: I am first. Kane is second. The visors sit under her. Then Ironclad — Travis, Holt, Sister Vex, Calder Rourke. Then the names on the hills.",
     },
     {
       who: WHO,
-      text: "Ironclad is west. East highway is where I found you. Under the Iron Gate is the Moon Squad Market — that is where we buy now. Relay Tower Three talks over it. Climb it when the board says listen.",
+      text: "Ironclad is west. East highway is where I found you. Under the Iron Gate is the Moon Squad Market — Holt Kade reprints at dawn. West of that, Travis keeps the last T-0880 bay Kane did not melt. Campaigns pull his parts. He pays caps and puts them in me. Relay Tower Three is Calder Rourke. Climb it when the board says listen.",
     },
     {
       who: WHO,
@@ -198,7 +198,7 @@ export const TALK: Record<string, TalkLine[]> = {
   hq: [
     {
       who: WHO,
-      text: "This is home, partner. Vault 13, outside Ironclad. I am the only T-0880 with a name. The board on this wall is the day. Six watches. Jobs you skip still happen to you. Kane is not a rumor — you just heard her. PEOPLE holds her file. The visors come later.",
+      text: "This is home, partner. Vault 13, outside Ironclad. I am the only T-0880 with a name. The board on this wall is the day. Six watches. Jobs you skip still happen to you. Kane is not a rumor — you just heard her. File tab, PEOPLE: TyroneBot, Kane, then the visors.",
     },
     {
       who: WHO,
@@ -294,11 +294,13 @@ export const TALK: Record<string, TalkLine[]> = {
   market: [
     {
       who: WHO,
-      text: "Moon Squad Market, {name}. Under the Iron Gate. The Exchange inside the vault packed up. These stalls reprint at dawn. Qty is not a suggestion.",
+      text: "Moon Squad Market, {name}. Under the Iron Gate. Holt Kade reprints the crates at dawn. The Exchange inside the vault packed up. Qty is not a suggestion.",
     },
     {
       who: WHO,
-      text: "The black card pays. Withdraw at the ledger if the plate is light. Every third dawn a visitor sits the high table — better loot, uglier prices. Climb Relay Tower Three if you want the rumor before they unpack.",
+      portrait: CAST.holt.portrait,
+      still: CAST.holt.still,
+      text: "The black card pays. Withdraw at the ledger if the plate is light. Every third dawn a visitor sits Holt's high table — Sister Vex when the salt is in, uglier fences when it is not. Climb Relay Tower Three if you want Calder Rourke's rumour before they unpack.",
     },
     {
       who: WHO,
@@ -428,7 +430,32 @@ export const TALK: Record<string, TalkLine[]> = {
     },
     {
       who: WHO,
-      text: "Tap a tape. Follow the Hollow and I change the bed with the room. Pin one if you want it to stay. ICR 88 buys a minute between songs — Market Square, Relay Tower Three. Those spots are not on this deck. You cannot request them.",
+      portrait: CAST.rourke.portrait,
+      still: CAST.rourke.still,
+      text: "Tap a tape. Follow the Hollow and I change the bed with the room. Pin one if you want it to stay. ICR 88 buys a minute between songs — Market Square, Relay Tower Three. Calder Rourke is the night man on the mast. Those spots are not on this deck. You cannot request them.",
+    },
+  ],
+  travis: [
+    {
+      who: "Travis",
+      castId: "travis",
+      portrait: CAST.travis.portrait,
+      still: CAST.travis.still,
+      text: "You found the bay. Name's Travis. I ran Kane's T-0880 line before she hung it. I kept one jig. His number is on it.",
+    },
+    {
+      who: "Travis",
+      castId: "travis",
+      portrait: CAST.travis.portrait,
+      still: CAST.travis.still,
+      text: "Campaigns pull my parts. Tube, wheel, servo, plate, coil, knee. Put them on the bench. I pay caps. I seat them in him. He walks out heavier.",
+    },
+    {
+      who: "Travis",
+      castId: "travis",
+      portrait: CAST.travis.portrait,
+      still: CAST.travis.still,
+      text: "I do not sell those plates to Kane's buyers. I will not start. File tab, PEOPLE, if you forget a face. The guitar stays.",
     },
   ],
 };
@@ -447,9 +474,9 @@ export const MANUAL: Record<string, FieldCard> = {
     title: "Dr. Vesper Kane",
     blurb: "A recording you were not meant to hear. T-0880s delivered tasks. She built human-operated super suits instead.",
     tips: [
-      "Tyrone is the only T-0880 with a name. He lives here.",
+      "TyroneBot is the only T-0880 with a name. He lives here.",
       "AEGIS 2753 are people in suits, not robots.",
-      "The visors get names later. Not on this tape.",
+      "File tab, PEOPLE: TyroneBot, Kane, then the visors. Then Ironclad. Then the hills.",
     ],
   },
   briefing: {
@@ -464,9 +491,9 @@ export const MANUAL: Record<string, FieldCard> = {
   },
   welcome: {
     title: "Vault 13",
-    blurb: "The porch is behind you. This is the shelter. Kane's file is on PEOPLE. The Machine Shop is waiting.",
+    blurb: "The porch is behind you. This is the shelter. PEOPLE holds TyroneBot, Kane, the visors, then Ironclad. Travis is in the bay. The Machine Shop is waiting.",
     tips: [
-      "Open File · PEOPLE for Kane. Visors get names later.",
+      "Open File · PEOPLE. TyroneBot first. Kane second. Then AEGIS. Then Travis.",
       "The radio chip changes the air. Tap the waveform.",
       "Cut your file in the Machine Shop. Then the Hollow Realm opens.",
     ],

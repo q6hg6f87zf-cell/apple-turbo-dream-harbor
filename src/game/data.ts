@@ -230,8 +230,8 @@ export const REGIONS: RegionDefinition[] = [
       "A hard northern frontier of iron ridges, rail cuts and fortress works. Vault 13 is buried into the ridgeline beyond the outer rail. The Exchange inside the vault is closed. Caps walk to the Moon Squad Market under the Iron Gate. Relay Tower Three still talks, if you climb it.",
     danger: 3,
     marker: { lat: 34, lon: -118, altitude: 0.012 },
-    mapAsset: "/map/regions/ironclad.jpg?v=painted1",
-    streetAsset: "/art/places/ironclad-street.jpg",
+    mapAsset: "/map/regions/ironclad.jpg?v=town4k1",
+    streetAsset: "/art/places/ironclad-street.jpg?v=town4k1",
     accent: "iron",
     points: [
       {
@@ -280,12 +280,25 @@ export const REGIONS: RegionDefinition[] = [
         kind: "merchant",
         x: 42,
         y: 64,
-        description: "Stalls under the Gate. Limited stock. Dawn reset. Special merchants sit when the Pack is hunting somewhere else. The black card pays. The vault drawer does not.",
+        description: "Stalls under the Gate. Holt Kade reprints at dawn. Limited stock. Special merchants sit when the Pack is hunting somewhere else. Sister Vex takes the high table when the salt is in. The black card pays. The vault drawer does not.",
         discovered: true,
         unlocked: true,
         danger: 1,
         merchantId: "moon-squad",
         action: "shop",
+      },
+      {
+        id: "ironclad-shop",
+        regionId: "ironclad",
+        name: "Ironclad Mechanical Shop",
+        kind: "facility",
+        x: 54,
+        y: 58,
+        description: "Travis keeps the last T-0880 bay Kane did not melt. Campaign parts go on the bench. He pays caps. TyroneBot walks out heavier.",
+        discovered: true,
+        unlocked: true,
+        danger: 1,
+        action: "bay",
       },
       {
         id: "ironclad-tower",
@@ -294,7 +307,7 @@ export const REGIONS: RegionDefinition[] = [
         kind: "radio",
         x: 58,
         y: 22,
-        description: "ICR 88's iron spine. Climb it, listen, and the Realm talks back — Kane frequencies, visiting stalls, sites the board has not named yet.",
+        description: "ICR 88's iron spine. Calder Rourke still climbs it. Listen, and the Realm talks back — Kane frequencies, visiting stalls, sites the board has not named yet.",
         discovered: true,
         unlocked: true,
         danger: 2,
@@ -392,8 +405,8 @@ export const REGIONS: RegionDefinition[] = [
       "A furnace settlement spread across red waste and cooling slag fields. Pipes cross the streets overhead. Kane's buyers take anything that still burns hot enough to feed a jump stack.",
     danger: 3,
     marker: { lat: -12, lon: -62, altitude: 0.012 },
-    mapAsset: "/map/regions/slagtown.jpg?v=painted1",
-    streetAsset: "/art/places/slagtown-street.jpg",
+    mapAsset: "/map/regions/slagtown.jpg?v=town4k1",
+    streetAsset: "/art/places/slagtown-street.jpg?v=town4k1",
     accent: "cinder",
     points: [
       {
@@ -489,8 +502,8 @@ export const REGIONS: RegionDefinition[] = [
       "A black mountain range punched through by mines, lift cages and impossible survey lines. Hollow ore from the Deepworks is the resource Kane needs for intergalactic travel. She will not ask politely.",
     danger: 4,
     marker: { lat: 43, lon: 8, altitude: 0.014 },
-    mapAsset: "/map/regions/blackspire.jpg?v=painted1",
-    streetAsset: "/art/places/blackspire-street.jpg",
+    mapAsset: "/map/regions/blackspire.jpg?v=town4k1",
+    streetAsset: "/art/places/blackspire-street.jpg?v=town4k1",
     accent: "obsidian",
     points: [
       {
@@ -586,8 +599,8 @@ export const REGIONS: RegionDefinition[] = [
       "A drowned industrial coast where brass towers rise from dark water and entire streets continue below the tide line. The Drowned Archive still holds pre-collapse jump tables. Kane's divers work at night.",
     danger: 3,
     marker: { lat: -29, lon: 48, altitude: 0.012 },
-    mapAsset: "/map/regions/brasswater.jpg?v=painted1",
-    streetAsset: "/art/places/brasswater-street.jpg",
+    mapAsset: "/map/regions/brasswater.jpg?v=town4k1",
+    streetAsset: "/art/places/brasswater-street.jpg?v=town4k1",
     accent: "brass",
     points: [
       {
@@ -683,8 +696,8 @@ export const REGIONS: RegionDefinition[] = [
       "Human city of AEGIS 2753 super suits — Halo-grade combat frames piloted by elite specialists. Dr. Vesper Kane built them as successors to the T-0880 robots after the shutdown order. Her classified mission is intergalactic travel. The Hollow Realm is the last resource map she does not yet own.",
     danger: 5,
     marker: { lat: 7, lon: 116, altitude: 0.016 },
-    mapAsset: "/map/regions/veyra.jpg?v=modern2",
-    streetAsset: "/art/places/veyra-street.jpg",
+    mapAsset: "/map/regions/veyra.jpg?v=town4k1",
+    streetAsset: "/art/places/veyra-street.jpg?v=town4k1",
     accent: "signal",
     points: [
       {

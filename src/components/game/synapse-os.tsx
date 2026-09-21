@@ -11,8 +11,9 @@ import { WATCH_LABEL } from "@/game/shift";
 import { currentArcLoc, isVacant, plateHandle, plateMember, seatedMember } from "@/game/squad";
 import { bandForRoll, STAT_COPY, STAT_ORDER } from "@/game/stats-copy";
 import { useGame } from "@/game/store";
-import { knownCast, isCastKnown } from "@/game/cast";
+import { knownCast } from "@/game/cast";
 import { kaneFileBlurb } from "@/game/story";
+import { fittedModules, travisBayBlurb } from "@/game/travis";
 import { currentPorch } from "@/game/porch";
 import type { Operative, Screen } from "@/game/types";
 import { resolveWeapon } from "@/game/weapon-ops";
@@ -567,6 +568,7 @@ function PeoplePane() {
   const known = knownCast(s);
   const porch = currentPorch();
   const live = porch.seats.filter((seat) => !seat.self);
+  const fitted = fittedModules(s);
   return (
     <div className="space-y-4 p-4">
       <div>
@@ -580,9 +582,8 @@ function PeoplePane() {
         ) : null}
       </div>
       {known.map((person) => {
-        const met = isCastKnown(s, person.id);
         return (
-          <article key={person.id} className="overflow-hidden rounded-[var(--radius-sm)] bg-ink/55">
+          <article key={person.id} data-cast={person.id} className="overflow-hidden rounded-[var(--radius-sm)] bg-ink/55">
             <img src={person.still} alt="" className="h-40 w-full object-cover object-top" />
             <div className="flex gap-3">
               <img src={person.portrait} alt="" className="h-28 w-20 shrink-0 object-cover object-top" />
@@ -592,8 +593,7 @@ function PeoplePane() {
                 <p className="text-label text-muted">
                   {person.callsign}
                   {person.visor ? ` · ${person.visor} visor` : ""}
-                  {" · "}
-                  {met ? "on file" : "named on the wing tape"}
+                  {" · on file"}
                 </p>
                 <p className="mt-2 text-secondary italic leading-relaxed text-moon">{person.tagline}</p>
               </div>
@@ -602,13 +602,19 @@ function PeoplePane() {
             {person.voice[0] ? (
               <p className="px-3 pb-3 text-secondary italic leading-relaxed text-ember">“{person.voice[0]}”</p>
             ) : null}
+            {person.id === "travis" ? (
+              <p className="px-3 pb-3 font-mono text-label leading-relaxed text-ember">{travisBayBlurb(s)}</p>
+            ) : null}
+            {person.id === "tyrone" && fitted.length ? (
+              <p className="px-3 pb-3 font-mono text-label leading-relaxed text-ember">
+                Travis fittings · {fitted.map((m) => m.part).join(", ")}
+              </p>
+            ) : null}
           </article>
         );
       })}
       <p className="font-mono text-label text-muted">
-        {(s.seenTalk ?? []).includes("wing")
-          ? "Lyra listens first. Vera-3 invoices. Drake knocks. Orion finishes."
-          : "Kane's file is open. The visors get names when they earn them."}
+        TyroneBot first. Kane second. Then Lyra, Vera-3, Drake, Orion. Then Ironclad: Travis, Holt Kade, Sister Vex, Calder Rourke. Then the names on the hills.
       </p>
     </div>
   );

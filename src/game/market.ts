@@ -3,6 +3,7 @@ import { TREASURE_CATALOG } from "./treasure-catalog";
 import { plateMember } from "./squad";
 import { arsenalUnlocked, campaignOpenRegions } from "./arsenal";
 import { copyWeaponSpec, hydrateWeapon } from "./weapon-ops";
+import { CAST } from "./cast";
 import type {
   GameState,
   Item,
@@ -16,7 +17,17 @@ export const MARKET_POI_ID = "ironclad-market";
 export const TOWER_POI_ID = "ironclad-tower";
 export const HIGHWAY_POI_ID = "ironclad-highway";
 
+export const MARKET_KEEPER = CAST.holt;
+
 const VISITORS: VisitingMerchant[] = [
+  {
+    id: "vex",
+    name: CAST.vex.name,
+    title: CAST.vex.title,
+    blurb: "She sits Holt's high table with salt and a sermon. Do not bring filth unless you are ready to bleed for it.",
+    regionId: "ironclad",
+    portrait: CAST.vex.portrait,
+  },
   {
     id: "marrow",
     name: "Marrow",

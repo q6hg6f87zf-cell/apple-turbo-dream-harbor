@@ -99,6 +99,8 @@ import { fetchSoul, postSoul } from "./soul";
 import { buyMarketLot, ensureMarket, MARKET_POI_ID, rollMarket, TOWER_POI_ID } from "./market";
 import type { FieldDeploy } from "./field-ops";
 import { workPoi, markFieldJob } from "./field-ops";
+import { deliverTravisPart } from "./travis";
+import { meetCast } from "./cast";
 import {
   canRestClean,
   ensureShift,
@@ -119,7 +121,8 @@ type Action =
 export type WorkJob =
   | { kind: "room"; room: RoomId }
   | { kind: "quarter"; quarter: QuarterId }
-  | { kind: "repair"; opId: string | "vault"; itemId: string };
+  | { kind: "repair"; opId: string | "vault"; itemId: string }
+  | { kind: "travis"; itemId?: string };
 
 interface Store {
   s: GameState;
@@ -169,6 +172,7 @@ interface Store {
   buyOffer: (tier: "bargain" | "essential" | "artifact") => string | null;
   buyLot: (lotId: string) => string | null;
   workSite: (poiId?: string) => string | null;
+  deliverTravis: (itemId?: string) => string | null;
   openMarket: () => void;
   buyNpc: (name: string, price: number) => string | null;
   deploy: (loc: LocationId, kind: MissionKind, partyIds: string[], field?: FieldDeploy) => string | null;
@@ -852,6 +856,8 @@ export const useGame = create<Store>((set, get) => ({
       st.selectedLoc = "ironclad";
       st.selectedPoiId = MARKET_POI_ID;
       ensureMarket(st);
+      meetCast(st, "holt");
+      if (st.market?.visitor?.id) meetCast(st, st.market.visitor.id);
       st.screen = "market";
       st.regionMapOpen = false;
       markFieldJob(st, "market", "Walked the Moon Squad Market under the Iron Gate.", 1);
@@ -862,6 +868,7 @@ export const useGame = create<Store>((set, get) => ({
     const id = poiId ?? s.selectedPoiId;
     if (!id) return "Pin a site first.";
     let msg: string | null = null;
+    let openBay = false;
     mutate(set, (st) => {
       msg = workPoi(st, loc, id);
       if (msg === "shop") {
@@ -869,6 +876,8 @@ export const useGame = create<Store>((set, get) => ({
         st.selectedLoc = loc;
         st.selectedPoiId = id;
         ensureMarket(st);
+        meetCast(st, "holt");
+        if (st.market?.visitor?.id) meetCast(st, st.market.visitor.id);
         st.screen = "market";
         st.regionMapOpen = false;
         markFieldJob(st, "market", "Walked the Moon Squad Market under the Iron Gate.", 1);
@@ -881,13 +890,38 @@ export const useGame = create<Store>((set, get) => ({
         msg = null;
         return;
       }
+      if (msg === "bay") {
+        meetCast(st, "travis");
+        st.selectedLoc = loc;
+        st.selectedPoiId = id;
+        st.regionMapOpen = false;
+        openBay = true;
+        msg = null;
+        return;
+      }
       if (msg === "boss") {
         st.regionMapOpen = false;
         st.toast = "Pin the site. Pick an approach. Deploy. That hill has a name.";
         msg = null;
       }
     });
+    if (openBay) set({ work: { kind: "travis" } });
     return msg;
+  },
+  deliverTravis: (itemId) => {
+    let line: string | null = null;
+    mutate(set, (st) => {
+      const result = deliverTravisPart(st, itemId);
+      if (typeof result === "string") {
+        line = result;
+        st.toast = result;
+        return;
+      }
+      pushLog(st, "hq", "Travis", result.line);
+      st.toast = result.line;
+      line = null;
+    });
+    return line;
   },
   buyNpc: (name, price) => {
     const s = get().s;

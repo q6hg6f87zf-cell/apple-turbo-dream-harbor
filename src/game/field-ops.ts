@@ -1,5 +1,6 @@
 import { canonicalRegionId, regionById } from "./data";
 import { rumorFor } from "./market";
+import { meetCast } from "./cast";
 import type {
   GameState,
   LocationId,
@@ -121,7 +122,7 @@ export function defaultPoi(state: GameState, loc: LocationId): RegionPointOfInte
     if (jobSite) return jobSite;
   }
   const field = knownPois(state, loc).filter(
-    (p) => p.action !== "home" && p.action !== "shop" && p.action !== "listen" && p.kind !== "merchant" && p.kind !== "radio",
+    (p) => p.action !== "home" && p.action !== "shop" && p.action !== "listen" && p.action !== "bay" && p.kind !== "merchant" && p.kind !== "radio",
   );
   return field[0] ?? knownPois(state, loc)[0] ?? poisForLocation(loc)[0];
 }
@@ -266,19 +267,21 @@ export function workPoi(state: GameState, loc: LocationId, poiId: string): strin
   if (action === "home") return "home";
   if (action === "shop") return "shop";
   if (action === "boss") return "boss";
+  if (action === "bay") return "bay";
 
   const left = state.shift?.watchesLeft ?? 0;
   if (left <= 0) return "Shift is over. Rest until dawn.";
   if (poiUsedToday(state, poi.id)) return "You already worked this site today. Dawn resets the ground.";
 
   if (action === "listen") {
+    meetCast(state, "rourke");
     state.locations[loc] = { ...state.locations[loc], intel: state.locations[loc].intel + 2 };
     const found = discoverNextPoi(state, loc);
     const rumor = rumorFor(state.day, state.kaneHeat ?? 0);
     markUsed(state, poi.id);
     const report = found
-      ? `${poi.name} talks. ${poi.description} ${rumor} Marked ${found.name}.`
-      : `${poi.name} talks. ${poi.description} ${rumor}`;
+      ? `${poi.name} talks. Calder Rourke on the mast. ${poi.description} ${rumor} Marked ${found.name}.`
+      : `${poi.name} talks. Calder Rourke on the mast. ${poi.description} ${rumor}`;
     markFieldJob(state, "tower", report, 1);
     state.toast = report;
     return null;

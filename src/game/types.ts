@@ -194,7 +194,7 @@ export interface RegionDefinition {
   points: RegionPointOfInterest[];
 }
 
-export type PoiAction = "shop" | "listen" | "salvage" | "scout" | "home" | "boss";
+export type PoiAction = "shop" | "listen" | "salvage" | "scout" | "home" | "boss" | "bay";
 
 export type WorldViewMode = "globe" | "region";
 
@@ -563,6 +563,7 @@ export interface VisitingMerchant {
   title: string;
   blurb: string;
   regionId: RegionId;
+  portrait?: string;
 }
 
 export interface MarketState {
@@ -735,7 +736,8 @@ export type TyroneEventType =
   | "promise"
   | "ask"
   | "region"
-  | "boss";
+  | "boss"
+  | "fit";
 
 export interface TyroneEpisode {
   id: string;
@@ -808,6 +810,12 @@ export interface TyroneMind {
   utterance: string | null;
 }
 
+export interface TravisBay {
+  fitted: string[];
+  paid: number;
+  jobs: number;
+}
+
 export interface GameState {
   version: number;
   started: boolean;
@@ -869,4 +877,5 @@ export interface GameState {
   shift: ShiftState;
   arcade: ArcadeState;
   tyrone: TyroneMind;
+  travis: TravisBay;
 }

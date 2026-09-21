@@ -4,6 +4,7 @@ import { defaultState } from "./engine";
 import { seedPackIfNeeded } from "./inventory";
 import { restoreHack, restoreTalk, restoreTerm } from "./terminal";
 import { restoreTyrone } from "./tyrone-mind";
+import { restoreTravis } from "./travis";
 import { ensureSquad } from "./squad";
 import type { GameState, LocationId, LocationProgress, Operative } from "./types";
 
@@ -152,6 +153,7 @@ export function loadSave(): GameState {
       creeRead: (parsed as GameState).arcade?.creeRead ?? [],
     };
     merged.tyrone = restoreTyrone((parsed as GameState).tyrone);
+    merged.travis = restoreTravis((parsed as GameState).travis);
     seedPackIfNeeded(merged);
     ensureSquad(merged);
     return merged;

@@ -1,10 +1,12 @@
 import { Button } from "@/components/ui/button";
 import { FACILITY_ART } from "@/game/art";
 import { sfx } from "@/game/audio";
+import { CAST } from "@/game/cast";
 import { BASE_ROOMS, QUARTERS } from "@/game/data";
 import { nextQuarterCost, nextRoomCost, repairCost } from "@/game/engine";
 import { itemArt } from "@/game/item-art";
 import { useGame, type WorkJob } from "@/game/store";
+import { fittedModules, pendingModules, travisBayBlurb, TRAVIS_MODULES } from "@/game/travis";
 import type { QuarterId, RoomId } from "@/game/types";
 import { X } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -37,6 +39,9 @@ const WORK_ART: Record<RoomId, string> = {
 type Phase = "inspect" | "working" | "done";
 
 function jobTitle(job: WorkJob, rooms: Record<RoomId, number>, quarters: Record<QuarterId, number>) {
+  if (job.kind === "travis") {
+    return { eyebrow: "Ironclad Mechanical Shop", title: "Last T-0880 bay", lvl: 0 };
+  }
   if (job.kind === "room") {
     const room = BASE_ROOMS[job.room];
     const lvl = rooms[job.room];
@@ -79,6 +84,7 @@ export function WorkBench() {
   }, [job, close]);
 
   if (!job) return null;
+  if (job.kind === "travis") return <TravisBay />;
 
   const meta = jobTitle(job, s.rooms, s.quarters);
   const item =
@@ -232,6 +238,139 @@ export function WorkBench() {
                 {phase === "done" ? "Close" : "Not now"}
               </Button>
             ) : null}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TravisBay() {
+  const s = useGame((g) => g.s);
+  const close = useGame((g) => g.closeWork);
+  const deliver = useGame((g) => g.deliverTravis);
+  const pending = pendingModules(s);
+  const fitted = fittedModules(s);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        close();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [close]);
+
+  const seat = (itemId: string) => {
+    setError(null);
+    setBusy(itemId);
+    sfx.forge();
+    window.setTimeout(() => {
+      const msg = deliver(itemId);
+      if (msg) {
+        setError(msg);
+        sfx.hurt();
+      } else {
+        sfx.unlock();
+        setNote(useGame.getState().s.toast);
+      }
+      setBusy(null);
+    }, 900);
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[92] flex items-end bg-ink/85 p-3 backdrop-blur-md md:items-center md:justify-center"
+      onClick={() => {
+        if (!busy) close();
+      }}
+    >
+      <div
+        className="ms-pop max-h-[92vh] w-full overflow-y-auto rounded-[var(--radius-xl)] border border-line bg-surface shadow-2xl md:max-w-lg ms-scroll"
+        onClick={(e) => e.stopPropagation()}
+        data-travis-bay="1"
+      >
+        <div className="relative h-52 overflow-hidden sm:h-60">
+          <img src={CAST.travis.still} alt="" className="size-full object-cover object-top" />
+          <div className="absolute inset-0 bg-gradient-to-t from-surface via-surface/20 to-ink/25" />
+          <button
+            type="button"
+            onClick={() => close()}
+            className="absolute right-3 top-3 flex size-10 items-center justify-center rounded-full bg-ink/70 text-muted"
+            aria-label="Close shop"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+        <div className="p-5">
+          <SectionLabel>{CAST.travis.title}</SectionLabel>
+          <h2 className="font-display text-2xl text-paper">{CAST.travis.name}</h2>
+          <p className="mt-1 text-sm text-muted">{CAST.travis.callsign} · {travisBayBlurb(s)}</p>
+          <p className="mt-3 text-sm italic leading-relaxed text-moon">“{CAST.travis.voice[s.travis.jobs ? 0 : 1]}”</p>
+
+          {pending.length ? (
+            <div className="mt-5 space-y-2">
+              <SectionLabel>On the bench</SectionLabel>
+              {pending.map(({ item, mod }) => (
+                <div key={item.id} className="flex gap-3 rounded-[var(--radius-sm)] bg-ink/55 p-3">
+                  <img
+                    src={itemArt({ kind: item.kind, name: item.name }) ?? CAST.travis.thumb}
+                    alt=""
+                    className="h-16 w-12 shrink-0 object-cover"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="font-display text-paper">{mod.name}</p>
+                    <p className="text-sm text-muted">{mod.fit}</p>
+                    <p className="mt-1 font-mono text-label text-ember">Pays {mod.pay} caps · {mod.slot}</p>
+                  </div>
+                  <Button
+                    variant="ember"
+                    className="self-center"
+                    disabled={!!busy}
+                    data-travis-fit={mod.id}
+                    onClick={() => seat(item.id)}
+                  >
+                    {busy === item.id ? "Seating…" : "Fit"}
+                  </Button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-5 text-sm leading-relaxed text-muted">
+              Nothing on the bench. Run a campaign — rail, Works, Berm, tower, Halo. Tube, wheel, servo, plate, coil, knee. I pay in caps. I put them in him.
+            </p>
+          )}
+
+          <div className="mt-5">
+            <SectionLabel>Seated in TyroneBot</SectionLabel>
+            <p className="mt-1 font-mono text-label text-muted">
+              {fitted.length} of {TRAVIS_MODULES.length} fittings · paid {s.travis.paid} caps
+            </p>
+            <ul className="mt-2 space-y-1">
+              {TRAVIS_MODULES.map((mod) => {
+                const on = fitted.some((m) => m.id === mod.id);
+                return (
+                  <li key={mod.id} className={on ? "text-sm text-paper" : "text-sm text-muted"}>
+                    {on ? "●" : "○"} {mod.name}
+                    {on ? ` · ${mod.tagline}` : ""}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+
+          {error ? <p className="mt-4 text-sm text-danger">{error}</p> : null}
+          {note ? <p className="mt-4 text-sm text-ok">{note}</p> : null}
+
+          <div className="mt-5 flex gap-2">
+            <Button className="flex-1" variant="quiet" onClick={() => close()} disabled={!!busy}>
+              Back to the Gate
+            </Button>
           </div>
         </div>
       </div>

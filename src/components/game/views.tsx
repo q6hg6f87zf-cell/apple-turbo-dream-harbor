@@ -80,10 +80,11 @@ import { ForgeBody } from "./forge-body";
 import { MoonCard } from "./card";
 import { regionThumb, FACILITY_ART } from "@/game/art";
 import { RIDER_AVATARS, avatarsForGender, type RiderGender } from "@/game/avatars";
-import { CAST, AEGIS_LINE_STILL, knownCast } from "@/game/cast";
+import { CAST, AEGIS_LINE_STILL, AEGIS_WING, knownCast } from "@/game/cast";
 import { kaneFileBlurb, siteCopyFor } from "@/game/story";
 import { CALIBER_ROSTER, ARC_OPEN, campaignOpenRegions } from "@/game/arsenal";
 import { APPROACHES, KANE_STAKES, defaultPoi, kaneBand, knownPois, locationToRegion } from "@/game/field-ops";
+import { MARKET_KEEPER } from "@/game/market";
 import { className, displayRace } from "@/game/presentation";
 import { FATE_COPY, FATE_KEYS, STAT_ORDER, fateLanding } from "@/game/stats-copy";
 import { punchClick, shockwaveAt } from "@/game/juice";
@@ -298,11 +299,10 @@ function CompoundWing() {
           </span>
         </button>
 
-        {knownCast(s).some((person) => person.faction === "aegis") ? (
-          <div className="mt-3 grid grid-cols-4 gap-2">
-            {knownCast(s)
-              .filter((person) => person.faction === "aegis")
-              .map((person) => (
+        <div className="mt-3 grid grid-cols-4 gap-2">
+            {AEGIS_WING.map((id) => {
+              const person = CAST[id];
+              return (
                 <button
                   key={person.id}
                   type="button"
@@ -321,9 +321,9 @@ function CompoundWing() {
                     {person.callsign}
                   </span>
                 </button>
-              ))}
+              );
+            })}
           </div>
-        ) : null}
 
         <div className="mt-4 grid gap-2 sm:grid-cols-2 md:grid-cols-3">
           {(Object.keys(BASE_ROOMS) as RoomId[]).map((id) => {
@@ -1178,6 +1178,8 @@ export function MapView() {
                       ? "Return to Vault 13"
                       : poi.action === "boss"
                         ? "This hill has a name"
+                        : poi.action === "bay"
+                          ? "Open Travis's bay"
                         : poi.action === "salvage"
                           ? "Salvage this site · 1 watch"
                           : "Scout this site · 1 watch"}
@@ -1515,25 +1517,39 @@ export function MarketView() {
 
   return (
     <div className="space-y-4 pb-8" data-market="1">
-      <div>
-        <SectionLabel>Ironclad · under the Gate</SectionLabel>
-        <h2 className="font-display text-2xl">Moon Squad Market</h2>
-        <p className="mt-1 text-secondary text-moon">
-          {left} watch{left === 1 ? "" : "es"} left · plate <Coin n={me.personalCaps} /> · dawn reprints the crates
-        </p>
-      </div>
+      <Panel className="overflow-hidden p-0">
+        <div className="flex gap-3">
+          <img src={MARKET_KEEPER.portrait} alt="" className="h-32 w-24 shrink-0 object-cover object-top" />
+          <div className="min-w-0 flex-1 py-3 pr-3">
+            <SectionLabel>Ironclad · under the Gate</SectionLabel>
+            <h2 className="font-display text-2xl">Moon Squad Market</h2>
+            <p className="mt-1 font-display text-sm text-paper">{MARKET_KEEPER.name}</p>
+            <p className="text-label uppercase tracking-[0.16em] text-ember">{MARKET_KEEPER.title}</p>
+            <p className="mt-2 text-secondary text-moon">
+              {left} watch{left === 1 ? "" : "es"} left · plate <Coin n={me.personalCaps} /> · dawn reprints the crates
+            </p>
+          </div>
+        </div>
+      </Panel>
 
       {visitor ? (
-        <Panel className="border border-ember/40 bg-surface/95" data-market-visitor={visitor.id}>
-          <SectionLabel>Visiting stall</SectionLabel>
-          <h3 className="font-display text-lg">{visitor.name}</h3>
-          <p className="text-label uppercase tracking-[0.16em] text-ember">{visitor.title}</p>
-          <p className="mt-2 text-secondary text-moon">{visitor.blurb}</p>
-          <div className="mt-3 space-y-2">{guests.map(card)}</div>
+        <Panel className="overflow-hidden border border-ember/40 bg-surface/95 p-0" data-market-visitor={visitor.id}>
+          <div className="flex gap-3">
+            {visitor.portrait ? (
+              <img src={visitor.portrait} alt="" className="h-28 w-20 shrink-0 object-cover object-top" />
+            ) : null}
+            <div className="min-w-0 flex-1 p-3">
+              <SectionLabel>Visiting stall</SectionLabel>
+              <h3 className="font-display text-lg">{visitor.name}</h3>
+              <p className="text-label uppercase tracking-[0.16em] text-ember">{visitor.title}</p>
+              <p className="mt-2 text-secondary text-moon">{visitor.blurb}</p>
+            </div>
+          </div>
+          <div className="space-y-2 px-3 pb-3">{guests.map(card)}</div>
         </Panel>
       ) : (
         <p className="text-secondary text-muted">
-          No visiting stall today. They sit every third dawn — climb the Relay Tower for the rumour first.
+          No visiting stall today. Sister Vex and the fences sit every third dawn — climb Relay Tower Three for Calder Rourke's rumour first.
         </p>
       )}
 
@@ -1546,9 +1562,21 @@ export function MarketView() {
         <div className="space-y-2">{stalls.map(card)}</div>
       )}
 
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-3 gap-2">
         <Button variant="ghost" className="min-h-12" onClick={() => setScreen("map")}>
           Ground map
+        </Button>
+        <Button
+          variant="ghost"
+          className="min-h-12"
+          onClick={() => {
+            useGame.getState().selectLoc("ironclad");
+            useGame.getState().selectPoi("ironclad-shop");
+            const msg = useGame.getState().workSite("ironclad-shop");
+            if (msg) err(msg);
+          }}
+        >
+          Travis's bay
         </Button>
         <Button
           variant="ghost"

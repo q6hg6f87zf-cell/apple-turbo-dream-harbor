@@ -277,6 +277,8 @@ export function RegionMapOverlay() {
                 ? "Return to Vault 13"
                 : act === "boss"
                   ? "Hold for deploy"
+                  : act === "bay"
+                    ? "Open Travis's bay"
                   : act === "salvage"
                     ? "Salvage · 1 watch"
                     : "Scout · 1 watch";
@@ -294,7 +296,7 @@ export function RegionMapOverlay() {
               <button
                 type="button"
                 data-poi-act={selected.id}
-                disabled={used && act !== "shop" && act !== "home" && act !== "boss"}
+                disabled={used && act !== "shop" && act !== "home" && act !== "boss" && act !== "bay"}
                 onClick={() => {
                   sfx.unlock();
                   const msg = useGame.getState().workSite(selected.id);
@@ -304,7 +306,7 @@ export function RegionMapOverlay() {
                 }}
                 className="mt-3 flex min-h-12 w-full items-center justify-center rounded-[var(--radius-sm)] bg-ember px-3 font-display text-sm text-ink disabled:opacity-40"
               >
-                {used && act !== "shop" && act !== "home" && act !== "boss" ? "Worked today" : label}
+                {used && act !== "shop" && act !== "home" && act !== "boss" && act !== "bay" ? "Worked today" : label}
               </button>
             ) : null}
           </div>

@@ -166,6 +166,14 @@ function remember(
   bumpBond(mind.relationship, row.weight);
 }
 
+export function rememberTyrone(
+  state: GameState,
+  row: Omit<TyroneEpisode, "id" | "ticks" | "day" | "recalled"> & { id?: string },
+) {
+  if (!state.tyrone) state.tyrone = emptyTyrone();
+  remember(state, row);
+}
+
 function bumpBond(b: TyroneBond, weight: number) {
   const k = Math.max(-8, Math.min(8, weight));
   b.sharedHistory = clamp100(b.sharedHistory + Math.abs(k) * 0.4);

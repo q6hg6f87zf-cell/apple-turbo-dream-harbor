@@ -61,6 +61,7 @@ import { eventBriefing, beatPrompt, contactFlavor, debriefLines, radioFor, rollL
 import { emptyMarket } from "./market";
 import { emptyShift } from "./shift";
 import { emptyTyrone } from "./tyrone-mind";
+import { emptyTravis, isTravisPart, maybeTravisPart, travisIncomeBonus, travisRepairFactor } from "./travis";
 import { scoreFromDice, STAT_ORDER } from "./stats-copy";
 import { freshClocks, grantPackLoot, starterPack } from "./inventory";
 import { queueTalk } from "./talk";
@@ -189,7 +190,7 @@ export function repairCost(state: GameState, item: Item): number {
   const base = item.condition === "Broken" ? 500 : item.condition === "Damaged" ? 320 : 180;
   const smith = state.residents.some((r) => r.role === "smith") ? 0.8 : 1;
   const tier = lvl >= 3 ? 0.3 : lvl >= 2 ? 0.55 : lvl >= 1 ? 1 : 1.4;
-  return Math.max(40, Math.round(base * tier * smith));
+  return Math.max(40, Math.round(base * tier * smith * travisRepairFactor(state)));
 }
 
 export function healCost(state: GameState, missing: number): number {
@@ -211,6 +212,7 @@ export function incomePerTick(state: GameState): number {
   if (state.residents.some((r) => r.role === "quartermaster")) n += 2;
   n += state.operatives.filter((o) => o.status === "idle" && o.location === "hq").length;
   n += Math.floor(state.moonFavor / 8);
+  n += travisIncomeBonus(state);
   return n;
 }
 
@@ -346,6 +348,7 @@ export function defaultState(): GameState {
       lastGame: null,
     },
     tyrone: emptyTyrone(),
+    travis: emptyTravis(),
   };
 }
 
@@ -557,13 +560,22 @@ export function buildMission(
 }
 
 function lootTable(state: GameState, loc: LocationId, kind: MissionKind, total: number): Item[] {
-  return rollLoot({
+  const items = rollLoot({
     loc,
     kind,
     total,
     day: state.day,
     poiId: state.mission?.poiId,
   }).map(makeItem);
+  const part = maybeTravisPart({
+    state,
+    kind,
+    poiId: state.mission?.poiId,
+    loc,
+    total,
+  });
+  if (part) items.push(makeItem(part));
+  return items;
 }
 
 function fieldKillLoot(_state: GameState, yard: boolean): Item | null {
@@ -792,6 +804,7 @@ export function completeMission(state: GameState): GameState {
     state.locations[loc].bossUnlocked = true;
     state.toast = `${L.name}: ${villainById(L.bossId)?.name ?? "A name"} is in play.`;
     pushLog(state, "note", "Watchtower", `Boss unlocked in ${L.short}: ${villainById(L.bossId)?.name ?? "Unknown"}.`);
+    meetCast(state, L.bossId);
   }
   // Campaign flags, not the calendar, open the next continent.
   syncWorldUnlocks(state);
@@ -841,6 +854,16 @@ export function completeMission(state: GameState): GameState {
       "Sortie",
       `Returned from ${L.short} with ${m.loot.map((x) => x.name).join(", ") || "scraps"}. +${m.coins} caps`,
     );
+  }
+  const travisDrop = m.loot.filter(isTravisPart);
+  if (travisDrop.length) {
+    pushLog(
+      state,
+      "loot",
+      "Travis",
+      `${travisDrop.map((x) => x.name).join(", ")} is marked for the Mechanical Shop. Travis pays caps and fits TyroneBot.`,
+    );
+    state.toast = `${travisDrop[0]!.name} is a Travis part. Take it to the Ironclad Mechanical Shop.`;
   }
   if (state.tutorial === "sortie") state.tutorial = "rest";
   state.moonFavor += m.kind === "boss" ? 0 : 1;

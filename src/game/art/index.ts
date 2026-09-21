@@ -2,15 +2,15 @@ import type { ClassName, DayTaskKind, RegionId, RoomId } from "../types";
 
 /** Sharp painted 1600×1200 regional maps. Cache-bust kills the old aerial blur. */
 export const REGION_ART: Record<RegionId, string> = {
-  ironclad: "/map/regions/ironclad.jpg?v=painted1",
-  slagtown: "/map/regions/slagtown.jpg?v=painted1",
-  blackspire: "/map/regions/blackspire.jpg?v=painted1",
-  brasswater: "/map/regions/brasswater.jpg?v=painted1",
-  veyra: "/map/regions/veyra.jpg?v=modern2",
+  ironclad: "/map/regions/ironclad.jpg?v=town4k1",
+  slagtown: "/map/regions/slagtown.jpg?v=town4k1",
+  blackspire: "/map/regions/blackspire.jpg?v=town4k1",
+  brasswater: "/map/regions/brasswater.jpg?v=town4k1",
+  veyra: "/map/regions/veyra.jpg?v=town4k1",
 };
 
 export function regionThumb(id: RegionId): string {
-  return `/map/regions/thumbs/${id}.jpg`;
+  return `/map/regions/thumbs/${id}.jpg?v=town4k1`;
 }
 
 export const CLASS_PORTRAIT: Record<ClassName, string> = {
@@ -56,6 +56,6 @@ export const FACILITY_ART: Record<RoomId, string> = {
 export const WORK_ART = {
   bench: "/art/rooms/workbench.jpg",
   vaultRaise: "/art/rooms/vault-raise.jpg",
-  t0880: "/art/npcs/t0880-line.jpg",
+  t0880: "/art/npcs/t0880-line.jpg?v=hang2",
   aegisSuit: "/art/npcs/aegis-suit.jpg",
 } as const;

@@ -172,6 +172,25 @@ const SITES: Record<string, SitePack> = {
     report: "Dead markets still have a pulse. {lead} says how hard it is beating.",
     hollow: "The Exchange died. The stencil told the truth. The rats kept the books.",
   },
+  "ironclad-shop": {
+    scout: {
+      title: "Walk the Mechanical Shop",
+      brief:
+        "Travis keeps the last T-0880 bay Kane did not melt. Campaign parts go on his bench. He pays caps and seats them in TyroneBot. The guitar on the wall is in tune. The jig is empty until you fill it.",
+      why: "A named chassis is still a customer. Kane's invoice is not the last word.",
+      fail: "The bay stayed empty. Tyrone listed to port another day.",
+    },
+    forage: {
+      title: "Sweep Travis's scrap",
+      brief: "Offcuts behind the guitar. A clipboard jig. A plate Kane's buyers will not be sold. Ask first.",
+      why: "What Travis will not sell still has a number.",
+      fail: "Travis kept the scrap. He always does.",
+    },
+    approach: "{lead} comes in off the Gate alley, not the office. Grey beard. Crossed arms. The sign still says Ironclad Mechanical Shop.",
+    sweep: "A jig with 0880 stamped in the lip. A stack of breastplates. {lead} does not touch them. Travis will.",
+    report: "The last T-0880 bay Kane did not melt. {lead} says whether the jig is empty.",
+    hollow: "Sparks, solder, a guitar that has outlived the line.",
+  },
   "slag-foundry-row": {
     scout: {
       title: "Walk Foundry Row",
@@ -504,7 +523,7 @@ export function resolveMissionSite(
   const pinned = poiById(loc, poiId);
   if (pinned) return pinned;
   const usable = poisForLocation(loc).filter(
-    (p) => p.kind !== "boss" && p.action !== "home" && p.action !== "shop" && p.id !== "ironclad-vault13",
+    (p) => p.kind !== "boss" && p.action !== "home" && p.action !== "shop" && p.action !== "bay" && p.id !== "ironclad-vault13",
   );
   const discovered = new Set(state.locations[loc]?.discoveredPois ?? []);
   const known = usable.filter((p) => p.discovered || discovered.has(p.id));
@@ -677,10 +696,7 @@ export function kaneFileBlurb(state: GameState): string {
   const region = locationToRegion(state.selectedLoc ?? "ironclad") ?? "ironclad";
   const stake = KANE_STAKES[region];
   if (state.day <= 2) {
-    if ((state.seenTalk ?? []).includes("wing")) {
-      return "Dr. Vesper Kane signed the T-0880 shutdown, then built AEGIS 2753 — human-operated super suits — to replace him. Lyra, Vera-3, Drake, Orion. Project Vesper needs hull plate. Ironclad is the first invoice.";
-    }
-    return "Dr. Vesper Kane signed the T-0880 shutdown. The line was built to deliver tasks. She developed human-operated super suits instead. Project Vesper needs hull plate. Ironclad is the first invoice. That is why you are here.";
+    return "TyroneBot first. Kane signed the T-0880 shutdown and hung the rest of the line. Travis kept the last bay. Then she built AEGIS 2753. Project Vesper needs hull plate. Ironclad is the first invoice.";
   }
   return `${stake.resource}. ${stake.why} ${kaneHeatLine(heat)}`;
 }

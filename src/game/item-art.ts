@@ -1,11 +1,11 @@
 import type { AmmoType, ItemKind, WeaponFamily } from "./types";
 
 export const REGION_STREET: Record<string, string> = {
-  ironclad: "/art/places/ironclad-street.jpg",
-  slagtown: "/art/places/slagtown-street.jpg",
-  blackspire: "/art/places/blackspire-street.jpg",
-  brasswater: "/art/places/brasswater-street.jpg",
-  veyra: "/art/places/veyra-street.jpg",
+  ironclad: "/art/places/ironclad-street.jpg?v=town4k1",
+  slagtown: "/art/places/slagtown-street.jpg?v=town4k1",
+  blackspire: "/art/places/blackspire-street.jpg?v=town4k1",
+  brasswater: "/art/places/brasswater-street.jpg?v=town4k1",
+  veyra: "/art/places/veyra-street.jpg?v=town4k1",
 };
 
 const ART = {
@@ -143,6 +143,12 @@ export function itemArt(input: {
   weaponFamily?: WeaponFamily;
 }): string | null {
   const n = input.name.toLowerCase();
+  if (/spare crt tube|crt tube/.test(n)) return ART.radio;
+  if (/t-0880 drive wheel|drive wheel/.test(n)) return ART.torque;
+  if (/clipboard servo/.test(n)) return ART.coil;
+  if (/bay plate 0880|chest plate/.test(n)) return ART.plate;
+  if (/icr voice coil|voice coil/.test(n)) return ART.ironcoil;
+  if (/hydraulic knee|knee ram/.test(n)) return ART.rivet;
   if (/bobby\s*pin/.test(n)) return ART.pin;
   if (/\bbb gun\b/.test(n) || /vault 13 bb/.test(n)) return ART.bbgun;
   if (/steel bb tin|\bbb tin\b/.test(n)) return ART.bbtin;
