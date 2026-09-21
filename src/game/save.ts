@@ -131,6 +131,9 @@ export function loadSave(): GameState {
     merged.activeMemberId = parsed.activeMemberId ?? null;
     merged.arc = parsed.arc ?? null;
     merged.kaneHeat = parsed.kaneHeat ?? 0;
+    merged.metCast = Array.isArray((parsed as GameState).metCast)
+      ? Array.from(new Set(["kane", "tyrone", ...((parsed as GameState).metCast as string[])]))
+      : ["kane", "tyrone"];
     merged.selectedPoiId = parsed.selectedPoiId ?? null;
     merged.regionMapOpen = false;
     merged.openedFrom = null;

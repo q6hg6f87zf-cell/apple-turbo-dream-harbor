@@ -116,12 +116,20 @@ type Action =
   | "flee"
   | "skill";
 
+export type WorkJob =
+  | { kind: "room"; room: RoomId }
+  | { kind: "quarter"; quarter: QuarterId }
+  | { kind: "repair"; opId: string | "vault"; itemId: string };
+
 interface Store {
   s: GameState;
   hydrated: boolean;
   confirmRest: boolean;
   handshake: HandshakeDelta | null;
   guideOpen: boolean;
+  expansionOpen: boolean;
+  work: WorkJob | null;
+  filePane: "stat" | "plate" | "roster" | "data" | "people" | null;
   hydrate: () => void;
   pullArcade: () => Promise<void>;
   persist: () => void;
@@ -146,6 +154,7 @@ interface Store {
     lineage: string;
     origin: string;
     rolls: Record<string, number>;
+    portraitId?: string;
   }) => string | null;
   upgradeRoom: (room: RoomId) => string | null;
   upgradeQuarter: (q: QuarterId) => string | null;
@@ -193,6 +202,11 @@ interface Store {
   toggleTyroneNumbers: () => void;
   openGuide: () => void;
   closeGuide: () => void;
+  openExpansion: () => void;
+  closeExpansion: () => void;
+  openWork: (job: WorkJob) => void;
+  closeWork: () => void;
+  openFile: (pane?: "stat" | "plate" | "roster" | "data" | "people") => void;
   registerRider: (name: string, handle?: string, discordId?: string) => string | null;
   playAs: (id: string) => void;
   giftRider: (toId: string, amount: number) => string | null;
@@ -242,6 +256,9 @@ export const useGame = create<Store>((set, get) => ({
   confirmRest: false,
   handshake: null,
   guideOpen: false,
+  expansionOpen: false,
+  work: null,
+  filePane: null,
   hydrate: () => {
     if (get().hydrated) return;
     if (typeof window === "undefined") return;
@@ -279,6 +296,16 @@ export const useGame = create<Store>((set, get) => ({
       if (loaded.started && !loaded.bounty) loaded.bounty = rollBounty(loaded);
       if (loaded.started) ensureShift(loaded);
       seedPackIfNeeded(loaded);
+      if (
+        loaded.started &&
+        !loaded.seenTalk.includes("kane") &&
+        !loaded.combat &&
+        !loaded.mission &&
+        loaded.talk?.script !== "wake" &&
+        loaded.talk?.script !== "kane"
+      ) {
+        queueTalk(loaded, "kane", true);
+      }
       set({ s: loaded, hydrated: true, handshake: deltaEmpty(delta) ? (urlSnap ? delta : null) : delta });
       void syncRemoteSoul();
     } catch (err) {
@@ -397,7 +424,12 @@ export const useGame = create<Store>((set, get) => ({
   leaveTask: () =>
     mutate(set, (s) => {
       if (!isTaskScreen(s.screen)) return;
-      const dest = s.openedFrom && isHubScreen(s.openedFrom) ? s.openedFrom : "more";
+      const dest =
+        s.openedFrom && isHubScreen(s.openedFrom)
+          ? s.openedFrom
+          : s.screen === "forge"
+            ? "hq"
+            : "more";
       s.openedFrom = null;
       s.screen = dest;
       if (dest !== "map") s.regionMapOpen = false;
@@ -422,7 +454,9 @@ export const useGame = create<Store>((set, get) => ({
       s.poiWatch = { day: 1, used: [] };
       s.bounty = rollBounty(s);
       ensureSquad(s);
-      pushLog(s, "session", "Tyrone", "Found you east of the highway. Vault 13. The radio is on the porch.");
+      pushLog(s, "session", "Tyrone", "Found you east of the highway. Kane's surveyors are already in Ironclad. Vault 13 holds.");
+      s.nightNote = "Kane's surveyors posted a weigh-in at the Rail Cut. Count their crates before they count ours.";
+      s.metCast = Array.from(new Set([...(s.metCast ?? []), "kane", "tyrone"]));
       queueTalk(s, "wake", true);
     });
     get().persist();
@@ -444,9 +478,8 @@ export const useGame = create<Store>((set, get) => ({
           queueTalk(st, "welcome", true);
           return;
         }
-        st.screen = "forge";
+        st.screen = "hq";
         st.tutorial = "forge";
-        queueTalk(st, "forge", true);
         return;
       }
       queueTalk(st, "resume", !st.talk);
@@ -492,6 +525,14 @@ export const useGame = create<Store>((set, get) => ({
     }),
   openGuide: () => set({ guideOpen: true }),
   closeGuide: () => set({ guideOpen: false }),
+  openExpansion: () => set({ expansionOpen: true }),
+  closeExpansion: () => set({ expansionOpen: false }),
+  openWork: (job) => set({ work: job }),
+  closeWork: () => set({ work: null }),
+  openFile: (pane = "stat") => {
+    set({ filePane: pane });
+    get().setScreen("file");
+  },
   finishBriefing: () =>
     mutate(set, (s) => {
       if (characterForged(s)) {
@@ -548,6 +589,7 @@ export const useGame = create<Store>((set, get) => ({
         origin: opts.origin,
         day: st.day,
         rolls: opts.rolls as never,
+        portraitId: opts.portraitId,
       });
       st.operatives = [op, ...st.operatives];
       if (st.tutorial === "forge") {
@@ -1091,6 +1133,7 @@ export const useGame = create<Store>((set, get) => ({
       const was = st.talk?.script;
       const result = stepTalk(st);
       if (was === "wake" && result === "done") leftWake = true;
+      if (st.screen === "hq") ensureShift(st);
     });
     if (leftWake) void startPorchRadio();
   },
@@ -1100,6 +1143,7 @@ export const useGame = create<Store>((set, get) => ({
       const was = st.talk?.script;
       skipTalkFn(st);
       if (was === "wake" && st.talk?.script !== "wake") leftWake = true;
+      if (st.screen === "hq") ensureShift(st);
     });
     if (leftWake) void startPorchRadio();
   },
@@ -1190,9 +1234,12 @@ export const useGame = create<Store>((set, get) => ({
         st.shift.activeId = id;
         if (task.loc) {
           st.selectedLoc = task.loc;
+          st.selectedPoiId = task.poiId ?? st.selectedPoiId;
           st.screen = "map";
         }
-        st.toast = `${task.title}. Pin the site, pick an approach, deploy.`;
+        st.toast = task.poiId
+          ? `${task.title}. Approach is yours. Deploy when the line is ready.`
+          : `${task.title}. Pin the site, pick an approach, deploy.`;
       });
       return null;
     }
@@ -1260,7 +1307,7 @@ export const useGame = create<Store>((set, get) => ({
         const t = st.shift.board.find((x) => x.id === id);
         if (t) {
           t.status = "done";
-          t.report = "You met a 2753 on the porch.";
+          t.report = `You met ${t.npcId ?? "AEGIS"} armed. The yard will remember.`;
         }
         st.shift.activeId = null;
         msg = null;

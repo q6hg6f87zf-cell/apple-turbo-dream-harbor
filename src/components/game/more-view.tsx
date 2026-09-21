@@ -18,6 +18,7 @@ import {
 import { sfx } from "@/game/audio";
 import { openRadioDeck } from "@/game/radio";
 import { Panel, SectionLabel } from "./primitives";
+import { TyroneHandshake } from "./menu";
 
 const TOOLS: {
   screen?: Screen;
@@ -42,11 +43,18 @@ const TOOLS: {
     icon: Film,
   },
   {
-    screen: "ledger",
-    name: "Moon Squad Card",
-    eyebrow: "Personal plate",
-    desc: "3D black card. Identity, daily clock-in, casino buy-in. Name, Discord handle, personal caps.",
-    icon: CreditCard,
+    screen: "file",
+    name: "S.Y.N.A.P.S.E OS",
+    eyebrow: "Rider plate",
+    desc: "Tyrone's operating system. STAT, black card, roster, today's data. Developed by S.Y.N.A.P.S.E.",
+    icon: IdCard,
+  },
+  {
+    screen: "squad",
+    name: "Campaign registry",
+    eyebrow: "Who sits",
+    desc: "Riders sharing this Vault 13 file. Lives on the File tab now.",
+    icon: Users,
   },
   {
     screen: "forge",
@@ -54,13 +62,6 @@ const TOOLS: {
     eyebrow: "One file",
     desc: "Cut your body once. Two rerolls. Then the Machine Shop closes for good.",
     icon: Hammer,
-  },
-  {
-    screen: "squad",
-    name: "Rider Registry",
-    eyebrow: "Moon Squad",
-    desc: "Also lives under Vault 13. Manage the people sharing this campaign file and ARC turns.",
-    icon: Users,
   },
   {
     screen: "market",
@@ -186,6 +187,8 @@ export function MoreView() {
           </div>
         </div>
       </Panel>
+
+      <TyroneHandshake />
     </div>
   );
 }

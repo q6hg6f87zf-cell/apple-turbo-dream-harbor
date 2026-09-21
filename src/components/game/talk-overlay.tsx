@@ -3,6 +3,7 @@ import { sfx } from "@/game/audio";
 import { wakeLineAt } from "@/game/opening-reel";
 import { getRadioSnapshot, subscribeRadio } from "@/game/radio";
 import { TALK, MANUAL, isPregameTalk, isTalkLocked, renderTalk, scriptForScreen } from "@/game/talk";
+import { speakerArt } from "@/game/cast";
 import { useGame } from "@/game/store";
 import type { TyroneAssist } from "@/game/types";
 import { cn } from "@/lib/cn";
@@ -102,7 +103,7 @@ export function TalkOverlay() {
           return;
         }
         if (shown.length < full.length) setShown(full);
-        else if (!locked) skip();
+        else if (!locked || talk?.script === "kane" || talk?.script === "wing") skip();
         return;
       }
       if (e.key === " " || e.key === "Enter") {
@@ -116,11 +117,23 @@ export function TalkOverlay() {
 
   if (!talk || !line) return null;
   const last = talk.i >= total - 1;
+  const art = speakerArt(line.who);
+  const portrait =
+    line.portrait ||
+    art.portrait ||
+    (talk.script === "wake" ? "/art/tyrone-wake.jpg" : "/art/tyrone.jpg");
+  const still = line.still || art.still;
+  const cinematic = talk.script === "kane" || talk.script === "wing";
 
   return (
     <>
-      {pregame ? (
-        <div className={cn("fixed inset-0 z-[44]", talk.script === "wake" ? "bg-ink/20" : "bg-ink/50")} aria-hidden />
+      {pregame || cinematic ? (
+        <div className={cn("fixed inset-0 z-[44] overflow-hidden", talk.script === "wake" ? "bg-ink/20" : "bg-ink/80")} aria-hidden>
+          {still && cinematic ? (
+            <img src={still} alt="" className="absolute inset-0 size-full object-cover object-top" />
+          ) : null}
+          {cinematic ? <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/50 to-ink/15" /> : null}
+        </div>
       ) : null}
       <div
         className={cn(
@@ -138,10 +151,10 @@ export function TalkOverlay() {
           data-wake-auto={liveWake ? "1" : undefined}
         >
           <img
-            src={talk.script === "wake" ? "/art/tyrone-wake.jpg" : "/art/tyrone.jpg"}
+            src={portrait}
             alt=""
             data-wake-portrait={talk.script === "wake" ? "1" : undefined}
-            className="size-16 shrink-0 rounded-[var(--radius-md)] object-cover shadow-[var(--shadow-border)] md:size-20"
+            className="size-16 shrink-0 rounded-[var(--radius-md)] object-cover object-top shadow-[var(--shadow-border)] md:size-20"
           />
           <div className="min-w-0 flex-1">
             <div className="flex items-center justify-between gap-3">
@@ -172,8 +185,12 @@ export function TalkOverlay() {
                   : "Listening · tap if the reel stalls"
                 : locked && last
                   ? talk.script === "welcome"
-                    ? "Tap to enter the Machine Shop"
-                    : "Tap to enter the ranch"
+                    ? "Tap to open Vault 13 · File holds her"
+                    : talk.script === "kane"
+                      ? "Tap to keep her face · File is waiting"
+                      : talk.script === "wing"
+                        ? "Tap to file the visors"
+                        : "Tap to enter the ranch"
                   : last
                     ? "Tap to close"
                     : locked

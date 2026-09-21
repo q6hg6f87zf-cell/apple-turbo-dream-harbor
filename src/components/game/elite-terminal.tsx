@@ -200,12 +200,15 @@ function guessElite(state: GameState, raw: string): "ok" | "denied" | "lock" | "
     if (!state.terminalDrained) {
       state.terminalDrained = true;
       state.challengeCoin = true;
-      pushLog(state, "Hidden terminal breach: T-0880 challenge coin recovered.");
-      state.toast = "Black channel cracked. T-0880 challenge coin unlocked.";
-      h.log = [...h.log, "EASTER EGG // T-0880 CHALLENGE COIN RECOVERED", "NO ECONOMY MUTATION AUTHORIZED"];
+      state.coins += 3000;
+      pushLog(state, "Hidden terminal breach: T-0880 challenge coin recovered. +3,000 bottle caps.");
+      state.toast = "Terminal cracked. +3,000 bottle caps.";
+      h.log = [...h.log, "ACCOUNT OVERRIDE", "+3,000 BOTTLE CAPS TRANSFERRED", "EASTER EGG // T-0880 CHALLENGE COIN RECOVERED"];
     } else {
-      state.toast = "Black channel reopened. The archive remembers you.";
-      h.log = [...h.log, "ARCHIVE RECOGNIZES PRIOR BREACH", "CACHE ALREADY RECOVERED"];
+      const drip = 40 + Math.floor(Math.random() * 25);
+      state.coins += drip;
+      state.toast = `Already drained. +${drip} caps in the tray.`;
+      h.log = [...h.log, "VAULT ACCOUNT: MOSTLY EMPTY", `TYRONE: "You already cleaned that crate."`, `+${drip} CAPS IN THE TRAY`];
     }
     return "won";
   }

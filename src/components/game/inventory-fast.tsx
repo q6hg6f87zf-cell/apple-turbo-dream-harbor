@@ -12,6 +12,7 @@ import { CLASS_PRESENTATION, ITEM_KIND_PRESENTATION, classLabel } from "@/game/p
 import { grantItemMastery, previewItem, residentProgress, residentPower } from "@/game/resident-progression";
 import { useGame } from "@/game/store";
 import { magLine } from "@/game/weapon-ops";
+import { sfx } from "@/game/audio";
 import type {
   ClassName,
   InventoryCategory,
@@ -181,7 +182,7 @@ export function InventoryFast() {
   const equip = useGame((g) => g.equipItem);
   const take = useGame((g) => g.takeFromVault);
   const stash = useGame((g) => g.stashItem);
-  const repair = useGame((g) => g.repairItem);
+  const openWork = useGame((g) => g.openWork);
   const usePack = useGame((g) => g.usePack);
 
   const session = inventorySession(SESSION_ID);
@@ -498,7 +499,7 @@ export function InventoryFast() {
               {(selected.source === "vault" || selected.source === "operative") && selected.item?.kind === "consumable" && target ? <Button variant="ember" className="w-full" onClick={() => useNormalConsumable(selected, target.id)}><Zap className="size-4" /> Use on {target.name}</Button> : null}
               {(selected.source === "vault" || selected.source === "operative") && selected.item?.kind === "enchantment" && target && resolvedTargetGearId ? <Button variant="ember" className="w-full" onClick={() => attach(selected, target.id, resolvedTargetGearId)}><Sparkles className="size-4" /> Attach to gear</Button> : null}
               {selected.source === "pack" && selected.packKey ? <Button variant="ember" className="w-full" onClick={() => { const msg = usePack(selected.packKey!); if (msg) setToast(msg); setSelectedKey(null); }}><Zap className="size-4" /> Use {selected.name}</Button> : null}
-              {(selected.source === "vault" || selected.source === "operative") && selected.item && selected.item.condition !== "Pristine" ? <Button variant="ghost" className="w-full" onClick={() => { const msg = repair(selected.source === "vault" ? "vault" : selected.ownerId!, selected.item!.id); if (msg) setToast(msg); }}><Wrench className="size-4" /> Repair</Button> : null}
+              {(selected.source === "vault" || selected.source === "operative") && selected.item && selected.item.condition !== "Pristine" ? <Button variant="ghost" className="w-full" onClick={() => { sfx.click(); openWork({ kind: "repair", opId: selected.source === "vault" ? "vault" : selected.ownerId!, itemId: selected.item!.id }); }}><Wrench className="size-4" /> Repair at the bench</Button> : null}
               {selected.source === "operative" && selected.item && selected.ownerId && !selected.item.equipped ? <Button variant="quiet" className="w-full" onClick={() => { const msg = stash(selected.ownerId!, selected.item!.id); if (msg) setToast(msg); else { setToast(`${selected.name} moved to Vault 13.`); setSelectedKey(null); } }}><Archive className="size-4" /> Move to Vault 13</Button> : null}
               {(selected.kind === "material" || selected.kind === "special") && selected.source !== "catalogue" ? <div className="rounded-[var(--radius-md)] border border-line bg-ink/45 px-3 py-3 text-sm text-muted">{selected.kind === "material" ? "Stored. Vault 13 construction will consume this when the correct expansion asks for it." : "Key/relic item. Keep it until a system specifically requests it."}</div> : null}
               {selected.source === "catalogue" ? <div className="rounded-[var(--radius-md)] border border-line bg-ink/45 px-3 py-3 text-sm text-muted">Catalogue only. Find it in the Hollow Realm before Tyrone lets you touch the buttons.</div> : null}

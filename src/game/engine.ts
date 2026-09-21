@@ -21,7 +21,6 @@ import type {
   StatKey,
 } from "./types";
 import {
-  ARMOR,
   BASE_ROOMS,
   BOUNTIES,
   CLASS_BASE,
@@ -44,11 +43,10 @@ import {
   SIGNATURE,
   TRAIT_TIERS,
   VILLAINS,
-  WEAPONS,
   WORLD,
+  YARD_ENEMIES,
+  BB_TIN,
   locById,
-  makeItemFromArmor,
-  makeItemFromWeapon,
   pickByRoll,
   resolveLineage,
   resolveRaceName,
@@ -68,6 +66,9 @@ import { freshClocks, grantPackLoot, starterPack } from "./inventory";
 import { queueTalk } from "./talk";
 import { ensureSquad, maybeSpendArcTurn, stampSeatedPlate } from "./squad";
 import { isPlaceholderName } from "./discord";
+import { CAST, aegisOnDuty, meetCast } from "./cast";
+import { aegisRunner, dawnDispatch, nightTale, resolveMissionSite } from "./story";
+import { rollLoot } from "./loot";
 
 export function uid(prefix = "id"): string {
   return `${prefix}-${Math.random().toString(36).slice(2, 9)}-${Date.now().toString(36)}`;
@@ -329,6 +330,7 @@ export function defaultState(): GameState {
     activeMemberId: null,
     arc: null,
     kaneHeat: 0,
+    metCast: ["kane", "tyrone"],
     selectedPoiId: null,
     regionMapOpen: false,
     market: emptyMarket(1),
@@ -380,6 +382,7 @@ export function forgeOperative(opts: {
   origin: string;
   day: number;
   rolls?: Partial<Record<"rep" | "trait" | "skill" | "shadow" | "enchant" | "destiny" | StatKey, number>>;
+  portraitId?: string;
 }): Operative {
   const rolls = {
     rep: opts.rolls?.rep ?? d20(),
@@ -404,8 +407,10 @@ export function forgeOperative(opts: {
   const lineage = resolveLineage(raceName, opts.lineage);
   const hp = CLASS_HP[opts.cls];
   const weapon = makeItem({ ...starterWeapon(opts.cls), equipped: true });
+  const tin = makeItem({ ...BB_TIN });
   const kit: Item[] = [
     weapon,
+    tin,
     ...race.kit.map((name) =>
       makeItem({
         name,
@@ -450,6 +455,7 @@ export function forgeOperative(opts: {
     curses: [],
     notes: "",
     joinedDay: opts.day,
+    portraitId: opts.portraitId,
     statDice,
   };
 }
@@ -472,7 +478,8 @@ export function buildMission(
   const approach = APPROACHES.find((a) => a.id === field?.approach) ?? APPROACHES[1];
   const dc = clamp(missionDc(state, loc, kind) + (approach?.dc ?? 0), 8, 19);
   const lead = partyLead(state, partyIds);
-  const theater = eventBriefing(state, loc, kind, partyIds);
+  const site = resolveMissionSite(state, loc, field?.poiId);
+  const theater = eventBriefing(state, loc, kind, partyIds, site?.id);
   const beats: MissionBeat[] = [];
   const add = (
     title: string,
@@ -483,7 +490,7 @@ export function buildMission(
     beats.push({
       id: uid("bt"),
       title,
-      prompt: beatPrompt(state, loc, kind, k, title, partyIds),
+      prompt: beatPrompt(state, loc, kind, k, title, partyIds, site?.id),
       stat,
       dc: clamp(dc + extra, 8, 19),
       kind: k,
@@ -491,10 +498,22 @@ export function buildMission(
     });
   };
 
+  let npcId: string | undefined;
   if (kind === "scout") {
     add("Approach", "WIS", -1);
     add("Sweep", "SPD", 0, "loot");
     add("Report", "INT", -1);
+    const heat = state.kaneHeat ?? 0;
+    const aegis = heat >= 5 && Math.random() < 0.4;
+    const contact = state.day <= 3 ? 0.62 : 0.28;
+    if (aegis) {
+      const person = aegisOnDuty(state.day, heat);
+      npcId = person.id;
+      meetCast(state, person.id);
+      add("AEGIS contact", "SPD", 1, "combat");
+    } else if (Math.random() < contact + L.danger * 0.08) {
+      add("Contact", "SPD", 1, "combat");
+    }
   } else if (kind === "forage") {
     add("Range", PRIMARY_STAT[lead.cls], 0);
     add("Haul", "STR", 1, "loot");
@@ -531,59 +550,48 @@ export function buildMission(
     stakes: theater.stakes,
     waiting: true,
     regionId: locationToRegion(loc) ?? undefined,
-    poiId: field?.poiId,
+    poiId: site?.id ?? field?.poiId,
     approach: field?.approach ?? approach.id,
+    npcId,
   };
 }
 
-function lootTable(loc: LocationId, kind: MissionKind, total: number): Item[] {
-  const out: Item[] = [];
-  const clsPool: ClassName[] = ["Warrior", "Wizard", "Rogue", "Healer", "Merchant", "Bard"];
-  const rarityFrom = (t: number): Item["rarity"] => {
-    if (t >= 20) return "Mythic";
-    if (t >= 18) return "Legendary";
-    if (t >= 15) return "Rare";
-    if (t >= 11) return "Uncommon";
-    return "Common";
-  };
-  if (total >= 10) {
-    const r = rarityFrom(total);
-    const weapons = WEAPONS.filter((w) => w.rarity === r || (r === "Common" && w.rarity === "Common"));
-    const pool = weapons.length ? weapons : WEAPONS.filter((w) => w.rarity === "Common");
-    const w = pick(pool.filter((x) => clsPool.includes(x.cls)));
-    out.push(makeItem(makeItemFromWeapon(w)));
-  }
-  if (total >= 14 && Math.random() < 0.45) {
-    const a = pick(ARMOR);
-    out.push(makeItem(makeItemFromArmor(a)));
-  }
-  if (loc === "caverns" || loc === "veyra") {
-    out.push(
-      makeItem({
-        name: "Hollow Ore",
-        kind: "material",
-        rarity: "Uncommon",
-        condition: "Pristine",
-        effect: "Forge fuel.",
-        lore: "It drinks torchlight.",
-        value: 200,
-      }),
-    );
-  }
-  if (kind === "scout" && Math.random() < 0.5) {
-    out.push(
-      makeItem({
-        name: "Field Cache",
-        kind: "consumable",
-        rarity: "Common",
-        condition: "Pristine",
-        effect: "Restore 3 HP.",
-        lore: "Someone packed this and did not come back.",
-        value: 80,
-      }),
-    );
-  }
-  return out;
+function lootTable(state: GameState, loc: LocationId, kind: MissionKind, total: number): Item[] {
+  return rollLoot({
+    loc,
+    kind,
+    total,
+    day: state.day,
+    poiId: state.mission?.poiId,
+  }).map(makeItem);
+}
+
+function fieldKillLoot(_state: GameState, yard: boolean): Item | null {
+  if (Math.random() > (yard ? 0.78 : 0.48)) return null;
+  const early: Omit<Item, "id">[] = [
+    { ...BB_TIN },
+    {
+      name: "Scrapsteel Bundle",
+      kind: "material",
+      rarity: "Common",
+      condition: "Worn",
+      effect: "Forge stock. One watch at the Machine Shop.",
+      lore: "Pulled off a body that did not need it.",
+      equipped: false,
+      value: 40,
+    },
+    {
+      name: "Field Cache",
+      kind: "consumable",
+      rarity: "Common",
+      condition: "Worn",
+      effect: "Restore 3 HP.",
+      lore: "Someone packed this and did not come back.",
+      equipped: false,
+      value: 80,
+    },
+  ];
+  return makeItem({ ...pick(early) });
 }
 
 export function applyRollToBeat(
@@ -642,7 +650,7 @@ export function applyRollToBeat(
       coins = strong ? Math.round(payout * 1.6) : b === "weak" ? Math.round(payout * 0.6) : payout;
       if (m.locationId === "caverns" || m.kind === "forage") ore = strong ? 2 : 1;
       if (beat.kind === "loot" || beat.kind === "merchant") {
-        m.loot = [...m.loot, ...lootTable(m.locationId, m.kind, total)];
+        m.loot = [...m.loot, ...lootTable(state, m.locationId, m.kind, total)];
         const drop = grantPackLoot(state, { source: locById(m.locationId).short });
         if (drop) notes.push(`Vault · ${drop.replace("_", " ")}.`);
       }
@@ -700,7 +708,7 @@ export function applyRollToBeat(
       startCombat = true;
     } else {
       coins = 90 + locById(m.locationId).danger * 20;
-      m.loot = [...m.loot, ...lootTable(m.locationId, m.kind, total)];
+      m.loot = [...m.loot, ...lootTable(state, m.locationId, m.kind, total)];
     }
   }
 
@@ -844,7 +852,11 @@ export function completeMission(state: GameState): GameState {
     rider.xp += m.kind === "boss" ? 12 : 4;
   }
   maybeSpendArcTurn(state, loc, m.kind, `${m.kind} on ${L.short}.`);
+  const firstWatch = m.kind === "scout" || m.kind === "forage";
   state.mission = null;
+  if (firstWatch && !(state.seenTalk ?? []).includes("wing")) {
+    queueTalk(state, "wing");
+  }
   state.toast = `Sortie complete. +${m.coins} caps${cut ? ` · +${cut} on the card` : ""}${m.ore ? ` · +${m.ore} ore` : ""}.`;
   return state;
 }
@@ -893,22 +905,48 @@ export function spawnCombat(state: GameState, opts: { boss?: boolean }): GameSta
       ...fieldArmor(state.bounty.name),
     });
   } else {
-    const pool = ENEMIES[loc];
-    const n = 1 + (m.kind === "raid" ? 1 : 0);
-    for (let i = 0; i < n; i++) {
-      const e = pick(pool);
+    const heat = state.kaneHeat ?? 0;
+    const named = m.npcId || m.beats[m.beatIndex]?.title === "AEGIS contact" || heat >= 8 && m.kind !== "scout" && m.kind !== "forage";
+    const yard = (m.kind === "scout" || m.kind === "forage" || state.day <= 3) && !named;
+    if (named) {
+      const person = aegisOnDuty(state.day, heat);
+      meetCast(state, person.id);
+      const runner = aegisRunner(person);
       enemies.push({
         id: uid("en"),
-        name: e.name,
-        hp: e.hp,
-        maxHp: e.hp,
-        atk: e.atk,
-        def: e.def,
-        dc: e.dc,
-        tags: [],
-        flavor: e.flavor,
-        ...fieldArmor(e.name),
+        name: runner.name,
+        hp: runner.hp,
+        maxHp: runner.hp,
+        atk: runner.atk,
+        def: runner.def,
+        dc: runner.dc,
+        tags: ["aegis"],
+        flavor: runner.flavor,
+        portrait: runner.portrait,
+        castId: runner.castId,
+        armorClass: "powered",
+        preferredRange: "mid",
+        resist: ["pistol"],
+        weakness: ["energy", "rifle"],
       });
+    } else {
+      const pool = yard ? YARD_ENEMIES : ENEMIES[loc];
+      const n = yard ? 1 : 1 + (m.kind === "raid" ? 1 : 0);
+      for (let i = 0; i < n; i++) {
+        const e = pick(pool.length ? pool : YARD_ENEMIES);
+        enemies.push({
+          id: uid("en"),
+          name: e.name,
+          hp: e.hp,
+          maxHp: e.hp,
+          atk: e.atk,
+          def: e.def,
+          dc: e.dc,
+          tags: yard ? ["yard"] : [],
+          flavor: e.flavor,
+          ...fieldArmor(e.name),
+        });
+      }
     }
   }
   const combat: CombatState = {
@@ -1268,8 +1306,15 @@ export function finishCombat(state: GameState, won: boolean, fled = false): Game
   if (!combat) return state;
   if (won) {
     const payout = Math.round((120 + locById(combat.locationId).danger * 40) * combat.rewardMult);
+    const yard = combat.enemies.some((e) => e.tags?.includes("yard")) || combat.missionKind === "scout" || combat.missionKind === "forage";
     state.coins += payout;
-    grantXp(state, combat.bossId ? 28 : 8);
+    grantXp(state, combat.bossId ? 28 : yard ? 14 : 8);
+    const rider = ensureSquad(state);
+    rider.xp += combat.bossId ? 12 : yard ? 6 : 3;
+    combat.partyIds.forEach((id) => {
+      const i = state.operatives.findIndex((o) => o.id === id);
+      if (i >= 0) state.operatives[i] = { ...state.operatives[i], battles: state.operatives[i].battles + 1 };
+    });
     // The fight's own log dies with the overlay. A villain's last word belongs
     // in the debrief, where the squad is still standing there reading it.
     const dying = !fled && combat.bossId ? villainById(combat.bossId) : null;
@@ -1304,6 +1349,15 @@ export function finishCombat(state: GameState, won: boolean, fled = false): Game
         state.moonFavor += 8;
         pushLog(state, "combat", v.name, `Fallen. ${v.lootName} recovered.`);
         state.toast = `${v.name} is down. ${v.arc} breaks.`;
+      }
+    } else {
+      const drop = fieldKillLoot(state, yard);
+      if (drop) {
+        state.vault.push(drop);
+        if (state.mission) state.mission.loot = [...state.mission.loot, drop];
+        pushLog(state, "loot", combat.enemies[0]?.name ?? "Field", `${drop.name} hits the vault.`);
+      } else {
+        grantPackLoot(state, { source: locById(combat.locationId).short });
       }
     }
     pushLog(state, "combat", "SYNAPSE", won ? "The field is ours." : "We left.");
@@ -1370,13 +1424,13 @@ export function restOvernight(state: GameState): GameState {
         : "Night raid. The lockbox held.";
     }
   } else if (roll < 0.3) {
-    state.nightNote = "A Dust-Walker trades whispers at the gate. Intel +1 on Ironclad.";
+    state.nightNote = "A Dust-Walker trades whispers at the gate. Ironclad intel +1. They mentioned Kane's weigh-in.";
     state.locations.ironclad.intel += 1;
   } else if (roll < 0.4) {
     state.ore += 1;
-    state.nightNote = "Krell's runners leave a crate. +1 Hollow Ore.";
+    state.nightNote = "Krell's runners leave a crate stamped for Kane. +1 Hollow Ore. We kept it.";
   } else {
-    state.nightNote = "Tyrone holds the CRT. The compound sleeps.";
+    state.nightNote = nightTale(state);
   }
   if (state.residents.some((r) => r.role === "spymaster")) {
     const open = WORLD.filter((w) => w.id !== "hq" && state.locations[w.id].unlocked);
@@ -1387,7 +1441,8 @@ export function restOvernight(state: GameState): GameState {
     }
   }
   grantXp(state, 6);
-  pushLog(state, "session", "HQ", `Day ${state.day} begins. ${state.nightNote}`);
+  const dispatch = dawnDispatch(state);
+  pushLog(state, "session", "Tyrone", `Day ${state.day}. ${dispatch}`);
   if (state.tutorial === "rest") state.tutorial = "done";
   state.toast = `Dawn of day ${state.day}.`;
   queueTalk(state, "dawn");
@@ -1415,7 +1470,7 @@ export function nextObjective(state: GameState): { text: string; screen: Screen;
     return {
       text: `${downed.name} is downed. The Infirmary — or they die at dawn.`,
       screen: "roster",
-      cta: "Roster",
+      cta: "File",
       opId: downed.id,
     };
   const wounded = state.operatives.find((o) => o.hp < o.maxHp && o.status === "idle");
@@ -1427,6 +1482,8 @@ export function nextObjective(state: GameState): { text: string; screen: Screen;
   if (state.coins < 350)
     return { text: "Caps are thin. Deploy a forage or crack a crate.", screen: "map", cta: "Deploy" };
   const ironclad = state.locations.ironclad;
+  if (state.day <= 2 && (ironclad?.intel ?? 0) < 4 && characterForged(state))
+    return { text: "Kane's surveyors posted a weigh-in at the Rail Cut. Scout it.", screen: "hq", cta: "Board" };
   if (ironclad.bossUnlocked && !ironclad.bossDefeated)
     return { text: "Gravenor holds Ironclad. Arc I is open — it is someone's turn.", screen: "map", cta: "Hunt" };
   const nextBoss = WORLD.find(
@@ -1438,7 +1495,7 @@ export function nextObjective(state: GameState): { text: string; screen: Screen;
       screen: "map",
       cta: "Hunt",
     };
-  if (state.coins >= 1400 && state.rooms.forge === 0)
+  if (state.coins >= 1400 && state.rooms.forge === 0 && state.day > 2)
     return { text: "Upgrade the Forge. Fumbles are eating steel.", screen: "hq", cta: "Raise" };
   if (idleAtHq(state).length)
     return { text: "Deploy a sortie. The Hollow does not wait.", screen: "map", cta: "Deploy" };
@@ -1536,17 +1593,27 @@ export function syncWorldUnlocks(state: GameState) {
 export function spawnAegisYard(state: GameState): GameState {
   const idle = idleAtHq(state);
   const party = (idle.length ? idle : living(state)).slice(0, 3).map((o) => o.id);
+  const task = state.shift?.board.find((t) => t.id === state.shift.activeId) ?? state.shift?.board.find((t) => t.kind === "aegis");
+  const person = aegisOnDuty(state.day, state.kaneHeat ?? 0);
+  const named = CAST[(task?.npcId as keyof typeof CAST) ?? person.id] ?? person;
+  meetCast(state, named.id);
+  const runner = aegisRunner(named);
   const enemy: Combatant = {
     id: uid("aegis"),
-    name: "AEGIS 2753",
-    hp: 28,
-    maxHp: 28,
-    atk: 7,
-    def: 5,
-    dc: 14,
+    name: runner.name,
+    hp: runner.hp,
+    maxHp: runner.hp,
+    atk: runner.atk,
+    def: runner.def,
+    dc: runner.dc,
     tags: ["aegis", "powered"],
-    flavor: "Kane leftover on the porch. Serial still warm.",
+    flavor: runner.flavor,
+    portrait: runner.portrait,
+    castId: runner.castId,
     armorClass: "powered",
+    preferredRange: "mid",
+    resist: ["pistol"],
+    weakness: ["energy", "rifle"],
   };
   state.combat = {
     locationId: "hq",
@@ -1555,7 +1622,7 @@ export function spawnAegisYard(state: GameState): GameState {
     enemies: [enemy],
     turn: 1,
     actorIndex: 0,
-    log: ["A 2753 frame is on the porch. Tyrone did not invite it."],
+    log: [`${named.name} sent a 2753. ${named.tagline}`],
     rewardMult: 1.4,
   };
   return state;

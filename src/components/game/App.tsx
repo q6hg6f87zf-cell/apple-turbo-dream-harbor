@@ -24,15 +24,15 @@ import {
   LedgerView,
   MapView,
   MarketView,
-  RosterView,
-  SquadView,
 } from "./views";
 import { InventoryView } from "./inventory-view";
 import { MoreView } from "./more-view";
 import { GalleryView } from "./gallery-view";
 import { ArcadeView } from "./arcade-view";
+import { FileView } from "./synapse-os";
 import { RadioDeckSheet, RadioDirector } from "./radio-deck";
 import { Dock, GuidanceRow, HubHeader, Rail, SceneBreath, TaskHeader } from "./chrome";
+import { WorkBench } from "./work-bench";
 
 export function GameApp() {
   const hydrate = useGame((g) => g.hydrate);
@@ -97,6 +97,10 @@ export function GameApp() {
         }
         if (st.guideOpen) {
           st.closeGuide();
+          return;
+        }
+        if (st.work) {
+          st.closeWork();
           return;
         }
         if (st.s.selectedId && !st.s.combat && !st.s.mission) {
@@ -197,7 +201,7 @@ export function GameApp() {
             )}
           >
             {screen === "hq" && <HQView />}
-            {screen === "roster" && <RosterView />}
+            {(screen === "file" || screen === "roster" || screen === "squad") && <FileView />}
             {screen === "forge" && <ForgeView />}
             {screen === "map" && <MapView />}
             {screen === "inventory" && <InventoryView />}
@@ -205,7 +209,6 @@ export function GameApp() {
             {screen === "vault" && <VaultView />}
             {screen === "ledger" && <LedgerView />}
             {screen === "market" && <MarketView />}
-            {screen === "squad" && <SquadView />}
             {screen === "codex" && <CodexView />}
             {screen === "arcade" && <ArcadeView />}
           </div>
@@ -224,6 +227,7 @@ export function GameApp() {
       <HelpChrome />
       <RadioDeckSheet />
       <CardSwipe />
+      <WorkBench />
     </div>
   );
 }

@@ -11,7 +11,9 @@ import { STAT_COPY, STAT_ORDER } from "@/game/stats-copy";
 import { cn } from "@/lib/cn";
 import { CommandBar, EncounterBackdrop, EventChips, EventLog } from "./encounter-scene";
 import { KIND_LABEL, eventChips, eventStatHint, shiftRadio, dawnLines } from "@/game/event-theater";
-import { currentPorch } from "@/game/porch";
+import { BOARD_KIND_LABEL, boardStake } from "@/game/board-copy";
+import { CAST, kaneHeatLine, AEGIS_FIELD_STILL, castById } from "@/game/cast";
+import { poiById } from "@/game/field-ops";
 import {
   ClassGlyph,
   Coin,
@@ -111,36 +113,45 @@ export function MissionOverlay() {
 
   const choosing = !!(mission.waiting && beat?.tactics && !beat.tacticId);
   const chips = eventChips(s, mission);
-  const porchLive = currentPorch().seats.filter((seat) => !seat.self);
+  const heat = s.kaneHeat ?? 0;
+  const site = poiById(mission.locationId, mission.poiId);
+  const face = castById(mission.npcId);
 
   return (
     <div className="fixed inset-0 z-40 flex flex-col" data-mission="1">
-      <EncounterBackdrop locationId={mission.locationId} tone={mission.kind === "boss" || mission.kind === "raid" ? "danger" : "neutral"} />
+      <EncounterBackdrop
+        locationId={mission.locationId}
+        tone={mission.kind === "boss" || mission.kind === "raid" ? "danger" : "neutral"}
+        art={face?.still}
+      />
 
       <div className="relative z-[1] flex min-h-0 flex-1 flex-col">
         <div className="shrink-0 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="font-display text-label uppercase tracking-[0.22em] text-ember">
-                {KIND_LABEL[mission.kind]} · {loc.short} · {mission.approach ?? "standard"} · beat {mission.beatIndex + 1}/
+                {KIND_LABEL[mission.kind]} · {site?.name ?? loc.short} · {mission.approach ?? "standard"} · beat {mission.beatIndex + 1}/
                 {mission.beats.length}
               </div>
               <h2 className="mt-1 font-display text-2xl leading-tight">{beat?.title ?? "Debrief"}</h2>
-              <p className="mt-1 text-secondary text-moon">{mission.briefing ?? beat?.prompt}</p>
+              <p className="mt-1 text-secondary text-moon">{beat?.prompt ?? mission.briefing}</p>
             </div>
-            <div className="shrink-0 text-right text-label text-muted">
-              <Coin n={mission.coins} />
+            <div className="flex shrink-0 items-start gap-2">
+              {face ? (
+                <img
+                  src={face.portrait}
+                  alt=""
+                  className="size-14 rounded-[var(--radius-sm)] object-cover object-top shadow-[var(--shadow-border)]"
+                />
+              ) : null}
+              <div className="text-right text-label text-muted">
+                <Coin n={mission.coins} />
+              </div>
             </div>
           </div>
           {mission.stakes ? <p className="mt-2 text-label text-muted">{mission.stakes}</p> : null}
           <EventChips chips={chips} />
-          {porchLive.length ? (
-            <p className="mt-2 text-label text-muted">
-              Porch · {porchLive.map((seat) => seat.name).join(", ")} · quiet jobs never wait
-            </p>
-          ) : (
-            <p className="mt-2 text-label text-muted">Porch · yours until someone sits</p>
-          )}
+          <p className="mt-2 text-label text-muted">Kane · {kaneHeatLine(heat)}</p>
 
           <div className="mt-3 flex gap-1.5">
             {mission.beats.map((b, i) => (
@@ -427,7 +438,11 @@ export function CombatOverlay() {
 
   return (
     <div className="fixed inset-0 z-40 flex flex-col" data-combat="1">
-      <EncounterBackdrop locationId={combat.locationId} tone="danger" />
+      <EncounterBackdrop
+        locationId={combat.locationId}
+        tone="danger"
+        art={enemy?.tags?.includes("aegis") ? AEGIS_FIELD_STILL : undefined}
+      />
 
       <div className={cn("relative z-[1] flex min-h-0 flex-1 flex-col", flash && "ms-hit")}>
         <div className="shrink-0 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
@@ -447,11 +462,19 @@ export function CombatOverlay() {
             <p className="text-label text-muted">
               {v.title} · {v.arc}
             </p>
+          ) : enemy?.castId ? (
+            <p className="text-label text-muted">{CAST[enemy.castId as keyof typeof CAST]?.title}</p>
           ) : null}
           {phase ? (
             <p className="mt-1 font-display text-label uppercase tracking-[0.16em] text-ember">{phase.name}</p>
           ) : enemy?.flavor ? (
             <p className="mt-1 text-secondary text-moon">{enemy.flavor}</p>
+          ) : null}
+
+          {enemy?.portrait ? (
+            <div className="relative mt-3 h-40 overflow-hidden rounded-[var(--radius-md)] shadow-[var(--shadow-border)]">
+              <img src={enemy.portrait} alt="" className="size-full object-cover object-top" />
+            </div>
           ) : null}
 
           <div className="relative mt-3">
@@ -573,7 +596,7 @@ export function OperativeSheet() {
   const take = useGame((g) => g.takeFromVault);
   const heal = useGame((g) => g.healOp);
   const stab = useGame((g) => g.stabilize);
-  const repair = useGame((g) => g.repairItem);
+  const openWork = useGame((g) => g.openWork);
   const bond = useGame((g) => g.bondCompanion);
   const hof = useGame((g) => g.hof);
   const [tab, setTab] = useState<"soul" | "kit" | "bonds">("soul");
@@ -738,7 +761,14 @@ export function OperativeSheet() {
                     Vault
                   </Button>
                   {it.condition !== "Pristine" && it.kind === "weapon" ? (
-                    <Button variant="ghost" size="sm" onClick={() => fail(repair(op.id, it.id))}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        sfx.click();
+                        openWork({ kind: "repair", opId: op.id, itemId: it.id });
+                      }}
+                    >
                       Repair
                     </Button>
                   ) : null}
@@ -908,6 +938,7 @@ export function ShiftSheet() {
   const idle = s.operatives.filter((o) => o.status === "idle" && o.hp > 0);
   const wounded = s.operatives.filter((o) => o.status === "downed" || (o.hp < o.maxHp && o.status !== "dead"));
   if (!task || task.kind === "sortie" || task.kind === "cabinet") return null;
+  if (task.kind === "market" || task.kind === "tower" || task.kind === "salvage") return null;
   if (s.combat || s.mission) return null;
 
   const go = (payload: Parameters<typeof resolve>[0]) => {
@@ -917,19 +948,28 @@ export function ShiftSheet() {
     else rumble(8);
   };
 
+  const face = task.npcId ? CAST[(task.npcId as keyof typeof CAST)] : undefined;
   return (
     <div className="fixed inset-0 z-[45] flex flex-col" data-shift-event="1">
-      <EncounterBackdrop locationId={task.loc ?? s.selectedLoc ?? "ironclad"} />
+      <EncounterBackdrop locationId={task.loc ?? s.selectedLoc ?? "ironclad"} art={face?.still ?? (task.kind === "aegis" ? AEGIS_FIELD_STILL : undefined)} />
       <div className="relative z-[1] flex min-h-0 flex-1 flex-col">
         <div className="shrink-0 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="font-display text-label uppercase tracking-[0.2em] text-ember">
-                {WATCH_LABEL[s.shift.watch]} · {task.watchCost} watch{task.watchCost > 1 ? "es" : ""}
+                {WATCH_LABEL[s.shift.watch]} · {BOARD_KIND_LABEL[task.kind]} · {task.watchCost} watch
+                {task.watchCost > 1 ? "es" : ""}
                 {task.required ? " · required" : ""}
               </p>
               <h2 className="mt-1 font-display text-xl">{task.title}</h2>
             </div>
+            {face ? (
+              <img
+                src={face.portrait}
+                alt=""
+                className="size-14 shrink-0 rounded-[var(--radius-sm)] object-cover object-top shadow-[var(--shadow-border)]"
+              />
+            ) : null}
             <button
               type="button"
               aria-label="Close job"
@@ -950,7 +990,14 @@ export function ShiftSheet() {
             ]}
           />
         </div>
-        <EventLog lines={[shiftRadio(task.kind), `SYNAPSE · ${task.brief}`, `Hollow · ${task.why}`]} />
+        <EventLog
+          lines={[
+            shiftRadio(task.kind),
+            `SYNAPSE · ${task.brief}`,
+            `Hollow · ${task.why}`,
+            `If you skip · ${boardStake(task)}`,
+          ]}
+        />
         <div className="ms-scroll max-h-[40vh] overflow-y-auto px-4 pb-4">
 
         {task.kind === "crates" && task.crates ? (

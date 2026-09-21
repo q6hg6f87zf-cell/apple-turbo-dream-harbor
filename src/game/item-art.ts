@@ -57,6 +57,8 @@ const ART = {
   scalpel: "/art/items/scalpel.jpg",
   lute: "/art/items/lute.jpg",
   pin: "/art/items/bobby-pin.jpg",
+  bbgun: "/art/items/bb-gun.jpg",
+  bbtin: "/art/items/bb-tin.jpg",
   sigil: "/art/items/sigil.jpg",
   whetstone: "/art/items/whetstone.jpg",
   staff: "/art/items/staff.jpg",
@@ -109,6 +111,7 @@ function ammoStill(ammoType: AmmoType | undefined, name: string): string {
   if (ammoType === "5.56" || /5\.56/.test(n)) return ART.ammo556;
   if (ammoType === ".30-30" || /30-30/.test(n)) return ART.ammo3030;
   if (ammoType === "12g" || /12g|shotgun shell/.test(n)) return ART.ammo12g;
+  if (ammoType === "bb" || /\bbb\b/.test(n)) return ART.bbtin;
   if (ammoType === "laser" || ammoType === "cell" || /cell|laser|crystal|capacitor/.test(n)) return ART.cell;
   return ART.ammo;
 }
@@ -141,6 +144,8 @@ export function itemArt(input: {
 }): string | null {
   const n = input.name.toLowerCase();
   if (/bobby\s*pin/.test(n)) return ART.pin;
+  if (/\bbb gun\b/.test(n) || /vault 13 bb/.test(n)) return ART.bbgun;
+  if (/steel bb tin|\bbb tin\b/.test(n)) return ART.bbtin;
   if (/whetstone/.test(n)) return ART.whetstone;
   if (/gate sigil|dented gate/.test(n)) return ART.sigil;
   if (/2753 rail/.test(n) && !/aegis|crate/.test(n)) return ART.rail2753;

@@ -1,8 +1,12 @@
 import type { GameState, Screen } from "./types";
+import { CAST, AEGIS_LINE_STILL, meetCast, type CastId } from "./cast";
 
 export interface TalkLine {
   who: string;
   text: string;
+  portrait?: string;
+  still?: string;
+  castId?: CastId;
 }
 
 export interface FieldCard {
@@ -45,13 +49,54 @@ export const TALK: Record<string, TalkLine[]> = {
     },
     {
       who: WHO,
-      text: "Come on, wanderer. Let's figure out who you are before the Hollow Realm decides for us. I keep a radio on that porch. When I finish talking, you tap the chip with the waveform. That is how you change the air in here.",
+      text: "Come on, wanderer. Let's figure out who you are before Kane's people decide for us. When I finish talking, I am going to show you her face. Dr. Vesper Kane already wants this town.",
+    },
+  ],
+  kane: [
+    {
+      who: "Dr. Vesper Kane",
+      castId: "kane",
+      portrait: CAST.kane.portrait,
+      still: CAST.kane.still,
+      text: "You are listening to a recording you were not meant to hear. I am Dr. Vesper Kane. Project Vesper needs hull plate. Ironclad is the first invoice.",
+    },
+    {
+      who: "Dr. Vesper Kane",
+      castId: "kane",
+      portrait: CAST.kane.portrait,
+      still: "/art/npcs/t0880-line.jpg",
+      text: "The T-0880 line was established to deliver tasks. Chassis with a clipboard. They walked packages. They did not think. They did not argue. They did not name themselves.",
+    },
+    {
+      who: "Dr. Vesper Kane",
+      castId: "kane",
+      portrait: CAST.kane.portrait,
+      still: "/art/npcs/t0880-line.jpg",
+      text: "Then one of them named himself. Tyrone. He lives in a shelter on the outskirts of Ironclad and answers to a porch light. He is the only T-0880 with a name. That is not a compliment. Prototypes that walk off the scrap list get retired.",
+    },
+    {
+      who: "Dr. Vesper Kane",
+      castId: "kane",
+      portrait: CAST.kane.portrait,
+      still: "/art/npcs/aegis-suit.jpg",
+      text: "The successor program is AEGIS 2753. Human-operated super suits. Halo-grade frames. A person inside the plate, not a delivery chassis pretending to be one. They do the job the T-0880s were never going to finish.",
+    },
+    {
+      who: "Dr. Vesper Kane",
+      castId: "kane",
+      portrait: CAST.kane.portrait,
+      still: CAST.kane.still,
+      text: "I do not hunt robots. I hunt what walked off the list. Vault 13 is a shelter, not a country. Do not make me prove the difference. Project Vesper does not sleep. Neither do I.",
     },
   ],
   welcome: [
     {
       who: WHO,
-      text: "On your feet, {name}. This is Vault 13. I hold the CRT. You hold the squad. The glowing box is S.Y.N.A.P.S.E. I surely did not tell you that.",
+      text: "On your feet, {name}. This is Vault 13, outside Ironclad. I hold the CRT. You hold the squad. I am T-0880. The only one of my line with a name. The rest of Kane's delivery chassis are scrap. I reside here.",
+    },
+    {
+      who: WHO,
+      text: "That recording was Dr. Vesper Kane. She signed my death warrant, then built human-operated super suits to do the job cleaner. AEGIS 2753. You will hear names when they earn them. File tab, PEOPLE, holds her file already.",
     },
     {
       who: WHO,
@@ -63,7 +108,7 @@ export const TALK: Record<string, TalkLine[]> = {
     },
     {
       who: WHO,
-      text: "First job is a resident. The Machine Shop is waiting. Tap the question mark if you get lost. After you, partner.",
+      text: "First job is a resident. The Machine Shop is waiting. Pick who you are. Then we work. Tap the question mark if you get lost. After you, partner.",
     },
   ],
   briefing: [
@@ -153,7 +198,7 @@ export const TALK: Record<string, TalkLine[]> = {
   hq: [
     {
       who: WHO,
-      text: "This is home, partner. Vault 13. Ironclad is out past the ridge, the wastes are farther, and everything we care about sleeps behind these bulkheads.",
+      text: "This is home, partner. Vault 13, outside Ironclad. I am the only T-0880 with a name. The board on this wall is the day. Six watches. Jobs you skip still happen to you. Kane is not a rumor — you just heard her. PEOPLE holds her file. The visors come later.",
     },
     {
       who: WHO,
@@ -185,11 +230,11 @@ export const TALK: Record<string, TalkLine[]> = {
   forge: [
     {
       who: WHO,
-      text: "Howdy. Welcome to the Machine Shop. This is your one file. Name and handle already locked from Discord. Class, blood, and the dice still belong to you.",
+      text: "Howdy. Welcome to the Machine Shop. Women or men first. Then a face. Generic kit. Class, blood, and the dice still belong to you.",
     },
     {
       who: WHO,
-      text: "Tap a face to roll it. After a number lands, you get two rerolls for the whole sheet. Then it stamps and the shop closes. No second character. No later rerolls.",
+      text: "Women or men first. Then a face. No headphones. No glasses. Pick who walks out of this shop. After a number lands, you get two rerolls for the whole sheet. Then it stamps and the shop closes.",
     },
     {
       who: WHO,
@@ -346,6 +391,24 @@ export const TALK: Record<string, TalkLine[]> = {
       text: "Scout is intel. Raid is a door and a fight. If a name surfaces, that is a boss. Bring a party. I will be waiting at Vault 13 when you get back.",
     },
   ],
+  wing: [
+    {
+      who: WHO,
+      still: CAST.kane.still,
+      text: "You made it home. Kane already has a weigh-chit with our number on it. That recording you heard — she was not done talking. She just does not waste a first tape on names.",
+    },
+    {
+      who: WHO,
+      portrait: CAST.lyra.portrait,
+      still: CAST.lyra.still,
+      text: "White light on the West Berm. That is Lyra. LYRA-4. She listens first. The rest of the wing arrives after she is sure.",
+    },
+    {
+      who: WHO,
+      still: AEGIS_LINE_STILL,
+      text: "Amber is Vera-3 — she invoices. Red is Drake-6 — he knocks. Violet is Orion-7 — he finishes. File tab, PEOPLE, if you forget a face. You will meet them in that order if you make enough noise.",
+    },
+  ],
   companion: [
     {
       who: WHO,
@@ -380,6 +443,15 @@ export const MANUAL: Record<string, FieldCard> = {
       "Rewatch it later under More · Vault Reels.",
     ],
   },
+  kane: {
+    title: "Dr. Vesper Kane",
+    blurb: "A recording you were not meant to hear. T-0880s delivered tasks. She built human-operated super suits instead.",
+    tips: [
+      "Tyrone is the only T-0880 with a name. He lives here.",
+      "AEGIS 2753 are people in suits, not robots.",
+      "The visors get names later. Not on this tape.",
+    ],
+  },
   briefing: {
     title: "Vault 13 orientation",
     blurb: "Tyrone walks you through the shelter before the Hollow Realm opens up. Tap his panel to continue. The first briefing cannot be skipped.",
@@ -392,10 +464,10 @@ export const MANUAL: Record<string, FieldCard> = {
   },
   welcome: {
     title: "Vault 13",
-    blurb: "The porch is behind you. This is the shelter. Short walk, then the Machine Shop.",
+    blurb: "The porch is behind you. This is the shelter. Kane's file is on PEOPLE. The Machine Shop is waiting.",
     tips: [
+      "Open File · PEOPLE for Kane. Visors get names later.",
       "The radio chip changes the air. Tap the waveform.",
-      "SYNAPSE is the glowing box. I did not tell you that.",
       "Cut your file in the Machine Shop. Then the Hollow Realm opens.",
     ],
   },
@@ -567,6 +639,15 @@ export const MANUAL: Record<string, FieldCard> = {
       "If the party is down, return to Vault 13.",
     ],
   },
+  wing: {
+    title: "AEGIS 2753",
+    blurb: "Kane did not waste the first tape on names. Tyrone names the visors after the first watch home.",
+    tips: [
+      "Lyra listens first. White visor. West Berm.",
+      "Vera-3 invoices. Drake-6 knocks. Orion-7 finishes.",
+      "PEOPLE on the File tab holds the faces.",
+    ],
+  },
   companion: {
     title: "Tyrone is on the line",
     blurb: "He is in Vault 13, watching the CRT. Ask about the roll, the Raid Matrix, a name on the roster, or a promise you made.",
@@ -610,15 +691,17 @@ export const SCREEN_SCRIPT: Partial<Record<Screen, string>> = {
   arcade: "arcade",
 };
 
-const LOCKED_UNTIL_SEEN = new Set(["wake", "welcome", "briefing", "resume"]);
-const PREGAME = new Set(["wake"]);
+const LOCKED_UNTIL_SEEN = new Set(["wake", "kane", "welcome", "briefing", "resume", "wing"]);
+const PREGAME = new Set(["wake", "kane"]);
 
 export function scriptForScreen(state: GameState): string {
   if (state.hack) return "synapse";
   if (state.combat) return "combat";
   if (state.mission) return "mission";
   if (state.talk?.script === "wake") return "wake";
+  if (state.talk?.script === "kane") return "kane";
   if (state.talk?.script === "welcome") return "welcome";
+  if (state.talk?.script === "wing") return "wing";
   if (state.screen === "title") return "menu";
   if (state.screen === "briefing") return "wake";
   if (state.screen === "rules") return "rules";
@@ -684,18 +767,32 @@ export function advanceTalk(state: GameState): "next" | "done" | "idle" {
     const script = t.script;
     state.talk = null;
     if (script === "wake") {
+      state.tutorial = "forge";
+      if (!state.seenTalk.includes("kane")) {
+        state.screen = "hq";
+        queueTalk(state, "kane", true);
+      } else if (!state.seenTalk.includes("welcome") && !state.seenTalk.includes("briefing")) {
+        state.screen = "hq";
+        queueTalk(state, "welcome", true);
+      } else if (state.operatives.length === 0) {
+        state.screen = "hq";
+        queueTalk(state, "forge");
+      } else {
+        state.screen = "hq";
+      }
+    } else if (script === "kane") {
+      meetCast(state, "kane");
       state.screen = "hq";
       state.tutorial = "forge";
       if (!state.seenTalk.includes("welcome") && !state.seenTalk.includes("briefing")) {
         queueTalk(state, "welcome", true);
-      } else if (state.operatives.length === 0) {
-        state.screen = "forge";
-        queueTalk(state, "forge");
       }
+    } else if (script === "wing") {
+      meetCast(state, "lyra");
+      if (state.screen === "briefing") state.screen = "hq";
     } else if (script === "welcome" || script === "briefing") {
-      state.screen = "forge";
+      state.screen = "hq";
       state.tutorial = "forge";
-      queueTalk(state, "forge");
     } else if (script === "resume") {
       const dest: Screen =
         state.tutorial === "forge" ? "forge" : state.tutorial === "sortie" ? "map" : "hq";
@@ -719,7 +816,7 @@ export function skipTalk(state: GameState) {
   const t = state.talk;
   if (!t) return;
   // First wake is locked so they hear it — unless they choose Skip.
-  if (isTalkLocked(state) && t.script !== "wake") return;
+  if (isTalkLocked(state) && t.script !== "wake" && t.script !== "kane" && t.script !== "wing") return;
   t.i = (TALK[t.script]?.length ?? 1) - 1;
   advanceTalk(state);
 }

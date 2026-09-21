@@ -2,6 +2,7 @@ import type { Screen } from "./types";
 
 export const ROOM_ART: Record<string, string> = {
   hq: "/art/rooms/command.jpg",
+  file: "/art/rooms/squad.jpg",
   arcade: "/art/rooms/thirty-eight.jpg",
   forge: "/art/rooms/forge.jpg",
   ledger: "/art/rooms/ledger.jpg",
@@ -19,7 +20,7 @@ export const ROOM_ART: Record<string, string> = {
 export const ROOM_FALLBACK = "/art/rooms/corridor.jpg";
 
 /** The rooms a player can reach in one dock tap. */
-const DOCK_ROOMS: Screen[] = ["hq", "map", "arcade", "inventory", "more"];
+const DOCK_ROOMS: Screen[] = ["hq", "file", "map", "arcade", "inventory", "more"];
 
 let warmed = false;
 

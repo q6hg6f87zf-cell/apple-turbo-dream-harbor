@@ -1,7 +1,8 @@
 import { locById, villainById } from "./data";
-import { approachById, kaneBand, KANE_STAKES, locationToRegion } from "./field-ops";
-import { porchSeats } from "./presence";
+import { approachById, kaneBand, KANE_STAKES, locationToRegion, poiById } from "./field-ops";
 import { seatedMember } from "./squad";
+import { beatSitePrompt, missionOpeners, resolveMissionSite, siteCopyFor } from "./story";
+import { CAST, aegisOnDuty, kaneHeatLine } from "./cast";
 import type {
   GameState,
   LocationId,
@@ -22,8 +23,8 @@ export const KIND_LABEL: Record<MissionKind, string> = {
 };
 
 export const KIND_WHY: Record<MissionKind, string> = {
-  scout: "Read the ground. Come home with a map, not a body.",
-  forage: "Pull salvage and ore. Something usually notices.",
+  scout: "Name the site. Count crates, visors, routes. Come home with a map, not a body.",
+  forage: "Pull named salvage before Kane's buyers box it. She notices taking.",
   raid: "Loud work. Heat, haul, and a fight if you miss the cut.",
   trade: "Price is a conversation. So is a knife.",
   bounty: "A name on the board. No speeches.",
@@ -42,7 +43,7 @@ const RADIO: Record<MissionKind, string[]> = {
     "Heavy packs make slow exits. Count the watches.",
   ],
   raid: [
-    "Breach is a promise to Kane. He keeps receipts.",
+    "Breach is a promise to Kane. She keeps receipts.",
     "Hold the door or do not open it. Halfway is a grave.",
     "Extract means walking. Caps do not walk themselves.",
   ],
@@ -63,14 +64,6 @@ const RADIO: Record<MissionKind, string[]> = {
   ],
 };
 
-const WORLD_LINE: Partial<Record<LocationId, string>> = {
-  ironclad: "Rail steel ticks in the cold. Kane's yard is never empty for long.",
-  kingdom: "Slag light paints the smoke. The furnaces do not sleep.",
-  caverns: "The mountain drinks torchlight. Do not follow the pretty veins too deep.",
-  library: "Floodwater and old math. The tables still think they are in charge.",
-  veyra: "2753 frames walk like people. Do not wave.",
-};
-
 function partyNames(state: GameState, ids: string[]) {
   return ids
     .map((id) => state.operatives.find((op) => op.id === id)?.name)
@@ -85,51 +78,40 @@ function solo(ids: string[]) {
   return ids.length <= 1;
 }
 
-function porchOthers(selfName: string) {
-  const seats = porchSeats().filter((seat) => !seat.self);
-  if (!seats.length) return "";
-  const names = seats.map((seat) => seat.name || "Rider").filter((name) => name !== selfName);
-  if (!names.length) return "The porch is lit.";
-  if (names.length === 1) return `${names[0]} has a stool. Quiet jobs stay yours. Loud jobs rotate.`;
-  return `${names.slice(0, 3).join(", ")} on the porch. You do not wait on an empty chair.`;
-}
-
 export function eventBriefing(
   state: GameState,
   loc: LocationId,
   kind: MissionKind,
   partyIds: string[],
+  poiId?: string,
 ): { briefing: string; stakes: string; open: string[] } {
   const L = locById(loc);
   const lead = leadOf(state, partyIds);
   const names = partyNames(state, partyIds);
-  const rider = seatedMember(state);
   const region = locationToRegion(loc);
   const kane = region ? KANE_STAKES[region] : null;
   const v = kind === "boss" ? villainById(L.bossId) : null;
   const bounty = kind === "bounty" ? state.bounty : null;
+  const poi = poiById(loc, poiId) ?? resolveMissionSite(state, loc, poiId);
+  const copy = poi ? siteCopyFor(poi, kind) : null;
   const alone = solo(partyIds);
   const company = alone
     ? `${lead?.name ?? "The file"} walks it alone.`
     : `${names.join(" · ")} on the line.`;
-  const porch = porchOthers(rider.name);
 
   const briefing = v
     ? `${v.name} — ${v.title}. ${v.tagline}`
     : bounty
       ? `${bounty.name}. ${bounty.type}. Last seen near ${L.short}.`
-      : `${KIND_LABEL[kind]} in ${L.name}. ${KIND_WHY[kind]}`;
+      : copy
+        ? `${copy.title}. ${copy.brief}`
+        : `${KIND_LABEL[kind]} in ${L.name}. ${KIND_WHY[kind]}`;
 
   const stakes = kane
-    ? `${kane.resource}. ${kane.why}`
-    : L.desc ?? "Come home with more than you spent.";
+    ? `Kane wants ${kane.resource.toLowerCase()}. ${kane.why}`
+    : copy?.why ?? L.desc ?? "Come home with more than you spent.";
 
-  const open = [
-    `SYNAPSE · ${company} ${L.short}.`,
-    `Tyrone · ${RADIO[kind][0]}`,
-    WORLD_LINE[loc] ? `Hollow · ${WORLD_LINE[loc]}` : `Hollow · ${L.name} does not blink.`,
-    porch ? `Porch · ${porch}` : `Porch · Vault 13 holds the light. You do not wait on a ghost.`,
-  ];
+  const open = missionOpeners(state, loc, kind, poi?.id, company);
 
   return { briefing, stakes, open };
 }
@@ -141,15 +123,15 @@ export function beatPrompt(
   beatKind: MissionBeat["kind"],
   title: string,
   partyIds: string[],
+  poiId?: string,
 ): string {
   const lead = leadOf(state, partyIds)?.name ?? "The file";
   const L = locById(loc);
   const v = villainById(L.bossId);
   const bounty = state.bounty;
-  if (kind === "scout" && title === "Approach") return `${lead} reads the ridgeline into ${L.short}. Count the watches. Do not announce.`;
-  if (kind === "scout" && title === "Sweep") return `Tracks, caches, the wrong kind of quiet. ${lead} puts a finger on the map.`;
-  if (kind === "scout" && title === "Report") return `SYNAPSE wants a picture, not a hero. ${lead} calls it in.`;
-  if (kind === "forage" && title === "Range") return `${lead} fans the squad for salvage. ${L.short} drops what it does not want to keep.`;
+  const site = beatSitePrompt(state, loc, kind, title, lead, poiId);
+  if (site) return site;
+  if (kind === "forage" && title === "Range") return `${lead} fans the squad for salvage. ${L.short} drops what Kane does not want to keep.`;
   if (kind === "forage" && title === "Haul") return `The pack gets heavy. Something in ${L.short} notices the taking.`;
   if (title === "Ambush") return `The ground was never empty. ${lead} finds out who was counting them.`;
   if (kind === "raid" && title === "Breach") return `${lead} goes in through a wound in the world. Kane will hear the hinge.`;
@@ -203,19 +185,16 @@ export function debriefLines(state: GameState, mission: MissionState): string[] 
   const lead = names[0] ?? "The file";
   const loot = mission.loot.length ? mission.loot.map((item) => item.name).join(", ") : "empty hands";
   const v = mission.kind === "boss" ? villainById(L.bossId) : null;
+  const poi = poiById(mission.locationId, mission.poiId);
+  const site = poi?.name ?? L.short;
   const lines = [
-    `SYNAPSE · ${KIND_LABEL[mission.kind]} closed in ${L.short}. +${mission.coins} caps${mission.ore ? ` · +${mission.ore} ore` : ""}.`,
-    `Tyrone · ${lead} is on the porch. ${loot === "empty hands" ? "We still learned the ground." : `Stow ${loot}.`}`,
+    `SYNAPSE · ${KIND_LABEL[mission.kind]} closed in ${site}. +${mission.coins} caps${mission.ore ? ` · +${mission.ore} ore` : ""}.`,
+    `Tyrone · ${lead} is back. ${loot === "empty hands" ? "We still learned the ground." : `Stow ${loot}.`}`,
   ];
   if (v && state.locations[mission.locationId].bossDefeated) {
     lines.push(`Hollow · ${v.name} is a story now. The arc does not rewind.`);
   }
-  const others = porchSeats().filter((seat) => !seat.self);
-  if (others.length) {
-    lines.push(`Porch · ${others.map((seat) => seat.name).join(", ")} saw the lights. Your card kept the caps.`);
-  } else {
-    lines.push("Porch · Quiet compound. The next loud job is still yours.");
-  }
+  lines.push(`Kane · ${kaneHeatLine(state.kaneHeat ?? 0)}`);
   return lines;
 }
 
@@ -230,7 +209,7 @@ export function eventChips(state: GameState, mission: MissionState): EventChip[]
   const beat = mission.beats[mission.beatIndex];
   const chips: EventChip[] = [
     { label: "Job", value: KIND_LABEL[mission.kind] },
-    { label: "Ground", value: L.short },
+    { label: "Ground", value: poiById(mission.locationId, mission.poiId)?.name ?? L.short },
     { label: "Approach", value: approach.label },
   ];
   if (beat) chips.push({ label: beat.stat, value: `DC ${beat.dc}` });
@@ -263,13 +242,17 @@ export function shiftRadio(kind: string) {
   const lines: Record<string, string> = {
     crates: "Tyrone · One crate is a gift. Two is a test. Three is a mistake.",
     visitor: "Tyrone · Be kind until the visor tells you not to.",
-    aegis: "Tyrone · 2753 on the wire. Do not wave. Do not run until I say.",
+    aegis: "Tyrone · Named visor on the wire. Do not wave. Do not run until I say.",
     treat: "Tyrone · Blood first. Pride second. Dawn does not wait on either.",
     scan: "Tyrone · Look twice. The Hollow hides the important thing under the loud thing.",
     repair: "Tyrone · Steel remembers how to hold if you ask it correctly.",
     run: "Tyrone · Caps on the card. Feet on the ground. That is a shift.",
     tribute: "Tyrone · Kane collects. Pay, stall, or make him work for it.",
     crisis: "Tyrone · This is the board telling the truth. Handle it before the next watch.",
+    cabinet: "Tyrone · T-0888 is scored. Play it like a job, not a carnival.",
+    market: "Tyrone · The Exchange is closed. The Gate still sells if you walk it.",
+    tower: "Tyrone · Climb. Listen. The tower talks whether we are on it or not.",
+    salvage: "Tyrone · Pin a site. The map is the job. Dice are the loud ones.",
   };
   return lines[kind] ?? "Tyrone · Do the job in front of you.";
 }
@@ -278,16 +261,15 @@ export function dawnLines(state: GameState): string[] {
   const rider = seatedMember(state);
   const living = state.operatives.filter((op) => op.status !== "dead");
   const downed = state.operatives.filter((op) => op.status === "downed");
-  const others = porchSeats().filter((seat) => !seat.self);
+  const heat = state.kaneHeat ?? 0;
+  const person = heat >= 5 ? aegisOnDuty(state.day, heat) : CAST.kane;
   const lines = [
     `SYNAPSE · Day ${state.day}. Watches reprint.`,
-    `Tyrone · ${rider.name}, the board is new. Idle is still work.`,
+    `Tyrone · ${rider.name}, the board is new. ${state.nightNote ?? "Idle is still work."}`,
   ];
   if (downed.length) lines.push(`Med Bay · ${downed.map((op) => op.name).join(", ")} still on the floor.`);
   else if (living.length) lines.push(`Compound · ${living.map((op) => op.name).join(", ")} standing.`);
-  if (state.nightNote) lines.push(`Hollow · ${state.nightNote}`);
-  if (others.length) lines.push(`Porch · ${others.map((seat) => seat.name).join(", ")} made dawn with you.`);
-  else lines.push("Porch · You kept the light. Loud jobs stay yours until someone sits.");
+  lines.push(`${person.name} · ${person.voice[state.day % person.voice.length]}`);
   return lines;
 }
 

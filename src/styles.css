@@ -264,6 +264,17 @@
     transform: translateY(0) scale(1);
   }
 }
+@keyframes ms-work {
+  from { width: 0%; }
+  to { width: 100%; }
+}
+.ms-work-bar {
+  width: 0%;
+  animation: ms-work 1.4s linear forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ms-work-bar { animation: none; width: 100%; }
+}
 @keyframes ms-shake {
   0%,
   to {
@@ -1858,6 +1869,296 @@ body[data-region-map="1"] .ms-help,
 }
 .ms-chip-rail::-webkit-scrollbar {
   display: none;
+}
+
+/* S.Y.N.A.P.S.E OS — rider plate. Ember phosphor, bronze bezel. */
+.ms-os {
+  padding-top: 0.25rem;
+}
+.ms-os-bezel {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--color-panel) 88%, var(--color-ember)) 0%, var(--color-surface) 40%, var(--color-ink) 100%);
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklab, var(--color-ember-bright) 22%, transparent),
+    0 0 0 1px color-mix(in oklab, var(--color-line) 80%, transparent),
+    0 24px 48px color-mix(in oklab, black 55%, transparent);
+}
+.ms-os-rivet {
+  position: absolute;
+  z-index: 2;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 999px;
+  background: radial-gradient(circle at 35% 30%, color-mix(in oklab, var(--color-ember-bright) 55%, white), var(--color-ember) 45%, var(--color-ink));
+  box-shadow: inset 0 -1px 0 color-mix(in oklab, black 40%, transparent);
+}
+.ms-os-rivet-tl { top: 0.45rem; left: 0.45rem; }
+.ms-os-rivet-tr { top: 0.45rem; right: 0.45rem; }
+.ms-os-rivet-bl { bottom: 0.45rem; left: 0.45rem; }
+.ms-os-rivet-br { bottom: 0.45rem; right: 0.45rem; }
+.ms-os-led {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: var(--color-ember);
+  box-shadow: 0 0 8px color-mix(in oklab, var(--color-ember) 80%, transparent);
+}
+.ms-os-top,
+.ms-os-foot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.7rem 1.4rem 0.5rem;
+}
+.ms-os-top {
+  border-bottom: 1px solid color-mix(in oklab, var(--color-ember) 28%, transparent);
+  background: color-mix(in oklab, var(--color-ink) 55%, transparent);
+}
+.ms-os-foot {
+  border-top: 1px solid color-mix(in oklab, var(--color-ember) 22%, transparent);
+  font-family: var(--font-mono);
+  font-size: var(--text-label);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+.ms-os-tabs {
+  display: flex;
+  gap: 0.15rem;
+  padding: 0.35rem 0.45rem 0;
+  background: color-mix(in oklab, var(--color-ink) 70%, transparent);
+}
+.ms-os-tab {
+  flex: 1;
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  border-radius: var(--radius-xs) var(--radius-xs) 0 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-label);
+  letter-spacing: 0.14em;
+  color: var(--color-muted);
+}
+.ms-os-tab-on {
+  color: var(--color-ember-bright);
+  background: color-mix(in oklab, var(--color-ink) 88%, var(--color-ember));
+  box-shadow: inset 0 -2px 0 var(--color-ember);
+  text-shadow: 0 0 12px color-mix(in oklab, var(--color-ember) 55%, transparent);
+}
+.ms-os-screen {
+  position: relative;
+  min-height: 22rem;
+  background: color-mix(in oklab, var(--color-ink) 82%, var(--color-ember));
+}
+.ms-os-grain {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.12;
+  mix-blend-mode: screen;
+}
+.ms-os-screen::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0 2px,
+    color-mix(in oklab, var(--color-ink) 22%, transparent) 2px 3px
+  );
+  mix-blend-mode: multiply;
+  opacity: 0.16;
+}
+.ms-os-screen > *:not(.ms-os-grain) {
+  position: relative;
+  z-index: 1;
+}
+.ms-os-boot {
+  min-height: 22rem;
+  background: radial-gradient(ellipse at 50% 80%, color-mix(in oklab, var(--color-ember) 18%, transparent), transparent 55%);
+}
+.ms-os-stat {
+  display: grid;
+  gap: 1rem;
+}
+@media (min-width: 768px) {
+  .ms-os-stat {
+    grid-template-columns: 9.5rem minmax(0, 1fr);
+    align-items: start;
+  }
+}
+.ms-os-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.ms-os-bust {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+  border-radius: var(--radius-xs);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in oklab, var(--color-ember) 35%, transparent),
+    0 0 18px color-mix(in oklab, var(--color-ember) 18%, transparent);
+}
+.ms-os-sub {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.2rem;
+  margin: 0 0 0.85rem;
+  padding: 0.2rem;
+  border-radius: var(--radius-xs);
+  background: color-mix(in oklab, var(--color-ink) 70%, transparent);
+}
+.ms-os-sub-tab {
+  display: inline-flex;
+  min-height: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.4rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-label);
+  letter-spacing: 0.14em;
+  color: var(--color-moon);
+}
+.ms-os-sub-on {
+  color: var(--color-ember-bright);
+  background: color-mix(in oklab, var(--color-ink) 80%, var(--color-ember));
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--color-ember) 45%, transparent);
+  text-shadow: 0 0 10px color-mix(in oklab, var(--color-ember) 45%, transparent);
+}
+.ms-os-primary {
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--color-ember) 45%, transparent);
+}
+.ms-os-file {
+  display: block;
+  min-height: 3.25rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: var(--radius-xs);
+  background: color-mix(in oklab, var(--color-ink) 55%, transparent);
+}
+.ms-os-file-on {
+  background: color-mix(in oklab, var(--color-ink) 70%, var(--color-ember));
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--color-ember) 40%, transparent);
+}
+.ms-day-board {
+  position: relative;
+  box-shadow: var(--shadow-border);
+}
+.ms-board-watch {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.25rem;
+}
+.ms-board-watch-pip {
+  display: flex;
+  min-height: 2.75rem;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  border-radius: var(--radius-xs);
+  background: color-mix(in oklab, var(--color-ink) 55%, transparent);
+}
+.ms-board-watch-dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: var(--color-ink);
+  box-shadow: inset 0 0 0 1px var(--color-line);
+}
+.ms-board-watch-pip.is-now .ms-board-watch-dot {
+  background: var(--color-ember);
+  box-shadow: 0 0 8px color-mix(in oklab, var(--color-ember) 70%, transparent);
+}
+.ms-board-watch-pip.is-spent .ms-board-watch-dot {
+  background: color-mix(in oklab, var(--color-muted) 70%, transparent);
+}
+.ms-board-watch-name {
+  font-family: var(--font-mono);
+  font-size: var(--text-label);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ms-board-watch-pip.is-now .ms-board-watch-name {
+  color: var(--color-ember-bright);
+}
+@media (max-width: 480px) {
+  .ms-board-watch-name {
+    display: none;
+  }
+  .ms-board-watch-pip {
+    min-height: 1.5rem;
+  }
+}
+.ms-board-lead {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-height: 14rem;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  text-align: left;
+  box-shadow: var(--shadow-border-hover);
+}
+.ms-board-lead-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.ms-board-lead-shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, color-mix(in oklab, var(--color-ink) 20%, transparent) 0%, color-mix(in oklab, var(--color-ink) 88%, transparent) 72%);
+}
+.ms-board-lead-seal {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  width: 4.25rem;
+  height: 4.25rem;
+  object-fit: cover;
+  border-radius: 999px;
+  box-shadow: 0 8px 18px color-mix(in oklab, black 55%, transparent);
+}
+.ms-board-lead-copy {
+  position: relative;
+  z-index: 1;
+  display: block;
+  padding: 5.5rem 1rem 1rem;
+}
+.ms-board-ticket {
+  background: color-mix(in oklab, var(--color-paper) 12%, var(--color-ink));
+  box-shadow: var(--shadow-border);
+}
+.ms-board-ticket-hot {
+  box-shadow: var(--shadow-border-hover);
+}
+.ms-board-ticket:disabled {
+  cursor: default;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ms-os-screen::after {
+    opacity: 0.12;
+  }
 }
 
 /* Reel faces. The plate carries the colour and the still sits on top of it —

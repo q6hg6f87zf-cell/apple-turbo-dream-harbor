@@ -31,5 +31,7 @@ describe("itemArt catalogue stills", () => {
     assert.equal(itemArt({ kind: "special", name: "Union Foreman's Seal" }), "/art/items/union-seal.jpg");
     assert.equal(itemArt({ kind: "consumable", name: "Civic Reboot Dose" }), "/art/items/reboot-dose.jpg");
     assert.equal(itemArt({ kind: "material", name: "Prismatic Conduit" }), "/art/items/prism-conduit.jpg");
+    assert.equal(itemArt({ kind: "weapon", name: "Vault 13 BB Gun" }), "/art/items/bb-gun.jpg");
+    assert.equal(itemArt({ kind: "consumable", name: "Steel BB Tin", ammoType: "bb" }), "/art/items/bb-tin.jpg");
   });
 });

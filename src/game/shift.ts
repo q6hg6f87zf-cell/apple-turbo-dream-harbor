@@ -1,5 +1,7 @@
 import { locById, WORLD } from "./data";
 import { discoverNextPoi, KANE_STAKES, locationToRegion } from "./field-ops";
+import { aegisJob, boardPostedLine, sortieJob } from "./story";
+import { CAST, meetCast } from "./cast";
 import { queueTalk } from "./talk";
 import type {
   DayTask,
@@ -12,7 +14,7 @@ import type {
   WatchId,
 } from "./types";
 
-const WATCH_ORDER: WatchId[] = ["dawn", "morning", "midday", "afternoon", "dusk", "night"];
+export const WATCH_ORDER: WatchId[] = ["dawn", "morning", "midday", "afternoon", "dusk", "night"];
 
 export const SHIFT_WATCHES = 6;
 
@@ -106,10 +108,11 @@ function crateTask(rand: () => number): DayTask {
     id: uid("job"),
     kind: "crates",
     title: "Crack the depot crates",
-    brief: "Three unmarked boxes came in overnight. Pick one. Leave the rest for Kane's people or the rats.",
+    brief: "Three unmarked boxes came in overnight. One still ticks. One smells like oil. One has a Kane stencil half scraped. Pick one. Leave the rest.",
     why: "Salvage is a decision, not a roll.",
     watchCost: 1,
     required: false,
+    failNote: "The crates went to Kane's people or the rats. Same difference.",
     crates: labels.map((label, i) => ({
       id: `c${i}`,
       label,
@@ -167,29 +170,8 @@ function visitorTask(rand: () => number, day: number): DayTask {
     why: "People at the gate are the Realm talking.",
     watchCost: 1,
     required: false,
+    failNote: "They walked. The Realm talked to someone else.",
     choices: v.choices,
-    status: "open",
-  };
-}
-
-function aegisTask(heat: number): DayTask {
-  return {
-    id: uid("job"),
-    kind: "aegis",
-    title: heat >= 12 ? "AEGIS at the bulkhead" : "AEGIS knock",
-    brief:
-      heat >= 12
-        ? "A 2753 visor is on the porch. They are asking for T-0880 serials. That is me, partner."
-        : "Two specialists in successor-suits want a word about salvage manifests.",
-    why: "Kane does not roll dice. She sends people.",
-    watchCost: 1,
-    required: heat >= 10,
-    failNote: "AEGIS walked the ridge. Kane marked Vault 13. Heat climbs.",
-    choices: [
-      { id: "hide", label: "Hide Tyrone", blurb: "Perimeter Control or a dark bunk. They want the robot, not you." },
-      { id: "lie", label: "We are a salvage outfit", blurb: "Talk. Needs a face at the door." },
-      { id: "fight", label: "Meet them armed", blurb: "Loud. They remember serials." },
-    ],
     status: "open",
   };
 }
@@ -271,25 +253,8 @@ export function generateBoard(state: GameState): ShiftState {
   const board: DayTask[] = [];
   const field = unlockedField(state);
   const loc = field[0] ?? WORLD.find((w) => w.id === "ironclad")!;
-  const kinds: MissionKind[] = state.day === 1 ? ["scout"] : state.day % 3 === 0 ? ["forage"] : ["scout", "forage"];
-  const kind = (state.locations[loc.id].bossUnlocked && !state.locations[loc.id].bossDefeated && state.day > 3
-    ? "raid"
-    : pickN(rand, kinds)) as MissionKind;
-  const site = loc.short;
 
-  board.push({
-    id: uid("job"),
-    kind: "sortie",
-    title: kind === "scout" ? `Scout ${site}` : kind === "forage" ? `Strip ${site}` : `Hit ${site}`,
-    brief: `Tyrone posted it. ${loc.desc}`,
-    why: "The one job that still uses a die. Call the tactic. Walk it.",
-    watchCost: sortieWatchCost(kind),
-    required: state.day <= 2 || kind !== "scout",
-    loc: loc.id,
-    missionKind: kind,
-    failNote: `${site} went unanswered. Kane's surveyors walked it instead.`,
-    status: "open",
-  });
+  board.push(sortieJob(state));
 
   const wounded = state.operatives.filter((o) => o.status === "downed" || (o.hp < o.maxHp && o.status !== "dead"));
   if (wounded.length) {
@@ -297,7 +262,7 @@ export function generateBoard(state: GameState): ShiftState {
       id: uid("job"),
       kind: "treat",
       title: wounded.some((o) => o.status === "downed") ? "Med pass — someone is down" : "Med pass",
-      brief: `${wounded.map((o) => o.name).join(", ")} need a bunk and a needle. You pick who.`,
+      brief: `${wounded.map((o) => o.name).join(", ")} need a bunk and a needle. You pick who. Kane does not wait on the wounded.`,
       why: "Dawn will finish anyone still downed without a Med Bay.",
       watchCost: 1,
       required: wounded.some((o) => o.status === "downed"),
@@ -308,24 +273,15 @@ export function generateBoard(state: GameState): ShiftState {
 
   board.push(crateTask(rand));
 
-  board.push({
-    id: uid("job"),
-    kind: "cabinet",
-    title: "T-0888 cabinet hour",
-    brief: "Tyrone Bot posted a scored file on the glass. Trivia, unscramble, lockpick or the CRT. Wins drop real caps into Vault 13 and a cut on your black card.",
-    why: "The Discord porch and this vault share one wallet. Play here, not as a side carnival.",
-    watchCost: 1,
-    required: false,
-    status: "open",
-  });
-
-  const broken = state.operatives.some((o) => o.inventory.some((i) => i.condition === "Broken" || i.condition === "Damaged"));
+  const broken = state.operatives.some((o) =>
+    (o.inventory ?? []).some((i) => i.condition === "Broken" || i.condition === "Damaged"),
+  );
   if (broken || rand() > 0.55) {
     board.push({
       id: uid("job"),
       kind: "repair",
       title: "Machine Shop hour",
-      brief: "Oil, weld, swear. Pick a piece of kit or spend the watch on the line.",
+      brief: "Oil, weld, swear. The BB gun still kicks if the receiver is proud. Pick a piece of kit or spend the watch on the line.",
       why: "Broken steel is a choice you already made.",
       watchCost: 1,
       required: broken,
@@ -338,16 +294,17 @@ export function generateBoard(state: GameState): ShiftState {
     id: uid("job"),
     kind: "scan",
     title: "Walk the perimeter",
-    brief: "Pick a region. The cameras, such as they are, tell you where Kane is sniffing.",
-    why: "Intel is how Ghost routes open.",
+    brief: "Cameras, such as they are. Count visors on the West Berm. Lyra paints ridges. If a white light is out there, the rest of the wing already has a map.",
+    why: "Intel is how Ghost routes open. Kane's outline of us is the other number.",
     watchCost: 1,
     required: false,
+    failNote: "The perimeter walked itself. Kane's outline of us is sharper.",
     status: "open",
   });
 
   if (state.day >= 2) board.push(visitorTask(rand, state.day));
 
-  if ((state.kaneHeat ?? 0) >= 5 || state.day % 4 === 0) board.push(aegisTask(state.kaneHeat ?? 0));
+  if (state.day >= 1) board.push(aegisJob(state));
 
   if (state.day >= 2 && (state.ore > 0 || state.day % 2 === 0)) board.push(tributeTask(state));
 
@@ -358,10 +315,11 @@ export function generateBoard(state: GameState): ShiftState {
       id: uid("job"),
       kind: "run",
       title: "Supply run",
-      brief: "Send one operative. They walk. You get the report. No die from you.",
+      brief: "Send one operative down the slag road. They walk. You get the report. Kane's buyers use the same road after dusk.",
       why: "The roster is the mechanic. Class decides the haul.",
       watchCost: 1,
       required: false,
+      failNote: "Nobody walked. The pantry stayed thin.",
       status: "open",
     });
   }
@@ -370,7 +328,7 @@ export function generateBoard(state: GameState): ShiftState {
     id: uid("job"),
     kind: "market",
     title: "Walk the Moon Squad Market",
-    brief: "The Exchange at Vault 13 is closed. Stalls sit under the Iron Gate. Limited stock. Dawn reset. The black card pays.",
+    brief: "Stalls under the Iron Gate. Kane's surveyors already bought a table at the gatehouse. Limited stock. Dawn reset. The black card pays.",
     why: "Gear lives on the ground now, not in a ledger drawer.",
     watchCost: 1,
     required: state.day % 2 === 1,
@@ -384,27 +342,30 @@ export function generateBoard(state: GameState): ShiftState {
     id: uid("job"),
     kind: "tower",
     title: "Climb Relay Tower Three",
-    brief: "ICR 88's iron spine. Listen. Kane frequencies, visiting stalls, sites the board has not named yet.",
-    why: "A day without a listen is a day Kane talks and we do not.",
+    brief: "ICR 88's iron spine. Kane frequencies, visiting stalls, sites the board has not named yet. Lyra listens here whether we climb or not.",
+    why: "A day Kane talks and we do not is a day we donate the map.",
     watchCost: 1,
     required: state.day >= 2 && state.day % 2 === 0,
     loc: "ironclad",
     poiId: "ironclad-tower",
-    failNote: "The tower talked to empty air. A site went unmarked.",
+    failNote: "The tower talked to empty air. Lyra kept the transcript.",
     status: "open",
   });
 
-  const salvageSite = loc.short;
+  const salvage = board.find((t) => t.kind === "sortie");
   board.push({
     id: uid("job"),
     kind: "salvage",
-    title: `Work a site in ${salvageSite}`,
-    brief: "Open the ground map. Pin a landmark, ruin or yard. Scout or salvage. One site, one watch, once per day.",
+    title: salvage?.poiId ? `Work ${locById(loc.id).short} on the ground` : `Work a site in ${loc.short}`,
+    brief: salvage?.brief
+      ? `Pin it on the ground map. Scout or salvage. One site, one watch. ${salvage.title} is already on the wall if you want the die.`
+      : "Open the ground map. Pin a landmark, ruin or yard. Scout or salvage. One site, one watch, once per day.",
     why: "The map is the job. Dice are only the loud ones.",
     watchCost: 1,
     required: false,
     loc: loc.id,
-    failNote: `${salvageSite} went unworked. Kane's surveyors pocketed the easy scrap.`,
+    poiId: salvage?.poiId,
+    failNote: `${loc.short} went unworked. Kane's surveyors pocketed the easy scrap.`,
     status: "open",
   });
 
@@ -413,7 +374,7 @@ export function generateBoard(state: GameState): ShiftState {
     watch: "dawn",
     watchesLeft: SHIFT_WATCHES,
     board,
-    log: [`Day ${state.day} board posted. ${board.length} jobs. Six watches.`],
+    log: [boardPostedLine(state, board)],
     activeId: null,
   };
 }
@@ -423,18 +384,18 @@ export function ensureShift(state: GameState): ShiftState {
     state.shift = generateBoard(state);
     return state.shift;
   }
-  const board = state.shift.board;
-  if (!board.some((t) => t.kind === "cabinet")) {
-    board.splice(Math.min(2, board.length), 0, {
-      id: uid("job"),
-      kind: "cabinet",
-      title: "T-0888 cabinet hour",
-      brief: "Tyrone Bot posted a scored file. Trivia, unscramble, lockpick or the CRT. Wins drop real caps into Vault 13.",
-      why: "The Discord porch and this vault share one wallet.",
-      watchCost: 1,
-      required: false,
-      status: "open",
-    });
+  const board = state.shift.board.filter((t) => t.kind !== "cabinet");
+  state.shift.board = board;
+  const sortie = board.find((t) => t.kind === "sortie");
+  if (sortie && !sortie.poiId) {
+    const fresh = sortieJob(state);
+    sortie.title = fresh.title;
+    sortie.brief = fresh.brief;
+    sortie.why = fresh.why;
+    sortie.loc = fresh.loc;
+    sortie.poiId = fresh.poiId;
+    sortie.missionKind = fresh.missionKind;
+    sortie.failNote = fresh.failNote;
   }
   if (!board.some((t) => t.kind === "market")) {
     board.push({
@@ -447,6 +408,7 @@ export function ensureShift(state: GameState): ShiftState {
       required: false,
       loc: "ironclad",
       poiId: "ironclad-market",
+      failNote: "The stalls packed up without Moon Squad. Dawn will reprint thinner.",
       status: "open",
     });
   }
@@ -461,6 +423,7 @@ export function ensureShift(state: GameState): ShiftState {
       required: false,
       loc: "ironclad",
       poiId: "ironclad-tower",
+      failNote: "The tower talked to empty air. A site went unmarked.",
       status: "open",
     });
   }
@@ -474,6 +437,7 @@ export function ensureShift(state: GameState): ShiftState {
       watchCost: 1,
       required: false,
       loc: "ironclad",
+      failNote: "The site went unworked. Kane's surveyors pocketed the easy scrap.",
       status: "open",
     });
   }
@@ -538,7 +502,7 @@ export function resolveTask(state: GameState, taskId: string, payload: TaskPaylo
   if (shift.watchesLeft < task.watchCost) return "Not enough watches left on this shift.";
 
   if (task.kind === "sortie") {
-    return "Take it on World. Pin the site, pick an approach, deploy.";
+    return "World already has the site pinned. Pick an approach and deploy.";
   }
 
   if (task.kind === "cabinet") {
@@ -707,25 +671,26 @@ export function resolveTask(state: GameState, taskId: string, payload: TaskPaylo
   if (task.kind === "aegis") {
     const tower = state.rooms.watchtower >= 1;
     const talker = state.operatives.find((o) => o.status === "idle" && (o.cls === "Bard" || o.cls === "Merchant"));
+    const person = CAST[(task.npcId as keyof typeof CAST) ?? "lyra"] ?? CAST.lyra;
+    meetCast(state, person.id);
     if (choice.id === "hide") {
       if (tower) {
         state.kaneHeat = Math.max(0, (state.kaneHeat ?? 0) - 1);
-        finish(state, task, "Perimeter Control buried me. They logged an empty ridge.");
+        finish(state, task, `Perimeter Control buried me. ${person.name} logged an empty ridge.`);
       } else {
         state.kaneHeat = Math.min(40, (state.kaneHeat ?? 0) + 2);
-        finish(state, task, "No cameras. They walked a bunk. Heat up. I stayed in the walls.");
+        finish(state, task, `No cameras. ${person.name} walked a bunk. Heat up. I stayed in the walls.`);
       }
     } else if (choice.id === "lie") {
       if (talker) {
-        finish(state, task, `${talker.name} sold the salvage-outfit line. They bought it. For now.`);
+        finish(state, task, `${talker.name} sold ${person.name} the salvage-outfit line. They bought it. For now.`);
       } else {
         state.kaneHeat = Math.min(40, (state.kaneHeat ?? 0) + 3);
-        finish(state, task, "Nobody here talks like a foundry. They logged a question mark.");
+        finish(state, task, `Nobody here talks like a foundry. ${person.name} logged a question mark.`);
       }
     } else {
       state.kaneHeat = Math.min(40, (state.kaneHeat ?? 0) + 4);
-      finish(state, task, "You met a 2753 armed. That is a conversation for the yard.");
-      // Combat is queued by the store after this returns a sentinel.
+      finish(state, task, `You met ${person.name}'s 2753 armed. That is a conversation for the yard.`);
       state.shift.activeId = task.id;
       task.status = "active";
       return "fight";

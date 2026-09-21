@@ -15,7 +15,7 @@ import { sfx } from "@/game/audio";
 import { useGame } from "@/game/store";
 import type { QuarterId, RoomId } from "@/game/types";
 import { cn } from "@/lib/cn";
-import { ChevronRight, LockKeyhole, ShieldCheck, X } from "lucide-react";
+import { ChevronRight, X } from "lucide-react";
 import { useState } from "react";
 import { Coin, Panel, SectionLabel } from "./primitives";
 
@@ -24,9 +24,10 @@ const QUARTER_IDS = Object.keys(QUARTERS) as QuarterId[];
 
 export function CampaignBalancePanel() {
   const s = useGame((g) => g.s);
+  const open = useGame((g) => g.expansionOpen);
+  const close = useGame((g) => g.closeExpansion);
   const upgradeRoom = useGame((g) => g.upgradeRoom);
   const upgradeQuarter = useGame((g) => g.upgradeQuarter);
-  const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   if (s.screen !== "hq" && s.screen !== "map") return null;
@@ -38,23 +39,8 @@ export function CampaignBalancePanel() {
 
   return (
     <>
-      {s.screen === "hq" ? (
-        <button
-          type="button"
-          onClick={() => {
-            sfx.click();
-            setOpen(true);
-            setError(null);
-          }}
-          className="fixed bottom-[5.8rem] right-3 z-30 flex min-h-12 items-center gap-2 rounded-full border border-ember/45 bg-surface/95 px-4 font-display text-[10px] uppercase tracking-[0.14em] text-ember shadow-xl backdrop-blur-md md:bottom-5 md:right-5"
-        >
-          <LockKeyhole className="size-4" />
-          Expansion Board
-        </button>
-      ) : null}
-
       {open ? (
-        <div className="fixed inset-0 z-[90] flex items-end bg-ink/80 p-3 backdrop-blur-md md:items-center md:justify-center" onClick={() => setOpen(false)}>
+        <div className="fixed inset-0 z-[90] flex items-end bg-ink/80 p-3 backdrop-blur-md md:items-center md:justify-center" onClick={() => close()}>
           <div
             className="ms-pop max-h-[90vh] w-full overflow-y-auto rounded-[var(--radius-xl)] border border-line bg-surface p-5 shadow-2xl md:max-w-2xl ms-scroll"
             onClick={(e) => e.stopPropagation()}
@@ -69,7 +55,7 @@ export function CampaignBalancePanel() {
                     : "Bosses are communal endgame checks. Registered riders must contribute before the raid can launch."}
                 </p>
               </div>
-              <button type="button" onClick={() => setOpen(false)} className="flex size-10 shrink-0 items-center justify-center rounded-full border border-line text-muted">
+              <button type="button" onClick={() => close()} className="flex size-10 shrink-0 items-center justify-center rounded-full border border-line text-muted">
                 <X className="size-4" />
               </button>
             </div>

@@ -37,7 +37,8 @@ describe("score stays off the radio deck", () => {
 
   it("keeps a gallery that can replay the opening", () => {
     assert.ok(GALLERY.some((item) => item.kind === "reel" && item.id === "found-you"));
-    assert.ok(GALLERY.filter((item) => item.kind === "still").length >= 4);
+    assert.ok(GALLERY.some((item) => item.id === "kane"));
+    assert.ok(GALLERY.some((item) => item.id === "aegis-line"));
   });
 
   it("beds the score on the title porch and boss fights only", () => {

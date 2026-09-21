@@ -85,7 +85,7 @@ export function inferFamily(item: Item): WeaponFamily {
   if (/\b(shotgun|scatter|pump)\b/.test(n)) return "shotgun";
   if (/\b(smg|subgun|machine pistol)\b/.test(n)) return "smg";
   if (/\b(rifle|carbine)\b/.test(n)) return "rifle";
-  if (/\b(pistol|revolver|sidearm)\b/.test(n)) return "pistol";
+  if (/\b(pistol|revolver|sidearm|bb gun)\b/.test(n)) return "pistol";
   return "melee";
 }
 
@@ -450,6 +450,7 @@ export function applyArmor(dmg: number, profile: WeaponProfile, target: Combatan
 
 export function fieldArmor(name: string): Pick<Combatant, "armorClass" | "preferredRange" | "resist" | "weakness" | "resistAmt"> {
   const n = name.toLowerCase();
+  if (/rat|mutt|picker|runner/.test(n)) return { armorClass: "soft", preferredRange: "close" };
   if (/hound|leech|briar/.test(n)) return { armorClass: "beast", preferredRange: "close", resist: ["melee"], weakness: ["shotgun"] };
   if (/watch|debt|bruiser|diver/.test(n)) return { armorClass: "plate", preferredRange: "mid", resist: ["pistol", "rifle"], weakness: ["energy"] };
   if (/frame|aegis|specialist/.test(n)) return { armorClass: "powered", preferredRange: "mid", resist: ["ballistic"], weakness: ["energy", "rail", "laser"], resistAmt: 1 };

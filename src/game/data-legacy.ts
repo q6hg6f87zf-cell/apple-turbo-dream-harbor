@@ -1332,6 +1332,14 @@ export const ENEMIES: Record<
   ],
 };
 
+/** Day-one contacts. A BB gun can drop these. Named villains cannot. */
+export const YARD_ENEMIES: { name: string; hp: number; atk: number; def: number; dc: number; flavor: string }[] = [
+  { name: "Slag-Rat", hp: 4, atk: 2, def: 0, dc: 8, flavor: "It has been eating the porch crumbs. It will die for them." },
+  { name: "Dust Picker", hp: 5, atk: 2, def: 1, dc: 9, flavor: "Kane leftover. Hungry, not trained." },
+  { name: "Porch Mutt", hp: 6, atk: 3, def: 1, dc: 10, flavor: "Ribs showing. Teeth still work." },
+  { name: "Alley Runner", hp: 5, atk: 2, def: 0, dc: 9, flavor: "A pipe and a reason to run. They picked the wrong porch." },
+];
+
 export const DANGER_LABELS = ["Calm", "Tense", "Dangerous", "Hostile", "Extreme"];
 
 export const RARITY_TINT: Record<Rarity, string> = {
@@ -1396,7 +1404,42 @@ export function makeItemFromArmor(a: (typeof ARMOR)[number]): Omit<Item, "id"> {
   };
 }
 
-export function starterWeapon(cls: ClassName): Omit<Item, "id"> {
-  const w = WEAPONS.find((x) => x.cls === cls && x.rarity === "Common") ?? WEAPONS[0];
-  return makeItemFromWeapon(w);
+/** Issue sidearm. Every file leaves the Machine Shop with this, not a class relic. */
+export const BB_GUN: Omit<Item, "id"> = {
+  name: "Vault 13 BB Gun",
+  kind: "weapon",
+  rarity: "Common",
+  condition: "Worn",
+  slot: "weapon",
+  damage: "1d4",
+  effect: "Spring piston. 1d4. It will not drop a named thing. It will drop a slag-rat.",
+  lore: "Tyrone found it in a locker that still smelled like gym class. Ten shots in the tube. The rest is in a dented tin.",
+  equipped: false,
+  value: 40,
+  weaponFamily: "pistol",
+  ammoType: "bb",
+  rangeBand: "mid",
+  mag: 10,
+  magSize: 10,
+  accuracy: 0,
+  recoil: 0,
+};
+
+export const BB_TIN: Omit<Item, "id"> = {
+  name: "Steel BB Tin",
+  kind: "consumable",
+  rarity: "Common",
+  condition: "Worn",
+  effect: "50 copper BBs. Feeds the Vault 13 BB Gun.",
+  lore: "The label wore off. The pellets did not.",
+  equipped: false,
+  value: 12,
+  ammoType: "bb",
+  ammoCount: 50,
+  ammoGrade: "ball",
+};
+
+export function starterWeapon(_cls?: ClassName): Omit<Item, "id"> {
+  return { ...BB_GUN };
 }
+

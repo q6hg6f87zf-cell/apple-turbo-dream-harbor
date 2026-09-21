@@ -1,7 +1,7 @@
 import type { GameState, Screen } from "./types";
 import { characterForged, nextObjective } from "./engine";
 
-export const HUB_SCREENS = ["hq", "roster", "squad", "map", "arcade", "inventory", "more"] as const;
+export const HUB_SCREENS = ["hq", "file", "roster", "squad", "map", "arcade", "inventory", "more"] as const;
 export const TASK_SCREENS = ["market", "forge", "ledger", "vault", "codex"] as const;
 
 export type HubScreen = (typeof HUB_SCREENS)[number];

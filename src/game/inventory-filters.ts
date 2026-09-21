@@ -35,6 +35,7 @@ export const CALIBERS: AmmoType[] = [
   ".308",
   ".300",
   "12g",
+  "bb",
   "rail",
   "bolt",
   "cell",

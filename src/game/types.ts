@@ -62,6 +62,7 @@ export type AmmoType =
   | ".308"
   | ".300"
   | "12g"
+  | "bb"
   | "rail"
   | "bolt"
   | "cell"
@@ -251,7 +252,8 @@ export type Screen =
   | "vault"
   | "squad"
   | "market"
-  | "gallery";
+  | "gallery"
+  | "file";
 
 export type MissionKind =
   | "scout"
@@ -307,6 +309,7 @@ export interface DayTask {
   loc?: LocationId;
   poiId?: string;
   missionKind?: MissionKind;
+  npcId?: string;
   choices?: TaskChoice[];
   crates?: TaskCrate[];
   status: "open" | "active" | "done" | "failed";
@@ -507,6 +510,8 @@ export interface Operative {
   curses: string[];
   notes: string;
   joinedDay: number;
+  /** Rider face chosen at the Machine Shop. Missing on old saves — Portrait falls back to class. */
+  portraitId?: string;
   /** d20s stamped at the forge. Missing on old saves — computeStats uses class floor. */
   statDice?: Stats;
 }
@@ -608,6 +613,8 @@ export interface Combatant {
   resist?: string[];
   weakness?: string[];
   resistAmt?: number;
+  portrait?: string;
+  castId?: string;
 }
 
 export interface CombatState {
@@ -678,6 +685,7 @@ export interface MissionState {
   regionId?: RegionId;
   poiId?: string;
   approach?: MissionApproach;
+  npcId?: string;
 }
 
 export interface LocationProgress {
@@ -855,6 +863,7 @@ export interface GameState {
   inventoryView?: InventoryViewState;
   spaceScene?: SpaceSceneSettings;
   kaneHeat: number;
+  metCast: string[];
   selectedPoiId: string | null;
   regionMapOpen: boolean;
   shift: ShiftState;

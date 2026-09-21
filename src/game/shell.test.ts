@@ -72,6 +72,7 @@ describe("chromeKind", () => {
     assert.equal(chromeKind("arcade"), "hub");
     assert.equal(chromeKind("inventory"), "hub");
     assert.equal(chromeKind("more"), "hub");
+    assert.equal(chromeKind("file"), "hub");
     assert.equal(chromeKind("roster"), "hub");
     assert.equal(chromeKind("squad"), "hub");
     assert.equal(chromeKind("market"), "task");

@@ -40,23 +40,17 @@ import type {
 import { itemArt } from "@/game/item-art";
 import { cn } from "@/lib/cn";
 import {
-  Archive,
   BedDouble,
   Crosshair,
   Eye,
   Globe2,
-  Hammer,
-  HeartPulse,
   Landmark,
   Lock,
   Package,
   Scale,
-  ScrollText,
-  Shield,
   Skull,
   Swords,
   Users,
-  Radio,
 } from "lucide-react";
 import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
@@ -71,24 +65,25 @@ import {
   SectionLabel,
   StatusPill,
 } from "./primitives";
-import { TerminalCard, TyroneHandshake } from "./menu";
+import { TerminalCard } from "./menu";
 import { ItemInspectShell } from "./item-inspect";
 import { ItemThumb } from "./item-thumb";
 import { FIT_TONE, MarketLotCard, lotFit, lotSpecs } from "./market-lot";
 import { RegionSheet } from "./region-sheet";
 import { WakeScene } from "./wake-scene";
+import { DayBoard } from "./day-board";
 import { wakeLineAt } from "@/game/opening-reel";
 import { getRadioSnapshot } from "@/game/radio";
-import { PorchStrip } from "./porch-presence";
 import { useOpeningBeat } from "@/game/opening";
-import { RadioChip } from "./radio-deck";
 import { Dice20 } from "./dice";
 import { ForgeBody } from "./forge-body";
 import { MoonCard } from "./card";
-import { regionThumb } from "@/game/art";
+import { regionThumb, FACILITY_ART } from "@/game/art";
+import { RIDER_AVATARS, avatarsForGender, type RiderGender } from "@/game/avatars";
+import { CAST, AEGIS_LINE_STILL, knownCast } from "@/game/cast";
+import { kaneFileBlurb, siteCopyFor } from "@/game/story";
 import { CALIBER_ROSTER, ARC_OPEN, campaignOpenRegions } from "@/game/arsenal";
 import { APPROACHES, KANE_STAKES, defaultPoi, kaneBand, knownPois, locationToRegion } from "@/game/field-ops";
-import { WATCH_LABEL } from "@/game/shift";
 import { className, displayRace } from "@/game/presentation";
 import { FATE_COPY, FATE_KEYS, STAT_ORDER, fateLanding } from "@/game/stats-copy";
 import { punchClick, shockwaveAt } from "@/game/juice";
@@ -103,83 +98,13 @@ function err(msg: string | null) {
   useGame.setState((st) => ({ s: { ...st.s, toast: msg } }));
 }
 
-function DayBoard() {
-  const s = useGame((g) => g.s);
-  const openTask = useGame((g) => g.openTask);
-  const rest = useGame((g) => g.rest);
-  const board = s.shift?.board ?? [];
-  const left = s.shift?.watchesLeft ?? 6;
-  const watch = s.shift?.watch ?? "dawn";
-  if (!board.length) return null;
-  return (
-    <div className="mt-4 rounded-[var(--radius-md)] bg-ink/55 p-3">
-      <div className="flex items-center justify-between gap-2">
-        <div>
-          <div className="font-display text-[10px] uppercase tracking-[0.2em] text-ember">Today's board</div>
-          <p className="mt-0.5 text-sm text-moon">
-            {WATCH_LABEL[watch]} · {left} watch{left === 1 ? "" : "es"} left
-          </p>
-        </div>
-        {left <= 0 ? (
-          <Button size="sm" variant="ember" onClick={() => rest()}>
-            Rest
-          </Button>
-        ) : null}
-      </div>
-      <div className="mt-3 space-y-2">
-        {board.map((task) => {
-          const closed = task.status === "done" || task.status === "failed";
-          return (
-            <button
-              key={task.id}
-              type="button"
-              disabled={closed || left < task.watchCost}
-              onClick={(e) => {
-                punchClick(e.clientX, e.clientY);
-                const msg = openTask(task.id);
-                if (msg) err(msg);
-              }}
-              className={cn(
-                "flex min-h-14 w-full items-center justify-between gap-3 rounded-[var(--radius-sm)] px-3 py-2 text-left",
-                closed ? "bg-surface/40 text-muted" : "bg-surface/90 shadow-[var(--shadow-border)]",
-                task.required && !closed && "shadow-[var(--shadow-border-hover)]",
-              )}
-            >
-              <span className="min-w-0">
-                <span className="block truncate font-display text-sm text-paper">{task.title}</span>
-                <span className="block truncate text-[11px] text-muted">
-                  {task.required ? "Required · " : ""}
-                  {task.watchCost}w · {task.kind}
-                  {task.report ? ` · ${task.report}` : ""}
-                </span>
-              </span>
-              <span className="shrink-0 font-display text-[10px] uppercase tracking-[0.14em] text-ember">
-                {closed ? task.status : "Take"}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-const ROOM_ICON: Record<RoomId, typeof Hammer> = {
-  vault: Archive,
-  barracks: Shield,
-  forge: Hammer,
-  infirmary: HeartPulse,
-  watchtower: Eye,
-  ledger: ScrollText,
-};
-
 const KIND_HELP: Record<MissionKind, string> = {
-  scout: "Walk the edges. You mark sites on the ground map and come home with intel, not a body count. Low blood. Kane is slower to notice. This is how a new region opens.",
-  forage: "Take what the land already dropped. Caps, ore, scraps, the odd crate. Combat is rare. The haul is thinner than a raid, and you keep your name off AEGIS paper.",
-  raid: "Kick a door. Combat is likely. Better loot, more heat. Kane's people hear it. Bring someone who can take a hit and do not go alone.",
-  trade: "Find this region's merchant and pay their price. No dice for blood. Caps in, goods out. Daily stalls live at the Moon Squad Market. This button is the region's own trader.",
-  bounty: "Hunt the named target Tyrone posted on today's board. Combat is the point. The card pays if they drop. Fail and the name walks.",
-  boss: "The name that surfaced for this arc. Not a daily job. Bring a party of three if you have them. Win and the region closes that chapter.",
+  scout: "Name the site. Count crates, visors, routes. Kane's surveyors are already invoicing this ground. Come home with a map, not a body.",
+  forage: "Strip what Kane's buyers have not boxed yet. Named salvage, not a generic haul. Combat is rare. Heat still climbs if you get greedy.",
+  raid: "Kick a door Kane thinks she owns. Combat is likely. Better loot, more heat. Bring someone who can take a hit.",
+  trade: "Find this region's merchant and pay their price. Daily stalls live at the Moon Squad Market under the Iron Gate.",
+  bounty: "Hunt the named target Tyrone posted. Combat is the point. The card pays if they drop.",
+  boss: "The name that surfaced for this arc. Not a daily job. Bring a party of three if you have them.",
 };
 
 const KIND_TAG: Record<MissionKind, string> = {
@@ -200,6 +125,7 @@ export function Briefing() {
   const syncWakeLine = useGame((g) => g.syncWakeLine);
   const finishWakeReel = useGame((g) => g.finishWakeReel);
   const [curtain, setCurtain] = useState(true);
+  const wakeLive = !talk || talk.script === "wake";
 
   useEffect(() => {
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -210,14 +136,25 @@ export function Briefing() {
 
   return (
     <div className="relative flex h-dvh flex-col justify-end overflow-hidden bg-ink px-5 py-8" data-briefing="1">
-      <WakeScene
-        onTime={(t) => {
-          const radio = getRadioSnapshot();
-          if (radio.mode === "intro") return;
-          syncWakeLine(wakeLineAt(t));
-        }}
-        onEnded={() => finishWakeReel()}
-      />
+      {wakeLive ? (
+        <WakeScene
+          onTime={(t) => {
+            const radio = getRadioSnapshot();
+            if (radio.mode === "intro") return;
+            syncWakeLine(wakeLineAt(t));
+          }}
+          onEnded={() => finishWakeReel()}
+        />
+      ) : (
+        <div className="ms-wake-film pointer-events-none absolute inset-0 z-0 overflow-hidden bg-ink" aria-hidden>
+          <img
+            src={talk?.script === "kane" ? CAST.kane.still : "/art/npcs/t0880-line.jpg"}
+            alt=""
+            className="absolute inset-0 size-full object-cover object-top"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/40 to-ink/20" />
+        </div>
+      )}
       <div
         className={cn("ms-opening-curtain", !curtain && "is-up")}
         data-opening={curtain ? "black" : "wake"}
@@ -247,52 +184,6 @@ export function Briefing() {
     </div>
   );
 }
-
-function PlateClock() {
-  const me = useGame((g) => seatedMember(g.s));
-  const tapped = useGame((g) => g.s.clocks?.cardTap ?? 0);
-  const clock = useGame((g) => g.clockPlate);
-  const setScreen = useGame((g) => g.setScreen);
-  const vacant = isVacant(me);
-  return (
-    <button
-      type="button"
-      onClick={() => {
-        if (vacant) {
-          sfx.hurt();
-          setScreen("ledger");
-          return;
-        }
-        const msg = clock();
-        if (msg) sfx.hurt();
-        else {
-          sfx.swipe();
-          sfx.coin();
-        }
-      }}
-      className="mt-3 flex min-h-14 w-full items-center justify-between gap-3 rounded-[var(--radius-md)] bg-ink/55 px-3 py-2 text-left shadow-[var(--shadow-border)]"
-    >
-      <span className="min-w-0">
-        <span className="flex items-center gap-2 font-display text-[10px] uppercase tracking-[0.18em] text-ember">
-          Black card
-        </span>
-        <span className="mt-0.5 block font-display text-sm text-paper">
-          {vacant ? "Stamp a plate to clock in" : tapped ? `${me.name} already clocked` : `Clock ${me.name}'s plate`}
-        </span>
-        <span className="block truncate text-[11px] text-muted">
-          Daily personal caps. Slots buy in from this plate.
-        </span>
-      </span>
-      <span className="shrink-0 text-right">
-        <span className="block font-display text-base tabular-nums text-ember">{me.personalCaps.toLocaleString()}</span>
-        <span className="font-display text-[10px] uppercase tracking-[0.14em] text-ember">
-          {vacant ? "Stamp" : tapped ? "Done" : "Clock"}
-        </span>
-      </span>
-    </button>
-  );
-}
-
 
 const EMPTY_PROGRESS: LocationProgress = {
   unlocked: false,
@@ -333,56 +224,29 @@ class MapErrorBoundary extends Component<{ children: ReactNode; onReset?: () => 
   }
 }
 
-function SquadWing() {
-  return (
-    <div className="space-y-5" data-moon-squad="1">
-      <div className="relative min-h-40 overflow-hidden rounded-[var(--radius-xl)] shadow-[var(--shadow-border)]">
-        <img src="/art/rooms/squad.jpg" alt="" className="absolute inset-0 size-full object-cover object-center" />
-        <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/60 to-ink/25" />
-        <div className="relative px-5 py-6">
-          <SectionLabel>Vault 13 · briefing</SectionLabel>
-          <h2 className="mt-1 font-display text-2xl text-paper">Moon Squad</h2>
-          <p className="mt-1 max-w-xl text-sm text-moon">The briefing room. Roster and the rider file live here now — not a dock tab.</p>
-        </div>
-      </div>
-      <RosterView />
-      <SquadView />
-    </div>
-  );
-}
-
 export function HQView() {
-  const [pane, setPane] = useState<"compound" | "squad">("compound");
   return (
-    <div className="space-y-5 pb-4" data-hq-pane={pane}>
-      <div className="flex flex-wrap gap-2" data-hq-tabs="1">
-        <Chip active={pane === "compound"} onClick={() => setPane("compound")}>
-          Compound
-        </Chip>
-        <Chip active={pane === "squad"} onClick={() => setPane("squad")}>
-          Moon Squad
-        </Chip>
-      </div>
-      {pane === "squad" ? <SquadWing /> : <CompoundWing />}
+    <div className="space-y-5 pb-24" data-hq-pane="compound">
+      <CompoundWing />
     </div>
   );
 }
 
 function CompoundWing() {
   const s = useGame((g) => g.s);
-  const upgradeRoom = useGame((g) => g.upgradeRoom);
-  const upgradeQuarter = useGame((g) => g.upgradeQuarter);
   const hire = useGame((g) => g.hireResident);
   const rest = useGame((g) => g.rest);
   const setScreen = useGame((g) => g.setScreen);
-  const select = useGame((g) => g.selectOp);
+  const openExpansion = useGame((g) => g.openExpansion);
+  const openWork = useGame((g) => g.openWork);
+  const openFile = useGame((g) => g.openFile);
   const [staff, setStaff] = useState("Rook");
   const [role, setRole] = useState<keyof typeof RESIDENT_ROLES>("guard");
   const income = incomePerTick(s);
   const living = s.operatives.filter((o) => o.status !== "dead");
 
   return (
-    <div className="space-y-5 pb-4">
+    <div className="space-y-5 pb-24">
       <div className="ms-well overflow-hidden rounded-[var(--radius-xl)] p-4 shadow-[var(--shadow-border)] md:p-5">
         <div className="flex items-center gap-4">
           <div className="ms-moon !size-14 shrink-0" />
@@ -390,7 +254,7 @@ function CompoundWing() {
             <SectionLabel>SYNAPSE Compound</SectionLabel>
             <h2 className="font-display text-2xl">The compound</h2>
             <p className="mt-1 text-sm text-muted">
-              Earns {income} caps while you wait · roster {living.length}/{rosterCap(s)}
+              Earns {income} caps while you wait · roster {living.length}/{rosterCap(s)}. Kane's Ironclad invoice is open.
             </p>
           </div>
           <Button
@@ -415,38 +279,57 @@ function CompoundWing() {
 
         <DayBoard />
 
-        <PorchStrip />
-
-        <PlateClock />
-
         <button
           type="button"
-          onClick={(e) => {
-            punchClick(e.clientX, e.clientY);
-            setScreen("arcade");
+          onClick={() => {
+            sfx.click();
+            openFile("people");
           }}
-          className="mt-3 flex min-h-14 w-full items-center justify-between gap-3 rounded-[var(--radius-md)] bg-ink/55 px-3 py-2 text-left shadow-[var(--shadow-border)]"
+          className="mt-4 flex w-full overflow-hidden rounded-[var(--radius-md)] bg-ink/55 text-left shadow-[var(--shadow-border)]"
         >
-          <span className="min-w-0">
-            <span className="flex items-center gap-2 font-display text-[10px] uppercase tracking-[0.18em] text-ember">
-              <Radio className="size-3.5" /> T-0888
-            </span>
-            <span className="mt-0.5 block font-display text-sm text-paper">Sit the cabinet</span>
-            <span className="block truncate text-[11px] text-muted">Buy-in is the black card. House takes a rake.</span>
+          <span className="relative h-28 w-24 shrink-0 sm:h-32 sm:w-28">
+            <img src={CAST.kane.portrait} alt="" className="size-full object-cover object-top" />
           </span>
-          <span className="shrink-0 font-display text-[10px] uppercase tracking-[0.14em] text-ember">Play</span>
+          <span className="min-w-0 flex-1 px-3 py-3">
+            <span className="font-mono text-label uppercase tracking-[0.18em] text-ember">Project Vesper</span>
+            <span className="mt-1 block font-display text-lg text-paper">{CAST.kane.name}</span>
+            <span className="mt-1 block text-secondary leading-relaxed text-moon">{kaneFileBlurb(s)}</span>
+            <span className="mt-2 inline-flex font-display text-label uppercase tracking-[0.16em] text-ember">Open file</span>
+          </span>
         </button>
 
-        <div className="mt-3">
-          <RadioChip />
-        </div>
+        {knownCast(s).some((person) => person.faction === "aegis") ? (
+          <div className="mt-3 grid grid-cols-4 gap-2">
+            {knownCast(s)
+              .filter((person) => person.faction === "aegis")
+              .map((person) => (
+                <button
+                  key={person.id}
+                  type="button"
+                  onClick={() => {
+                    sfx.click();
+                    openFile("people");
+                  }}
+                  className="flex min-w-0 flex-col items-center gap-1"
+                >
+                  <img
+                    src={person.portrait}
+                    alt=""
+                    className="aspect-square w-full rounded-[var(--radius-sm)] object-cover object-top shadow-[var(--shadow-border)]"
+                  />
+                  <span className="w-full truncate text-center font-display text-label uppercase tracking-[0.08em] text-ember">
+                    {person.callsign}
+                  </span>
+                </button>
+              ))}
+          </div>
+        ) : null}
 
         <div className="mt-4 grid gap-2 sm:grid-cols-2 md:grid-cols-3">
           {(Object.keys(BASE_ROOMS) as RoomId[]).map((id) => {
             const room = BASE_ROOMS[id];
             const lvl = s.rooms[id];
             const cost = nextRoomCost(s, id);
-            const Icon = ROOM_ICON[id];
             const built = lvl > 0;
             return (
               <div
@@ -458,13 +341,8 @@ function CompoundWing() {
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <span
-                      className={cn(
-                        "flex size-8 items-center justify-center rounded-[var(--radius-xs)]",
-                        built ? "bg-ember/15 text-ember" : "bg-ink text-muted",
-                      )}
-                    >
-                      <Icon className="size-4" />
+                    <span className="relative size-12 shrink-0 overflow-hidden rounded-[var(--radius-xs)] bg-ink shadow-[var(--shadow-border)]">
+                      <img src={FACILITY_ART[id]} alt="" className="size-full object-cover" />
                     </span>
                     <div>
                       <div className="font-display text-sm">{room.name}</div>
@@ -481,8 +359,10 @@ function CompoundWing() {
                     size="sm"
                     variant={built ? "ghost" : "ember"}
                     className="mt-3 w-full"
-                    onClick={() => err(upgradeRoom(id))}
-                    disabled={s.coins < cost}
+                    onClick={() => {
+                      sfx.click();
+                      openWork({ kind: "room", room: id });
+                    }}
                   >
                     {built ? "Upgrade" : "Raise"} · <Coin n={cost} />
                   </Button>
@@ -498,47 +378,18 @@ function CompoundWing() {
             );
           })}
         </div>
-      </div>
 
-      <div>
-        <SectionLabel>Who is home</SectionLabel>
-        {living.length === 0 ? (
-          <Panel className="bg-raised">
-            {characterForged(s) ? (
-              <>
-                <p className="text-sm text-muted">Your file is closed. The Machine Shop will not cut a second soul.</p>
-              </>
-            ) : (
-              <>
-                <p className="text-sm text-muted">The bunks are empty. Cut your file. Two rerolls. Then it locks.</p>
-                <Button className="mt-3 ms-nudge" variant="ember" onClick={() => setScreen("forge")}>
-                  <Users className="size-4" /> Cut your file
-                </Button>
-              </>
-            )}
-          </Panel>
-        ) : (
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {living.map((op) => (
-              <button
-                key={op.id}
-                type="button"
-            onClick={() => {
-              sfx.click();
-              select(op.id);
-            }}
-                className="flex min-w-[10rem] items-center gap-3 rounded-[var(--radius-md)] bg-raised px-3 py-3 text-left shadow-[var(--shadow-border)] transition-[box-shadow] hover:shadow-[var(--shadow-border-hover)]"
-              >
-                <Portrait op={op} size={40} />
-                <div className="min-w-0">
-                  <div className="truncate font-display text-sm">{op.name}</div>
-                  <StatusPill status={op.status} />
-                  <HpBar hp={op.hp} max={op.maxHp} className="mt-1.5" />
-                </div>
-              </button>
-            ))}
-          </div>
-        )}
+        <Button
+          type="button"
+          variant="ghost"
+          className="mt-3 w-full"
+          onClick={() => {
+            sfx.click();
+            openExpansion();
+          }}
+        >
+          Expansion Protocol
+        </Button>
       </div>
 
       <SectionLabel>Bunkhouse</SectionLabel>
@@ -559,7 +410,15 @@ function CompoundWing() {
                 {QUARTERS[q].tiers[Math.min(lvl, QUARTERS[q].tiers.length - 1)]?.bonus}
               </p>
               {cost != null ? (
-                <Button className="mt-3 w-full" size="sm" variant="ghost" onClick={() => err(upgradeQuarter(q))}>
+                <Button
+                  className="mt-3 w-full"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    sfx.click();
+                    openWork({ kind: "quarter", quarter: q });
+                  }}
+                >
                   Upgrade · <Coin n={cost} />
                 </Button>
               ) : (
@@ -611,6 +470,9 @@ function CompoundWing() {
         <Button variant="quiet" onClick={() => setScreen("map")}>
           <Swords className="size-4" /> Deploy
         </Button>
+        <Button variant="quiet" onClick={() => setScreen("file")}>
+          <Users className="size-4" /> File
+        </Button>
         <Button variant="quiet" onClick={() => setScreen("ledger")}>
           <Landmark className="size-4" /> Ledger
         </Button>
@@ -619,7 +481,7 @@ function CompoundWing() {
   );
 }
 
-export function RosterView() {
+export function RosterView({ embedded = false }: { embedded?: boolean }) {
   const s = useGame((g) => g.s);
   const select = useGame((g) => g.selectOp);
   const setScreen = useGame((g) => g.setScreen);
@@ -631,10 +493,11 @@ export function RosterView() {
 
   return (
     <div className="space-y-4 pb-4">
+      {embedded ? null : (
       <div className="flex items-end justify-between">
         <div>
           <SectionLabel>Roster</SectionLabel>
-          <h2 className="font-display text-2xl">Moon Squad</h2>
+          <h2 className="font-display text-2xl">Who still breathes</h2>
         </div>
         {characterForged(s) ? null : (
         <Button variant="ember" size="sm" onClick={() => setScreen("forge")}>
@@ -642,6 +505,7 @@ export function RosterView() {
         </Button>
         )}
       </div>
+      )}
       <div className="flex gap-2">
         {(["living", "fallen", "hof"] as const).map((t) => (
           <Chip key={t} active={tab === t} onClick={() => setTab(t)}>
@@ -720,6 +584,8 @@ export function ForgeView() {
   const [origin, setOrigin] = useState(ORIGINS[0]);
   const lineages = Object.keys(RACES[race].lineage);
   const [lineage, setLineage] = useState(lineages[0]);
+  const [portraitId, setPortraitId] = useState<string | null>(null);
+  const [genderFilter, setGenderFilter] = useState<RiderGender | null>(null);
   const [bodyI, setBodyI] = useState(0);
   const [rolls, setRolls] = useState<Record<string, number>>({});
   const [spinKey, setSpinKey] = useState<string | null>(null);
@@ -806,6 +672,10 @@ export function ForgeView() {
     setLineage(nextLin);
     setOrigin(nextOrigin);
     setRolls(next);
+    const faces = genderFilter ? avatarsForGender(genderFilter) : RIDER_AVATARS;
+    const pick = faces[Math.floor(Math.random() * faces.length)] ?? RIDER_AVATARS[0]!;
+    setPortraitId(pick.id);
+    if (!genderFilter) setGenderFilter(pick.gender);
     setStep(2);
     setBodyI(7);
     useGame.setState((st) => ({
@@ -815,6 +685,7 @@ export function ForgeView() {
 
   const canForge =
     Boolean(fileName.trim()) &&
+    Boolean(portraitId) &&
     FATE_KEYS.every((k) => typeof rolls[k] === "number") &&
     STAT_ORDER.every((k) => typeof rolls[k] === "number");
 
@@ -869,6 +740,62 @@ export function ForgeView() {
             <p className="mt-1 font-display text-lg text-paper">{fileName}</p>
             <p className="mt-1 text-xs text-muted">Scraped from Discord. It does not edit. Class and blood still do.</p>
           </div>
+          <label className="mt-5 block font-display text-[10px] uppercase tracking-wider text-ember">Face</label>
+          <p className="mt-1 text-xs text-muted">
+            Women or men first. Then a face. Generic kit. No glasses. No headphones. This locks with the file.
+          </p>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            {([
+              ["female", "Women"],
+              ["male", "Men"],
+            ] as const).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => {
+                  sfx.click();
+                  setGenderFilter(id);
+                  const first = avatarsForGender(id)[0];
+                  if (first) setPortraitId(first.id);
+                }}
+                className={cn(
+                  "min-h-16 rounded-[var(--radius-md)] px-3 py-3 font-display text-sm uppercase tracking-[0.14em]",
+                  genderFilter === id ? "bg-ember text-ink" : "bg-ink text-moon shadow-[var(--shadow-border)]",
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {genderFilter ? (
+            <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
+              {avatarsForGender(genderFilter).map((row) => (
+                <button
+                  key={row.id}
+                  type="button"
+                  onClick={() => {
+                    sfx.click();
+                    setPortraitId(row.id);
+                  }}
+                  className={cn(
+                    "overflow-hidden rounded-[var(--radius-md)] text-left",
+                    portraitId === row.id ? "shadow-[var(--shadow-border-hover)] ring-2 ring-ember" : "shadow-[var(--shadow-border)]",
+                  )}
+                  aria-label={`${row.label}, ${row.hair}, ${row.eyes} eyes`}
+                >
+                  <img src={row.src} alt="" className="aspect-[2/3] size-full object-cover object-top" />
+                  <span className="block truncate bg-ink/80 px-1.5 py-1 font-display text-label uppercase tracking-[0.08em] text-paper">
+                    {row.label}
+                  </span>
+                  <span className="block truncate bg-ink/80 px-1.5 pb-1.5 text-[10px] text-muted">
+                    {row.hair} · {row.eyes}
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-3 text-sm italic text-moon">Pick women or men. The shop will not show faces until you do.</p>
+          )}
           <label className="mt-5 block font-display text-[10px] uppercase tracking-wider text-ember">Class</label>
           <div className="mt-2 grid grid-cols-2 gap-2">
             {CLASSES.map((c) => (
@@ -892,7 +819,7 @@ export function ForgeView() {
             ))}
           </div>
           <p className="mt-3 text-xs text-moon">{CLASS_LORE[cls].playstyle}</p>
-          <Button className="mt-4 w-full" variant="ember" onClick={() => setStep(1)}>
+          <Button className="mt-4 w-full" variant="ember" disabled={!genderFilter || !portraitId} onClick={() => setStep(1)}>
             Blood and origin
           </Button>
           <Button className="mt-2 w-full" variant="ghost" onClick={() => hollowDecide(true)}>
@@ -1013,7 +940,7 @@ export function ForgeView() {
               className="w-full"
               variant="ember"
               disabled={!canForge}
-              onClick={() => err(forge({ name: fileName, cls, race, lineage, origin, rolls }))}
+              onClick={() => err(forge({ name: fileName, cls, race, lineage, origin, rolls, portraitId: portraitId ?? undefined }))}
             >
               Stamp the file
             </Button>
@@ -1186,7 +1113,7 @@ export function MapView() {
                 }
               }}
             >
-              {party.length ? `Deploy ${party.length} to ${L.short}` : "Pick who walks"}
+              {party.length ? `Deploy ${party.length} to ${poi?.name ?? L.short}` : "Pick who walks"}
             </Button>
           }
         >
@@ -1222,7 +1149,11 @@ export function MapView() {
                 </Chip>
               ))}
             </div>
-            {poi ? <p className="mt-2 text-xs text-muted">{poi.description}</p> : null}
+            {poi ? (
+              <p className="mt-2 text-sm leading-relaxed text-moon">
+                {siteCopyFor(poi, kind === "forage" ? "forage" : "scout").brief}
+              </p>
+            ) : null}
             {poi ? (
               <Button
                 variant="ghost"
@@ -1695,7 +1626,7 @@ export function MarketView() {
   );
 }
 
-export function SquadView() {
+export function SquadView({ embedded = false }: { embedded?: boolean }) {
   const s = useGame((g) => g.s);
   const register = useGame((g) => g.registerRider);
   const playAs = useGame((g) => g.playAs);
@@ -1721,15 +1652,24 @@ export function SquadView() {
 
   return (
     <div className="space-y-4 pb-8">
-      <SectionLabel>Moon Squad</SectionLabel>
-      <h2 className="font-display text-2xl">The file</h2>
-      <p className="text-sm text-muted">
-        One campaign. Many riders. Register a name and handle, search the list, sit in their chair when the ARC turn
-        comes around. Their black card paints the moment they sit.
-      </p>
-
-      <TyroneHandshake />
-
+      {embedded ? (
+        <div>
+          <SectionLabel>Registry</SectionLabel>
+          <h2 className="font-display text-2xl">Who sits this campaign</h2>
+          <p className="text-sm text-muted">
+            Register a rider, sit their chair when the ARC turn comes. The black card paints the moment they sit.
+          </p>
+        </div>
+      ) : (
+        <>
+          <SectionLabel>Registry</SectionLabel>
+          <h2 className="font-display text-2xl">Who sits this campaign</h2>
+          <p className="text-sm text-muted">
+            One campaign. Many riders. Register a name and handle, search the list, sit in their chair when the ARC turn
+            comes around. Their black card paints the moment they sit.
+          </p>
+        </>
+      )}
       <Panel className="glass-strong bg-transparent">
         <p className="font-display text-[10px] uppercase tracking-[0.2em] text-ember">
           Arc {s.arc?.chapter ?? 1} · {locById(currentArcLoc(s)).name}
@@ -1874,8 +1814,9 @@ export function SquadView() {
 export function CodexView() {
   const day = useGame((g) => g.s.day);
   const locations = useGame((g) => g.s.locations);
+  const s = useGame((g) => g.s);
   const open = campaignOpenRegions(day, locations);
-  const [tab, setTab] = useState<"arcs" | "races" | "rules" | "rifles">("arcs");
+  const [tab, setTab] = useState<"people" | "arcs" | "races" | "rules" | "rifles">("people");
   const how = useMemo(
     () => [
       {
@@ -1918,12 +1859,39 @@ export function CodexView() {
       <SectionLabel>Codex</SectionLabel>
       <h2 className="font-display text-2xl">What the Hollow remembers</h2>
       <div className="flex flex-wrap gap-2">
-        {(["arcs", "races", "rules", "rifles"] as const).map((t) => (
+        {(["people", "arcs", "races", "rules", "rifles"] as const).map((t) => (
           <Chip key={t} active={tab === t} onClick={() => setTab(t)}>
             {t}
           </Chip>
         ))}
       </div>
+      {tab === "people" && (
+        <>
+          <Panel className="overflow-hidden p-0">
+            <img src={AEGIS_LINE_STILL} alt="" className="h-36 w-full object-cover object-top" />
+            <div className="p-4">
+              <div className="font-display text-[10px] uppercase tracking-[0.2em] text-ember">AEGIS 2753 · first wing</div>
+              <p className="mt-2 text-sm text-muted">
+                Human pilots in successor-suits. Kane built them to replace the T-0880 line. Orion, Vera, Drake, Lyra.
+              </p>
+            </div>
+          </Panel>
+          {knownCast(s).map((person) => (
+            <Panel key={person.id} className="overflow-hidden p-0">
+              <div className="flex gap-3">
+                <img src={person.portrait} alt="" className="h-36 w-24 shrink-0 object-cover object-top" />
+                <div className="min-w-0 flex-1 py-3 pr-3">
+                  <div className="font-display text-[10px] uppercase tracking-[0.2em] text-ember">{person.title}</div>
+                  <h3 className="mt-1 font-display text-lg">{person.name}</h3>
+                  <p className="text-xs text-muted">{person.callsign}{person.visor ? ` · ${person.visor} visor` : ""}</p>
+                  <p className="mt-2 text-sm italic text-moon">{person.tagline}</p>
+                </div>
+              </div>
+              <p className="px-4 pb-4 text-sm text-muted">{person.dossier}</p>
+            </Panel>
+          ))}
+        </>
+      )}
       {tab === "arcs" &&
         VILLAINS.map((v) => (
           <Panel key={v.id} className="bg-raised">

@@ -226,7 +226,9 @@ export function answerTyroneQuestion(state: GameState, raw: string): string {
   }
 
   if (/this place|where are we|what do you think|look around/.test(low)) {
-    if (state.screen === "hq") return "Vault 13. Roof leaks. Door sticks. Home is a generous word, but it is ours.";
+    if (state.screen === "hq") return "Vault 13. Roof leaks. Door sticks. The board is the day. Home is a generous word, but it is ours.";
+    if (state.screen === "file" || state.screen === "roster" || state.screen === "squad")
+      return "S.Y.N.A.P.S.E OS. Your plate. I wrote the firmware. Try not to spill stim on it.";
     const place = locById(loc);
     const mem = retrieveMemories(state, { region: locationToRegion(loc), limit: 1 })[0];
     if (mem) return `${place.name}. ${mem.description.replace(/\.$/, "")}. Let's improve the record.`;

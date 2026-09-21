@@ -1,5 +1,7 @@
-import { cn } from "@/lib/cn";
+import { CLASS_PORTRAIT } from "@/game/art";
+import { avatarSrc } from "@/game/avatars";
 import { sfx } from "@/game/audio";
+import { cn } from "@/lib/cn";
 import { className, displayRace } from "@/game/presentation";
 import { bandForRoll, STAT_COPY, STAT_ORDER } from "@/game/stats-copy";
 import type { ClassName, Item, Operative, Rarity, Stats } from "@/game/types";
@@ -26,38 +28,16 @@ export function MoonCrest({ className }: { className?: string }) {
   );
 }
 
-function hashStr(s: string) {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
-  return Math.abs(h);
-}
-
 export function Portrait({
   op,
   size = 40,
   className,
 }: {
-  op: Pick<Operative, "id" | "name" | "cls" | "status">;
+  op: Pick<Operative, "id" | "name" | "cls" | "status" | "portraitId">;
   size?: number;
   className?: string;
 }) {
-  const h = hashStr(op.id + op.name);
-  const ox = ((h % 9) - 4) * 1.7;
-  const oy = (((h >> 3) % 7) - 3) * 1.3;
-  const initials = op.name
-    .split(/\s+/)
-    .map((w) => w[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-  const tone =
-    op.status === "dead"
-      ? "text-muted"
-      : op.status === "downed"
-        ? "text-danger"
-        : op.status === "deployed"
-          ? "text-ember-bright"
-          : "text-ember";
+  const face = avatarSrc(op.portraitId) ?? CLASS_PORTRAIT[op.cls];
   const ring =
     op.status === "dead"
       ? "shadow-[0_0_0_1px_var(--color-line)]"
@@ -77,17 +57,19 @@ export function Portrait({
       aria-hidden
     >
       <span className={cn("flex size-full items-center justify-center overflow-hidden rounded-full bg-ink", ring)}>
-        <svg viewBox="0 0 48 48" className={cn("absolute inset-0 size-full", tone)}>
-          <circle cx="24" cy="24" r="22" fill="var(--color-raised)" />
-          <circle cx={28 + ox} cy={20 + oy} r="13" fill="currentColor" opacity="0.88" />
-          <circle cx={20 + ox * 0.35} cy={22 + oy * 0.35} r="11" fill="var(--color-ink)" />
-        </svg>
+        <img
+          src={face}
+          alt=""
+          className={cn(
+            "size-full object-cover",
+            op.status === "dead" && "grayscale opacity-50",
+            op.status === "downed" && "opacity-70",
+          )}
+        />
         <span
-          className="relative z-[1] font-display tracking-wider text-paper"
-          style={{ fontSize: Math.max(10, size * 0.28) }}
-        >
-          {initials}
-        </span>
+          className="pointer-events-none absolute inset-0 bg-gradient-to-t from-ink/50 to-transparent"
+          aria-hidden
+        />
       </span>
       <span className="absolute -bottom-0.5 -right-0.5 flex size-4 items-center justify-center rounded-full bg-surface text-ember shadow-[var(--shadow-border)]">
         <ClassGlyph cls={op.cls} className="size-2.5" />

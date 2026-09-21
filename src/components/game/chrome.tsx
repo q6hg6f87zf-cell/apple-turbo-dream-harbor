@@ -14,6 +14,7 @@ import {
   Ellipsis,
   Globe2,
   Hammer,
+  IdCard,
   Landmark,
   LogOut,
   Moon,
@@ -24,18 +25,19 @@ import {
   VolumeX,
 } from "lucide-react";
 import { useMemo, useState } from "react";
-import { MoonCardSheet } from "./card";
 import { MoonCrest } from "./primitives";
 
-export const NAV: { id: Screen; label: string; icon: typeof Landmark; hint?: string }[] = [
-  { id: "hq", label: "Vault 13", icon: Landmark },
-  { id: "map", label: "World", icon: Globe2, hint: "sortie" },
-  { id: "arcade", label: "Thirty-Eight", icon: Spade },
-  { id: "inventory", label: "Inventory", icon: PackageOpen },
-  { id: "more", label: "More", icon: MoreHorizontal },
+export const NAV: { id: Screen; label: string; short: string; icon: typeof Landmark; hint?: string }[] = [
+  { id: "hq", label: "Vault 13", short: "13", icon: Landmark },
+  { id: "file", label: "File", short: "File", icon: IdCard },
+  { id: "map", label: "World", short: "World", icon: Globe2, hint: "sortie" },
+  { id: "arcade", label: "Thirty-Eight", short: "38", icon: Spade },
+  { id: "inventory", label: "Inventory", short: "Pack", icon: PackageOpen },
+  { id: "more", label: "More", short: "More", icon: MoreHorizontal },
 ];
 
-export const VAULT_SCREENS: Screen[] = ["hq", "roster", "squad"];
+export const VAULT_SCREENS: Screen[] = ["hq"];
+export const FILE_SCREENS: Screen[] = ["file", "roster", "squad"];
 export const MORE_SCREENS: Screen[] = ["forge", "ledger", "market", "vault", "codex"];
 
 const ASSIST: TyroneAssist[] = ["off", "minimal", "normal", "helpful", "high"];
@@ -51,7 +53,6 @@ export function HubHeader() {
   const openGuide = useGame((g) => g.openGuide);
   const me = useGame((g) => plateMember(g.s));
   const busy = !!s.mission || !!s.combat;
-  const [cardOpen, setCardOpen] = useState(false);
   const [overflow, setOverflow] = useState(false);
   const vacant = isVacant(me);
 
@@ -78,9 +79,9 @@ export function HubHeader() {
           className="ms-hud-plate min-h-11 min-w-0 flex-1 px-2.5 py-1.5 text-left"
           onClick={() => {
             sfx.click();
-            setCardOpen(true);
+            setScreen("file");
           }}
-          aria-label="Open Moon Squad card"
+          aria-label="Open S.Y.N.A.P.S.E OS"
         >
           <span className="flex min-w-0 items-center gap-2">
             <span className="ms-hud-chip" aria-hidden />
@@ -131,7 +132,6 @@ export function HubHeader() {
           onClose={() => setOverflow(false)}
         />
       ) : null}
-      <MoonCardSheet open={cardOpen} onClose={() => setCardOpen(false)} />
     </>
   );
 }
@@ -336,6 +336,7 @@ export function NavButtons({ compact }: { compact?: boolean }) {
         const active =
           screen === n.id ||
           (n.id === "hq" && VAULT_SCREENS.includes(screen)) ||
+          (n.id === "file" && FILE_SCREENS.includes(screen)) ||
           (n.id === "more" && MORE_SCREENS.includes(screen));
         const nudge = n.hint === "sortie" && tutorial === "sortie";
         const waiting = !active && signals.has(n.id);
@@ -368,7 +369,7 @@ export function NavButtons({ compact }: { compact?: boolean }) {
               ) : null}
             </span>
             <span className={cn("font-display uppercase tracking-[0.12em] text-label", compact && "leading-none")}>
-              {n.label}
+              {compact ? n.short : n.label}
             </span>
           </button>
         );

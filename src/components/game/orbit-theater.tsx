@@ -1,6 +1,7 @@
 import { REGION_ART } from "@/game/art";
 import { CANONICAL_REGION_IDS, locById, regionById } from "@/game/data";
 import { knownPois, locationToRegion, poiActionOf, poiUsedToday } from "@/game/field-ops";
+import { siteCopyFor } from "@/game/story";
 import { REGION_STREET } from "@/game/item-art";
 import { sfx } from "@/game/audio";
 import { punchClick, shockwaveAt } from "@/game/juice";
@@ -284,7 +285,11 @@ export function RegionMapOverlay() {
             <p className="font-display text-[10px] uppercase tracking-[0.2em] text-ember">
               {selected ? selected.name : region.name}
             </p>
-            <p className="mt-1 text-sm text-moon">{selected ? selected.description : locById(loc).desc}</p>
+            <p className="mt-1 text-sm text-moon">
+              {selected
+                ? siteCopyFor(selected, act === "salvage" ? "forage" : "scout").brief
+                : locById(loc).desc}
+            </p>
             {selected ? (
               <button
                 type="button"

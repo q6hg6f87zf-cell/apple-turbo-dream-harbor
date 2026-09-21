@@ -82,6 +82,9 @@ export function knownPois(state: GameState, loc: LocationId): RegionPointOfInter
   const points = poisForLocation(loc);
   const progress = state.locations[loc];
   const discovered = new Set(progress?.discoveredPois ?? []);
+  const sortie = state.shift?.board.find((t) => t.kind === "sortie" && (t.status === "open" || t.status === "active"));
+  if (sortie?.poiId && (sortie.loc === loc || !sortie.loc)) discovered.add(sortie.poiId);
+  if (state.selectedPoiId) discovered.add(state.selectedPoiId);
   return points.filter((p) => {
     if (p.kind === "boss") return !!progress?.bossUnlocked;
     return p.discovered || discovered.has(p.id);
@@ -93,11 +96,34 @@ export function poiById(loc: LocationId, poiId: string | null | undefined) {
   return poisForLocation(loc).find((p) => p.id === poiId);
 }
 
+export function discoverPoi(
+  state: GameState,
+  loc: LocationId,
+  poiId: string | null | undefined,
+): RegionPointOfInterest | undefined {
+  const poi = poiById(loc, poiId);
+  if (!poi || poi.kind === "boss") return poi;
+  const progress = state.locations[loc];
+  if (!progress) return poi;
+  const current = progress.discoveredPois ?? [];
+  if (!poi.discovered && !current.includes(poi.id)) {
+    progress.discoveredPois = [...current, poi.id];
+  }
+  return poi;
+}
+
 export function defaultPoi(state: GameState, loc: LocationId): RegionPointOfInterest | undefined {
-  const known = knownPois(state, loc);
   const selected = poiById(loc, state.selectedPoiId);
-  if (selected && known.some((p) => p.id === selected.id)) return selected;
-  return known[0] ?? poisForLocation(loc)[0];
+  if (selected && selected.kind !== "boss") return selected;
+  const sortie = state.shift?.board.find((t) => t.kind === "sortie" && (t.status === "open" || t.status === "active"));
+  if (sortie?.poiId && (sortie.loc === loc || !sortie.loc)) {
+    const jobSite = poiById(loc, sortie.poiId);
+    if (jobSite) return jobSite;
+  }
+  const field = knownPois(state, loc).filter(
+    (p) => p.action !== "home" && p.action !== "shop" && p.action !== "listen" && p.kind !== "merchant" && p.kind !== "radio",
+  );
+  return field[0] ?? knownPois(state, loc)[0] ?? poisForLocation(loc)[0];
 }
 
 export function kaneBand(heat: number) {
@@ -250,7 +276,9 @@ export function workPoi(state: GameState, loc: LocationId, poiId: string): strin
     const found = discoverNextPoi(state, loc);
     const rumor = rumorFor(state.day, state.kaneHeat ?? 0);
     markUsed(state, poi.id);
-    const report = found ? `${poi.name} talks. ${rumor} Marked ${found.name}.` : `${poi.name} talks. ${rumor}`;
+    const report = found
+      ? `${poi.name} talks. ${poi.description} ${rumor} Marked ${found.name}.`
+      : `${poi.name} talks. ${poi.description} ${rumor}`;
     markFieldJob(state, "tower", report, 1);
     state.toast = report;
     return null;
@@ -266,8 +294,8 @@ export function workPoi(state: GameState, loc: LocationId, poiId: string): strin
     const found = Math.random() < 0.45 ? discoverNextPoi(state, loc) : null;
     markUsed(state, poi.id);
     const report = found
-      ? `${poi.name} paid ${haul} and ${caps} caps. Also marked ${found.name}.`
-      : `${poi.name} paid ${haul} and ${caps} caps.`;
+      ? `${poi.name} paid ${haul} and ${caps} caps. ${poi.description} Also marked ${found.name}.`
+      : `${poi.name} paid ${haul} and ${caps} caps. ${poi.description}`;
     markFieldJob(state, "salvage", report, 1);
     state.toast = report;
     return null;
@@ -279,8 +307,8 @@ export function workPoi(state: GameState, loc: LocationId, poiId: string): strin
   state.coins += caps;
   markUsed(state, poi.id);
   const report = found
-    ? `${poi.name} walked. Intel +1. Marked ${found.name}. +${caps} caps in pockets.`
-    : `${poi.name} walked. Intel +1. +${caps} caps. The ground already knew us.`;
+    ? `${poi.name} walked. ${poi.description} Marked ${found.name}. +${caps} caps.`
+    : `${poi.name} walked. ${poi.description} +${caps} caps.`;
   markFieldJob(state, "salvage", report, 1);
   state.toast = report;
   return null;

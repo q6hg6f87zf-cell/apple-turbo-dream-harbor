@@ -1,5 +1,6 @@
 import { locationToRegion } from "@/game/field-ops";
 import { parseEventLine, type EventChip } from "@/game/event-theater";
+import { speakerArt } from "@/game/cast";
 import { REGION_STREET } from "@/game/item-art";
 import { roomArtFor } from "@/game/rooms";
 import type { LocationId } from "@/game/types";
@@ -13,12 +14,14 @@ import type { ReactNode } from "react";
 export function EncounterBackdrop({
   locationId,
   tone = "neutral",
+  art,
 }: {
   locationId: LocationId;
   tone?: "neutral" | "danger";
+  art?: string;
 }) {
   const region = locationToRegion(locationId);
-  const src = (region && REGION_STREET[region]) || roomArtFor("map");
+  const src = art || (region && REGION_STREET[region]) || roomArtFor("map");
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden data-encounter-art="1">
       <img src={src} alt="" decoding="async" className="ms-scene-photo absolute inset-0 size-full object-cover" />
@@ -57,19 +60,29 @@ export function EventLog({ lines, className }: { lines: string[]; className?: st
         {lines.map((line, i, all) => {
           const parsed = parseEventLine(line);
           const last = i === all.length - 1;
+          const art = speakerArt(parsed.speaker);
           return (
-            <p key={`${i}-${line.slice(0, 24)}`} className={last ? "text-paper" : "text-muted"}>
-              {parsed.speaker ? (
-                <>
-                  <span className="font-display text-[10px] uppercase tracking-[0.16em] text-ember">
-                    {parsed.speaker}
-                  </span>
-                  <span className="mt-0.5 block text-secondary leading-relaxed">{parsed.text}</span>
-                </>
-              ) : (
-                <span className="text-secondary leading-relaxed">{parsed.text}</span>
-              )}
-            </p>
+            <div key={`${i}-${line.slice(0, 24)}`} className={cn("flex gap-2", last ? "text-paper" : "text-muted")}>
+              {art.portrait ? (
+                <img
+                  src={art.portrait}
+                  alt=""
+                  className="mt-0.5 size-8 shrink-0 rounded-[var(--radius-xs)] object-cover object-top"
+                />
+              ) : null}
+              <p className="min-w-0 flex-1">
+                {parsed.speaker ? (
+                  <>
+                    <span className="font-display text-[10px] uppercase tracking-[0.16em] text-ember">
+                      {parsed.speaker}
+                    </span>
+                    <span className="mt-0.5 block text-secondary leading-relaxed">{parsed.text}</span>
+                  </>
+                ) : (
+                  <span className="text-secondary leading-relaxed">{parsed.text}</span>
+                )}
+              </p>
+            </div>
           );
         })}
       </div>

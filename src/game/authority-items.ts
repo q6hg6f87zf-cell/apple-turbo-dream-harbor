@@ -1,4 +1,4 @@
-import { ARMOR, LEDGER_POOLS, RACES, WEAPONS } from "./data";
+import { ARMOR, BB_GUN, BB_TIN, LEDGER_POOLS, RACES, WEAPONS } from "./data";
 import { HOLLOW_CATALOG } from "./hollow-catalog";
 import { TREASURE_CATALOG } from "./treasure-catalog";
 import type { ClassName, Item, ItemKind, Rarity, RegionId, WeaponSpec } from "./types";
@@ -183,6 +183,38 @@ for (const weapon of WEAPONS) {
   });
 }
 
+templates.push({
+  key: keyFor("weapon", BB_GUN.name),
+  name: BB_GUN.name,
+  kind: "weapon",
+  rarity: BB_GUN.rarity,
+  effect: BB_GUN.effect,
+  lore: BB_GUN.lore,
+  value: BB_GUN.value,
+  slot: "weapon",
+  damage: BB_GUN.damage,
+  weaponFamily: BB_GUN.weaponFamily,
+  ammoType: BB_GUN.ammoType,
+  rangeBand: BB_GUN.rangeBand,
+  mag: BB_GUN.mag,
+  magSize: BB_GUN.magSize,
+  accuracy: BB_GUN.accuracy,
+  recoil: BB_GUN.recoil,
+});
+
+templates.push({
+  key: keyFor("consumable", BB_TIN.name),
+  name: BB_TIN.name,
+  kind: "consumable",
+  rarity: BB_TIN.rarity,
+  effect: BB_TIN.effect,
+  lore: BB_TIN.lore,
+  value: BB_TIN.value,
+  ammoType: BB_TIN.ammoType,
+  ammoCount: BB_TIN.ammoCount,
+  ammoGrade: BB_TIN.ammoGrade,
+});
+
 for (const armor of ARMOR) {
   templates.push({
     key: keyFor("armor", armor.name),
@@ -344,13 +376,14 @@ export function legacyItemTemplate(raw: Pick<Item, "name" | "kind"> & Partial<It
   return template;
 }
 
-export function starterAuthorityTemplates(cls: ClassName, raceName: string) {
-  const weapon = WEAPONS.find((entry) => entry.cls === cls && entry.rarity === "Common") ?? WEAPONS[0];
+export function starterAuthorityTemplates(_cls: ClassName, raceName: string) {
   const race = RACES[raceName];
-  if (!weapon || !race) return [];
+  if (!race) return [];
   const rows: AuthorityItemTemplate[] = [];
-  const starterWeapon = authorityTemplate("weapon", weapon.name);
-  if (starterWeapon) rows.push(starterWeapon);
+  const gun = authorityTemplate("weapon", BB_GUN.name);
+  if (gun) rows.push(gun);
+  const tin = authorityTemplate("consumable", BB_TIN.name);
+  if (tin) rows.push(tin);
   for (const name of race.kit) {
     const kind = starterKind(name);
     const template = authorityTemplate(kind, name);
