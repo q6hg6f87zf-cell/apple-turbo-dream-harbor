@@ -1,0 +1,60 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { cleanDiscordId, json, rateLimit, requireTrustedWriter } from "@/lib/bridge/auth.server";
+import { recordMemory, relevantMemories, sanitizeClaim } from "@/lib/bridge/memory.server";
+import { publishWorldEvent } from "@/lib/bridge/events.server";
+
+const KINDS = ["episode", "fact", "promise", "conversation"] as const;
+
+export const Route = createFileRoute("/api/bridge/memory")({
+  server: {
+    handlers: {
+      GET: async ({ request }) => {
+        const denied = requireTrustedWriter(request);
+        if (denied) return denied;
+        const url = new URL(request.url);
+        const id = cleanDiscordId(url.searchParams.get("discord"));
+        if (!id) return json({ error: "invalid discord id" }, 400);
+        const q = String(url.searchParams.get("q") ?? "").slice(0, 160);
+        const memories = await relevantMemories({ discordId: id, query: q, limit: 8 });
+        return json({ memories });
+      },
+      POST: async ({ request }) => {
+        const denied = requireTrustedWriter(request);
+        if (denied) return denied;
+        let body: Record<string, unknown> = {};
+        try {
+          body = (await request.json()) as Record<string, unknown>;
+        } catch {
+          return json({ error: "bad json" }, 400);
+        }
+        const id = cleanDiscordId(body.discord);
+        if (!id) return json({ error: "invalid discord id" }, 400);
+        if (!rateLimit(`mem:${id}`, 20)) return json({ error: "rate limited" }, 429);
+        const kind = KINDS.includes(body.kind as (typeof KINDS)[number]) ? (body.kind as (typeof KINDS)[number]) : null;
+        if (!kind) return json({ error: "unknown memory kind" }, 400);
+        const claim = sanitizeClaim(body.claim);
+        const result = await recordMemory({
+          discordId: id,
+          kind,
+          claim,
+          tags: Array.isArray(body.tags) ? body.tags.map(String) : [],
+          importance: typeof body.importance === "number" ? body.importance : 4,
+          locationId: typeof body.locationId === "string" ? body.locationId : null,
+          payload: body.payload && typeof body.payload === "object" ? (body.payload as Record<string, unknown>) : {},
+          source: "discord",
+        });
+        if ("error" in result) return json({ error: result.error }, result.status);
+        if (kind === "promise" || kind === "episode") {
+          await publishWorldEvent({
+            type: kind === "promise" ? "tyrone.promise_created" : "tyrone.memory_recorded",
+            discordId: id,
+            payload: { kind, claim: claim.slice(0, 160) },
+            visibility: "private",
+            idempotencyKey: `mem:${result.id}`,
+          });
+        }
+        return json({ ok: true, memory: result });
+      },
+    },
+  },
+});

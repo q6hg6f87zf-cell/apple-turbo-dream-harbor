@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { getSql } from "@/lib/db";
-import { env } from "@/lib/env.server";
+import { cleanDiscordId, json, requireTrustedWriter } from "@/lib/bridge/auth.server";
 
 const PACK_KEYS = [
   "bobby_pin",
@@ -11,20 +11,6 @@ const PACK_KEYS = [
   "sarsaparilla",
   "probe_kit",
 ] as const;
-
-const RESPONSE_HEADERS: Record<string, string> = {
-  "Cache-Control": "no-store",
-  "X-Content-Type-Options": "nosniff",
-};
-
-function json(data: unknown, status = 200) {
-  return Response.json(data, { status, headers: RESPONSE_HEADERS });
-}
-
-function cleanDiscordId(raw: unknown): string | null {
-  const id = String(raw ?? "").trim();
-  return /^\d{17,22}$/.test(id) ? id : null;
-}
 
 function cleanName(raw: unknown, fallback: string) {
   const name = String(raw ?? "").trim().replace(/^@/, "").slice(0, 32);
@@ -46,33 +32,6 @@ function cleanPack(raw: unknown): Record<string, number> {
     pack[key] = safeInt(source[key], 0, 0, 100000);
   }
   return pack;
-}
-
-function trustedWriter(request: Request): "ok" | "disabled" | "denied" {
-  const secret = env("TYRONE_SYNC_WRITE_KEY");
-  if (!secret) return "disabled";
-  const header = request.headers.get("authorization") ?? "";
-  const supplied = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
-  if (!supplied) return "denied";
-  const expectedBytes = Buffer.from(secret);
-  const suppliedBytes = Buffer.from(supplied);
-  if (expectedBytes.length !== suppliedBytes.length) return "denied";
-  return timingSafeEqual(expectedBytes, suppliedBytes) ? "ok" : "denied";
-}
-
-function requireTrustedWriter(request: Request): Response | null {
-  const result = trustedWriter(request);
-  if (result === "ok") return null;
-  if (result === "disabled") {
-    return json(
-      {
-        error: "trusted sync disabled",
-        note: "Set TYRONE_SYNC_WRITE_KEY on the server before TyroneBot can write arcade state.",
-      },
-      503,
-    );
-  }
-  return json({ error: "unauthorized" }, 401);
 }
 
 function contract(origin: string) {
@@ -111,7 +70,7 @@ export const Route = createFileRoute("/api/tyrone/sync")({
       OPTIONS: async () =>
         new Response(null, {
           status: 204,
-          headers: { ...RESPONSE_HEADERS, Allow: "GET, POST, OPTIONS" },
+          headers: { "Cache-Control": "no-store", Allow: "GET, POST, OPTIONS" },
         }),
 
       GET: async ({ request }) => {

@@ -10,13 +10,23 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as InventoryRouteImport } from './routes/inventory'
+import { Route as ProfileRouteImport } from './routes/profile'
+import { Route as VaultRouteImport } from './routes/vault'
+import { Route as WorldRouteImport } from './routes/world'
 import { Route as ApiRtcRouteImport } from './routes/api/rtc'
+import { Route as RegionIdRouteImport } from './routes/region.$id'
+import { Route as ApiBridgeContextRouteImport } from './routes/api/bridge/context'
+import { Route as ApiBridgeEventsRouteImport } from './routes/api/bridge/events'
+import { Route as ApiBridgeMemoryRouteImport } from './routes/api/bridge/memory'
+import { Route as ApiBridgeSoulRouteImport } from './routes/api/bridge/soul'
 import { Route as ApiDiscordCallbackRouteImport } from './routes/api/discord/callback'
 import { Route as ApiDiscordLogoutRouteImport } from './routes/api/discord/logout'
 import { Route as ApiDiscordPlateRouteImport } from './routes/api/discord/plate'
 import { Route as ApiDiscordStartRouteImport } from './routes/api/discord/start'
 import { Route as ApiHollowAccessRouteImport } from './routes/api/hollow/access'
 import { Route as ApiHollowAcquisitionRouteImport } from './routes/api/hollow/acquisition'
+import { Route as ApiHollowChronicleRouteImport } from './routes/api/hollow/chronicle'
 import { Route as ApiHollowEconomyRouteImport } from './routes/api/hollow/economy'
 import { Route as ApiHollowInventoryRouteImport } from './routes/api/hollow/inventory'
 import { Route as ApiHollowPorchRouteImport } from './routes/api/hollow/porch'
@@ -31,9 +41,54 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const InventoryRoute = InventoryRouteImport.update({
+  id: '/inventory',
+  path: '/inventory',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProfileRoute = ProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VaultRoute = VaultRouteImport.update({
+  id: '/vault',
+  path: '/vault',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WorldRoute = WorldRouteImport.update({
+  id: '/world',
+  path: '/world',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiRtcRoute = ApiRtcRouteImport.update({
   id: '/api/rtc',
   path: '/api/rtc',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RegionIdRoute = RegionIdRouteImport.update({
+  id: '/region/$id',
+  path: '/region/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiBridgeContextRoute = ApiBridgeContextRouteImport.update({
+  id: '/api/bridge/context',
+  path: '/api/bridge/context',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiBridgeEventsRoute = ApiBridgeEventsRouteImport.update({
+  id: '/api/bridge/events',
+  path: '/api/bridge/events',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiBridgeMemoryRoute = ApiBridgeMemoryRouteImport.update({
+  id: '/api/bridge/memory',
+  path: '/api/bridge/memory',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiBridgeSoulRoute = ApiBridgeSoulRouteImport.update({
+  id: '/api/bridge/soul',
+  path: '/api/bridge/soul',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiDiscordCallbackRoute = ApiDiscordCallbackRouteImport.update({
@@ -64,6 +119,11 @@ const ApiHollowAccessRoute = ApiHollowAccessRouteImport.update({
 const ApiHollowAcquisitionRoute = ApiHollowAcquisitionRouteImport.update({
   id: '/api/hollow/acquisition',
   path: '/api/hollow/acquisition',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiHollowChronicleRoute = ApiHollowChronicleRouteImport.update({
+  id: '/api/hollow/chronicle',
+  path: '/api/hollow/chronicle',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiHollowEconomyRoute = ApiHollowEconomyRouteImport.update({
@@ -109,13 +169,23 @@ const ApiTyroneSyncRoute = ApiTyroneSyncRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/inventory': typeof InventoryRoute
+  '/profile': typeof ProfileRoute
+  '/vault': typeof VaultRoute
+  '/world': typeof WorldRoute
   '/api/rtc': typeof ApiRtcRoute
+  '/region/$id': typeof RegionIdRoute
+  '/api/bridge/context': typeof ApiBridgeContextRoute
+  '/api/bridge/events': typeof ApiBridgeEventsRoute
+  '/api/bridge/memory': typeof ApiBridgeMemoryRoute
+  '/api/bridge/soul': typeof ApiBridgeSoulRoute
   '/api/discord/callback': typeof ApiDiscordCallbackRoute
   '/api/discord/logout': typeof ApiDiscordLogoutRoute
   '/api/discord/plate': typeof ApiDiscordPlateRoute
   '/api/discord/start': typeof ApiDiscordStartRoute
   '/api/hollow/access': typeof ApiHollowAccessRoute
   '/api/hollow/acquisition': typeof ApiHollowAcquisitionRoute
+  '/api/hollow/chronicle': typeof ApiHollowChronicleRoute
   '/api/hollow/economy': typeof ApiHollowEconomyRoute
   '/api/hollow/inventory': typeof ApiHollowInventoryRoute
   '/api/hollow/porch': typeof ApiHollowPorchRoute
@@ -127,13 +197,23 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/inventory': typeof InventoryRoute
+  '/profile': typeof ProfileRoute
+  '/vault': typeof VaultRoute
+  '/world': typeof WorldRoute
   '/api/rtc': typeof ApiRtcRoute
+  '/region/$id': typeof RegionIdRoute
+  '/api/bridge/context': typeof ApiBridgeContextRoute
+  '/api/bridge/events': typeof ApiBridgeEventsRoute
+  '/api/bridge/memory': typeof ApiBridgeMemoryRoute
+  '/api/bridge/soul': typeof ApiBridgeSoulRoute
   '/api/discord/callback': typeof ApiDiscordCallbackRoute
   '/api/discord/logout': typeof ApiDiscordLogoutRoute
   '/api/discord/plate': typeof ApiDiscordPlateRoute
   '/api/discord/start': typeof ApiDiscordStartRoute
   '/api/hollow/access': typeof ApiHollowAccessRoute
   '/api/hollow/acquisition': typeof ApiHollowAcquisitionRoute
+  '/api/hollow/chronicle': typeof ApiHollowChronicleRoute
   '/api/hollow/economy': typeof ApiHollowEconomyRoute
   '/api/hollow/inventory': typeof ApiHollowInventoryRoute
   '/api/hollow/porch': typeof ApiHollowPorchRoute
@@ -146,13 +226,23 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/inventory': typeof InventoryRoute
+  '/profile': typeof ProfileRoute
+  '/vault': typeof VaultRoute
+  '/world': typeof WorldRoute
   '/api/rtc': typeof ApiRtcRoute
+  '/region/$id': typeof RegionIdRoute
+  '/api/bridge/context': typeof ApiBridgeContextRoute
+  '/api/bridge/events': typeof ApiBridgeEventsRoute
+  '/api/bridge/memory': typeof ApiBridgeMemoryRoute
+  '/api/bridge/soul': typeof ApiBridgeSoulRoute
   '/api/discord/callback': typeof ApiDiscordCallbackRoute
   '/api/discord/logout': typeof ApiDiscordLogoutRoute
   '/api/discord/plate': typeof ApiDiscordPlateRoute
   '/api/discord/start': typeof ApiDiscordStartRoute
   '/api/hollow/access': typeof ApiHollowAccessRoute
   '/api/hollow/acquisition': typeof ApiHollowAcquisitionRoute
+  '/api/hollow/chronicle': typeof ApiHollowChronicleRoute
   '/api/hollow/economy': typeof ApiHollowEconomyRoute
   '/api/hollow/inventory': typeof ApiHollowInventoryRoute
   '/api/hollow/porch': typeof ApiHollowPorchRoute
@@ -166,13 +256,23 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/inventory'
+    | '/profile'
+    | '/vault'
+    | '/world'
     | '/api/rtc'
+    | '/region/$id'
+    | '/api/bridge/context'
+    | '/api/bridge/events'
+    | '/api/bridge/memory'
+    | '/api/bridge/soul'
     | '/api/discord/callback'
     | '/api/discord/logout'
     | '/api/discord/plate'
     | '/api/discord/start'
     | '/api/hollow/access'
     | '/api/hollow/acquisition'
+    | '/api/hollow/chronicle'
     | '/api/hollow/economy'
     | '/api/hollow/inventory'
     | '/api/hollow/porch'
@@ -184,13 +284,23 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/inventory'
+    | '/profile'
+    | '/vault'
+    | '/world'
     | '/api/rtc'
+    | '/region/$id'
+    | '/api/bridge/context'
+    | '/api/bridge/events'
+    | '/api/bridge/memory'
+    | '/api/bridge/soul'
     | '/api/discord/callback'
     | '/api/discord/logout'
     | '/api/discord/plate'
     | '/api/discord/start'
     | '/api/hollow/access'
     | '/api/hollow/acquisition'
+    | '/api/hollow/chronicle'
     | '/api/hollow/economy'
     | '/api/hollow/inventory'
     | '/api/hollow/porch'
@@ -202,13 +312,23 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/inventory'
+    | '/profile'
+    | '/vault'
+    | '/world'
     | '/api/rtc'
+    | '/region/$id'
+    | '/api/bridge/context'
+    | '/api/bridge/events'
+    | '/api/bridge/memory'
+    | '/api/bridge/soul'
     | '/api/discord/callback'
     | '/api/discord/logout'
     | '/api/discord/plate'
     | '/api/discord/start'
     | '/api/hollow/access'
     | '/api/hollow/acquisition'
+    | '/api/hollow/chronicle'
     | '/api/hollow/economy'
     | '/api/hollow/inventory'
     | '/api/hollow/porch'
@@ -221,13 +341,23 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  InventoryRoute: typeof InventoryRoute
+  ProfileRoute: typeof ProfileRoute
+  VaultRoute: typeof VaultRoute
+  WorldRoute: typeof WorldRoute
   ApiRtcRoute: typeof ApiRtcRoute
+  RegionIdRoute: typeof RegionIdRoute
+  ApiBridgeContextRoute: typeof ApiBridgeContextRoute
+  ApiBridgeEventsRoute: typeof ApiBridgeEventsRoute
+  ApiBridgeMemoryRoute: typeof ApiBridgeMemoryRoute
+  ApiBridgeSoulRoute: typeof ApiBridgeSoulRoute
   ApiDiscordCallbackRoute: typeof ApiDiscordCallbackRoute
   ApiDiscordLogoutRoute: typeof ApiDiscordLogoutRoute
   ApiDiscordPlateRoute: typeof ApiDiscordPlateRoute
   ApiDiscordStartRoute: typeof ApiDiscordStartRoute
   ApiHollowAccessRoute: typeof ApiHollowAccessRoute
   ApiHollowAcquisitionRoute: typeof ApiHollowAcquisitionRoute
+  ApiHollowChronicleRoute: typeof ApiHollowChronicleRoute
   ApiHollowEconomyRoute: typeof ApiHollowEconomyRoute
   ApiHollowInventoryRoute: typeof ApiHollowInventoryRoute
   ApiHollowPorchRoute: typeof ApiHollowPorchRoute
@@ -247,11 +377,74 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/inventory': {
+      id: '/inventory'
+      path: '/inventory'
+      fullPath: '/inventory'
+      preLoaderRoute: typeof InventoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/profile': {
+      id: '/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/vault': {
+      id: '/vault'
+      path: '/vault'
+      fullPath: '/vault'
+      preLoaderRoute: typeof VaultRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/world': {
+      id: '/world'
+      path: '/world'
+      fullPath: '/world'
+      preLoaderRoute: typeof WorldRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/rtc': {
       id: '/api/rtc'
       path: '/api/rtc'
       fullPath: '/api/rtc'
       preLoaderRoute: typeof ApiRtcRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/region/$id': {
+      id: '/region/$id'
+      path: '/region/$id'
+      fullPath: '/region/$id'
+      preLoaderRoute: typeof RegionIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/bridge/context': {
+      id: '/api/bridge/context'
+      path: '/api/bridge/context'
+      fullPath: '/api/bridge/context'
+      preLoaderRoute: typeof ApiBridgeContextRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/bridge/events': {
+      id: '/api/bridge/events'
+      path: '/api/bridge/events'
+      fullPath: '/api/bridge/events'
+      preLoaderRoute: typeof ApiBridgeEventsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/bridge/memory': {
+      id: '/api/bridge/memory'
+      path: '/api/bridge/memory'
+      fullPath: '/api/bridge/memory'
+      preLoaderRoute: typeof ApiBridgeMemoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/bridge/soul': {
+      id: '/api/bridge/soul'
+      path: '/api/bridge/soul'
+      fullPath: '/api/bridge/soul'
+      preLoaderRoute: typeof ApiBridgeSoulRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/discord/callback': {
@@ -294,6 +487,13 @@ declare module '@tanstack/react-router' {
       path: '/api/hollow/acquisition'
       fullPath: '/api/hollow/acquisition'
       preLoaderRoute: typeof ApiHollowAcquisitionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/hollow/chronicle': {
+      id: '/api/hollow/chronicle'
+      path: '/api/hollow/chronicle'
+      fullPath: '/api/hollow/chronicle'
+      preLoaderRoute: typeof ApiHollowChronicleRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/hollow/economy': {
@@ -357,13 +557,23 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  InventoryRoute: InventoryRoute,
+  ProfileRoute: ProfileRoute,
+  VaultRoute: VaultRoute,
+  WorldRoute: WorldRoute,
   ApiRtcRoute: ApiRtcRoute,
+  RegionIdRoute: RegionIdRoute,
+  ApiBridgeContextRoute: ApiBridgeContextRoute,
+  ApiBridgeEventsRoute: ApiBridgeEventsRoute,
+  ApiBridgeMemoryRoute: ApiBridgeMemoryRoute,
+  ApiBridgeSoulRoute: ApiBridgeSoulRoute,
   ApiDiscordCallbackRoute: ApiDiscordCallbackRoute,
   ApiDiscordLogoutRoute: ApiDiscordLogoutRoute,
   ApiDiscordPlateRoute: ApiDiscordPlateRoute,
   ApiDiscordStartRoute: ApiDiscordStartRoute,
   ApiHollowAccessRoute: ApiHollowAccessRoute,
   ApiHollowAcquisitionRoute: ApiHollowAcquisitionRoute,
+  ApiHollowChronicleRoute: ApiHollowChronicleRoute,
   ApiHollowEconomyRoute: ApiHollowEconomyRoute,
   ApiHollowInventoryRoute: ApiHollowInventoryRoute,
   ApiHollowPorchRoute: ApiHollowPorchRoute,
