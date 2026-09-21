@@ -58,7 +58,8 @@ import {
 } from "./data";
 import { REGION_LOCATION, campaignOpenRegions } from "./arsenal";
 import { applyArmor, fieldArmor, rangeHitMod, resolveWeapon } from "./weapon-ops";
-import { APPROACHES, locationToRegion, type FieldDeploy } from "./field-ops";
+import { APPROACHES, locationToRegion, tacticsFor, type FieldDeploy } from "./field-ops";
+import { eventBriefing, beatPrompt, contactFlavor, debriefLines, radioFor, rollLines } from "./event-theater";
 import { emptyMarket } from "./market";
 import { emptyShift } from "./shift";
 import { emptyTyrone } from "./tyrone-mind";
@@ -467,13 +468,13 @@ export function buildMission(
   field?: FieldDeploy,
 ): MissionState {
   const L = locById(loc);
-  const approach = APPROACHES.find((a) => a.id === field?.approach);
+  const approach = APPROACHES.find((a) => a.id === field?.approach) ?? APPROACHES[1];
   const dc = clamp(missionDc(state, loc, kind) + (approach?.dc ?? 0), 8, 19);
   const lead = partyLead(state, partyIds);
+  const theater = eventBriefing(state, loc, kind, partyIds);
   const beats: MissionBeat[] = [];
   const add = (
     title: string,
-    prompt: string,
     stat: StatKey,
     extra = 0,
     k: MissionBeat["kind"] = "check",
@@ -481,43 +482,37 @@ export function buildMission(
     beats.push({
       id: uid("bt"),
       title,
-      prompt,
+      prompt: beatPrompt(state, loc, kind, k, title, partyIds),
       stat,
       dc: clamp(dc + extra, 8, 19),
       kind: k,
+      tactics: tacticsFor({ beatKind: k, approach: approach.id, leadStat: PRIMARY_STAT[lead.cls] }),
     });
   };
 
   if (kind === "scout") {
-    add("Approach", `${lead.name} reads the approach to ${L.short}.`, "WIS", -1);
-    add("Sweep", "Tracks, caches, the wrong kind of quiet.", "SPD", 0, "loot");
+    add("Approach", "WIS", -1);
+    add("Sweep", "SPD", 0, "loot");
+    add("Report", "INT", -1);
   } else if (kind === "forage") {
-    add("Range", "The squad fans out for salvage and ore.", PRIMARY_STAT[lead.cls], 0);
-    add("Haul", "Something does not want to be taken.", "STR", 1, "loot");
+    add("Range", PRIMARY_STAT[lead.cls], 0);
+    add("Haul", "STR", 1, "loot");
     if (Math.random() < 0.35 + L.danger * 0.08) {
-      add("Ambush", "The ground was never empty.", "SPD", 2, "combat");
+      add("Ambush", "SPD", 2, "combat");
     }
   } else if (kind === "raid") {
-    add("Breach", "In through a wound in the world.", "SPD", 1);
-    add("Hold", "Something answers the noise.", PRIMARY_STAT[lead.cls], 2, "combat");
-    add("Extract", "Leave with more than you brought. Or don't.", "LCK", 1, "loot");
+    add("Breach", "SPD", 1);
+    add("Hold", PRIMARY_STAT[lead.cls], 2, "combat");
+    add("Extract", "LCK", 1, "loot");
   } else if (kind === "trade") {
-    add("Haggle", "Price is a conversation. So is threat.", "CHA", 0, "merchant");
-    add("Walk away", "Deals have teeth. Count your fingers.", "WIS", 0, "loot");
+    add("Haggle", "CHA", 0, "merchant");
+    add("Walk away", "WIS", 0, "loot");
   } else if (kind === "bounty") {
-    const b = state.bounty;
-    add("Track", b ? `${b.name} last seen near ${L.short}.` : "The board named a shadow.", "WIS", 1);
-    add("Engage", "No speeches. The contract is the speech.", "STR", 2, "combat");
+    add("Track", "WIS", 1);
+    add("Engage", "STR", 2, "combat");
   } else {
-    const v = villainById(L.bossId);
-    add("Threshold", v ? v.tagline : "The air changes register.", "WIS", 1);
-    add(
-      "The name",
-      v ? `${v.name} is here. ${v.title}.` : "Something with a name.",
-      PRIMARY_STAT[lead.cls],
-      3,
-      "boss",
-    );
+    add("Threshold", "WIS", 1);
+    add("The name", PRIMARY_STAT[lead.cls], 3, "boss");
   }
 
   return {
@@ -530,13 +525,13 @@ export function buildMission(
     coins: 0,
     ore: 0,
     loot: [],
-    narrative: [
-      `SYNAPSE deploys to ${L.name}. ${partyIds.length} operative${partyIds.length > 1 ? "s" : ""}.`,
-    ],
+    narrative: theater.open,
+    briefing: theater.briefing,
+    stakes: theater.stakes,
     waiting: true,
     regionId: locationToRegion(loc) ?? undefined,
     poiId: field?.poiId,
-    approach: field?.approach,
+    approach: field?.approach ?? approach.id,
   };
 }
 
@@ -619,7 +614,7 @@ export function applyRollToBeat(
   let startBoss = false;
 
   if (b === "fumble") {
-    notes.push(`${lead.name} fumbles. The world takes a piece.`);
+    notes.push(`${lead.name} · fumbles. The world takes a piece.`);
     const w = equippedWeapon(lead);
     if (w && w.condition !== "Broken") {
       w.condition = degrade(w.condition);
@@ -648,35 +643,81 @@ export function applyRollToBeat(
       if (beat.kind === "loot" || beat.kind === "merchant") {
         m.loot = [...m.loot, ...lootTable(m.locationId, m.kind, total)];
         const drop = grantPackLoot(state, { source: locById(m.locationId).short });
-        if (drop) notes.push(`Vault tick: ${drop.replace("_", " ")}.`);
+        if (drop) notes.push(`Vault · ${drop.replace("_", " ")}.`);
       }
-      notes.push(strong ? `${lead.name} makes it look inevitable.` : `${lead.name} gets it done.`);
+      notes.push(
+        ...rollLines({
+          lead: lead.name,
+          title: beat.title,
+          band: BAND_LABEL[b],
+          hit: true,
+          strong,
+          kind: m.kind,
+          beatKind: beat.kind,
+          dc: beat.dc,
+          total,
+        }).slice(1),
+      );
     } else {
-      notes.push(`${lead.name} misses the beat. DC ${beat.dc}, total ${total}.`);
+      notes.push(
+        ...rollLines({
+          lead: lead.name,
+          title: beat.title,
+          band: BAND_LABEL[b],
+          hit: false,
+          strong: false,
+          kind: m.kind,
+          beatKind: beat.kind,
+          dc: beat.dc,
+          total,
+        }),
+      );
       if (b === "weak") {
         coins = 15;
-        notes.push("A scrap. Not nothing.");
+        notes.push("Hollow · A scrap. Not nothing.");
       }
     }
   }
 
   if (beat.kind === "combat") {
+    notes.push(
+      ...rollLines({
+        lead: lead.name,
+        title: beat.title,
+        band: BAND_LABEL[b],
+        hit,
+        strong,
+        kind: m.kind,
+        beatKind: beat.kind,
+        dc: beat.dc,
+        total,
+      }),
+    );
     if (b === "fail" || b === "fumble" || !hit) {
       startCombat = true;
-      notes.push("They were waiting.");
     } else if (b === "weak") {
       startCombat = true;
-      notes.push("Contact. Ugly, but you saw it coming.");
     } else {
       coins = 90 + locById(m.locationId).danger * 20;
-      notes.push(`${lead.name} ends it before it starts.`);
       m.loot = [...m.loot, ...lootTable(m.locationId, m.kind, total)];
     }
   }
 
   if (beat.kind === "boss") {
     startBoss = true;
-    notes.push("No more map. Only the name.");
+    notes.push(
+      ...rollLines({
+        lead: lead.name,
+        title: beat.title,
+        band: BAND_LABEL[b],
+        hit: true,
+        strong: true,
+        kind: m.kind,
+        beatKind: beat.kind,
+        dc: beat.dc,
+        total,
+      }),
+    );
   }
 
   if (!lead.destinyFired && raw >= 18 && Math.random() < 0.5) {
@@ -699,6 +740,9 @@ export function applyRollToBeat(
     text: `${BAND_LABEL[b]} · ${raw} → ${total} vs DC ${beat.dc}`,
   };
   m.narrative = [...m.narrative, ...notes];
+  if (m.beatIndex >= m.beats.length - 1) {
+    m.narrative = [...m.narrative, ...debriefLines(state, m)];
+  }
   m.waiting = false;
   state.mission = m;
   state.coins += coins;
@@ -716,6 +760,7 @@ export function advanceBeat(state: GameState): GameState {
     return completeMission(state);
   }
   m.waiting = true;
+  m.narrative = [...m.narrative, radioFor(m.kind, m.beatIndex), m.beats[m.beatIndex]?.prompt ?? ""].filter(Boolean);
   state.mission = m;
   return state;
 }
@@ -872,7 +917,13 @@ export function spawnCombat(state: GameState, opts: { boss?: boolean }): GameSta
     enemies,
     turn: 1,
     actorIndex: 0,
-    log: [`${enemies.map((e) => e.name).join(" & ")} — ${enemies[0]?.flavor ?? ""}`],
+    log: [
+      `SYNAPSE · ${contactFlavor(state, loc, opts.boss, m.kind === "bounty")}.`,
+      `Hollow · ${enemies.map((e) => e.name).join(" & ")} — ${enemies[0]?.flavor ?? "the field notices."}`,
+      opts.boss
+        ? `Tyrone · Phases are not flavor. When it speaks, let it. Then finish.`
+        : `Tyrone · Magazines matter. Shame is cheaper than a grave.`,
+    ],
     bossId: opts.boss ? locById(loc).bossId : undefined,
     rewardMult: opts.boss ? 3 : m.kind === "raid" ? 1.6 : 1,
   };

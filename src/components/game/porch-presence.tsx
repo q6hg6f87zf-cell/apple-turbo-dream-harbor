@@ -1,4 +1,5 @@
 import { beatPorch, leavePorch, PORCH_MAX, watchPorch, type PorchSnapshot } from "@/game/porch";
+import { setLiveDiscordIds } from "@/game/presence";
 import { useGame } from "@/game/store";
 import { useP2PRoom } from "@/lib/multiplayer/use-p2p-room";
 import { useEffect, useState } from "react";

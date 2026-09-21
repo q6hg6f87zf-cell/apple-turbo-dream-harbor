@@ -665,6 +665,8 @@ export interface MissionState {
   loot: Item[];
   narrative: string[];
   waiting: boolean;
+  briefing?: string;
+  stakes?: string;
   lastRoll?: {
     value: number;
     band: RollBand;

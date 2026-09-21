@@ -1,5 +1,6 @@
 import { locById } from "./data";
 import { ensureClocks } from "./inventory";
+import { isDiscordOnPorch, porchSignalLive } from "./presence";
 import { CARD_CLOCK_BASE, STARTER_PLATE } from "./rooms";
 import type { GameState, LocationId, MissionKind, SquadMember } from "./types";
 
@@ -203,30 +204,51 @@ export function isArcAction(loc: LocationId, kind: MissionKind): boolean {
   return (kind === "raid" || kind === "boss" || kind === "bounty") && ARC_ORDER.includes(loc);
 }
 
+/** Stamped riders who can actually take a loud job. Ghost chairs never count. */
+export function ridersOnDuty(state: GameState): SquadMember[] {
+  ensureSquad(state);
+  const seated = seatedMember(state);
+  const named = (state.squad ?? []).filter((member) => !isVacant(member));
+  if (named.length <= 1) return named.length ? named : [seated];
+  if (!porchSignalLive()) return [seated];
+  const live = named.filter((member) => member.id === state.activeMemberId || isDiscordOnPorch(member.discordId));
+  return live.length ? live : [seated];
+}
+
 export function canTakeArcTurn(state: GameState, loc: LocationId, kind: MissionKind): boolean {
   ensureSquad(state);
-  if (!(kind === "raid" || kind === "boss" || kind === "bounty")) return true;
+  if (!isArcAction(loc, kind)) return true;
   if (loc !== currentArcLoc(state)) return true;
-  return state.arc!.turnMemberId === state.activeMemberId;
+  const duty = ridersOnDuty(state);
+  if (duty.length <= 1) {
+    if (state.arc && duty[0]) state.arc.turnMemberId = duty[0].id;
+    return true;
+  }
+  const holder = duty.find((member) => member.id === state.arc?.turnMemberId);
+  if (!holder) {
+    state.arc!.turnMemberId = state.activeMemberId ?? duty[0].id;
+    return true;
+  }
+  return holder.id === state.activeMemberId;
 }
 
 export function spendArcTurn(state: GameState, note: string) {
   const who = ensureSquad(state);
   const loc = currentArcLoc(state);
-  const i = Math.max(
-    0,
-    state.squad.findIndex((m) => m.id === state.arc!.turnMemberId),
-  );
-  const actor = state.squad[i] ?? who;
-  const next = state.squad[(i + 1) % state.squad.length];
+  const duty = ridersOnDuty(state);
+  const actor = duty.find((member) => member.id === (state.activeMemberId ?? who.id)) ?? who;
+  const i = Math.max(0, duty.findIndex((member) => member.id === actor.id));
+  const next = duty.length <= 1 ? actor : duty[(i + 1) % duty.length] ?? actor;
   actor.lastTurnDay = state.day;
   state.arc!.chapter = arcChapter(state);
   state.arc!.turn += 1;
   state.arc!.turnMemberId = next.id;
-  const line = `${actor.name} closed a beat in ${locById(loc).short}. Turn passes to ${next.name}. ${note}`;
+  const line = `${actor.name} closed a beat in ${locById(loc).short}. ${
+    next.id === actor.id ? "The porch is yours until someone sits." : `Turn offers ${next.name} the next loud job.`
+  } ${note}`;
   state.arc!.log = [line, ...state.arc!.log].slice(0, 24);
-  if (state.squad.length > 1) {
-    state.toast = `ARC turn → ${next.name}`;
+  if (duty.length > 1 && next.id !== actor.id) {
+    state.toast = `ARC offers ${next.name} the next loud job. Quiet work stays open.`;
   }
 }
 
@@ -336,8 +358,11 @@ export function maybeSpendArcTurn(state: GameState, loc: LocationId, kind: Missi
 
 export function passArcTurn(state: GameState) {
   ensureSquad(state);
-  if (state.arc!.turnMemberId !== state.activeMemberId) {
-    state.toast = "ARC turn belongs to someone else.";
+  if (!canTakeArcTurn(state, currentArcLoc(state), "raid")) {
+    const wait = ridersOnDuty(state).find((member) => member.id === state.arc?.turnMemberId);
+    state.toast = wait
+      ? `${wait.name} has the next loud job. Scout, forage, trade, and the board never wait.`
+      : "Loud jobs are open. The porch is yours.";
     return;
   }
   spendArcTurn(state, "Passed from the porch.");

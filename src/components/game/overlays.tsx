@@ -9,7 +9,9 @@ import { useGame } from "@/game/store";
 import type { Operative } from "@/game/types";
 import { STAT_COPY, STAT_ORDER } from "@/game/stats-copy";
 import { cn } from "@/lib/cn";
-import { CommandBar, EncounterBackdrop } from "./encounter-scene";
+import { CommandBar, EncounterBackdrop, EventChips, EventLog } from "./encounter-scene";
+import { KIND_LABEL, eventChips, eventStatHint, shiftRadio, dawnLines } from "@/game/event-theater";
+import { currentPorch } from "@/game/porch";
 import {
   ClassGlyph,
   Coin,
@@ -45,9 +47,10 @@ export function ToastHost() {
 }
 
 export function MissionOverlay() {
-  const mission = useGame((g) => g.s.mission);
-  const combat = useGame((g) => g.s.combat);
-  const ops = useGame((g) => g.s.operatives);
+  const s = useGame((g) => g.s);
+  const mission = s.mission;
+  const combat = s.combat;
+  const ops = s.operatives;
   const rollBeat = useGame((g) => g.rollBeat);
   const pickTactic = useGame((g) => g.pickTactic);
   const cont = useGame((g) => g.continueMission);
@@ -100,43 +103,44 @@ export function MissionOverlay() {
   if (!mission || combat) return null;
   const beat = mission.beats[mission.beatIndex];
   const last = mission.beatIndex >= mission.beats.length - 1;
-  const lead = ops.find((o) => o.id === mission.partyIds[0]);
   const loc = locById(mission.locationId);
-  const leadStats = lead ? computeStats(lead) : null;
   const party = mission.partyIds
     .map((id) => ops.find((o) => o.id === id))
     .filter(Boolean) as Operative[];
   const partyDown = party.length > 0 && party.every((o) => o.hp <= 0 || o.status === "dead");
 
   const choosing = !!(mission.waiting && beat?.tactics && !beat.tacticId);
+  const chips = eventChips(s, mission);
+  const porchLive = currentPorch().seats.filter((seat) => !seat.self);
 
   return (
     <div className="fixed inset-0 z-40 flex flex-col" data-mission="1">
-      <EncounterBackdrop locationId={mission.locationId} />
+      <EncounterBackdrop locationId={mission.locationId} tone={mission.kind === "boss" || mission.kind === "raid" ? "danger" : "neutral"} />
 
       <div className="relative z-[1] flex min-h-0 flex-1 flex-col">
         <div className="shrink-0 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="font-display text-label uppercase tracking-[0.22em] text-ember">
-                {loc.short} · {mission.approach ?? "standard"} · {mission.kind} · beat {mission.beatIndex + 1}/
+                {KIND_LABEL[mission.kind]} · {loc.short} · {mission.approach ?? "standard"} · beat {mission.beatIndex + 1}/
                 {mission.beats.length}
               </div>
-              <h2 className="mt-1 font-display text-2xl leading-tight">{beat?.title ?? "Return"}</h2>
+              <h2 className="mt-1 font-display text-2xl leading-tight">{beat?.title ?? "Debrief"}</h2>
+              <p className="mt-1 text-secondary text-moon">{mission.briefing ?? beat?.prompt}</p>
             </div>
             <div className="shrink-0 text-right text-label text-muted">
               <Coin n={mission.coins} />
             </div>
           </div>
-
-          <div className="mt-3 flex items-center gap-2">
-            {party.map((op) => (
-              <div key={op.id} className="flex items-center gap-1.5">
-                <Portrait op={op} size={28} />
-                <span className="hidden text-label text-muted sm:inline">{op.name}</span>
-              </div>
-            ))}
-          </div>
+          {mission.stakes ? <p className="mt-2 text-label text-muted">{mission.stakes}</p> : null}
+          <EventChips chips={chips} />
+          {porchLive.length ? (
+            <p className="mt-2 text-label text-muted">
+              Porch · {porchLive.map((seat) => seat.name).join(", ")} · quiet jobs never wait
+            </p>
+          ) : (
+            <p className="mt-2 text-label text-muted">Porch · yours until someone sits</p>
+          )}
 
           <div className="mt-3 flex gap-1.5">
             {mission.beats.map((b, i) => (
@@ -151,18 +155,9 @@ export function MissionOverlay() {
           </div>
         </div>
 
-        <div className="ms-scroll min-h-0 flex-1 overflow-y-auto px-4 pb-4">
-          <p className="text-body leading-relaxed text-moon">{beat?.prompt}</p>
-          {beat && lead && beat.tacticId ? (
-            <div className="mt-3 flex flex-wrap items-center gap-2 text-label uppercase tracking-wider text-muted">
-              <span className="rounded-full bg-ink/70 px-2 py-1 text-ember">
-                {beat.stat} {leadStats ? leadStats[beat.stat] : ""} · DC {beat.dc}
-              </span>
-              <span>{lead.name} rolls</span>
-            </div>
-          ) : null}
-
-          {choosing ? (
+        {choosing ? (
+          <div className="ms-scroll min-h-0 flex-1 overflow-y-auto px-4 pb-4">
+            <p className="text-body leading-relaxed text-moon">{beat?.prompt}</p>
             <div className="mt-4 space-y-2">
               <p className="font-display text-label uppercase tracking-[0.16em] text-ember">Call it</p>
               {beat?.tactics?.map((t) => (
@@ -180,43 +175,60 @@ export function MissionOverlay() {
                 </button>
               ))}
             </div>
-          ) : (
-            <>
-              <div className="mt-5 flex justify-center">
-                <DiceFace value={mission.lastRoll?.value} band={mission.lastRoll?.band} spinning={spin} size={128} />
-              </div>
-              {mission.lastRoll ? (
-                <p className="mt-3 text-center text-secondary text-muted">
-                  {mission.lastRoll.text}. {BAND_COPY[mission.lastRoll.band]}
-                </p>
-              ) : null}
-
-              <ul className="mt-4 space-y-1.5 text-secondary text-muted">
-                {mission.narrative.slice(-4).map((n, i, all) => (
-                  <li key={i} className={i === all.length - 1 ? "text-paper" : ""}>
-                    {n}
-                  </li>
-                ))}
-              </ul>
-
-              {mission.loot.length ? (
-                <div className="mt-4 border-t border-line pt-3">
-                  <SectionLabel>Recovered</SectionLabel>
-                  {mission.loot.map((it) => (
-                    <ItemLine key={it.id} item={it} />
-                  ))}
+          </div>
+        ) : (
+          <>
+            <EventLog lines={mission.narrative} />
+            {mission.lastRoll ? (
+              <div className="shrink-0 px-4 pb-2">
+                <div className="flex items-center justify-center gap-3">
+                  <DiceFace value={mission.lastRoll.value} band={mission.lastRoll.band} spinning={spin} size={72} />
+                  <p className="text-secondary text-moon">
+                    {mission.lastRoll.text}. {BAND_COPY[mission.lastRoll.band]}
+                  </p>
                 </div>
-              ) : null}
-            </>
-          )}
+              </div>
+            ) : spin ? (
+              <div className="flex shrink-0 justify-center px-4 pb-2">
+                <DiceFace spinning size={72} />
+              </div>
+            ) : null}
+            {mission.loot.length ? (
+              <div className="shrink-0 border-t border-line/50 px-4 py-2">
+                <SectionLabel>Recovered</SectionLabel>
+                {mission.loot.map((it) => (
+                  <ItemLine key={it.id} item={it} />
+                ))}
+              </div>
+            ) : null}
+          </>
+        )}
+
+        <div className="shrink-0 px-3 py-2">
+          <div className="grid grid-cols-3 gap-2">
+            {party.map((op) => (
+              <div key={op.id} className="min-w-0 rounded-[var(--radius-sm)] bg-ink/70 px-2 py-2 backdrop-blur-sm shadow-[var(--shadow-border)]">
+                <div className="flex min-w-0 items-center gap-2">
+                  <Portrait op={op} size={28} />
+                  <span className="min-w-0 flex-1 truncate text-label text-paper">{op.name}</span>
+                </div>
+                <HpBar hp={op.hp} max={op.maxHp} className="mt-1.5" />
+              </div>
+            ))}
+          </div>
         </div>
 
         {choosing ? null : (
           <CommandBar>
             {mission.waiting ? (
-              <Button className="w-full" variant="ember" onClick={onRoll} disabled={spin} sound="none" autoFocus>
-                Roll d20
-              </Button>
+              <>
+                {beat ? (
+                  <p className="mb-2 min-h-8 text-secondary text-moon">{eventStatHint(beat.stat, beat.dc)}</p>
+                ) : null}
+                <Button className="w-full" variant="ember" onClick={onRoll} disabled={spin} sound="none" autoFocus>
+                  Roll d20
+                </Button>
+              </>
             ) : (
               <Button
                 className="w-full"
@@ -438,6 +450,8 @@ export function CombatOverlay() {
           ) : null}
           {phase ? (
             <p className="mt-1 font-display text-label uppercase tracking-[0.16em] text-ember">{phase.name}</p>
+          ) : enemy?.flavor ? (
+            <p className="mt-1 text-secondary text-moon">{enemy.flavor}</p>
           ) : null}
 
           <div className="relative mt-3">
@@ -465,15 +479,7 @@ export function CombatOverlay() {
         </div>
 
         {/* The room fills the gap; the fight's words sit down against the party. */}
-        <div className="ms-scroll min-h-0 flex-1 overflow-y-auto px-4" aria-live="polite">
-          <div className="flex min-h-full flex-col justify-end space-y-1 text-secondary text-muted">
-            {combat.log.slice(-10).map((line, i, all) => (
-              <p key={i} className={i === all.length - 1 ? "text-paper" : ""}>
-                {line}
-              </p>
-            ))}
-          </div>
-        </div>
+        <EventLog lines={combat.log} />
 
         <div className="shrink-0 px-3 py-3">
           <div className="grid grid-cols-3 gap-2">
@@ -828,6 +834,17 @@ export function RestConfirm() {
             {downedNames} {many ? "are" : "is"} downed. Resting without an Infirmary kills them for good.
           </p>
         ) : null}
+        <ul className="mt-3 space-y-2 text-sm text-moon">
+          {dawnLines(s).map((line) => {
+            const parsed = line.includes(" · ") ? line.split(" · ") : ["", line];
+            return (
+              <li key={line}>
+                <span className="font-display text-[10px] uppercase tracking-[0.14em] text-ember">{parsed[0]}</span>
+                <span className="mt-0.5 block">{parsed.slice(1).join(" · ")}</span>
+              </li>
+            );
+          })}
+        </ul>
         {penalties.length ? (
           <ul className="mt-3 space-y-1.5 text-sm text-ember">
             {penalties.map((p) => (
@@ -901,30 +918,40 @@ export function ShiftSheet() {
   };
 
   return (
-    <div className="fixed inset-0 z-[45] flex items-end justify-center bg-ink/80 p-3 md:items-center">
-      <div className="ms-pop max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-[var(--radius-xl)] bg-surface p-5 shadow-[var(--shadow-border)] ms-scroll">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="font-display text-[10px] uppercase tracking-[0.2em] text-ember">
-              {WATCH_LABEL[s.shift.watch]} · {task.watchCost} watch{task.watchCost > 1 ? "es" : ""}
-              {task.required ? " · required" : ""}
-            </p>
-            <h2 className="mt-1 font-display text-xl">{task.title}</h2>
+    <div className="fixed inset-0 z-[45] flex flex-col" data-shift-event="1">
+      <EncounterBackdrop locationId={task.loc ?? s.selectedLoc ?? "ironclad"} />
+      <div className="relative z-[1] flex min-h-0 flex-1 flex-col">
+        <div className="shrink-0 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="font-display text-label uppercase tracking-[0.2em] text-ember">
+                {WATCH_LABEL[s.shift.watch]} · {task.watchCost} watch{task.watchCost > 1 ? "es" : ""}
+                {task.required ? " · required" : ""}
+              </p>
+              <h2 className="mt-1 font-display text-xl">{task.title}</h2>
+            </div>
+            <button
+              type="button"
+              aria-label="Close job"
+              onClick={() => {
+                sfx.click();
+                close();
+              }}
+              className="flex size-11 items-center justify-center rounded-lg border border-line text-moon"
+            >
+              <X className="size-5" />
+            </button>
           </div>
-          <button
-            type="button"
-            aria-label="Close job"
-            onClick={() => {
-              sfx.click();
-              close();
-            }}
-            className="flex size-11 items-center justify-center rounded-lg border border-line text-moon"
-          >
-            <X className="size-5" />
-          </button>
+          <EventChips
+            chips={[
+              { label: "Watch", value: WATCH_LABEL[s.shift.watch] },
+              { label: "Cost", value: `${task.watchCost}` },
+              { label: "Board", value: task.required ? "required" : "open" },
+            ]}
+          />
         </div>
-        <p className="mt-3 text-[15px] leading-relaxed text-moon">{task.brief}</p>
-        <p className="mt-2 text-sm text-muted">{task.why}</p>
+        <EventLog lines={[shiftRadio(task.kind), `SYNAPSE · ${task.brief}`, `Hollow · ${task.why}`]} />
+        <div className="ms-scroll max-h-[40vh] overflow-y-auto px-4 pb-4">
 
         {task.kind === "crates" && task.crates ? (
           <div className="mt-5 space-y-2">
@@ -1022,6 +1049,7 @@ export function ShiftSheet() {
             ))}
           </div>
         ) : null}
+        </div>
       </div>
     </div>
   );

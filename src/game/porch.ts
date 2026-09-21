@@ -1,4 +1,5 @@
 import { getBearerToken } from "@/lib/auth/client";
+import { setPorchSeats } from "./presence";
 
 export const PORCH_MAX = 10;
 
@@ -87,6 +88,7 @@ export function watchPorch(fn: (snap: PorchSnapshot) => void) {
 
 export function publishPorch(snap: PorchSnapshot) {
   cache = snap;
+  setPorchSeats(snap.ok ? snap.seats.map((seat) => ({ discordId: seat.discordId, name: seat.name, self: seat.self })) : []);
   listeners.forEach((fn) => fn(snap));
 }
 

@@ -858,7 +858,7 @@ export const useGame = create<Store>((set, get) => ({
     if ((s.shift?.watchesLeft ?? 4) < cost) return "No watches left on this shift. Rest until dawn.";
     if (!canTakeArcTurn(s, loc, kind)) {
       const wait = s.squad.find((m) => m.id === s.arc?.turnMemberId);
-      return `ARC turn belongs to ${wait?.name ?? "another rider"}. Scout is always open.`;
+      return `${wait?.name ?? "another rider"} has the next loud job. Scout, forage, and the board stay open.`;
     }
     mutate(set, (st) => {
       st.mission = buildMission(st, loc, kind, partyIds, field);
@@ -886,7 +886,7 @@ export const useGame = create<Store>((set, get) => ({
       beat.tacticId = tactic.id;
       beat.stat = tactic.stat;
       beat.dc = clamp(beat.dc + tactic.dcMod, 8, 19);
-      m.narrative = [...m.narrative, `${tactic.label}. ${tactic.blurb}`];
+      m.narrative = [...m.narrative, `SYNAPSE · ${tactic.label}. ${tactic.blurb}`];
     }),
   rollBeat: () =>
     mutate(set, (st) => {

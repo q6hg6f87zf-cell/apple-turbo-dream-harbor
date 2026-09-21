@@ -1,4 +1,5 @@
 import { locationToRegion } from "@/game/field-ops";
+import { parseEventLine, type EventChip } from "@/game/event-theater";
 import { REGION_STREET } from "@/game/item-art";
 import { roomArtFor } from "@/game/rooms";
 import type { LocationId } from "@/game/types";
@@ -27,6 +28,51 @@ export function EncounterBackdrop({
           tone === "danger" ? "ms-encounter-veil-danger" : "ms-encounter-veil",
         )}
       />
+    </div>
+  );
+}
+
+export function EventChips({ chips }: { chips: EventChip[] }) {
+  return (
+    <div className="mt-3 flex flex-wrap gap-1.5">
+      {chips.map((chip) => (
+        <span
+          key={`${chip.label}-${chip.value}`}
+          className={cn(
+            "rounded-full bg-ink/70 px-2 py-1 font-display text-[10px] uppercase tracking-[0.14em]",
+            chip.warn ? "text-ember" : "text-muted",
+          )}
+        >
+          {chip.label} {chip.value}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+export function EventLog({ lines, className }: { lines: string[]; className?: string }) {
+  return (
+    <div className={cn("ms-scroll min-h-0 flex-1 overflow-y-auto px-4", className)} aria-live="polite">
+      <div className="flex min-h-full flex-col justify-end space-y-2 py-2">
+        {lines.map((line, i, all) => {
+          const parsed = parseEventLine(line);
+          const last = i === all.length - 1;
+          return (
+            <p key={`${i}-${line.slice(0, 24)}`} className={last ? "text-paper" : "text-muted"}>
+              {parsed.speaker ? (
+                <>
+                  <span className="font-display text-[10px] uppercase tracking-[0.16em] text-ember">
+                    {parsed.speaker}
+                  </span>
+                  <span className="mt-0.5 block text-secondary leading-relaxed">{parsed.text}</span>
+                </>
+              ) : (
+                <span className="text-secondary leading-relaxed">{parsed.text}</span>
+              )}
+            </p>
+          );
+        })}
+      </div>
     </div>
   );
 }
