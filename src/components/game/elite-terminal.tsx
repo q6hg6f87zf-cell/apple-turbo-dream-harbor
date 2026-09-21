@@ -200,15 +200,26 @@ function guessElite(state: GameState, raw: string): "ok" | "denied" | "lock" | "
     if (!state.terminalDrained) {
       state.terminalDrained = true;
       state.challengeCoin = true;
-      state.coins += 3000;
-      pushLog(state, "Hidden terminal breach: T-0880 challenge coin recovered. +3,000 bottle caps.");
-      state.toast = "Terminal cracked. +3,000 bottle caps.";
-      h.log = [...h.log, "ACCOUNT OVERRIDE", "+3,000 BOTTLE CAPS TRANSFERRED", "EASTER EGG // T-0880 CHALLENGE COIN RECOVERED"];
-    } else {
+      // Main-menu / unstarted breaches unlock the challenge coin only. Bottle
+      // caps stay on the server-authoritative economy once a campaign file is live.
+      if (state.started) {
+        state.coins += 3000;
+        pushLog(state, "Hidden terminal breach: T-0880 challenge coin recovered. +3,000 bottle caps.");
+        state.toast = "Terminal cracked. +3,000 bottle caps.";
+        h.log = [...h.log, "ACCOUNT OVERRIDE", "+3,000 BOTTLE CAPS TRANSFERRED", "EASTER EGG // T-0880 CHALLENGE COIN RECOVERED"];
+      } else {
+        pushLog(state, "Hidden terminal breach: T-0880 challenge coin recovered.");
+        state.toast = "T-0880 challenge coin recovered.";
+        h.log = [...h.log, "EASTER EGG // T-0880 CHALLENGE COIN RECOVERED"];
+      }
+    } else if (state.started) {
       const drip = 40 + Math.floor(Math.random() * 25);
       state.coins += drip;
       state.toast = `Already drained. +${drip} caps in the tray.`;
       h.log = [...h.log, "VAULT ACCOUNT: MOSTLY EMPTY", `TYRONE: "You already cleaned that crate."`, `+${drip} CAPS IN THE TRAY`];
+    } else {
+      state.toast = "Archive already recovered.";
+      h.log = [...h.log, "VAULT ACCOUNT: MOSTLY EMPTY", "ARCHIVE ALREADY RECOVERED"];
     }
     return "won";
   }

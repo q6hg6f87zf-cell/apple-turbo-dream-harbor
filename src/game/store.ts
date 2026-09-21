@@ -1388,5 +1388,6 @@ if (typeof window !== "undefined") {
       api.openRegionMap();
     },
     getState: () => useGame.getState().s,
+    hackPick: (word: string) => useGame.getState().hackPick(word),
   };
 }
