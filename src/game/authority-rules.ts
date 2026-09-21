@@ -153,6 +153,21 @@ export function normalizePerformanceScore(raw: unknown): number {
   return Math.max(0, Math.min(1000, Math.round(n)));
 }
 
+/** 0 → 0.55, 500 → 1.00, 1000 → 1.45. Rank gates never scale. */
+export function authorityPerformanceScale(score: number): number {
+  const n = normalizePerformanceScore(score);
+  return Math.round((0.55 + (n / 1000) * 0.9) * 1000) / 1000;
+}
+
+export function scaleAuthorityAmount(base: number, score: number): number {
+  if (!base) return 0;
+  return Math.max(0, Math.round(base * authorityPerformanceScale(score)));
+}
+
+export function authorityEconomyLocked(state: { authorityCampaign?: { active?: boolean } | null }): boolean {
+  return !!state.authorityCampaign?.active;
+}
+
 // Resident level is derived from total authoritative XP. The client may cache
 // the display level, but it cannot submit a level value to satisfy raid/Vault
 // gates. One curve therefore serves gameplay, persistence and server checks.
