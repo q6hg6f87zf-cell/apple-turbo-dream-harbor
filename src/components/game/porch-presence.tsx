@@ -3,6 +3,34 @@ import { useGame } from "@/game/store";
 import { useP2PRoom } from "@/lib/multiplayer/use-p2p-room";
 import { useEffect, useState } from "react";
 
+const WHERE: Record<string, string> = {
+  title: "porch",
+  briefing: "briefing",
+  hq: "compound",
+  inventory: "lockbox",
+  more: "more",
+  roster: "roster",
+  forge: "machine shop",
+  map: "the map",
+  ledger: "ledger",
+  codex: "codex",
+  arcade: "cabinet",
+  vault: "vault",
+  squad: "registry",
+  market: "market",
+  gallery: "reels",
+  rules: "rules",
+};
+
+function where(screen: string) {
+  return WHERE[screen] ?? screen.replace(/-/g, " ");
+}
+
+function initial(name: string) {
+  const t = name.trim();
+  return (t[0] ?? "?").toUpperCase();
+}
+
 function Mesh({
   discordId,
   name,
@@ -75,20 +103,41 @@ export function PorchStrip() {
   if (!snap) return null;
   const live = snap.live;
   const max = snap.max || PORCH_MAX;
+  const others = snap.seats.filter((seat) => !seat.self);
   return (
     <div className="rounded-[var(--radius-md)] bg-ink/55 px-3 py-3 shadow-[var(--shadow-border)]" data-porch-strip="1">
       <div className="flex items-baseline justify-between gap-3">
-        <div className="font-display text-[10px] uppercase tracking-[0.18em] text-ember">Porch occupancy</div>
+        <div className="font-display text-[10px] uppercase tracking-[0.18em] text-ember">Vault 13 porch</div>
         <div className="font-mono text-[11px] text-ember-bright">
           {live}/{max}
         </div>
       </div>
-      <p className="mt-1 text-[12px] leading-relaxed text-muted">
+      <div className="mt-2 flex gap-1" aria-hidden>
+        {Array.from({ length: max }, (_, i) => {
+          const seat = snap.seats[i];
+          return (
+            <span
+              key={seat?.discordId ?? `empty-${i}`}
+              title={seat ? `${seat.name}${seat.handle ? ` @${seat.handle.replace(/^@/, "")}` : ""}` : "empty stool"}
+              className={
+                seat
+                  ? "flex size-6 items-center justify-center rounded-full bg-ember text-[10px] font-display text-ink"
+                  : "size-6 rounded-full bg-ink/80 shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--color-line)_70%,transparent)]"
+              }
+            >
+              {seat ? initial(seat.name || "R") : ""}
+            </span>
+          );
+        })}
+      </div>
+      <p className="mt-2 text-[12px] leading-relaxed text-muted">
         {snap.full && !snap.seated
-          ? "Ten stools are sat. Your file stays private until one cools."
-          : snap.seated
-            ? "You have a stool. Caps stay on your card. The porch is presence."
-            : "Vault 13 holds ten live riders. Sit a stool — the eleventh waits."}
+          ? "Ten stools are sat. Wait for one to cool."
+          : others.length
+            ? `${others.length} other rider${others.length === 1 ? "" : "s"} on the porch. Caps stay on your card.`
+            : snap.seated
+              ? "You have a stool. The porch is quiet — wait for the others."
+              : "Vault 13 holds ten live riders. Sit a stool."}
       </p>
       {snap.seats.length ? (
         <ul className="mt-2 space-y-1 font-mono text-[11px] text-ember-bright">
@@ -99,7 +148,7 @@ export function PorchStrip() {
                 {seat.name || "Rider"}
                 {seat.handle ? ` @${seat.handle.replace(/^@/, "")}` : ""}
               </span>
-              <span className="shrink-0 text-ember/70">{seat.screen}</span>
+              <span className="shrink-0 text-ember/70">{where(seat.screen)}</span>
             </li>
           ))}
         </ul>

@@ -295,6 +295,18 @@ async function validateMissionStart(
 ): Promise<string | null> {
   if (!regionUnlocked(region, row.boss_clears ?? {})) return `${region} is locked by the previous regional boss.`;
   if (!partyIds.length) return "A server mission requires at least one registered resident.";
+  if (kind === "boss") {
+    const sql = await getSql();
+    const inflight = await sql<{ user_id: string }>`
+      select user_id from hollow_mission_ticket
+      where campaign_id = ${CAMPAIGN_ID}
+        and region = ${region}
+        and mission_kind = 'boss'
+        and settled_at is null
+      limit 1
+    `;
+    if (inflight[0]) return `${region} raid is already in motion. Wait for that rider to finish.`;
+  }
   if (kind !== "boss") return null;
   if (row.boss_clears?.[region]) return `${region} boss has already been cleared.`;
 

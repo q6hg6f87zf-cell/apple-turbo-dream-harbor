@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import type { Operative } from "@/game/types";
 import { getBearerToken } from "./client";
 
 export type DiscordAccess = {
@@ -14,6 +15,7 @@ export type DiscordAccess = {
   discordId?: string;
   name?: string;
   handle?: string;
+  soul?: Operative | null;
   error?: string;
 };
 
@@ -44,6 +46,7 @@ export async function fetchDiscordAccess(): Promise<DiscordAccess> {
     discordId: body.discordId,
     name: body.name,
     handle: body.handle,
+    soul: body.soul ?? null,
     error: body.error,
   };
 }

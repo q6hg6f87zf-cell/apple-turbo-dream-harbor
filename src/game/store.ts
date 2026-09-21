@@ -43,6 +43,7 @@ import {
   rollBounty,
   rollShop,
   rosterCap,
+  seatSoul,
   spawnCombat,
   spawnAegisYard,
   stampPlayerProfile,
@@ -92,6 +93,7 @@ import {
   switchMember,
   withdrawFromCard,
 } from "./squad";
+import { fetchSoul, postSoul } from "./soul";
 import { buyMarketLot, ensureMarket, MARKET_POI_ID, rollMarket, TOWER_POI_ID } from "./market";
 import type { FieldDeploy } from "./field-ops";
 import { workPoi, markFieldJob } from "./field-ops";
@@ -215,6 +217,22 @@ function mutate(set: (fn: (x: Store) => Partial<Store>) => void, fn: (s: GameSta
 
 let lastRestAt = 0;
 
+async function syncRemoteSoul() {
+  const store = useGame.getState();
+  if (!store.s.discordId) return;
+  const remote = await fetchSoul();
+  if (remote) {
+    mutate(useGame.setState, (st) => {
+      if (seatSoul(st, remote)) {
+        st.toast = `${remote.name} sat from the shared file.`;
+      }
+    });
+    return;
+  }
+  const local = store.s.operatives[0];
+  if (local) void postSoul(local);
+}
+
 export const useGame = create<Store>((set, get) => ({
   s: defaultState(),
   hydrated: false,
@@ -252,6 +270,7 @@ export const useGame = create<Store>((set, get) => ({
       if (loaded.started) ensureShift(loaded);
       seedPackIfNeeded(loaded);
       set({ s: loaded, hydrated: true, handshake: deltaEmpty(delta) ? (urlSnap ? delta : null) : delta });
+      void syncRemoteSoul();
     } catch (err) {
       console.error("Hollow file failed to boot. Starting a clean porch.", err);
       const fresh = defaultState();
@@ -521,6 +540,8 @@ export const useGame = create<Store>((set, get) => ({
       st.toast = `${op.name} is on the roster.`;
     });
     sfx.forge();
+    const forged = get().s.operatives[0];
+    if (forged) void postSoul(forged);
     return null;
   },
   upgradeRoom: (room) => {
@@ -830,6 +851,9 @@ export const useGame = create<Store>((set, get) => ({
     const valid = partyIds.every((id) => idleAtHq(s).some((o) => o.id === id));
     if (!valid) return "Pick idle operatives at HQ.";
     if (kind === "raid" && partyIds.length < 1) return "Raid needs a body.";
+    if (kind === "boss" && s.locations[loc]?.bossDefeated) {
+      return "That hill is already cut. The Realm does not let you kill them twice.";
+    }
     const cost = sortieWatchCost(kind);
     if ((s.shift?.watchesLeft ?? 4) < cost) return "No watches left on this shift. Rest until dawn.";
     if (!canTakeArcTurn(s, loc, kind)) {

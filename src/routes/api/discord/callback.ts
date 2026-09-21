@@ -11,6 +11,7 @@ import {
   riderCookie,
 } from "@/lib/auth/discord-native.server";
 import { lookupRider, upsertRiderFromDiscord } from "@/lib/auth/discord-riders.server";
+import { enrollMoonSquad } from "@/lib/auth/enroll-campaign.server";
 
 export const Route = createFileRoute("/api/discord/callback")({
   server: {
@@ -37,6 +38,11 @@ export const Route = createFileRoute("/api/discord/callback")({
           if (!profile) return bounce("profile");
           const existing = await lookupRider(profile.id);
           const rider = await upsertRiderFromDiscord(profile, existing);
+          try {
+            await enrollMoonSquad(rider.discordId, rider.name, rider.handle);
+          } catch {
+            /* cookie still seats the rider */
+          }
           return redirectWithCookies(homeRedirect(request, { discord: "ok" }), [
             riderCookie({
               did: rider.discordId,

@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { hasPlayerProfile } from "@/game/engine";
+import { cloneState, hasPlayerProfile, seatSoul } from "@/game/engine";
 import { seatedMember } from "@/game/squad";
 import { sfx, unlockAudio } from "@/game/audio";
 import { useGame } from "@/game/store";
@@ -81,6 +81,16 @@ export function AuthenticatedMainMenu() {
     }
     if (access?.devBypass) stamp("Rider", "sandbox");
   }, [allowed, access?.name, access?.handle, access?.devBypass, stamp]);
+
+  useEffect(() => {
+    if (!allowed || !access?.soul) return;
+    const soul = access.soul;
+    useGame.setState((store) => {
+      const next = cloneState(store.s);
+      if (!seatSoul(next, soul)) return store;
+      return { s: next };
+    });
+  }, [allowed, access?.soul]);
 
   useEffect(() => {
     if (!allowed || !named || access?.devBypass || !access?.discordId) return;

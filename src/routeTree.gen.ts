@@ -21,6 +21,7 @@ import { Route as ApiHollowEconomyRouteImport } from './routes/api/hollow/econom
 import { Route as ApiHollowInventoryRouteImport } from './routes/api/hollow/inventory'
 import { Route as ApiHollowPorchRouteImport } from './routes/api/hollow/porch'
 import { Route as ApiHollowProgressionRouteImport } from './routes/api/hollow/progression'
+import { Route as ApiHollowSoulRouteImport } from './routes/api/hollow/soul'
 import { Route as ApiTyroneClaimRouteImport } from './routes/api/tyrone/claim'
 import { Route as ApiTyroneSpeakRouteImport } from './routes/api/tyrone/speak'
 import { Route as ApiTyroneSyncRouteImport } from './routes/api/tyrone/sync'
@@ -85,6 +86,11 @@ const ApiHollowProgressionRoute = ApiHollowProgressionRouteImport.update({
   path: '/api/hollow/progression',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiHollowSoulRoute = ApiHollowSoulRouteImport.update({
+  id: '/api/hollow/soul',
+  path: '/api/hollow/soul',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiTyroneClaimRoute = ApiTyroneClaimRouteImport.update({
   id: '/api/tyrone/claim',
   path: '/api/tyrone/claim',
@@ -114,6 +120,7 @@ export interface FileRoutesByFullPath {
   '/api/hollow/inventory': typeof ApiHollowInventoryRoute
   '/api/hollow/porch': typeof ApiHollowPorchRoute
   '/api/hollow/progression': typeof ApiHollowProgressionRoute
+  '/api/hollow/soul': typeof ApiHollowSoulRoute
   '/api/tyrone/claim': typeof ApiTyroneClaimRoute
   '/api/tyrone/speak': typeof ApiTyroneSpeakRoute
   '/api/tyrone/sync': typeof ApiTyroneSyncRoute
@@ -131,6 +138,7 @@ export interface FileRoutesByTo {
   '/api/hollow/inventory': typeof ApiHollowInventoryRoute
   '/api/hollow/porch': typeof ApiHollowPorchRoute
   '/api/hollow/progression': typeof ApiHollowProgressionRoute
+  '/api/hollow/soul': typeof ApiHollowSoulRoute
   '/api/tyrone/claim': typeof ApiTyroneClaimRoute
   '/api/tyrone/speak': typeof ApiTyroneSpeakRoute
   '/api/tyrone/sync': typeof ApiTyroneSyncRoute
@@ -149,6 +157,7 @@ export interface FileRoutesById {
   '/api/hollow/inventory': typeof ApiHollowInventoryRoute
   '/api/hollow/porch': typeof ApiHollowPorchRoute
   '/api/hollow/progression': typeof ApiHollowProgressionRoute
+  '/api/hollow/soul': typeof ApiHollowSoulRoute
   '/api/tyrone/claim': typeof ApiTyroneClaimRoute
   '/api/tyrone/speak': typeof ApiTyroneSpeakRoute
   '/api/tyrone/sync': typeof ApiTyroneSyncRoute
@@ -168,6 +177,7 @@ export interface FileRouteTypes {
     | '/api/hollow/inventory'
     | '/api/hollow/porch'
     | '/api/hollow/progression'
+    | '/api/hollow/soul'
     | '/api/tyrone/claim'
     | '/api/tyrone/speak'
     | '/api/tyrone/sync'
@@ -185,6 +195,7 @@ export interface FileRouteTypes {
     | '/api/hollow/inventory'
     | '/api/hollow/porch'
     | '/api/hollow/progression'
+    | '/api/hollow/soul'
     | '/api/tyrone/claim'
     | '/api/tyrone/speak'
     | '/api/tyrone/sync'
@@ -202,6 +213,7 @@ export interface FileRouteTypes {
     | '/api/hollow/inventory'
     | '/api/hollow/porch'
     | '/api/hollow/progression'
+    | '/api/hollow/soul'
     | '/api/tyrone/claim'
     | '/api/tyrone/speak'
     | '/api/tyrone/sync'
@@ -220,6 +232,7 @@ export interface RootRouteChildren {
   ApiHollowInventoryRoute: typeof ApiHollowInventoryRoute
   ApiHollowPorchRoute: typeof ApiHollowPorchRoute
   ApiHollowProgressionRoute: typeof ApiHollowProgressionRoute
+  ApiHollowSoulRoute: typeof ApiHollowSoulRoute
   ApiTyroneClaimRoute: typeof ApiTyroneClaimRoute
   ApiTyroneSpeakRoute: typeof ApiTyroneSpeakRoute
   ApiTyroneSyncRoute: typeof ApiTyroneSyncRoute
@@ -311,6 +324,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiHollowProgressionRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/hollow/soul': {
+      id: '/api/hollow/soul'
+      path: '/api/hollow/soul'
+      fullPath: '/api/hollow/soul'
+      preLoaderRoute: typeof ApiHollowSoulRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/tyrone/claim': {
       id: '/api/tyrone/claim'
       path: '/api/tyrone/claim'
@@ -348,6 +368,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiHollowInventoryRoute: ApiHollowInventoryRoute,
   ApiHollowPorchRoute: ApiHollowPorchRoute,
   ApiHollowProgressionRoute: ApiHollowProgressionRoute,
+  ApiHollowSoulRoute: ApiHollowSoulRoute,
   ApiTyroneClaimRoute: ApiTyroneClaimRoute,
   ApiTyroneSpeakRoute: ApiTyroneSpeakRoute,
   ApiTyroneSyncRoute: ApiTyroneSyncRoute,

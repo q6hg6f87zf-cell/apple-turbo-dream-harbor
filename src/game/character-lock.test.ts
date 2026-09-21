@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { characterForged, defaultState, FORGE_REROLLS, stampPlayerProfile } from "./engine.ts";
+import { characterForged, defaultState, FORGE_REROLLS, seatSoul, stampPlayerProfile } from "./engine.ts";
+import type { Operative } from "./types.ts";
 
 test("character is unforged until the first operative exists", () => {
   const s = defaultState();
@@ -21,4 +22,39 @@ test("discord plate name and handle lock after the first stamp", () => {
   assert.equal(stampPlayerProfile(s, "Other Name", "otherhandle"), null);
   assert.equal(s.playerName, "Brent McDonald");
   assert.equal(s.playerHandle, "brontosaurus");
+});
+
+const soul = {
+  id: "op-soul-1",
+  name: "Brontosaurus",
+  cls: "Warrior",
+  race: "Human",
+  lineage: "Dust",
+  origin: "Vault",
+  hp: 12,
+  maxHp: 12,
+  status: "idle",
+  inventory: [],
+} as unknown as Operative;
+
+test("remote soul seats on an empty file", () => {
+  const s = defaultState();
+  assert.equal(seatSoul(s, soul), true);
+  assert.equal(s.operatives[0]?.id, "op-soul-1");
+  assert.equal(characterForged(s), true);
+});
+
+test("remote soul replaces a second local character", () => {
+  const s = defaultState();
+  s.operatives = [{ id: "local-other", name: "Impostor", status: "idle", inventory: [] } as never];
+  assert.equal(seatSoul(s, soul), true);
+  assert.equal(s.operatives.length, 1);
+  assert.equal(s.operatives[0]?.id, "op-soul-1");
+});
+
+test("the same soul does not reshuffle an already seated file", () => {
+  const s = defaultState();
+  assert.equal(seatSoul(s, soul), true);
+  assert.equal(seatSoul(s, soul), false);
+  assert.equal(s.operatives.length, 1);
 });

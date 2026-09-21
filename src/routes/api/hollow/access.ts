@@ -3,7 +3,9 @@ import {
   discordConfigured,
   readRiderSession,
 } from "@/lib/auth/discord-native.server";
+import { enrollMoonSquad } from "@/lib/auth/enroll-campaign.server";
 import { lookupRider } from "@/lib/auth/discord-riders.server";
+import { lookupSoul } from "@/lib/auth/hollow-soul.server";
 
 const HEADERS = { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" };
 
@@ -30,18 +32,25 @@ async function riderAccess(request: Request) {
   const name = stored?.name || session.name;
   const handle = stored?.handle || session.handle;
   const stamped = true;
+  try {
+    await enrollMoonSquad(session.did, name, handle);
+  } catch {
+    /* porch still seats without the ledger */
+  }
+  const soul = await lookupSoul(session.did);
   return json({
     allowed: true,
     authenticated: true,
     discord: true,
     linked: true,
     stamped,
-    returning: !!stored?.stamped || session.stamped,
+    returning: !!stored?.stamped || session.stamped || !!soul,
     devBypass: false,
     provider: "discord",
     discordId: session.did,
     name,
     handle,
+    soul: soul?.operative ?? null,
     stage: "ready" as const,
   });
 }

@@ -1433,6 +1433,18 @@ export function characterForged(state: GameState): boolean {
   return state.operatives.length > 0;
 }
 
+/** Seat the Discord-locked soul. Server file wins over a local second character. */
+export function seatSoul(state: GameState, soul: Operative | null | undefined): boolean {
+  if (!soul?.id || !soul.name || !soul.cls) return false;
+  const current = state.operatives[0];
+  if (current?.id === soul.id && state.operatives.length === 1) return false;
+  state.operatives = [soul];
+  state.selectedId = soul.id;
+  if (state.tutorial === "briefing" || state.tutorial === "forge") state.tutorial = "shift";
+  if (state.screen === "forge") state.screen = "hq";
+  return true;
+}
+
 export const FORGE_REROLLS = 2;
 
 export function hasPlayerProfile(state: GameState): boolean {
