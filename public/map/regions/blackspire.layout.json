@@ -1,0 +1,14 @@
+{
+  "id": "blackspire",
+  "map": "/map/regions/blackspire.jpg?v=town4k1",
+  "camera": { "yaw": 8, "pitch": 50, "fov": 28 },
+  "bounds": { "w": 1, "h": 1 },
+  "rim": { "ember": 0.45, "teal": 0.05 },
+  "layers": [
+    { "id": "ground", "z": 0 },
+    { "id": "districts", "z": 0.08 },
+    { "id": "roofs", "z": 0.18 },
+    { "id": "smoke", "z": 0.26, "scroll": true }
+  ],
+  "anchors": []
+}

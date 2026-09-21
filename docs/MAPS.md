@@ -23,24 +23,25 @@ POI records already live on `RegionDefinition.points` in `src/game/data.ts` with
 
 ## What is live today (do not confuse these)
 
-1. `WorldAtlas` → `HollowGlobeWebGL` is an Earth-like orbital shader. It is **not** the painted Hollow overworld.
-2. Region briefing (`region-sheet.tsx`) uses a **street photo** as a full-bleed backdrop, then lists POIs. The painted region JPGs are barely the play surface.
-3. That is why the game still feels like "a flat jpg with pins" even though 1MB strategy maps already sit in `/public/map/regions`.
+1. `WorldAtlas` → `HollowGlobeWebGL` is an Earth-like orbital shader. It is **not** the painted Hollow overworld. **Keep it** — this slice does not wrap the overworld onto the globe.
+2. `RegionMapStage` (`src/components/game/region-map-stage.tsx`) is the **2.5D war-table player**: painted jpg as a displaced WebGL plane, layout sidecars in `/public/map/regions/<id>.layout.json`, world-anchored POI pins, fog silhouettes, Kane rim tint. Falls back to the flat CSS map if WebGL2 fails.
+3. Globe → region handoff plays a short dive using the region painting (`hollow:region-dive`), then seats the war table. Do not invent a new mission flow.
+4. Region briefing (`region-sheet.tsx`) still uses a **street photo** as a full-bleed backdrop for sortie setup. Street stills are not the map.
 
 ## Required rebuild — 2.5D map player
 
-Build `RegionMapStage` (and later `OverworldMapStage`) that:
+`RegionMapStage` is live. Keep hardening it so that:
 
-- Renders the painted jpg as a textured plane, not a CSS `background-image`.
-- Adds a matching height / occlusion layer so rooftops sit above streets.
+- It renders the painted jpg as a textured plane, not a CSS `background-image`.
+- It adds a matching height / occlusion layer so rooftops sit above streets.
 - Camera is high isometric, same angle as the prompts. Orbit ±18°, pitch locked, pinch-zoom 0.8–2.4.
 - Parallax: far haze, mid districts, near rails/smoke. No first-person walk.
-- POIs are world-anchored meshes/sprites at `point.x/y`, not HTML dots over a photo.
+- POIs are world-anchored (projected) at `point.x/y`, not unprojected HTML dots over a photo.
 - Fog-of-war uses `discoveredPois` / `unlocked`. Unknown sites are silhouettes, not missing art.
 - Heat / watch / Kane band can tint the rim. Do not redraw the city to show state.
-- Mobile: one-finger pan, two-finger zoom, tap pin → existing `RegionSheet` briefing. Do not invent a new mission flow.
+- Mobile: one-finger pan, two-finger zoom, tap pin → existing briefing / `workSite` flow. Do not invent a new mission flow.
 
-Stack: Three/R3F or a tight WebGL2 plane + displacement. Keep `globe-webgl.tsx` as the orbital theater until a second pass wraps the painted overworld onto a custom globe. Do not delete the globe in this slice.
+Stack: tight WebGL2 plane + luminance-derived displacement (Three/R3F optional later). Keep `globe-webgl.tsx` as the orbital theater until a second pass wraps the painted overworld onto a custom globe. Do not delete the globe in this slice.
 
 ## Forbidden
 

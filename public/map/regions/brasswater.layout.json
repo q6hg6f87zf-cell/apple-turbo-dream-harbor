@@ -1,0 +1,14 @@
+{
+  "id": "brasswater",
+  "map": "/map/regions/brasswater.jpg?v=town4k1",
+  "camera": { "yaw": -6, "pitch": 53, "fov": 29 },
+  "bounds": { "w": 1, "h": 1 },
+  "rim": { "ember": 0.28, "teal": 0.55 },
+  "layers": [
+    { "id": "ground", "z": 0 },
+    { "id": "districts", "z": 0.05 },
+    { "id": "roofs", "z": 0.12 },
+    { "id": "smoke", "z": 0.2, "scroll": true }
+  ],
+  "anchors": []
+}

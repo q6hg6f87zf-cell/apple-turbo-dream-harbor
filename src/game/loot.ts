@@ -102,6 +102,101 @@ function siteScrap(loc: LocationId, poiId: string | undefined, rarity: Rarity): 
         value: 110,
       },
     ],
+    "ironclad-halo": [
+      {
+        name: "Drill Square Chalk",
+        kind: "material",
+        rarity: "Common",
+        condition: "Worn",
+        effect: "Old AEGIS layout dust. Marks a footprint.",
+        lore: `2753 outlines still burn the ${site}. Someone retraced a heel last week.`,
+        value: 50,
+      },
+      {
+        name: "Frame Serial Scrap",
+        kind: "special",
+        rarity: "Uncommon",
+        condition: "Worn",
+        effect: "A T-line number Kane scrubbed from the books.",
+        lore: `Stamped into concrete at the ${site}. Not in Vesper's open ledger.`,
+        value: 95,
+      },
+    ],
+    "ironclad-berm": [
+      {
+        name: "Slag Wind Mask",
+        kind: "consumable",
+        rarity: "Common",
+        condition: "Worn",
+        effect: "Ignore the first ash choke this watch.",
+        lore: `Cloth and wire from the ${site}. Pack watches the hills from here.`,
+        value: 70,
+      },
+    ],
+    "ironclad-exchange": [
+      {
+        name: "Shut Ledger Page",
+        kind: "special",
+        rarity: "Uncommon",
+        condition: "Worn",
+        effect: "Proof the market moved under the Gate.",
+        lore: `Rats kept the ${site} books. Caps still smell like Vault 13 ink.`,
+        value: 100,
+      },
+    ],
+    "slag-foundry-row": [
+      {
+        name: "Hot Rivet Tin",
+        kind: "material",
+        rarity: "Common",
+        condition: "Worn",
+        effect: "Forge stock. Burns hotter than Ironclad scrap.",
+        lore: `Pulled off a boiler on ${site}. Still warm to the glove.`,
+        value: 65,
+      },
+      {
+        name: "Union Hall Token",
+        kind: "special",
+        rarity: "Uncommon",
+        condition: "Pristine",
+        effect: "Opens a side door on Foundry Row.",
+        lore: `Brass disk. Stamp says the night shift never ended at ${site}.`,
+        value: 120,
+      },
+    ],
+    "blackspire-lift": [
+      {
+        name: "Cage Chain Link",
+        kind: "material",
+        rarity: "Common",
+        condition: "Worn",
+        effect: "Mine lift steel. Hollow ore residue.",
+        lore: `From the ${site}. Kane wants whatever was in the cage.`,
+        value: 75,
+      },
+    ],
+    "brasswater-archive": [
+      {
+        name: "Brass Folio Corner",
+        kind: "special",
+        rarity: "Uncommon",
+        condition: "Worn",
+        effect: "Half a jump table. Math without a sky.",
+        lore: `Salt-stained metal from the ${site}. Pre-collapse hand. Incomplete on purpose.`,
+        value: 140,
+      },
+    ],
+    "veyra-spire": [
+      {
+        name: "Needle Spire Shard",
+        kind: "material",
+        rarity: "Rare",
+        condition: "Pristine",
+        effect: "AEGIS frame glass. Humming faintly.",
+        lore: `Chipped from the ${site}. Successor light to the T-0880 line.`,
+        value: 180,
+      },
+    ],
   };
   const pool = (table[poiId ?? ""] ?? []).filter((row) => RANK[row.rarity] <= RANK[rarity]);
   if (pool.length) return pick(pool);
