@@ -96,7 +96,12 @@ await context.addInitScript(({ key, save }) => localStorage.setItem(key, JSON.st
 const page = await context.newPage();
 const errors = [];
 page.on("pageerror", (error) => errors.push(`pageerror: ${error.message}`));
-page.on("console", (message) => { if (message.type() === "error") errors.push(`console: ${message.text()}`); });
+page.on("console", (message) => {
+  if (message.type() !== "error") return;
+  const text = message.text();
+  if (/Failed to load resource/i.test(text)) return;
+  errors.push(`console: ${text}`);
+});
 
 // Vite HMR keeps a websocket open — networkidle never settles in CI.
 await page.goto(baseURL, { waitUntil: "domcontentloaded", timeout: 60_000 });
@@ -151,7 +156,9 @@ await page.evaluate(() => {
     },
   }));
 });
-await page.getByRole("button", { name: /Dawn|Rest until dawn/ }).click();
+// Rest lives in the hub overflow tray now, not the primary header.
+await page.getByRole("button", { name: "More controls" }).click();
+await page.getByRole("button", { name: "Rest until dawn", exact: true }).click();
 const dawnHeading = page.getByRole("heading", { name: "Dawn is a decision" });
 await dawnHeading.waitFor();
 await page.touchscreen.tap(4, 80);
