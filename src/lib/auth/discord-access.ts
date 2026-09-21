@@ -102,3 +102,16 @@ export function useDiscordAccess() {
 export async function signInWithDiscord() {
   window.location.assign("/api/discord/start");
 }
+
+export async function signOutDiscord() {
+  try {
+    await fetch("/api/discord/logout", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { accept: "application/json" },
+    });
+  } catch {
+    /* still bounce to the porch */
+  }
+  window.location.replace("/");
+}

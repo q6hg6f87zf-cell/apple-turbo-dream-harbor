@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiRtcRouteImport } from './routes/api/rtc'
 import { Route as ApiDiscordCallbackRouteImport } from './routes/api/discord/callback'
+import { Route as ApiDiscordLogoutRouteImport } from './routes/api/discord/logout'
 import { Route as ApiDiscordPlateRouteImport } from './routes/api/discord/plate'
 import { Route as ApiDiscordStartRouteImport } from './routes/api/discord/start'
 import { Route as ApiHollowAccessRouteImport } from './routes/api/hollow/access'
@@ -37,6 +38,11 @@ const ApiRtcRoute = ApiRtcRouteImport.update({
 const ApiDiscordCallbackRoute = ApiDiscordCallbackRouteImport.update({
   id: '/api/discord/callback',
   path: '/api/discord/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDiscordLogoutRoute = ApiDiscordLogoutRouteImport.update({
+  id: '/api/discord/logout',
+  path: '/api/discord/logout',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiDiscordPlateRoute = ApiDiscordPlateRouteImport.update({
@@ -99,6 +105,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/api/rtc': typeof ApiRtcRoute
   '/api/discord/callback': typeof ApiDiscordCallbackRoute
+  '/api/discord/logout': typeof ApiDiscordLogoutRoute
   '/api/discord/plate': typeof ApiDiscordPlateRoute
   '/api/discord/start': typeof ApiDiscordStartRoute
   '/api/hollow/access': typeof ApiHollowAccessRoute
@@ -115,6 +122,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/api/rtc': typeof ApiRtcRoute
   '/api/discord/callback': typeof ApiDiscordCallbackRoute
+  '/api/discord/logout': typeof ApiDiscordLogoutRoute
   '/api/discord/plate': typeof ApiDiscordPlateRoute
   '/api/discord/start': typeof ApiDiscordStartRoute
   '/api/hollow/access': typeof ApiHollowAccessRoute
@@ -132,6 +140,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/api/rtc': typeof ApiRtcRoute
   '/api/discord/callback': typeof ApiDiscordCallbackRoute
+  '/api/discord/logout': typeof ApiDiscordLogoutRoute
   '/api/discord/plate': typeof ApiDiscordPlateRoute
   '/api/discord/start': typeof ApiDiscordStartRoute
   '/api/hollow/access': typeof ApiHollowAccessRoute
@@ -150,6 +159,7 @@ export interface FileRouteTypes {
     | '/'
     | '/api/rtc'
     | '/api/discord/callback'
+    | '/api/discord/logout'
     | '/api/discord/plate'
     | '/api/discord/start'
     | '/api/hollow/access'
@@ -166,6 +176,7 @@ export interface FileRouteTypes {
     | '/'
     | '/api/rtc'
     | '/api/discord/callback'
+    | '/api/discord/logout'
     | '/api/discord/plate'
     | '/api/discord/start'
     | '/api/hollow/access'
@@ -182,6 +193,7 @@ export interface FileRouteTypes {
     | '/'
     | '/api/rtc'
     | '/api/discord/callback'
+    | '/api/discord/logout'
     | '/api/discord/plate'
     | '/api/discord/start'
     | '/api/hollow/access'
@@ -199,6 +211,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ApiRtcRoute: typeof ApiRtcRoute
   ApiDiscordCallbackRoute: typeof ApiDiscordCallbackRoute
+  ApiDiscordLogoutRoute: typeof ApiDiscordLogoutRoute
   ApiDiscordPlateRoute: typeof ApiDiscordPlateRoute
   ApiDiscordStartRoute: typeof ApiDiscordStartRoute
   ApiHollowAccessRoute: typeof ApiHollowAccessRoute
@@ -233,6 +246,13 @@ declare module '@tanstack/react-router' {
       path: '/api/discord/callback'
       fullPath: '/api/discord/callback'
       preLoaderRoute: typeof ApiDiscordCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/discord/logout': {
+      id: '/api/discord/logout'
+      path: '/api/discord/logout'
+      fullPath: '/api/discord/logout'
+      preLoaderRoute: typeof ApiDiscordLogoutRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/discord/plate': {
@@ -319,6 +339,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ApiRtcRoute: ApiRtcRoute,
   ApiDiscordCallbackRoute: ApiDiscordCallbackRoute,
+  ApiDiscordLogoutRoute: ApiDiscordLogoutRoute,
   ApiDiscordPlateRoute: ApiDiscordPlateRoute,
   ApiDiscordStartRoute: ApiDiscordStartRoute,
   ApiHollowAccessRoute: ApiHollowAccessRoute,

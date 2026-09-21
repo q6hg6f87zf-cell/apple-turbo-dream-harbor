@@ -3,8 +3,8 @@ import { hasPlayerProfile } from "@/game/engine";
 import { seatedMember } from "@/game/squad";
 import { sfx, unlockAudio } from "@/game/audio";
 import { useGame } from "@/game/store";
-import { signInWithDiscord, stampDiscordPlate, useDiscordAccess } from "@/lib/auth/discord-access";
-import { RefreshCw, ShieldCheck } from "lucide-react";
+import { signInWithDiscord, signOutDiscord, stampDiscordPlate, useDiscordAccess } from "@/lib/auth/discord-access";
+import { LogOut, RefreshCw, ShieldCheck } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { CapMark, SectionLabel } from "./primitives";
 import { HelpChrome, TalkOverlay } from "./talk-overlay";
@@ -254,6 +254,17 @@ export function AuthenticatedMainMenu() {
                   >
                     {allowed ? <DiscordMark className="size-4" /> : null}
                     {loginLabel}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="w-full"
+                    onClick={() => {
+                      unlockAudio();
+                      sfx.click();
+                      void signOutDiscord();
+                    }}
+                  >
+                    <LogOut className="size-4" /> Log out
                   </Button>
                 </div>
               </>
