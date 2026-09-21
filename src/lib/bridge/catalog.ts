@@ -21,6 +21,8 @@ export type EventVisibility = "private" | "party" | "campaign" | "guild" | "publ
 
 export const FEED_VISIBILITY = new Set<EventVisibility>(["campaign", "guild", "public"]);
 
+export const CANONICAL_ORIGIN = "https://thehollowrealm.com";
+
 export const DEEP_LINKS = {
   home: "/",
   vault: "/vault",
@@ -30,17 +32,33 @@ export const DEEP_LINKS = {
   region: (id: string) => `/region/${id}`,
 } as const;
 
+export const ALLOWED_REGIONS = ["ironclad", "slagtown", "blackspire", "brasswater", "veyra", "kingdom", "caverns", "library"] as const;
+
 export const ALLOWED_TO = ["vault", "inventory", "map", "hq", "roster", "profile", "market"] as const;
 export type DeepTo = (typeof ALLOWED_TO)[number];
 
 export function parseDeepTo(raw: unknown): DeepTo | null {
   const value = String(raw ?? "").trim().toLowerCase();
+  if (value === "world") return "map";
   return (ALLOWED_TO as readonly string[]).includes(value) ? (value as DeepTo) : null;
 }
 
 export function screenForTo(to: DeepTo) {
   if (to === "profile" || to === "hq") return "hq" as const;
   return to;
+}
+
+export function parseRegion(raw: unknown) {
+  const value = String(raw ?? "").trim().toLowerCase();
+  return (ALLOWED_REGIONS as readonly string[]).includes(value) ? value : null;
+}
+
+export function absoluteDeepLink(path: string) {
+  const dest = path.startsWith("/") ? path : `/${path}`;
+  if (dest.startsWith("//") || /^https?:/i.test(path) || /javascript:/i.test(path)) {
+    return `${CANONICAL_ORIGIN}/`;
+  }
+  return `${CANONICAL_ORIGIN}${dest}`;
 }
 
 export function isEventType(raw: unknown): raw is WorldEventType {
@@ -59,5 +77,3 @@ export function defaultImportance(type: WorldEventType) {
   if (type === "mission.completed" || type === "rare_item.found") return 5;
   return 3;
 }
-
-export const CANONICAL_ORIGIN = "https://thehollowrealm.com";

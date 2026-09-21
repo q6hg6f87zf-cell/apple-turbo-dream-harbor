@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { getSql } from "@/lib/db";
-import { audit } from "./audit.server";
+import { audit } from "./audit.server.ts";
+import { bridgeLog } from "./log";
 import {
   defaultImportance,
   defaultVisibility,
@@ -20,6 +21,8 @@ export type WorldEventRow = {
   payload: Record<string, unknown>;
   idempotency_key: string;
   delivery_status: string;
+  delivery_attempts?: number;
+  last_error?: string | null;
   created_at: string;
 };
 
@@ -46,6 +49,7 @@ export async function publishWorldEvent(input: {
   const visibility = input.visibility ?? defaultVisibility(input.type);
   const importance = input.importance ?? defaultImportance(input.type);
   const payload = input.payload ?? {};
+  const started = Date.now();
   try {
     const sql = await getSql();
     const inserted = await sql<{ id: string }>`
@@ -64,13 +68,21 @@ export async function publishWorldEvent(input: {
       on conflict (idempotency_key) do nothing
       returning id
     `;
-    if (!inserted[0]) return { id: key, duplicate: true };
+    if (!inserted[0]) {
+      const existing = await sql<{ id: string }>`
+        select id from hollow_world_event where idempotency_key = ${key} limit 1
+      `;
+      bridgeLog("event.publish", { type: input.type, duplicate: true, ms: Date.now() - started });
+      return { id: existing[0]?.id ?? key, duplicate: true };
+    }
     await audit("world event published", {
       discordId: input.discordId,
       detail: { type: input.type, visibility, id: inserted[0].id },
     });
+    bridgeLog("event.publish", { type: input.type, duplicate: false, visibility, ms: Date.now() - started });
     return { id: inserted[0].id, duplicate: false };
   } catch (error) {
+    bridgeLog("event.publish_failed", { type: input.type, db: true });
     return { error: error instanceof Error ? error.message : "event store unavailable" };
   }
 }
@@ -78,13 +90,18 @@ export async function publishWorldEvent(input: {
 export async function pendingFeedEvents(limit = 20): Promise<WorldEventRow[]> {
   const sql = await getSql();
   const rows = await sql<WorldEventRow>`
-    select id, event_type, discord_id, campaign_id, importance, visibility, payload, idempotency_key, delivery_status, created_at::text as created_at
+    select id, event_type, discord_id, campaign_id, importance, visibility, payload, idempotency_key,
+           delivery_status, delivery_attempts, last_error, created_at::text as created_at
     from hollow_world_event
-    where delivery_status = 'pending'
-      and visibility in ('campaign', 'guild', 'public')
+    where visibility in ('campaign', 'guild', 'public')
+      and (
+        delivery_status = 'pending'
+        or (delivery_status = 'failed' and coalesce(delivery_attempts, 0) < 3)
+      )
     order by created_at asc
     limit ${Math.max(1, Math.min(50, limit))}
   `;
+  bridgeLog("event.read", { n: rows.length });
   return rows.map((row) => ({
     ...row,
     payload: (row.payload ?? {}) as Record<string, unknown>,
@@ -92,20 +109,38 @@ export async function pendingFeedEvents(limit = 20): Promise<WorldEventRow[]> {
   }));
 }
 
-export async function ackEvents(ids: string[], status: "delivered" | "skipped" | "failed" = "delivered") {
+export async function ackEvents(
+  ids: string[],
+  status: "delivered" | "skipped" | "failed" = "delivered",
+  error = "",
+) {
   const clean = ids.map((id) => String(id).slice(0, 64)).filter((id) => id.startsWith("ev-")).slice(0, 50);
   if (!clean.length) return 0;
   const sql = await getSql();
   let n = 0;
   for (const id of clean) {
+    if (status === "failed") {
+      const rows = await sql<{ id: string }>`
+        update hollow_world_event
+        set delivery_status = 'failed',
+            delivered_at = now(),
+            delivery_attempts = coalesce(delivery_attempts, 0) + 1,
+            last_error = ${error.slice(0, 180)}
+        where id = ${id} and delivery_status in ('pending', 'failed')
+        returning id
+      `;
+      n += rows.length;
+      continue;
+    }
     const rows = await sql<{ id: string }>`
       update hollow_world_event
       set delivery_status = ${status}, delivered_at = now()
-      where id = ${id} and delivery_status = 'pending'
+      where id = ${id} and delivery_status in ('pending', 'failed')
       returning id
     `;
     n += rows.length;
   }
+  bridgeLog("event.ack", { status, n });
   return n;
 }
 

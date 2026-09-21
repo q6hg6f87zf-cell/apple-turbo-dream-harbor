@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { cleanDiscordId, json, rateLimit, requireTrustedWriter } from "@/lib/bridge/auth.server";
 import { recordMemory, relevantMemories, sanitizeClaim } from "@/lib/bridge/memory.server";
 import { publishWorldEvent } from "@/lib/bridge/events.server";
+import { bridgeLog } from "@/lib/bridge/log";
 
 const KINDS = ["episode", "fact", "promise", "conversation"] as const;
 
@@ -44,16 +45,17 @@ export const Route = createFileRoute("/api/bridge/memory")({
           source: "discord",
         });
         if ("error" in result) return json({ error: result.error }, result.status);
-        if (kind === "promise" || kind === "episode") {
+        if (!result.duplicate && (kind === "promise" || kind === "episode")) {
           await publishWorldEvent({
             type: kind === "promise" ? "tyrone.promise_created" : "tyrone.memory_recorded",
             discordId: id,
             payload: { kind, claim: claim.slice(0, 160) },
             visibility: "private",
-            idempotencyKey: `mem:${result.id}`,
+            idempotencyKey: `mem:${result.row.id}`,
           });
         }
-        return json({ ok: true, memory: result });
+        bridgeLog("memory.http_write", { discordId: id, duplicate: result.duplicate, kind });
+        return json({ ok: true, memory: result.row, duplicate: result.duplicate });
       },
     },
   },

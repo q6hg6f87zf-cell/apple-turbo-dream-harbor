@@ -45,7 +45,7 @@ export const Route = createFileRoute("/api/hollow/chronicle")({
             body.memory.kind === "promise" || body.memory.kind === "fact" || body.memory.kind === "conversation"
               ? body.memory.kind
               : "episode";
-          out.memory = await recordMemory({
+          const written = await recordMemory({
             discordId: who.discordId,
             kind,
             claim: sanitizeClaim(body.memory.claim),
@@ -54,6 +54,7 @@ export const Route = createFileRoute("/api/hollow/chronicle")({
             source: "game",
             id: typeof body.memory.id === "string" ? body.memory.id : undefined,
           });
+          out.memory = "error" in written ? written : { ...written.row, duplicate: written.duplicate };
         }
         return json({ ok: true, ...out });
       },

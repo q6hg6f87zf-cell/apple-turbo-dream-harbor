@@ -1,20 +1,32 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  absoluteDeepLink,
   defaultVisibility,
+  DEEP_LINKS,
   isEventType,
   parseDeepTo,
+  parseRegion,
   screenForTo,
 } from "./catalog.ts";
 import { IDENTITY_INVARIANT, isCommunityField } from "./identity.ts";
 import { memoryId, sanitizeClaim } from "./memory-id.ts";
+import { BRIDGE_CONTRACT_VERSION, TRUST_BOUNDARY } from "./contract.ts";
 
 test("deep links only accept known destinations", () => {
   assert.equal(parseDeepTo("vault"), "vault");
+  assert.equal(parseDeepTo("world"), "map");
   assert.equal(parseDeepTo("https://evil.example"), null);
   assert.equal(parseDeepTo("../../admin"), null);
   assert.equal(screenForTo("profile"), "hq");
   assert.equal(screenForTo("inventory"), "inventory");
+  assert.equal(parseRegion("ironclad"), "ironclad");
+  assert.equal(DEEP_LINKS.vault, "/vault");
+  assert.equal(DEEP_LINKS.inventory, "/inventory");
+  assert.equal(DEEP_LINKS.world, "/world");
+  assert.equal(DEEP_LINKS.profile, "/profile");
+  assert.equal(DEEP_LINKS.region("ironclad"), "/region/ironclad");
+  assert.equal(absoluteDeepLink("/region/ironclad"), "https://thehollowrealm.com/region/ironclad");
 });
 
 test("event types and visibility are locked", () => {
@@ -40,4 +52,6 @@ test("Hollow Soul is not a Moon Squad community profile", () => {
   assert.equal(isCommunityField("ethera"), true);
   assert.equal(isCommunityField("caps"), false);
   assert.equal(isCommunityField("operative"), false);
+  assert.match(TRUST_BOUNDARY, /Bearer/);
+  assert.equal(BRIDGE_CONTRACT_VERSION, "1");
 });

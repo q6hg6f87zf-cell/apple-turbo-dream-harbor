@@ -104,6 +104,8 @@ export async function tyroneContext(discordId: string, query?: string) {
   const unknown: string[] = [];
   if (!soul.character) unknown.push("character");
   if (!soul.region) unknown.push("region");
+  if (!soul.inventory.length) unknown.push("inventory");
+  if (!soul.bosses.length) unknown.push("bosses");
   return {
     soul,
     facts,

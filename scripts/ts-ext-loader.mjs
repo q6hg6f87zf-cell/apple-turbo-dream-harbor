@@ -3,6 +3,7 @@ import { dirname, extname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const EXTS = [".ts", ".tsx", ".js", ".mjs"];
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 function tryFile(base) {
   for (const ext of EXTS) {
@@ -17,6 +18,10 @@ function tryFile(base) {
 }
 
 export async function resolve(specifier, context, nextResolve) {
+  if (specifier.startsWith("@/")) {
+    const hit = tryFile(join(ROOT, "src", specifier.slice(2)));
+    if (hit) return nextResolve(pathToFileURL(hit).href, context);
+  }
   const bare = specifier.startsWith(".") && !extname(new URL(specifier, "file:///").pathname);
   if (bare && context.parentURL) {
     const dir = dirname(fileURLToPath(context.parentURL));
