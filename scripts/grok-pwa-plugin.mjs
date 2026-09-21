@@ -53,7 +53,8 @@ function serveGrokPwa(middlewares) {
     }
 
     if (pathOnly === "/__grok/manifest.webmanifest" || pathOnly === "/__grok/manifest.json") {
-      const body = Buffer.from(renderWebManifest(requestHost(req)), "utf8");
+      const identity = snapshotOgIdentity();
+      const body = Buffer.from(renderWebManifest(requestHost(req), identity.site), "utf8");
       res.statusCode = 200;
       res.setHeader("content-type", "application/manifest+json; charset=utf-8");
       res.setHeader("cache-control", "no-cache");
@@ -64,7 +65,16 @@ function serveGrokPwa(middlewares) {
 
     if (isInstallQuery(rawUrl) && isDocumentPath(pathOnly) && acceptsHtml(req.headers.accept)) {
       try {
-        sendHtml(res, renderInstallPage(requestHost(req), rawUrl));
+        const identity = snapshotOgIdentity();
+        const template = readFileSync(INSTALL_PAGE_PATH, "utf8");
+        sendHtml(
+          res,
+          renderInstallPageHtml(template, {
+            host: requestHost(req),
+            url: rawUrl,
+            site: identity.site,
+          }),
+        );
       } catch (err) {
         console.error("[app-builder] install page missing:", err);
         res.statusCode = 500;

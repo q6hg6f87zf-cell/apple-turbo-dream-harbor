@@ -1,30 +1,20 @@
 import { useCallback, useEffect, useState } from "react";
-import { authEnabled, getBearerToken, signIn } from "./client";
-import { DISCORD_PROVIDER_ID } from "./providers";
-import { useCurrentUserState } from "./use-current-user";
+import { getBearerToken } from "./client";
 
 export type DiscordAccess = {
   allowed: boolean;
   authenticated: boolean;
   discord: boolean;
   linked: boolean;
+  stamped?: boolean;
+  returning?: boolean;
   devBypass: boolean;
   provider: string | null;
-  stage?: "discord" | "tyrone" | "ready";
+  stage?: "discord" | "tyrone" | "stamp" | "ready";
   discordId?: string;
   name?: string;
   handle?: string;
   error?: string;
-};
-
-const DEV_ACCESS: DiscordAccess = {
-  allowed: true,
-  authenticated: true,
-  discord: true,
-  linked: true,
-  devBypass: true,
-  provider: "dev",
-  stage: "ready",
 };
 
 function headers() {
@@ -35,7 +25,6 @@ function headers() {
 }
 
 export async function fetchDiscordAccess(): Promise<DiscordAccess> {
-  if (!authEnabled) return DEV_ACCESS;
   const response = await fetch("/api/hollow/access", {
     method: "GET",
     credentials: "same-origin",
@@ -47,6 +36,8 @@ export async function fetchDiscordAccess(): Promise<DiscordAccess> {
     authenticated: !!body.authenticated,
     discord: !!body.discord,
     linked: !!body.linked,
+    stamped: !!body.stamped,
+    returning: !!body.returning,
     devBypass: !!body.devBypass,
     provider: body.provider ?? null,
     stage: body.stage,
@@ -57,24 +48,23 @@ export async function fetchDiscordAccess(): Promise<DiscordAccess> {
   };
 }
 
+export async function stampDiscordPlate(name: string, handle?: string) {
+  const response = await fetch("/api/discord/plate", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { ...Object.fromEntries(headers()), "content-type": "application/json" },
+    body: JSON.stringify({ name, handle }),
+  });
+  return response.ok;
+}
+
 export function useDiscordAccess() {
-  const session = useCurrentUserState();
-  const [access, setAccess] = useState<DiscordAccess | null>(authEnabled ? null : DEV_ACCESS);
-  const [pending, setPending] = useState(authEnabled);
+  const [access, setAccess] = useState<DiscordAccess | null>(null);
+  const [pending, setPending] = useState(true);
   const [revision, setRevision] = useState(0);
   const refresh = useCallback(() => setRevision((value) => value + 1), []);
 
   useEffect(() => {
-    if (!authEnabled) {
-      setAccess(DEV_ACCESS);
-      setPending(false);
-      return;
-    }
-    if (session.isPending) {
-      setPending(true);
-      return;
-    }
-
     let cancelled = false;
     setPending(true);
     void fetchDiscordAccess()
@@ -85,9 +75,11 @@ export function useDiscordAccess() {
         if (!cancelled) {
           setAccess({
             allowed: false,
-            authenticated: !!session.user,
+            authenticated: false,
             discord: false,
             linked: false,
+            stamped: false,
+            returning: false,
             devBypass: false,
             provider: null,
             stage: "discord",
@@ -102,11 +94,11 @@ export function useDiscordAccess() {
     return () => {
       cancelled = true;
     };
-  }, [session.isPending, session.user?.id, revision]);
+  }, [revision]);
 
-  return { access, pending: pending || session.isPending, user: session.user, refresh };
+  return { access, pending, refresh };
 }
 
 export async function signInWithDiscord() {
-  await signIn(DISCORD_PROVIDER_ID, { callbackURL: "/", errorCallbackURL: "/" });
+  window.location.assign("/api/discord/start");
 }

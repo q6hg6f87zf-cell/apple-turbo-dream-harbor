@@ -86,7 +86,9 @@ export function ProfileStamp({
     >
       <SectionLabel>Rider file</SectionLabel>
       <p className="text-sm leading-relaxed text-moon">
-        Stamp the name Tyrone found east of the highway. Discord sits under it on the black card.
+        {handleLocked
+          ? "Stamp the name Tyrone found east of the highway. Discord stays locked underneath."
+          : "Stamp the name Tyrone found east of the highway. Discord sits under it on the black card."}
       </p>
       <label className="block">
         <span className="font-display text-[10px] uppercase tracking-[0.18em] text-muted">Chosen name</span>

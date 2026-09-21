@@ -3,6 +3,11 @@ import { getSql } from "@/lib/db";
 import { assertSameSiteRequest } from "@/lib/auth/isolation.server";
 import { requireUserId } from "@/lib/auth/verify.server";
 import { DISCORD_PROVIDER_ID } from "@/lib/auth/providers";
+import {
+  discordConfigured,
+  readRiderSession,
+} from "@/lib/auth/discord-native.server";
+import { lookupRider } from "@/lib/auth/discord-riders.server";
 
 const CAMPAIGN_ID = "moon-squad";
 const HEADERS = { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" };
@@ -23,6 +28,18 @@ function looksLikeHandle(value: string) {
 function isSnowflake(value: string) {
   return /^\d{17,22}$/.test(value);
 }
+
+const DEV_ACCESS = {
+  allowed: true,
+  authenticated: true,
+  discord: true,
+  linked: true,
+  stamped: true,
+  returning: false,
+  devBypass: true,
+  provider: "dev",
+  stage: "ready" as const,
+};
 
 async function discordHandleFromToken(accessToken: string | null | undefined, fallbackName: string) {
   const fallback = looksLikeHandle(fallbackName) ? fallbackName.trim().replace(/^@/, "") : "";
@@ -85,22 +102,53 @@ async function bootstrapDiscordIdentity(userId: string, discordId: string, displ
   `;
 }
 
+async function riderAccess(request: Request) {
+  const session = readRiderSession(request);
+  if (!session) return null;
+  const stored = await lookupRider(session.did);
+  const name = stored?.name || session.name;
+  const handle = stored?.handle || session.handle;
+  const stamped = stored?.stamped ?? session.stamped;
+  return json({
+    allowed: true,
+    authenticated: true,
+    discord: true,
+    linked: true,
+    stamped,
+    returning: stamped,
+    devBypass: false,
+    provider: "discord",
+    discordId: session.did,
+    name,
+    handle,
+    stage: stamped ? "ready" : "stamp",
+  });
+}
+
 export const Route = createFileRoute("/api/hollow/access")({
   server: {
     handlers: {
-      GET: async () => {
-        // CI/local development intentionally keeps auth off. This bypass never
-        // runs in a real auth-enabled deployment.
-        if (authDisabled()) {
-          return json({
-            allowed: true,
-            authenticated: true,
-            discord: true,
-            linked: true,
-            devBypass: true,
-            provider: "dev",
-          });
+      GET: async ({ request }) => {
+        if (request) {
+          const native = await riderAccess(request);
+          if (native) return native;
+          if (discordConfigured()) {
+            return json({
+              allowed: false,
+              authenticated: false,
+              discord: false,
+              linked: false,
+              stamped: false,
+              returning: false,
+              devBypass: false,
+              provider: null,
+              stage: "discord",
+            });
+          }
         }
+
+        // Preview / local: keep the stamp card without a Discord app.
+        if (authDisabled()) return json(DEV_ACCESS);
 
         let userId: string;
         try {
@@ -112,6 +160,8 @@ export const Route = createFileRoute("/api/hollow/access")({
             authenticated: false,
             discord: false,
             linked: false,
+            stamped: false,
+            returning: false,
             devBypass: false,
             provider: null,
             stage: "discord",
@@ -134,6 +184,8 @@ export const Route = createFileRoute("/api/hollow/access")({
             authenticated: true,
             discord: false,
             linked: false,
+            stamped: false,
+            returning: false,
             devBypass: false,
             provider: null,
             stage: "discord",
@@ -147,9 +199,6 @@ export const Route = createFileRoute("/api/hollow/access")({
           select discord_id from hollow_identity_link where user_id = ${userId} limit 1
         `;
 
-        // If the broker exposes the raw Discord snowflake, the entire first-run
-        // path becomes one click. If it does not, Tyrone's one-time claim remains
-        // the trusted bridge instead of guessing at identity.
         if (!links[0] && isSnowflake(discordAccount.account_id)) {
           await bootstrapDiscordIdentity(userId, discordAccount.account_id, profile.name || "Moon Squad Rider");
           links = await sql<{ discord_id: string }>`
@@ -164,6 +213,8 @@ export const Route = createFileRoute("/api/hollow/access")({
             authenticated: true,
             discord: true,
             linked: false,
+            stamped: false,
+            returning: false,
             devBypass: false,
             provider: DISCORD_PROVIDER_ID,
             stage: "tyrone",
@@ -178,6 +229,8 @@ export const Route = createFileRoute("/api/hollow/access")({
           authenticated: true,
           discord: true,
           linked: true,
+          stamped: true,
+          returning: true,
           devBypass: false,
           provider: DISCORD_PROVIDER_ID,
           discordId: link.discord_id,

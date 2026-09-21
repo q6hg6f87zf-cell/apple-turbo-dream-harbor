@@ -25,6 +25,15 @@ import {
   renderWebManifest,
 } from "../../scripts/grok-pwa-shared.mjs";
 
+const webManifest = renderWebManifest as (
+  hostHeader?: string,
+  site?: Record<string, unknown>,
+) => string;
+const installPage = renderInstallPageHtml as (
+  template: string,
+  opts?: { host?: string | null; url?: string | null; site?: Record<string, unknown> },
+) => string;
+
 interface GrokPwaEvent {
   url: URL;
   req: { method: string; headers: Headers };
@@ -71,7 +80,7 @@ export default async function grokPwaMiddleware(
   const urlWithQuery = path + event.url.search;
 
   if (path === "/__grok/manifest.webmanifest" || path === "/__grok/manifest.json") {
-    return new Response(renderWebManifest(requestHost(event)), {
+    return new Response(webManifest(requestHost(event), grokOgIdentity.site), {
       headers: {
         "content-type": "application/manifest+json; charset=utf-8",
         "cache-control": "no-cache",
@@ -84,9 +93,10 @@ export default async function grokPwaMiddleware(
     isDocumentPath(path) &&
     acceptsHtml(event.req.headers.get("accept"))
   ) {
-    const html = renderInstallPageHtml(installPageTemplate, {
+    const html = installPage(installPageTemplate, {
       host: requestHost(event),
       url: urlWithQuery,
+      site: grokOgIdentity.site,
     });
     return new Response(html, {
       headers: {

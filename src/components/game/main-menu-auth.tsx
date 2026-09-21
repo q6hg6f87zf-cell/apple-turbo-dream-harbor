@@ -3,7 +3,7 @@ import { hasPlayerProfile } from "@/game/engine";
 import { seatedMember } from "@/game/squad";
 import { sfx, unlockAudio } from "@/game/audio";
 import { useGame } from "@/game/store";
-import { signInWithDiscord, useDiscordAccess } from "@/lib/auth/discord-access";
+import { signInWithDiscord, stampDiscordPlate, useDiscordAccess } from "@/lib/auth/discord-access";
 import { RefreshCw, ShieldCheck } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { CapMark, SectionLabel } from "./primitives";
@@ -22,12 +22,24 @@ function FileStat({ label, value }: { label: string; value: ReactNode }) {
   );
 }
 
+function DiscordMark({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M19.7 5.3A18 18 0 0 0 15.2 4l-.2.4a16.4 16.4 0 0 1 4 1.6c-4-2-8.4-2-12.3 0A16 16 0 0 1 6.7 4.4L6.5 4a18 18 0 0 0-4.5 1.3C.3 9.2-.4 13 0 16.7A18.4 18.4 0 0 0 5.7 19.4l.7-1.1a12 12 0 0 1-1.9-.9l.5-.4c3.7 1.7 7.7 1.7 11.4 0l.5.4a12 12 0 0 1-1.9.9l.7 1.1a18.4 18.4 0 0 0 5.7-2.7c.5-4.2-.7-7.9-2.2-11.4ZM8.3 14.6c-1.1 0-2-1-2-2.2s.9-2.2 2-2.2 2 1 2 2.2-.9 2.2-2 2.2Zm7.4 0c-1.1 0-2-1-2-2.2s.9-2.2 2-2.2 2 1 2 2.2-.9 2.2-2 2.2Z"
+      />
+    </svg>
+  );
+}
+
 export function AuthenticatedMainMenu() {
   const assume = useGame((g) => g.assumeCommand);
   const resume = useGame((g) => g.resumeSession);
   const reset = useGame((g) => g.reset);
   const openTerminal = useGame((g) => g.openTerminal);
   const linkDiscord = useGame((g) => g.linkDiscord);
+  const stamp = useGame((g) => g.stampProfile);
   const started = useGame((g) => g.s.started);
   const day = useGame((g) => g.s.day);
   const coins = useGame((g) => g.s.coins);
@@ -49,6 +61,8 @@ export function AuthenticatedMainMenu() {
   const [signingIn, setSigningIn] = useState(false);
 
   const allowed = !!access?.allowed;
+  const discordHandle = (access?.handle || playerHandle || "").replace(/^@/, "");
+  const chosenName = playerName || access?.name || "";
   const roster = ops.filter((op) => op.status !== "dead").length;
   const beds = 3 + rooms.barracks * 2;
   const roomN = Object.values(rooms).filter((n) => n > 0).length;
@@ -59,6 +73,33 @@ export function AuthenticatedMainMenu() {
     if (riderId === access.discordId && (!handle || playerHandle === handle)) return;
     linkDiscord(access.discordId, handle);
   }, [access?.discordId, access?.handle, access?.name, allowed, linkDiscord, riderId, playerHandle]);
+
+  useEffect(() => {
+    if (!allowed || named) return;
+    const name = (access?.name ?? "").trim();
+    if (access?.stamped && name.length >= 2) {
+      stamp(name, access.handle || "");
+    }
+  }, [allowed, named, access?.stamped, access?.name, access?.handle, stamp]);
+
+  useEffect(() => {
+    if (!allowed || !named || access?.devBypass || !access?.discordId) return;
+    void stampDiscordPlate(playerName ?? "", playerHandle ?? "");
+  }, [allowed, named, access?.devBypass, access?.discordId, playerName, playerHandle]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const reason = params.get("reason");
+    if (params.get("discord") === "error") {
+      setAuthError(
+        reason === "access_denied"
+          ? "Discord sign-in was cancelled."
+          : reason === "not-configured"
+            ? "Discord login is not seated on this host yet."
+            : "Discord sign-in failed. Try again.",
+      );
+    }
+  }, []);
 
   const boot = () => {
     if (!allowed || !named) return;
@@ -80,6 +121,18 @@ export function AuthenticatedMainMenu() {
       setSigningIn(false);
     }
   };
+
+  useEffect(() => {
+    if (pending || allowed || signingIn) return;
+    if (access?.stage !== "discord") return;
+    if (authError) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("discord") === "error") return;
+    const timer = window.setTimeout(() => {
+      void connectDiscord();
+    }, 480);
+    return () => window.clearTimeout(timer);
+  }, [pending, allowed, signingIn, access?.stage, authError]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -108,12 +161,16 @@ export function AuthenticatedMainMenu() {
           <div className="ms-title-dock rounded-[var(--radius-xl)] bg-ink/62 p-4 shadow-[var(--shadow-border)] backdrop-blur-md md:p-5">
             <p className="font-display text-[11px] uppercase tracking-[0.42em] text-ember">S.Y.N.A.P.S.E T-0880</p>
             <p className="mt-1 text-xs text-moon">
-              {!allowed ? "Vault 13 recognizes verified riders only." : named ? "Tyrone keeps the porch light on." : "Stamp a name. Then we wake you."}
+              {!allowed
+                ? "Discord opens the file. Then we stamp the black card."
+                : named
+                  ? "Tyrone keeps the porch light on."
+                  : "Stamp a name. Then we wake you."}
             </p>
             {!allowed ? (
               <div>
                 <div className="flex items-center justify-between gap-3">
-                  <SectionLabel>Vault 13 access control</SectionLabel>
+                  <SectionLabel>Vault 13 rider login</SectionLabel>
                   <ShieldCheck className="size-4 text-ember" />
                 </div>
                 {pending ? (
@@ -136,11 +193,14 @@ export function AuthenticatedMainMenu() {
                 ) : (
                   <>
                     <p className="mt-3 text-sm leading-relaxed text-moon">
-                      Sign in with Discord before a save can start, resume, access the terminal, or enter the shared Moon Squad campaign.
+                      Sign in with Discord. Chosen name stays yours. Handle locks to the Discord file and does not move.
                     </p>
                     <Button variant="ember" size="lg" className="mt-4 w-full" onClick={() => void connectDiscord()} disabled={signingIn}>
-                      <ShieldCheck className="size-4" /> {signingIn ? "Opening Discord…" : "Continue with Discord"}
+                      <DiscordMark className="size-4" /> {signingIn ? "Opening Discord…" : "Continue with Discord"}
                     </Button>
+                    <p className="mt-3 font-display text-[10px] uppercase tracking-[0.18em] text-muted">
+                      Returning riders skip the stamp card
+                    </p>
                   </>
                 )}
                 {(authError || access?.error) ? <p className="mt-3 text-xs leading-relaxed text-danger">{authError ?? access?.error}</p> : null}
@@ -148,9 +208,9 @@ export function AuthenticatedMainMenu() {
             ) : !named ? (
               <div className="mt-4">
                 <ProfileStamp
-                  prefill={playerName || ""}
-                  prefillHandle={playerHandle || access?.handle || ""}
-                  handleLocked={Boolean(access?.handle || playerHandle)}
+                  prefill={chosenName}
+                  prefillHandle={discordHandle}
+                  handleLocked={Boolean(discordHandle)}
                 />
               </div>
             ) : (

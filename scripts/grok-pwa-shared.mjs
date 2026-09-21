@@ -7,6 +7,9 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 export const DEFAULT_APP_NAME = "Grok App";
+export const HOLLOW_REALM_NAME = "The Hollow Realm";
+export const HOLLOW_REALM_ICON = "/icon-180.png";
+export const GROK_PWA_ICON = "/__grok/icon-180.png";
 export const OG_SERVICE_URL_DEFAULT = "https://og.grok.me";
 export const OG_SITE_REL_PATH = "src/lib/og/site.json";
 
@@ -54,10 +57,24 @@ function placeholderCardColor(site = {}) {
   return /^[0-9a-fA-F]{6}$/.test(hex) ? hex : "";
 }
 
+export function isHollowRealmHost(hostHeader) {
+  const host = String(hostHeader ?? "")
+    .split(",")[0]
+    .trim()
+    .split(":")[0]
+    .toLowerCase();
+  return (
+    host === "thehollowrealm.com" ||
+    host === "www.thehollowrealm.com" ||
+    host.endsWith(".thehollowrealm.com")
+  );
+}
+
 /**
  * "wild-race.grok.me" → "Wild Race". Only published app hosts encode the
  * display name in the first label. Preview / guest hosts are image origins
  * only — slugifying them produced internal names like "Hds Abc 3000 Xy".
+ * Custom Hollow Realm hosts always install as "The Hollow Realm".
  */
 export function appNameFromHost(hostHeader) {
   const host = String(hostHeader ?? "")
@@ -65,6 +82,7 @@ export function appNameFromHost(hostHeader) {
     .trim()
     .split(":")[0]
     .toLowerCase();
+  if (isHollowRealmHost(host)) return HOLLOW_REALM_NAME;
   if (!host.endsWith(".grok.me")) {
     return DEFAULT_APP_NAME;
   }
@@ -151,43 +169,76 @@ export function stripInstallParams(url) {
   return rest ? `${path}?${rest}` : path;
 }
 
-export function renderInstallPageHtml(template, { host, url } = {}) {
+/**
+ * @param {string} template
+ * @param {{ host?: string | null, url?: string | null, site?: Record<string, unknown> }} [opts]
+ */
+export function renderInstallPageHtml(template, { host, url, site } = {}) {
+  const name = String(site?.title ?? "").trim() || appNameFromHost(host);
   return String(template)
-    .replaceAll("{{APP_NAME}}", escapeHtml(appNameFromHost(host)))
+    .replaceAll("{{APP_NAME}}", escapeHtml(name))
     .replaceAll("{{APP_URL}}", escapeHtml(stripInstallParams(url)));
 }
 
-export function renderWebManifest(hostHeader) {
-  const name = appNameFromHost(hostHeader);
+export function usesHollowPwaIdentity(hostHeader, site = {}) {
+  if (isHollowRealmHost(hostHeader)) return true;
+  const title = String(site.title ?? "").trim();
+  return title === HOLLOW_REALM_NAME || title === "Hollow Realm";
+}
+
+export function pwaIconHref(hostHeader, site = {}) {
+  return usesHollowPwaIdentity(hostHeader, site) ? HOLLOW_REALM_ICON : GROK_PWA_ICON;
+}
+
+export function pwaIconsFor(hostHeader, site = {}) {
+  if (!usesHollowPwaIdentity(hostHeader, site)) {
+    return [
+      {
+        src: GROK_PWA_ICON,
+        sizes: "180x180",
+        type: "image/png",
+      },
+    ];
+  }
+  return [
+    { src: "/icon-180.png", sizes: "180x180", type: "image/png" },
+    { src: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+    { src: "/icon-192.png", sizes: "192x192", type: "image/png" },
+    { src: "/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+    { src: "/icon-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+  ];
+}
+
+/**
+ * @param {string} [hostHeader]
+ * @param {Record<string, unknown>} [site]
+ */
+export function renderWebManifest(hostHeader, site = {}) {
+  const name = String(site.title ?? "").trim() || appNameFromHost(hostHeader);
+  const shortName = name === HOLLOW_REALM_NAME ? "Hollow Realm" : name;
   return JSON.stringify(
     {
       name,
-      short_name: name,
+      short_name: shortName,
       id: "/",
       start_url: "/",
       scope: "/",
       display: "standalone",
-      background_color: "#000000",
-      theme_color: "#000000",
-      icons: [
-        {
-          src: "/__grok/icon-180.png",
-          sizes: "180x180",
-          type: "image/png",
-        },
-      ],
+      background_color: "#0c0a08",
+      theme_color: "#0c0a08",
+      icons: pwaIconsFor(hostHeader, site),
     },
     null,
     2,
   );
 }
 
-export function grokPwaHeadTags(appName = DEFAULT_APP_NAME) {
+export function grokPwaHeadTags(appName = DEFAULT_APP_NAME, iconHref = GROK_PWA_ICON) {
   return [
     // Standalone display comes from the manifest ("display": "standalone");
     // the legacy *-web-app-capable metas it replaces are deliberately absent.
     ["manifest", '<link rel="manifest" href="/__grok/manifest.webmanifest">'],
-    ["apple-touch-icon", '<link rel="apple-touch-icon" href="/__grok/icon-180.png">'],
+    ["apple-touch-icon", `<link rel="apple-touch-icon" href="${escapeHtml(iconHref)}">`],
     [
       "apple-mobile-web-app-title",
       `<meta name="apple-mobile-web-app-title" content="${escapeHtml(appName)}">`,
@@ -196,7 +247,7 @@ export function grokPwaHeadTags(appName = DEFAULT_APP_NAME) {
       "apple-mobile-web-app-status-bar-style",
       '<meta name="apple-mobile-web-app-status-bar-style" content="black">',
     ],
-    ["theme-color", '<meta name="theme-color" content="#000000">'],
+    ["theme-color", '<meta name="theme-color" content="#0c0a08">'],
   ];
 }
 
@@ -434,10 +485,10 @@ export function injectGrokPwaHead(html, ctx = {}) {
   );
   let next = stripShareMetaTags(html);
 
-  const missing = grokPwaHeadTags(appName)
+  const missing = grokPwaHeadTags(appName, pwaIconHref(host, site))
     .filter(([key]) => {
       if (key === "manifest") return !next.includes('href="/__grok/manifest.webmanifest"');
-      if (key === "apple-touch-icon") return !next.includes('href="/__grok/icon-180.png"');
+      if (key === "apple-touch-icon") return !/rel=["']apple-touch-icon["']/.test(next);
       return !next.includes(`name="${key}"`);
     })
     .map(([, tag]) => tag);

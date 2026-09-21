@@ -11,6 +11,9 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiRtcRouteImport } from './routes/api/rtc'
+import { Route as ApiDiscordCallbackRouteImport } from './routes/api/discord/callback'
+import { Route as ApiDiscordPlateRouteImport } from './routes/api/discord/plate'
+import { Route as ApiDiscordStartRouteImport } from './routes/api/discord/start'
 import { Route as ApiHollowAccessRouteImport } from './routes/api/hollow/access'
 import { Route as ApiHollowAcquisitionRouteImport } from './routes/api/hollow/acquisition'
 import { Route as ApiHollowEconomyRouteImport } from './routes/api/hollow/economy'
@@ -29,6 +32,21 @@ const IndexRoute = IndexRouteImport.update({
 const ApiRtcRoute = ApiRtcRouteImport.update({
   id: '/api/rtc',
   path: '/api/rtc',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDiscordCallbackRoute = ApiDiscordCallbackRouteImport.update({
+  id: '/api/discord/callback',
+  path: '/api/discord/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDiscordPlateRoute = ApiDiscordPlateRouteImport.update({
+  id: '/api/discord/plate',
+  path: '/api/discord/plate',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDiscordStartRoute = ApiDiscordStartRouteImport.update({
+  id: '/api/discord/start',
+  path: '/api/discord/start',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiHollowAccessRoute = ApiHollowAccessRouteImport.update({
@@ -80,6 +98,9 @@ const ApiTyroneSyncRoute = ApiTyroneSyncRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/api/rtc': typeof ApiRtcRoute
+  '/api/discord/callback': typeof ApiDiscordCallbackRoute
+  '/api/discord/plate': typeof ApiDiscordPlateRoute
+  '/api/discord/start': typeof ApiDiscordStartRoute
   '/api/hollow/access': typeof ApiHollowAccessRoute
   '/api/hollow/acquisition': typeof ApiHollowAcquisitionRoute
   '/api/hollow/economy': typeof ApiHollowEconomyRoute
@@ -93,6 +114,9 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/api/rtc': typeof ApiRtcRoute
+  '/api/discord/callback': typeof ApiDiscordCallbackRoute
+  '/api/discord/plate': typeof ApiDiscordPlateRoute
+  '/api/discord/start': typeof ApiDiscordStartRoute
   '/api/hollow/access': typeof ApiHollowAccessRoute
   '/api/hollow/acquisition': typeof ApiHollowAcquisitionRoute
   '/api/hollow/economy': typeof ApiHollowEconomyRoute
@@ -107,6 +131,9 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/api/rtc': typeof ApiRtcRoute
+  '/api/discord/callback': typeof ApiDiscordCallbackRoute
+  '/api/discord/plate': typeof ApiDiscordPlateRoute
+  '/api/discord/start': typeof ApiDiscordStartRoute
   '/api/hollow/access': typeof ApiHollowAccessRoute
   '/api/hollow/acquisition': typeof ApiHollowAcquisitionRoute
   '/api/hollow/economy': typeof ApiHollowEconomyRoute
@@ -122,6 +149,9 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/api/rtc'
+    | '/api/discord/callback'
+    | '/api/discord/plate'
+    | '/api/discord/start'
     | '/api/hollow/access'
     | '/api/hollow/acquisition'
     | '/api/hollow/economy'
@@ -135,6 +165,9 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/api/rtc'
+    | '/api/discord/callback'
+    | '/api/discord/plate'
+    | '/api/discord/start'
     | '/api/hollow/access'
     | '/api/hollow/acquisition'
     | '/api/hollow/economy'
@@ -148,6 +181,9 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/api/rtc'
+    | '/api/discord/callback'
+    | '/api/discord/plate'
+    | '/api/discord/start'
     | '/api/hollow/access'
     | '/api/hollow/acquisition'
     | '/api/hollow/economy'
@@ -162,6 +198,9 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ApiRtcRoute: typeof ApiRtcRoute
+  ApiDiscordCallbackRoute: typeof ApiDiscordCallbackRoute
+  ApiDiscordPlateRoute: typeof ApiDiscordPlateRoute
+  ApiDiscordStartRoute: typeof ApiDiscordStartRoute
   ApiHollowAccessRoute: typeof ApiHollowAccessRoute
   ApiHollowAcquisitionRoute: typeof ApiHollowAcquisitionRoute
   ApiHollowEconomyRoute: typeof ApiHollowEconomyRoute
@@ -187,6 +226,27 @@ declare module '@tanstack/react-router' {
       path: '/api/rtc'
       fullPath: '/api/rtc'
       preLoaderRoute: typeof ApiRtcRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/discord/callback': {
+      id: '/api/discord/callback'
+      path: '/api/discord/callback'
+      fullPath: '/api/discord/callback'
+      preLoaderRoute: typeof ApiDiscordCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/discord/plate': {
+      id: '/api/discord/plate'
+      path: '/api/discord/plate'
+      fullPath: '/api/discord/plate'
+      preLoaderRoute: typeof ApiDiscordPlateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/discord/start': {
+      id: '/api/discord/start'
+      path: '/api/discord/start'
+      fullPath: '/api/discord/start'
+      preLoaderRoute: typeof ApiDiscordStartRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/hollow/access': {
@@ -258,6 +318,9 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ApiRtcRoute: ApiRtcRoute,
+  ApiDiscordCallbackRoute: ApiDiscordCallbackRoute,
+  ApiDiscordPlateRoute: ApiDiscordPlateRoute,
+  ApiDiscordStartRoute: ApiDiscordStartRoute,
   ApiHollowAccessRoute: ApiHollowAccessRoute,
   ApiHollowAcquisitionRoute: ApiHollowAcquisitionRoute,
   ApiHollowEconomyRoute: ApiHollowEconomyRoute,
