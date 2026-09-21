@@ -3,6 +3,7 @@ import { openRadioDeck } from "@/game/radio";
 import { guidanceSignal, isTaskScreen, navSignalKey, TASK_META } from "@/game/shell";
 import { isVacant, plateMember } from "@/game/squad";
 import { useGame } from "@/game/store";
+import { characterForged } from "@/game/engine";
 import type { Screen, TyroneAssist } from "@/game/types";
 import { cn } from "@/lib/cn";
 import {
@@ -146,6 +147,7 @@ function OverflowMenu({
   const assist = useGame((g) => g.s.tyrone?.settings.assist ?? "normal");
   const setAssist = useGame((g) => g.setTyroneAssist);
   const setScreen = useGame((g) => g.setScreen);
+  const forged = useGame((g) => characterForged(g.s));
 
   return (
     <div className="relative z-30">
@@ -202,6 +204,7 @@ function OverflowMenu({
           <Moon className="size-4" />
           Rest until dawn
         </button>
+        {forged ? null : (
         <button
           type="button"
           className="flex min-h-11 w-full items-center gap-3 rounded-[var(--radius-sm)] px-3 text-left text-body text-paper hover:bg-raised"
@@ -213,8 +216,9 @@ function OverflowMenu({
           }}
         >
           <Hammer className="size-4 text-ember" />
-          Forge resident
+          Cut your file
         </button>
+        )}
       </div>
     </div>
   );

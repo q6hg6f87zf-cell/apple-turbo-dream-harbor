@@ -14,15 +14,15 @@ import {
   regionById,
 } from "@/game/data";
 import {
+  characterForged,
   computeStats,
   d20,
-  forgeCost,
+  FORGE_REROLLS,
   hireResidentCost,
   idleAtHq,
   incomePerTick,
   nextQuarterCost,
   nextRoomCost,
-  randomName,
   rosterCap,
 } from "@/game/engine";
 import { sfx, unlockAudio } from "@/game/audio";
@@ -239,7 +239,7 @@ export function Briefing() {
                 go();
               }}
             >
-              Forge the first
+              Cut your file
             </Button>
           </>
         ) : null}
@@ -504,10 +504,18 @@ function CompoundWing() {
         <SectionLabel>Who is home</SectionLabel>
         {living.length === 0 ? (
           <Panel className="bg-raised">
-            <p className="text-sm text-muted">The bunks are empty. Forge someone who can walk the Hollow.</p>
-            <Button className="mt-3 ms-nudge" variant="ember" onClick={() => setScreen("forge")}>
-              <Users className="size-4" /> Forge the first
-            </Button>
+            {characterForged(s) ? (
+              <>
+                <p className="text-sm text-muted">Your file is closed. The Machine Shop will not cut a second soul.</p>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-muted">The bunks are empty. Cut your file. Two rerolls. Then it locks.</p>
+                <Button className="mt-3 ms-nudge" variant="ember" onClick={() => setScreen("forge")}>
+                  <Users className="size-4" /> Cut your file
+                </Button>
+              </>
+            )}
           </Panel>
         ) : (
           <div className="flex gap-2 overflow-x-auto pb-1">
@@ -529,17 +537,6 @@ function CompoundWing() {
                 </div>
               </button>
             ))}
-            <button
-              type="button"
-              onClick={() => {
-                sfx.click();
-                setScreen("forge");
-              }}
-              className="flex min-h-[4.5rem] min-w-[4.5rem] flex-col items-center justify-center gap-1 rounded-[var(--radius-md)] bg-ink text-ember shadow-[var(--shadow-border)]"
-            >
-              <span className="font-display text-lg leading-none">+</span>
-              <span className="font-display text-[9px] uppercase tracking-[0.16em]">Forge</span>
-            </button>
           </div>
         )}
       </div>
@@ -639,9 +636,11 @@ export function RosterView() {
           <SectionLabel>Roster</SectionLabel>
           <h2 className="font-display text-2xl">Moon Squad</h2>
         </div>
+        {characterForged(s) ? null : (
         <Button variant="ember" size="sm" onClick={() => setScreen("forge")}>
-          Forge
+          Cut file
         </Button>
+        )}
       </div>
       <div className="flex gap-2">
         {(["living", "fallen", "hof"] as const).map((t) => (
@@ -653,11 +652,11 @@ export function RosterView() {
       {list.length === 0 ? (
         <Panel>
           <p className="text-sm text-muted">
-            {tab === "living" ? "Empty. Forge someone who can walk the Hollow." : "None yet."}
+            {tab === "living" ? "Empty. Your file is waiting in the Machine Shop." : "None yet."}
           </p>
-          {tab === "living" ? (
+          {tab === "living" && !characterForged(s) ? (
             <Button className="mt-3" variant="ember" onClick={() => setScreen("forge")}>
-              Forge an operative
+              Forge the first
             </Button>
           ) : null}
         </Panel>
@@ -712,10 +711,10 @@ export function RosterView() {
 export function ForgeView() {
   const s = useGame((g) => g.s);
   const forge = useGame((g) => g.forge);
+  const setScreen = useGame((g) => g.setScreen);
   const stamped = (s.playerName ?? "").trim();
-  const nameLocked = Boolean(stamped);
-  const [step, setStep] = useState(() => (nameLocked && s.operatives.length === 0 ? 2 : 0));
-  const [name, setName] = useState(() => stamped || randomName());
+  const locked = characterForged(s);
+  const [step, setStep] = useState(0);
   const [cls, setCls] = useState<ClassName>("Warrior");
   const [race, setRace] = useState(Object.keys(RACES)[0]);
   const [origin, setOrigin] = useState(ORIGINS[0]);
@@ -725,8 +724,28 @@ export function ForgeView() {
   const [rolls, setRolls] = useState<Record<string, number>>({});
   const [spinKey, setSpinKey] = useState<string | null>(null);
   const [spinAll, setSpinAll] = useState(false);
-  const cost = forgeCost(s);
+  const [rerollsLeft, setRerollsLeft] = useState(FORGE_REROLLS);
   const raceDef = RACES[race];
+  const fileName = stamped || "Rider";
+
+  const spentRerollToast = () => {
+    useGame.setState((st) => ({
+      s: { ...st.s, toast: "Two rerolls. That's the law. Stamp what you have." },
+    }));
+  };
+
+  const hasRoll = (k: string) => typeof rolls[k] === "number";
+  const hasAnyRoll = Object.values(rolls).some((n) => typeof n === "number");
+
+  const takeReroll = (needed: boolean) => {
+    if (!needed) return true;
+    if (rerollsLeft <= 0) {
+      spentRerollToast();
+      return false;
+    }
+    setRerollsLeft((n) => n - 1);
+    return true;
+  };
 
   const setRaceAndLine = (r: string) => {
     setRace(r);
@@ -735,6 +754,7 @@ export function ForgeView() {
 
   const rollOne = (k: string) => {
     if (spinKey || spinAll) return;
+    if (!takeReroll(hasRoll(k))) return;
     sfx.dice();
     setSpinKey(k);
     window.setTimeout(() => {
@@ -744,6 +764,7 @@ export function ForgeView() {
   };
   const rollAll = () => {
     if (spinKey || spinAll) return;
+    if (!takeReroll(hasAnyRoll)) return;
     sfx.dice();
     setSpinAll(true);
     window.setTimeout(() => {
@@ -763,6 +784,7 @@ export function ForgeView() {
   };
 
   const hollowDecide = (wild = false) => {
+    if (!takeReroll(hasAnyRoll)) return;
     sfx.dice();
     const nextCls = wild ? CLASSES[Math.floor(Math.random() * CLASSES.length)] : cls;
     const raceKeys = Object.keys(RACES);
@@ -792,21 +814,33 @@ export function ForgeView() {
   };
 
   const canForge =
-    Boolean((nameLocked ? stamped : name).trim()) &&
+    Boolean(fileName.trim()) &&
     FATE_KEYS.every((k) => typeof rolls[k] === "number") &&
     STAT_ORDER.every((k) => typeof rolls[k] === "number");
+
+  if (locked) {
+    return (
+      <div className="space-y-4 pb-8">
+        <SectionLabel>Machine Shop</SectionLabel>
+        <h2 className="font-display text-2xl">File already cut</h2>
+        <Panel className="bg-raised">
+          <p className="text-sm leading-relaxed text-moon">
+            {fileName} is already on the roster. The Machine Shop does not stamp a second soul. No rerolls. No second file.
+          </p>
+          <Button className="mt-4 w-full" variant="ember" onClick={() => setScreen("hq")}>
+            Back to Vault 13
+          </Button>
+        </Panel>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4 pb-8">
       <SectionLabel>Character Forge</SectionLabel>
-      <h2 className="font-display text-2xl">{nameLocked && s.operatives.length === 0 ? "Roll their fate" : "Make them real"}</h2>
+      <h2 className="font-display text-2xl">Cut your file</h2>
       <p className="text-sm text-muted">
-        {nameLocked && s.operatives.length === 0
-          ? `${stamped} is already on the black card. Class and blood can wait. The body dice do not.`
-          : cost === 0
-            ? "First operative is a gift of the moon."
-            : <>Next forge costs <Coin n={cost} />.</>}{" "}
-        {!(nameLocked && s.operatives.length === 0) ? "Three steps. Body and fate. Thirteen dice. One life." : "Seven body dice. Six fate dice. One life."}
+        {fileName} is locked on the black card from Discord. Class, blood, and thirteen dice. Two rerolls. Then the shop closes.
       </p>
 
       <div className="flex gap-2">
@@ -830,28 +864,11 @@ export function ForgeView() {
 
       {step === 0 ? (
         <Panel className="bg-raised">
-          {nameLocked ? (
-            <div className="rounded-[var(--radius-sm)] bg-ink px-3 py-3 shadow-[var(--shadow-border)]">
-              <p className="font-display text-[10px] uppercase tracking-wider text-ember">Stamped name</p>
-              <p className="mt-1 font-display text-lg text-paper">{stamped}</p>
-              <p className="mt-1 text-xs text-muted">Tyrone already has this from the black card. The dice do the rest.</p>
-            </div>
-          ) : (
-            <>
-          <label className="font-display text-[10px] uppercase tracking-wider text-ember">Name</label>
-          <div className="mt-1 flex gap-2">
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Given name"
-              className="h-11 flex-1 rounded-[var(--radius-sm)] bg-ink px-3 text-sm outline-none shadow-[var(--shadow-border)] focus:shadow-[var(--shadow-border-hover)]"
-            />
-            <Button variant="quiet" onClick={() => setName(randomName())}>
-              Random
-            </Button>
+          <div className="rounded-[var(--radius-sm)] bg-ink px-3 py-3 shadow-[var(--shadow-border)]">
+            <p className="font-display text-[10px] uppercase tracking-wider text-ember">Discord name · locked</p>
+            <p className="mt-1 font-display text-lg text-paper">{fileName}</p>
+            <p className="mt-1 text-xs text-muted">Scraped from Discord. It does not edit. Class and blood still do.</p>
           </div>
-            </>
-          )}
           <label className="mt-5 block font-display text-[10px] uppercase tracking-wider text-ember">Class</label>
           <div className="mt-2 grid grid-cols-2 gap-2">
             {CLASSES.map((c) => (
@@ -947,6 +964,7 @@ export function ForgeView() {
             setBodyI={setBodyI}
             onRoll={rollOne}
             onRollAll={rollAll}
+            rerollsLeft={rerollsLeft}
           />
           {bodyI >= STAT_ORDER.length ? (
             <>
@@ -995,12 +1013,12 @@ export function ForgeView() {
               className="w-full"
               variant="ember"
               disabled={!canForge}
-              onClick={() => err(forge({ name: (nameLocked ? stamped : name) || randomName(), cls, race, lineage, origin, rolls }))}
+              onClick={() => err(forge({ name: fileName, cls, race, lineage, origin, rolls }))}
             >
-              {cost === 0 ? "Forge" : <>Forge · <Coin n={cost} /></>}
+              Stamp the file
             </Button>
             <Button variant="ghost" className="w-full" onClick={() => hollowDecide(false)}>
-              Let the Hollow decide
+              Let the Hollow decide{hasAnyRoll ? ` · ${rerollsLeft} left` : ""}
             </Button>
             <Button variant="quiet" onClick={() => setStep(1)}>
               Back

@@ -1,5 +1,5 @@
 import type { GameState, Screen } from "./types";
-import { nextObjective } from "./engine";
+import { characterForged, nextObjective } from "./engine";
 
 export const HUB_SCREENS = ["hq", "roster", "squad", "map", "arcade", "inventory", "more"] as const;
 export const TASK_SCREENS = ["market", "forge", "ledger", "vault", "codex"] as const;
@@ -100,7 +100,10 @@ export function guidanceSignal(state: GameState): {
     return { mode, ...obj };
   }
   if (livingCount(state) === 0) {
-    return { mode, text: "The roster is empty. Forge an operative.", screen: "forge", cta: "Forge" };
+    if (characterForged(state)) {
+      return { mode, text: "Your file is closed. The Machine Shop will not cut a second soul.", screen: "hq", cta: "HQ" };
+    }
+    return { mode, text: "Cut your file in the Machine Shop. Two rerolls. Then it locks.", screen: "forge", cta: "Forge" };
   }
   const downed = state.operatives.find((o) => o.status === "downed");
   if (downed) {

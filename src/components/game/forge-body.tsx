@@ -17,6 +17,7 @@ export function ForgeBody({
   setBodyI,
   onRoll,
   onRollAll,
+  rerollsLeft,
 }: {
   cls: ClassName;
   raceStats: Stats;
@@ -27,6 +28,7 @@ export function ForgeBody({
   setBodyI: (n: number) => void;
   onRoll: (k: string) => void;
   onRollAll: () => void;
+  rerollsLeft: number;
 }) {
   const recap = bodyI >= STAT_ORDER.length;
   const current = recap ? null : STAT_ORDER[bodyI]!;
@@ -37,13 +39,16 @@ export function ForgeBody({
     <Panel className="bg-raised">
       <div className="flex items-center justify-between gap-3">
         <SectionLabel>{recap ? "Body · recap" : `Body · ${bodyI + 1} of 7`}</SectionLabel>
-        <Button size="sm" variant="ghost" onClick={onRollAll}>
+        <Button size="sm" variant="ghost" onClick={onRollAll} disabled={spinAll || !!spinKey}>
           Roll all
         </Button>
       </div>
       <p className="mt-2 text-sm leading-relaxed text-moon">
         A 10 is ranch average for this class. Every two points off 10 shifts the score by 1. Blood still adds its own
-        number. {className(cls)} lives on {STAT_COPY[primary].name}.
+        number. {className(cls)} lives on {STAT_COPY[primary].name}. Two rerolls for the whole file. Then it stamps.
+      </p>
+      <p className="mt-2 font-display text-[10px] uppercase tracking-[0.18em] text-ember">
+        Rerolls left · {rerollsLeft}
       </p>
 
       {current ? (

@@ -1,4 +1,5 @@
 import { useGame } from "@/game/store";
+import { characterForged } from "@/game/engine";
 import type { Screen } from "@/game/types";
 import { cn } from "@/lib/cn";
 import {
@@ -49,9 +50,9 @@ const TOOLS: {
   },
   {
     screen: "forge",
-    name: "Resident Forge",
-    eyebrow: "Recruitment",
-    desc: "Create a new Vault 13 resident and roll their Hollow profile.",
+    name: "Character Forge",
+    eyebrow: "One file",
+    desc: "Cut your body once. Two rerolls. Then the Machine Shop closes for good.",
     icon: Hammer,
   },
   {
@@ -103,6 +104,8 @@ export function MoreView() {
   const openGuide = useGame((g) => g.openGuide);
   const residentCount = useGame((g) => g.s.operatives.filter((o) => o.status !== "dead").length);
   const staffCount = useGame((g) => g.s.residents.length);
+  const forged = useGame((g) => characterForged(g.s));
+  const tools = forged ? TOOLS.filter((tool) => tool.screen !== "forge") : TOOLS;
 
   return (
     <div className="space-y-4 pb-8">
@@ -137,7 +140,7 @@ export function MoreView() {
       </Panel>
 
       <div className="grid gap-2 sm:grid-cols-2">
-        {TOOLS.map((tool) => {
+        {tools.map((tool) => {
           const Icon = tool.icon;
           return (
             <button

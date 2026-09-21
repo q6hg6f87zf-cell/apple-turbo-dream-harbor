@@ -175,7 +175,7 @@ export const TALK: Record<string, TalkLine[]> = {
     },
     {
       who: WHO,
-      text: "Idle residents at Vault 13 can deploy. Downed residents need the Med Bay or a stimpak. Dead is a closed file. Do not worry, the Machine Shop can forge another operative. It will cost you.",
+      text: "Idle residents at Vault 13 can deploy. Downed residents need the Med Bay or a stimpak. Dead is a closed file. The Machine Shop already cut your one file. It does not stamp a second soul.",
     },
     {
       who: WHO,
@@ -185,15 +185,15 @@ export const TALK: Record<string, TalkLine[]> = {
   forge: [
     {
       who: WHO,
-      text: "Howdy. Welcome to the Machine Shop. Every operative is from Ironclad. The rest of the file comes from class, blood, reputation, talent, shadow and whatever destiny crawls out of the die.",
+      text: "Howdy. Welcome to the Machine Shop. This is your one file. Name and handle already locked from Discord. Class, blood, and the dice still belong to you.",
     },
     {
       who: WHO,
-      text: "Tap a face to reroll that truth. Or let the Hollow decide the whole set. First resident is free. After that Vault 13 charges for the resources. Check the cost before you lock it.",
+      text: "Tap a face to roll it. After a number lands, you get two rerolls for the whole sheet. Then it stamps and the shop closes. No second character. No later rerolls.",
     },
     {
       who: WHO,
-      text: "Name them like you mean it. The Hollow keeps records. When you lock the file, they get a bunk in Vault 13 and a place on the roster.",
+      text: "The Discord name is already on the black card. When you lock the file, they get a bunk in Vault 13. The Machine Shop does not open again.",
     },
   ],
   deploy: [
@@ -385,7 +385,7 @@ export const MANUAL: Record<string, FieldCard> = {
     blurb: "Tyrone walks you through the shelter before the Hollow Realm opens up. Tap his panel to continue. The first briefing cannot be skipped.",
     tips: [
       "Every resident starts in Ironclad and lives at Vault 13.",
-      "Forge an operative. First one is free.",
+      "Cut your one file. Two rerolls. Then the Machine Shop closes.",
       "Deploy them. Caps and salvage come home, or they do not.",
       "Keep the Med Bay online before you rest the downed.",
     ],
@@ -396,7 +396,7 @@ export const MANUAL: Record<string, FieldCard> = {
     tips: [
       "The radio chip changes the air. Tap the waveform.",
       "SYNAPSE is the glowing box. I did not tell you that.",
-      "Forge the first resident. Then the Hollow Realm opens.",
+      "Cut your file in the Machine Shop. Then the Hollow Realm opens.",
     ],
   },
   resume: {
@@ -445,17 +445,17 @@ export const MANUAL: Record<string, FieldCard> = {
       "Idle residents at Vault 13 can deploy. Downed residents need Med Bay or a stimpak.",
       "Issue gear from the Salvage Depot. Bond companions with caps.",
       "Hall of Fame is earned by surviving the Hollow Realm.",
-      "Forge more residents from the plus on the HUD.",
+      "Your one file is already cut. The Machine Shop stays dark.",
     ],
   },
   forge: {
     title: "Machine Shop",
-    blurb: "Every operative is Ironclad-born. The Hollow writes the rest of the file.",
+    blurb: "One file. Discord name locked. Two rerolls. Then the shop goes dark.",
     tips: [
-      "Tap a die face to reroll that truth.",
-      "Let the Hollow decide if you do not want to own it.",
-      "Name them. Lock the file. They receive a bunk in Vault 13.",
-      "Resident Quarters cap how many operatives you can house.",
+      "Tap a die face to roll it. Two rerolls after that. Then stamp.",
+      "Let the Hollow decide if you do not want to own the first throw.",
+      "Discord name is locked. The shop closes after this file.",
+      "There is no second character. There is no later reroll.",
     ],
   },
   deploy: {

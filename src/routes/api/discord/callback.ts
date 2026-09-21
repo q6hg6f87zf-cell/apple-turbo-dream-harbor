@@ -42,7 +42,7 @@ export const Route = createFileRoute("/api/discord/callback")({
               did: rider.discordId,
               handle: rider.handle,
               name: rider.name,
-              stamped: rider.stamped,
+              stamped: true,
             }),
             expireCookie(OAUTH_COOKIE),
           ]);

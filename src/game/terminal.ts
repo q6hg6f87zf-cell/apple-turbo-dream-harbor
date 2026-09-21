@@ -156,7 +156,7 @@ export function pageBody(state: GameState, page: TermPage): string[] {
   }
   if (page === "squad") {
     if (!living.length) {
-      return ["SQUAD ROSTER // EMPTY", "Tyrone is holding a bunk. Forge the first operative."];
+      return ["SQUAD ROSTER // EMPTY", "Tyrone is holding a bunk. Cut your file. Two rerolls."];
     }
     return [
       `SQUAD ROSTER // ${living.length} LIVE`,

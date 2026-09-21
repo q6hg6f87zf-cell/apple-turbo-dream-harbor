@@ -54,11 +54,14 @@ export async function lookupRider(discordId: string): Promise<StoredRider | null
 }
 
 export async function upsertRiderFromDiscord(profile: DiscordProfile, existing?: StoredRider | null) {
+  if (existing?.stamped) {
+    return existing;
+  }
   const next: StoredRider = {
     discordId: profile.id,
     handle: profile.handle,
-    name: existing?.stamped ? existing.name : profile.name,
-    stamped: !!existing?.stamped,
+    name: profile.name || profile.handle,
+    stamped: true,
   };
   try {
     const sql = await ensureRiders();
@@ -66,8 +69,9 @@ export async function upsertRiderFromDiscord(profile: DiscordProfile, existing?:
       insert into hollow_riders (discord_id, handle, display_name, stamped, created_at, updated_at)
       values (${next.discordId}, ${next.handle}, ${next.name}, ${next.stamped}, now(), now())
       on conflict (discord_id) do update set
-        handle = excluded.handle,
+        handle = case when hollow_riders.stamped then hollow_riders.handle else excluded.handle end,
         display_name = case when hollow_riders.stamped then hollow_riders.display_name else excluded.display_name end,
+        stamped = true,
         updated_at = now()
     `;
   } catch {

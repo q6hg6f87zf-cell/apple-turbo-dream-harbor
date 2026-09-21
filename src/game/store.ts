@@ -18,6 +18,7 @@ import {
   applyRollToBeat,
   buildMission,
   clamp,
+  characterForged,
   cloneState,
   companionCost,
   completeMission,
@@ -328,6 +329,12 @@ export const useGame = create<Store>((set, get) => ({
   },
   setScreen: (screen) =>
     mutate(set, (s) => {
+      if (screen === "forge" && characterForged(s)) {
+        s.toast = "Your file is already cut. The Machine Shop does not stamp a second soul.";
+        s.screen = "hq";
+        s.openedFrom = null;
+        return;
+      }
       if (isTaskScreen(screen) && isHubScreen(s.screen) && !s.openedFrom) {
         s.openedFrom = s.screen;
       }
@@ -439,6 +446,13 @@ export const useGame = create<Store>((set, get) => ({
   closeGuide: () => set({ guideOpen: false }),
   finishBriefing: () =>
     mutate(set, (s) => {
+      if (characterForged(s)) {
+        s.screen = "hq";
+        s.tutorial = "shift";
+        ensureShift(s);
+        queueTalk(s, "shift");
+        return;
+      }
       s.openedFrom = "hq";
       s.screen = "forge";
       s.tutorial = "forge";
@@ -471,6 +485,7 @@ export const useGame = create<Store>((set, get) => ({
     }),
   forge: (opts) => {
     const s = get().s;
+    if (characterForged(s)) return "Your file is already cut. The Machine Shop does not stamp a second soul.";
     const cost = forgeCost(s);
     if (living(s).length >= rosterCap(s)) return "Barracks full. Upgrade for more beds.";
     if (s.coins < cost) return `Need ${cost} caps to forge.`;

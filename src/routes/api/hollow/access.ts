@@ -29,20 +29,20 @@ async function riderAccess(request: Request) {
   const stored = await lookupRider(session.did);
   const name = stored?.name || session.name;
   const handle = stored?.handle || session.handle;
-  const stamped = stored?.stamped ?? session.stamped;
+  const stamped = true;
   return json({
     allowed: true,
     authenticated: true,
     discord: true,
     linked: true,
     stamped,
-    returning: stamped,
+    returning: !!stored?.stamped || session.stamped,
     devBypass: false,
     provider: "discord",
     discordId: session.did,
     name,
     handle,
-    stage: stamped ? "ready" : "stamp",
+    stage: "ready" as const,
   });
 }
 

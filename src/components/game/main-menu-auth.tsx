@@ -8,7 +8,6 @@ import { RefreshCw, ShieldCheck } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { CapMark, SectionLabel } from "./primitives";
 import { HelpChrome, TalkOverlay } from "./talk-overlay";
-import { ProfileStamp } from "./menu";
 import { OpeningBoot, TitleBackdrop, SynapseLoadBar } from "./title-scene";
 import { MoonCard } from "./card";
 import { RadioChip, RadioDeckSheet, RadioDirector } from "./radio-deck";
@@ -36,7 +35,6 @@ function DiscordMark({ className }: { className?: string }) {
 export function AuthenticatedMainMenu() {
   const assume = useGame((g) => g.assumeCommand);
   const resume = useGame((g) => g.resumeSession);
-  const reset = useGame((g) => g.reset);
   const openTerminal = useGame((g) => g.openTerminal);
   const linkDiscord = useGame((g) => g.linkDiscord);
   const stamp = useGame((g) => g.stampProfile);
@@ -56,7 +54,6 @@ export function AuthenticatedMainMenu() {
   const talking = useGame((g) => !!g.s.talk);
   const hydrated = useGame((g) => g.hydrated);
   const { access, pending, refresh } = useDiscordAccess();
-  const [ask, setAsk] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [signingIn, setSigningIn] = useState(false);
 
@@ -75,12 +72,15 @@ export function AuthenticatedMainMenu() {
   }, [access?.discordId, access?.handle, access?.name, allowed, linkDiscord, riderId, playerHandle]);
 
   useEffect(() => {
-    if (!allowed || named) return;
+    if (!allowed) return;
     const name = (access?.name ?? "").trim();
-    if (access?.stamped && name.length >= 2) {
-      stamp(name, access.handle || "");
+    const handle = (access?.handle ?? "").replace(/^@/, "");
+    if (name.length >= 2) {
+      stamp(name, handle);
+      return;
     }
-  }, [allowed, named, access?.stamped, access?.name, access?.handle, stamp]);
+    if (access?.devBypass) stamp("Rider", "sandbox");
+  }, [allowed, access?.name, access?.handle, access?.devBypass, stamp]);
 
   useEffect(() => {
     if (!allowed || !named || access?.devBypass || !access?.discordId) return;
@@ -101,8 +101,14 @@ export function AuthenticatedMainMenu() {
     }
   }, []);
 
-  const boot = () => {
-    if (!allowed || !named) return;
+  const enterFile = () => {
+    if (!allowed) return;
+    if (!named) {
+      const name = (access?.name ?? "").trim() || (access?.devBypass ? "Rider" : "");
+      const handle = (access?.handle ?? "").replace(/^@/, "") || (access?.devBypass ? "sandbox" : "");
+      if (name.length >= 2) stamp(name, handle);
+      else return;
+    }
     unlockAudio();
     sfx.click();
     if (started) resume();
@@ -122,33 +128,31 @@ export function AuthenticatedMainMenu() {
     }
   };
 
-  useEffect(() => {
-    if (pending || allowed || signingIn) return;
-    if (access?.stage !== "discord") return;
-    if (authError) return;
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("discord") === "error") return;
-    const timer = window.setTimeout(() => {
-      void connectDiscord();
-    }, 480);
-    return () => window.clearTimeout(timer);
-  }, [pending, allowed, signingIn, access?.stage, authError]);
+  const onLogin = () => {
+    if (allowed) enterFile();
+    else void connectDiscord();
+  };
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (ask || talking || !named) {
-        if (event.key === "Escape") setAsk(false);
-        return;
-      }
+      if (talking) return;
       const target = event.target as HTMLElement | null;
       if (target?.closest("input, textarea, select, button")) return;
       if (event.key !== "Enter") return;
-      if (allowed) boot();
-      else if (!pending && access?.stage !== "tyrone") void connectDiscord();
+      if (pending) return;
+      onLogin();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   });
+
+  const loginLabel = !allowed
+    ? signingIn
+      ? "Opening Discord…"
+      : "Log in to Discord"
+    : started
+      ? "Log in"
+      : "Wake up";
 
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden bg-ink text-paper" data-ready="1">
@@ -162,10 +166,10 @@ export function AuthenticatedMainMenu() {
             <p className="font-display text-[11px] uppercase tracking-[0.42em] text-ember">S.Y.N.A.P.S.E T-0880</p>
             <p className="mt-1 text-xs text-moon">
               {!allowed
-                ? "Discord opens the file. Then we stamp the black card."
-                : named
+                ? "The porch stays up. Discord cuts the black card. Name and handle lock to that file."
+                : started
                   ? "Tyrone keeps the porch light on."
-                  : "Stamp a name. Then we wake you."}
+                  : "Your black card is cut from Discord. Wake up and we roll the body. Two rerolls. Then it locks."}
             </p>
             {!allowed ? (
               <div>
@@ -184,7 +188,7 @@ export function AuthenticatedMainMenu() {
                   <>
                     <p className="mt-3 font-display text-sm text-paper">Discord authenticated{access.name ? ` · ${access.name}` : ""}</p>
                     <p className="mt-2 text-sm leading-relaxed text-moon">
-                      One more handshake. Ask TyroneBot in Discord for your one-time Hollow Realm verification link, open it in this browser, then refresh the gate. No caps or XP travel in the URL.
+                      One more handshake. Ask TyroneBot in Discord for your one-time Hollow Realm verification link, open it in this browser, then refresh the gate.
                     </p>
                     <Button variant="ember" size="lg" className="mt-4 w-full" onClick={refresh}>
                       <RefreshCw className="size-4" /> I verified with Tyrone
@@ -193,25 +197,14 @@ export function AuthenticatedMainMenu() {
                 ) : (
                   <>
                     <p className="mt-3 text-sm leading-relaxed text-moon">
-                      Sign in with Discord. Chosen name stays yours. Handle locks to the Discord file and does not move.
+                      New riders authenticate once. Returning riders tap login and walk back in. Discord name and @ stamp the black card and never move.
                     </p>
-                    <Button variant="ember" size="lg" className="mt-4 w-full" onClick={() => void connectDiscord()} disabled={signingIn}>
-                      <DiscordMark className="size-4" /> {signingIn ? "Opening Discord…" : "Continue with Discord"}
+                    <Button variant="ember" size="lg" className="mt-4 w-full" onClick={onLogin} disabled={signingIn || pending}>
+                      <DiscordMark className="size-4" /> {loginLabel}
                     </Button>
-                    <p className="mt-3 font-display text-[10px] uppercase tracking-[0.18em] text-muted">
-                      Returning riders skip the stamp card
-                    </p>
                   </>
                 )}
                 {(authError || access?.error) ? <p className="mt-3 text-xs leading-relaxed text-danger">{authError ?? access?.error}</p> : null}
-              </div>
-            ) : !named ? (
-              <div className="mt-4">
-                <ProfileStamp
-                  prefill={chosenName}
-                  prefillHandle={discordHandle}
-                  handleLocked={Boolean(discordHandle)}
-                />
               </div>
             ) : (
               <>
@@ -227,15 +220,20 @@ export function AuthenticatedMainMenu() {
                       <FileStat label="Roster" value={`${roster}/${beds}`} />
                       <FileStat label="Rooms" value={String(roomN)} />
                     </div>
+                    {discordHandle ? (
+                      <p className="mt-3 font-display text-[10px] uppercase tracking-[0.18em] text-ember">
+                        {chosenName} · @{discordHandle}
+                      </p>
+                    ) : null}
                   </div>
                 ) : (
                   <div className="mt-4">
-                    <SectionLabel>File stamped</SectionLabel>
+                    <SectionLabel>Black card · locked</SectionLabel>
                     <p className="mt-2 text-sm leading-relaxed text-moon">
-                      {playerName}. I found you east of the highway. No tracks. Wake up and I will walk you into Vault 13.
+                      {chosenName || "Rider"}. Scraped from Discord. The name and @ do not edit. Two rerolls when we cut the body. Then the Machine Shop closes.
                     </p>
-                    {playerHandle ? (
-                      <p className="mt-3 font-display text-[10px] uppercase tracking-[0.18em] text-ember">@{playerHandle}</p>
+                    {discordHandle ? (
+                      <p className="mt-3 font-display text-[10px] uppercase tracking-[0.18em] text-ember">@{discordHandle}</p>
                     ) : null}
                     <div className="mt-4">
                       <MoonCard member={me} />
@@ -251,12 +249,12 @@ export function AuthenticatedMainMenu() {
                     onPointerDown={() => {
                       unlockAudio();
                     }}
-                    onClick={boot}
+                    onClick={onLogin}
                     disabled={talking}
                   >
-                    {started ? `Assume command · Day ${day}` : "Wake up"}
+                    {allowed ? <DiscordMark className="size-4" /> : null}
+                    {loginLabel}
                   </Button>
-                  {started ? <Button variant="ghost" className="w-full" onClick={() => setAsk(true)} disabled={talking}>New file</Button> : null}
                 </div>
               </>
             )}
@@ -282,40 +280,6 @@ export function AuthenticatedMainMenu() {
           SIT THE CRT
         </span>
       </button>
-      ) : null}
-
-      {ask ? (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-ink/70 p-4 md:items-center"
-          onClick={() => setAsk(false)}
-          role="presentation"
-        >
-          <div
-            className="ms-pop glass-strong w-full max-w-md rounded-[var(--radius-xl)] p-5 text-left"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Confirm new local file"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <h2 className="font-display text-xl">Wipe this local file?</h2>
-            <p className="mt-3 text-sm leading-relaxed text-moon">The local roster/cache resets. Server-authoritative campaign value remains governed by Vault 13.</p>
-            <div className="mt-5 flex gap-2">
-              <Button
-                variant="danger"
-                className="flex-1"
-                onClick={() => {
-                  reset();
-                  setAsk(false);
-                  unlockAudio();
-                  useGame.getState().assumeCommand();
-                }}
-              >
-                New file
-              </Button>
-              <Button variant="quiet" className="flex-1" onClick={() => setAsk(false)}>Hold</Button>
-            </div>
-          </div>
-        </div>
       ) : null}
 
       <RadioDirector />

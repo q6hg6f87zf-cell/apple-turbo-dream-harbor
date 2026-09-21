@@ -1344,13 +1344,16 @@ export function restOvernight(state: GameState): GameState {
 
 export function nextObjective(state: GameState): { text: string; screen: Screen; cta: string; opId?: string } {
   if (!state.started)
-    return { text: "Assume command. Tyrone is already on the line.", screen: "title", cta: "Begin" };
-  if (state.tutorial === "briefing")
-    return { text: "Read the briefing. Then forge your first operative.", screen: "forge", cta: "Forge" };
-  if (state.operatives.filter((o) => o.status !== "dead").length === 0)
-    return { text: "The roster is empty. Forge an operative.", screen: "forge", cta: "Forge" };
-  if (state.tutorial === "forge")
-    return { text: "Name them. Roll the six. Make it stick.", screen: "forge", cta: "Forge" };
+    return { text: "Log in with Discord. Tyrone is already on the line.", screen: "title", cta: "Login" };
+  if (state.tutorial === "briefing" && !characterForged(state))
+    return { text: "Read the briefing. Then cut your file in the Machine Shop.", screen: "forge", cta: "Forge" };
+  if (state.tutorial === "forge" && !characterForged(state))
+    return { text: "Two rerolls. Then stamp. The file does not open again.", screen: "forge", cta: "Forge" };
+  if (state.operatives.filter((o) => o.status !== "dead").length === 0) {
+    if (characterForged(state))
+      return { text: "Your file is closed. The Machine Shop will not cut a second soul.", screen: "hq", cta: "HQ" };
+    return { text: "Cut your file in the Machine Shop. Two rerolls. Then it locks.", screen: "forge", cta: "Forge" };
+  }
   if (state.tutorial === "sortie")
     return { text: "Open the map. Send them into Ironclad.", screen: "map", cta: "Deploy" };
   if (state.tutorial === "rest")
@@ -1426,16 +1429,25 @@ export function companionCost(type: string): number {
   return COMPANIONS[type]?.cost ?? 900;
 }
 
+export function characterForged(state: GameState): boolean {
+  return state.operatives.length > 0;
+}
+
+export const FORGE_REROLLS = 2;
+
 export function hasPlayerProfile(state: GameState): boolean {
   return Boolean(state.playerName?.trim());
 }
 
 export function stampPlayerProfile(state: GameState, name: string, handle?: string | null): string | null {
   const clean = name.trim().replace(/^@/, "").slice(0, 24);
+  const hid = (handle ?? "").trim().replace(/^@/, "").slice(0, 32);
+  if (state.playerName?.trim() && state.playerHandle) {
+    return null;
+  }
   if (clean.length < 2) return "Stamp a name first, partner.";
-  state.playerName = clean;
-  const hid = (handle ?? "").trim().replace(/^@/, "");
-  if (hid.length >= 2) state.playerHandle = hid;
+  state.playerName = state.playerName?.trim() || clean;
+  if (hid.length >= 2 && !state.playerHandle) state.playerHandle = hid;
   return stampSeatedPlate(state);
 }
 
