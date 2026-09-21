@@ -358,9 +358,10 @@ export function RegionMapStage({
         cam.current = {
           yaw: layout.camera.yaw * DEG,
           pitch: layout.camera.pitch * DEG,
-          zoom: 1.05,
+          // Start clearly tilted so the war table never reads as a flat JPG.
+          zoom: 0.92,
           targetYaw: layout.camera.yaw * DEG,
-          targetZoom: 1.15,
+          targetZoom: 1.05,
           panX: 0,
           panY: 0,
           targetPanX: 0,
@@ -496,7 +497,7 @@ export function RegionMapStage({
           b.gl.bindTexture(b.gl.TEXTURE_2D, b.heightTex);
           b.gl.uniform1i(b.uniforms.u_height, 1);
           b.gl.uniformMatrix4fv(b.uniforms.u_mvp, false, mvpScratch.current);
-          b.gl.uniform1f(b.uniforms.u_displace, 0.22);
+          b.gl.uniform1f(b.uniforms.u_displace, 0.34);
           b.gl.uniform1f(b.uniforms.u_time, (now - t0) / 1000);
           const ember = Math.min(1, L.rim.ember + heatRef.current / 40);
           b.gl.uniform1f(b.uniforms.u_ember, ember);
@@ -509,7 +510,7 @@ export function RegionMapStage({
           const next: ScreenPin[] = [];
           for (const p of poisRef.current) {
             const { u, v } = poiMapUv(p.x, p.y);
-            const hh = field ? sampleHeight(field.data, field.w, field.h, u, v) * 0.22 : 0.05;
+            const hh = field ? sampleHeight(field.data, field.w, field.h, u, v) * 0.34 : 0.08;
             const scr = projectPin(u, v, hh, mvpScratch.current, rect.width, rect.height);
             if (!scr.visible) continue;
             next.push({
@@ -645,6 +646,9 @@ export function RegionMapStage({
       })}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-ink/50 to-transparent" />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-ink/55 to-transparent" />
+      <p className="pointer-events-none absolute left-3 top-3 z-20 rounded-[var(--radius-sm)] border border-ember/40 bg-ink/75 px-2 py-1 font-display text-[9px] uppercase tracking-[0.2em] text-ember backdrop-blur-md">
+        2.5D · drag · pinch
+      </p>
     </div>
   );
 }

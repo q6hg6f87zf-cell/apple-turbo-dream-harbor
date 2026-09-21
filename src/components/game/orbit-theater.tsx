@@ -277,7 +277,7 @@ export function RegionMapOverlay() {
           <X className="size-5" />
         </button>
         <div className="min-w-0 flex-1">
-          <p className="font-display text-[10px] uppercase tracking-[0.22em] text-ember">{region.continent} · war table</p>
+          <p className="font-display text-[10px] uppercase tracking-[0.22em] text-ember">{region.continent} · 2.5D war table</p>
           <h2 className="truncate font-display text-lg sm:text-xl">{region.name}</h2>
         </div>
         <div className="flex items-center gap-1">
