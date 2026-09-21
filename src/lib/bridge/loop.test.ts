@@ -67,6 +67,18 @@ class Ledger {
     return null;
   }
 
+  claim(ids: string[]) {
+    const claimed: string[] = [];
+    for (const event of this.events.values()) {
+      if (!ids.includes(event.id)) continue;
+      if (event.status === "pending" || event.status === "failed") {
+        event.status = "delivering";
+        claimed.push(event.id);
+      }
+    }
+    return claimed;
+  }
+
   pending() {
     return [...this.events.values()].filter((event) => event.status === "pending" || event.status === "failed");
   }
@@ -134,6 +146,14 @@ test("event publish is idempotent and failed delivery is not success", () => {
   ledger.ack(unlocked.id, "failed");
   assert.equal(ledger.pending().some((event) => event.id === unlocked.id), false);
   assert.notEqual(ledger.ack(unlocked.id, "failed")?.status, "delivered");
+});
+
+test("claim-before-send restart cannot pull the event again", () => {
+  const ledger = new Ledger();
+  const first = ledger.publish("boss.defeated", A, "gravenor-chaos");
+  assert.deepEqual(ledger.claim([first.id]), [first.id]);
+  assert.equal(ledger.pending().some((event) => event.id === first.id), false);
+  assert.deepEqual(ledger.claim([first.id]), []);
 });
 
 test("deep links refuse open redirects", () => {

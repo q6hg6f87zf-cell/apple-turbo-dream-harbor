@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { json, rateLimit, requireTrustedWriter } from "@/lib/bridge/auth.server";
-import { ackEvents, pendingFeedEvents } from "@/lib/bridge/events.server";
+import { ackEvents, claimEvents, pendingFeedEvents } from "@/lib/bridge/events.server";
 import { audit } from "@/lib/bridge/audit.server";
 import { bridgeLog } from "@/lib/bridge/log";
 
@@ -26,11 +26,19 @@ export const Route = createFileRoute("/api/bridge/events")({
           return json({ error: "bad json" }, 400);
         }
         const ids = Array.isArray(body.ids) ? body.ids.map(String) : [];
-        const status = body.status === "skipped" || body.status === "failed" ? body.status : "delivered";
+        const status =
+          body.status === "skipped" || body.status === "failed" || body.status === "delivering"
+            ? body.status
+            : "delivered";
+        if (status === "delivering") {
+          const claimed = await claimEvents(ids);
+          bridgeLog("event.http_claim", { n: claimed.length });
+          return json({ ok: true, acked: claimed.length, ids: claimed, status });
+        }
         const n = await ackEvents(ids, status, String(body.error ?? ""));
         await audit("discord event delivered", { actor: "tyrone-bot", detail: { n, status } });
         bridgeLog("event.http_ack", { status, n });
-        return json({ ok: true, acked: n });
+        return json({ ok: true, acked: n, ids, status });
       },
     },
   },

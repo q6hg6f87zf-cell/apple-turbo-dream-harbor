@@ -109,11 +109,33 @@ export async function pendingFeedEvents(limit = 20): Promise<WorldEventRow[]> {
   }));
 }
 
+/** Take ownership before Discord send. Restart cannot pull these again. */
+export async function claimEvents(ids: string[]) {
+  const clean = ids.map((id) => String(id).slice(0, 64)).filter((id) => id.startsWith("ev-")).slice(0, 50);
+  if (!clean.length) return [];
+  const sql = await getSql();
+  const claimed: string[] = [];
+  for (const id of clean) {
+    const rows = await sql<{ id: string }>`
+      update hollow_world_event
+      set delivery_status = 'delivering',
+          last_error = 'claimed',
+          delivered_at = now()
+      where id = ${id} and delivery_status in ('pending', 'failed')
+      returning id
+    `;
+    if (rows[0]) claimed.push(rows[0].id);
+  }
+  bridgeLog("event.claim", { n: claimed.length });
+  return claimed;
+}
+
 export async function ackEvents(
   ids: string[],
-  status: "delivered" | "skipped" | "failed" = "delivered",
+  status: "delivered" | "skipped" | "failed" | "delivering" = "delivered",
   error = "",
 ) {
+  if (status === "delivering") return (await claimEvents(ids)).length;
   const clean = ids.map((id) => String(id).slice(0, 64)).filter((id) => id.startsWith("ev-")).slice(0, 50);
   if (!clean.length) return 0;
   const sql = await getSql();
@@ -126,7 +148,7 @@ export async function ackEvents(
             delivered_at = now(),
             delivery_attempts = coalesce(delivery_attempts, 0) + 1,
             last_error = ${error.slice(0, 180)}
-        where id = ${id} and delivery_status in ('pending', 'failed')
+        where id = ${id} and delivery_status in ('pending', 'delivering', 'failed')
         returning id
       `;
       n += rows.length;
@@ -135,7 +157,7 @@ export async function ackEvents(
     const rows = await sql<{ id: string }>`
       update hollow_world_event
       set delivery_status = ${status}, delivered_at = now()
-      where id = ${id} and delivery_status in ('pending', 'failed')
+      where id = ${id} and delivery_status in ('pending', 'delivering', 'failed')
       returning id
     `;
     n += rows.length;

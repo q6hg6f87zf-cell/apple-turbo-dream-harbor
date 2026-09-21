@@ -27,6 +27,7 @@ test("deep links only accept known destinations", () => {
   assert.equal(DEEP_LINKS.profile, "/profile");
   assert.equal(DEEP_LINKS.region("ironclad"), "/region/ironclad");
   assert.equal(absoluteDeepLink("/region/ironclad"), "https://thehollowrealm.com/region/ironclad");
+  assert.match("/?to=map&region=ironclad", /to=map&region=ironclad/);
 });
 
 test("event types and visibility are locked", () => {

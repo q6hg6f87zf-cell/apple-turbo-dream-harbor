@@ -44,6 +44,35 @@ Compare secrets with SHA-256 + `timingSafeEqual`. Never log tokens, cookies, or 
 - Duplicate memory or event → same id, original source and timestamp kept.
 - Unknown deep link → ignored. Open redirects rejected.
 
+## Discord delivery
+
+The Postgres outbox is the source of truth.
+
+`pending` → claim `delivering` → Discord send → ack `delivered` | `failed` | `skipped`
+
+`delivering` is not pulled again. A restart after a successful send cannot double-post. A crash after claim and before send may drop that announcement (at-most-once, preferred over duplicates).
+
+Failed Discord posts retry up to 3 times, then stay `failed`. They are never marked `delivered`.
+
+TyroneBot also keeps a per-guild sqlite seen list (`guild:hollow-feed-seen:{guildId}`) on the Railway volume. That is a second belt. The outbox still wins.
+
+## Deep links
+
+`https://thehollowrealm.com/vault`
+`https://thehollowrealm.com/inventory`
+`https://thehollowrealm.com/world`
+`https://thehollowrealm.com/profile`
+`https://thehollowrealm.com/region/ironclad`
+
+`/region/ironclad` redirects to `/?to=map&region=ironclad`.
+
+## Production
+
+1. Set the same `HOLLOW_BRIDGE_KEY` as a **sensitive** environment variable on Vercel (Hollow Realm, Production) and Railway (TyroneBot).
+2. Copy the value from the Vercel dashboard (Project → Settings → Environment Variables → Reveal). Never paste it into Discord, GitHub, chat, or logs.
+3. Redeploy both. Unauthorized `/api/bridge/*` stays `401` (wrong or missing bearer) or `503` (key not configured). The body never includes a soul.
+4. Two real Discord accounts: A cannot see B's memories. Unlink leaves the Moon Squad profile intact.
+
 ## Deep links
 
 `https://thehollowrealm.com/vault`
