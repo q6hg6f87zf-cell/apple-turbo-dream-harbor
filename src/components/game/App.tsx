@@ -33,6 +33,7 @@ import { FileView } from "./synapse-os";
 import { RadioDeckSheet, RadioDirector } from "./radio-deck";
 import { Dock, GuidanceRow, HubHeader, Rail, SceneBreath, TaskHeader } from "./chrome";
 import { WorkBench } from "./work-bench";
+import { RegionMapOverlay } from "./orbit-theater";
 
 export function GameApp() {
   const hydrate = useGame((g) => g.hydrate);
@@ -44,6 +45,7 @@ export function GameApp() {
   const started = useGame((g) => g.s.started);
   const mission = useGame((g) => g.s.mission);
   const combat = useGame((g) => g.s.combat);
+  const regionMapOpen = useGame((g) => !!g.s.regionMapOpen);
   const focused = !!mission || !!combat;
   const kind = focused ? "focused" : chromeKind(screen);
 
@@ -228,6 +230,7 @@ export function GameApp() {
       <RadioDeckSheet />
       <CardSwipe />
       <WorkBench />
+      {regionMapOpen ? <RegionMapOverlay /> : null}
     </div>
   );
 }

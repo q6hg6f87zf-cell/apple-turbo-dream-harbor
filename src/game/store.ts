@@ -570,6 +570,7 @@ export const useGame = create<Store>((set, get) => ({
     }),
   openRegionMap: () =>
     mutate(set, (s) => {
+      s.screen = "map";
       s.regionMapOpen = true;
     }),
   closeRegionMap: () =>
@@ -1363,3 +1364,29 @@ export const useGame = create<Store>((set, get) => ({
     return out;
   },
 }));
+
+if (typeof window !== "undefined") {
+  (window as unknown as { __hollowQa?: Record<string, unknown> }).__hollowQa = {
+    openRegionMap: (regionId = "ironclad") => {
+      const api = useGame.getState();
+      const loc =
+        regionId === "slagtown"
+          ? "kingdom"
+          : regionId === "blackspire"
+            ? "caverns"
+            : regionId === "brasswater"
+              ? "library"
+              : regionId === "veyra"
+                ? "veyra"
+                : "ironclad";
+      try {
+        sessionStorage.setItem("hollow:region-dive", String(regionId));
+      } catch {
+        /* */
+      }
+      api.selectLoc(loc as never);
+      api.openRegionMap();
+    },
+    getState: () => useGame.getState().s,
+  };
+}
