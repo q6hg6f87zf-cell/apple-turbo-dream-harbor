@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 import {
+  CANONICAL_REDIRECT,
   discordHandleFromUser,
+  discordRedirectUri,
   isLiveRealmHost,
   riderCookie,
   readRiderSession,
@@ -20,6 +22,25 @@ test("live realm hosts include apex and www", () => {
   assert.equal(isLiveRealmHost("www.thehollowrealm.com"), true);
   assert.equal(isLiveRealmHost("localhost:8080"), false);
   assert.equal(isLiveRealmHost("apple-turbo-dream-harbor.vercel.app"), false);
+});
+
+test("discord redirect uri is always the apex callback on live hosts", () => {
+  const apex = new Request("https://thehollowrealm.com/api/discord/start", {
+    headers: { host: "thehollowrealm.com" },
+  });
+  const www = new Request("https://www.thehollowrealm.com/api/discord/start", {
+    headers: { host: "www.thehollowrealm.com" },
+  });
+  const vercel = new Request("https://hollow-realm.vercel.app/api/discord/start", {
+    headers: { host: "hollow-realm.vercel.app" },
+  });
+  const local = new Request("http://localhost:8080/api/discord/start", {
+    headers: { host: "localhost:8080", "x-forwarded-proto": "http" },
+  });
+  assert.equal(discordRedirectUri(apex), CANONICAL_REDIRECT);
+  assert.equal(discordRedirectUri(www), CANONICAL_REDIRECT);
+  assert.equal(discordRedirectUri(vercel), CANONICAL_REDIRECT);
+  assert.equal(discordRedirectUri(local), "http://localhost:8080/api/discord/callback");
 });
 
 test("discord handle prefers username and global name", () => {

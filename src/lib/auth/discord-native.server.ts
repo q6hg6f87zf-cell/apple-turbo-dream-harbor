@@ -44,18 +44,8 @@ export function discordConfigured() {
   return Boolean(discordClientId() && discordClientSecret());
 }
 
-export function isLiveRealmHost(hostHeader: string | null | undefined) {
-  const host = String(hostHeader ?? "")
-    .split(",")[0]
-    .trim()
-    .split(":")[0]
-    .toLowerCase();
-  return (
-    host === "thehollowrealm.com" ||
-    host === "www.thehollowrealm.com" ||
-    host.endsWith(".thehollowrealm.com")
-  );
-}
+export const CANONICAL_ORIGIN = "https://thehollowrealm.com";
+export const CANONICAL_REDIRECT = `${CANONICAL_ORIGIN}/api/discord/callback`;
 
 export function requestHost(request: Request) {
   return (
@@ -65,14 +55,45 @@ export function requestHost(request: Request) {
   );
 }
 
+function hostName(hostHeader: string | null | undefined) {
+  return String(hostHeader ?? "")
+    .split(",")[0]
+    .trim()
+    .split(":")[0]
+    .toLowerCase();
+}
+
+export function isLiveRealmHost(hostHeader: string | null | undefined) {
+  const host = hostName(hostHeader);
+  return (
+    host === "thehollowrealm.com" ||
+    host === "www.thehollowrealm.com" ||
+    host.endsWith(".thehollowrealm.com")
+  );
+}
+
+export function usesCanonicalDiscord(hostHeader: string | null | undefined) {
+  const host = hostName(hostHeader);
+  return isLiveRealmHost(host) || host.endsWith(".vercel.app");
+}
+
 export function publicOrigin(request: Request) {
   const host = requestHost(request).split(",")[0].trim();
+  if (usesCanonicalDiscord(host)) return CANONICAL_ORIGIN;
   const proto = (request.headers.get("x-forwarded-proto") ?? "https").split(",")[0].trim() || "https";
   return `${proto}://${host}`;
 }
 
 export function discordRedirectUri(request: Request) {
+  if (usesCanonicalDiscord(requestHost(request))) return CANONICAL_REDIRECT;
   return `${publicOrigin(request)}/api/discord/callback`;
+}
+
+export function discordStartUrl(request: Request) {
+  if (usesCanonicalDiscord(requestHost(request))) {
+    return `${CANONICAL_ORIGIN}/api/discord/start`;
+  }
+  return `${publicOrigin(request)}/api/discord/start`;
 }
 
 function sessionSecret() {
