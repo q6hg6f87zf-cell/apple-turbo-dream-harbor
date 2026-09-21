@@ -21,6 +21,8 @@ export type MemoryRow = {
   payload: Record<string, unknown>;
   source: string;
   created_at: string;
+  visibility?: string;
+  poi_id?: string | null;
 };
 
 export type MemoryWrite =
@@ -28,6 +30,7 @@ export type MemoryWrite =
   | { error: string; status: number };
 
 const KINDS: MemoryKind[] = ["episode", "fact", "promise", "conversation"];
+const SOURCES = ["game", "discord", "admin", "world", "system"];
 
 export async function recordMemory(input: {
   discordId: string;
@@ -36,9 +39,12 @@ export async function recordMemory(input: {
   tags?: string[];
   importance?: number;
   locationId?: string | null;
+  poiId?: string | null;
   payload?: Record<string, unknown>;
   source?: string;
   id?: string;
+  visibility?: string;
+  relatedEventId?: string | null;
 }): Promise<MemoryWrite> {
   if (!KINDS.includes(input.kind)) return { error: "unknown memory kind", status: 400 };
   const claim = sanitizeClaim(input.claim);
@@ -46,38 +52,44 @@ export async function recordMemory(input: {
   const id = (input.id || memoryId(input.discordId, input.kind, claim)).slice(0, 64);
   const tags = (input.tags ?? []).map((tag) => String(tag).slice(0, 32)).slice(0, 8);
   const importance = Math.max(0, Math.min(10, Math.floor(input.importance ?? 3)));
-  const source = ["game", "discord", "admin", "world"].includes(input.source ?? "") ? input.source! : "game";
+  const source = SOURCES.includes(input.source ?? "") ? input.source! : "game";
+  const visibility = ["private", "campaign", "guild", "public"].includes(input.visibility ?? "")
+    ? input.visibility!
+    : "private";
   const started = Date.now();
   try {
     const sql = await getSql();
-    const inserted = await sql<MemoryRow>`
-      insert into hollow_tyrone_memory (
-        id, discord_id, kind, claim, tags, importance, location_id, payload, source
-      ) values (
-        ${id},
-        ${input.discordId},
-        ${input.kind},
-        ${claim},
-        ${tags},
-        ${importance},
-        ${input.locationId ?? null},
-        ${JSON.stringify(input.payload ?? {})}::jsonb,
-        ${source}
-      )
+    const inserted = await sql.query<MemoryRow>(
+      `insert into hollow_tyrone_memory (
+        id, discord_id, kind, claim, tags, importance, location_id, payload, source, visibility, related_event_id, poi_id
+      ) values ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11,$12)
       on conflict (discord_id, id) do nothing
-      returning id, discord_id, kind, claim, tags, importance, location_id, payload, source, created_at::text as created_at
-    `;
+      returning id, discord_id, kind, claim, tags, importance, location_id, payload, source, created_at::text as created_at, visibility, poi_id`,
+      [
+        id,
+        input.discordId,
+        input.kind,
+        claim,
+        tags,
+        importance,
+        input.locationId ?? null,
+        JSON.stringify(input.payload ?? {}),
+        source,
+        visibility,
+        input.relatedEventId ?? null,
+        input.poiId ?? null,
+      ],
+    );
     if (inserted[0]) {
       await audit("tyrone memory created", { discordId: input.discordId, actor: source, detail: { id, kind: input.kind } });
       bridgeLog("memory.write", { discordId: input.discordId, kind: input.kind, duplicate: false, ms: Date.now() - started });
       return { row: inserted[0], duplicate: false };
     }
-    const existing = await sql<MemoryRow>`
-      select id, discord_id, kind, claim, tags, importance, location_id, payload, source, created_at::text as created_at
-      from hollow_tyrone_memory
-      where discord_id = ${input.discordId} and id = ${id}
-      limit 1
-    `;
+    const existing = await sql.query<MemoryRow>(
+      `select id, discord_id, kind, claim, tags, importance, location_id, payload, source, created_at::text as created_at, visibility, poi_id
+       from hollow_tyrone_memory where discord_id = $1 and id = $2 limit 1`,
+      [input.discordId, id],
+    );
     if (!existing[0]) return { error: "memory store unavailable", status: 503 };
     bridgeLog("memory.write", { discordId: input.discordId, kind: input.kind, duplicate: true, ms: Date.now() - started });
     return { row: existing[0], duplicate: true };
@@ -91,21 +103,23 @@ export async function relevantMemories(opts: {
   discordId: string;
   query?: string;
   locationId?: string | null;
+  poiId?: string | null;
   limit?: number;
 }): Promise<MemoryRow[]> {
   const started = Date.now();
   try {
     const sql = await getSql();
-    const rows = await sql<MemoryRow>`
-      select id, discord_id, kind, claim, tags, importance, location_id, payload, source, created_at::text as created_at
-      from hollow_tyrone_memory
-      where discord_id = ${opts.discordId}
-      order by importance desc, created_at desc
-      limit 40
-    `;
+    const rows = await sql.query<MemoryRow>(
+      `select id, discord_id, kind, claim, tags, importance, location_id, payload, source, created_at::text as created_at, visibility, poi_id
+       from hollow_tyrone_memory
+       where discord_id = $1
+       order by importance desc, created_at desc
+       limit 40`,
+      [opts.discordId],
+    );
     const picked = pickRelevant(rows, opts);
     bridgeLog("memory.read", { discordId: opts.discordId, n: picked.length, ms: Date.now() - started });
-    return pickRelevant(rows, opts) as MemoryRow[];
+    return picked as MemoryRow[];
   } catch (error) {
     bridgeLog("memory.read_failed", { discordId: opts.discordId, db: true });
     throw error;

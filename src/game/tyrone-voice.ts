@@ -24,6 +24,7 @@ import {
   scoutBeforeRaid,
 } from "./tyrone-rules";
 import type { GameState, LocationId, RoomId, TyroneAssist } from "./types";
+import { promiseCallbackLine } from "@/lib/bridge/continuity-core";
 
 const WHO = "Tyrone Bot";
 
@@ -304,12 +305,19 @@ export function considerTyroneHint(state: GameState, before: TyroneSnap) {
   if (promise && state.screen === "map" && before.loc !== state.selectedLoc) {
     if (!onCooldown(state, "promise-" + promise.id)) {
       const said = speakTyrone(state, {
-        text: "You said we'd come back.",
-        concept: "promise",
+        text: promiseCallbackLine({
+          subject: promise.text,
+          tags: [],
+          regionId: promise.locationId ?? null,
+        }),
+        concept: "promise-" + promise.id,
         priority: 2,
         reason: "promise at this site",
       });
-      if (said) cooling(state, "promise-" + promise.id, 80);
+      if (said) {
+        cooling(state, "promise-" + promise.id, 80);
+        promise.kept = true;
+      }
       return;
     }
   }

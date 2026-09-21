@@ -3,6 +3,7 @@ import { parseDeepTo, screenForTo } from "@/lib/bridge/catalog";
 import { getBearerToken } from "@/lib/auth/client";
 import { useGame } from "@/game/store";
 import { useEffect, useRef } from "react";
+import type { TyroneBond, TyronePromise } from "@/game/types";
 
 function headers() {
   const token = getBearerToken();
@@ -27,23 +28,41 @@ export function WorldBridgeRuntime() {
   const discordId = useGame((g) => g.s.discordId);
   const started = useGame((g) => g.s.started);
   const day = useGame((g) => g.s.day);
+  const loc = useGame((g) => g.s.selectedLoc);
+  const poi = useGame((g) => g.s.selectedPoiId);
   const forged = useGame((g) => characterForged(g.s));
   const bossFlags = useGame((g) =>
     Object.entries(g.s.locations)
-      .filter(([, loc]) => loc.bossDefeated)
+      .filter(([, row]) => row.bossDefeated)
       .map(([id]) => id)
       .join(","),
   );
   const unlocked = useGame((g) =>
     Object.entries(g.s.locations)
-      .filter(([, loc]) => loc.unlocked)
+      .filter(([, row]) => row.unlocked)
       .map(([id]) => id)
       .join(","),
   );
   const lastPromise = useGame((g) => g.s.tyrone?.promises.at(-1)?.text ?? "");
   const lastEpisode = useGame((g) => g.s.tyrone?.episodic.at(-1)?.id ?? "");
+  const kept = useGame((g) =>
+    (g.s.tyrone?.promises ?? [])
+      .filter((row) => row.kept && String(row.id).startsWith("prm-"))
+      .map((row) => row.id)
+      .join(","),
+  );
   const hydrated = useGame((g) => g.hydrated);
-  const seen = useRef({ forged: false, day: 0, bosses: "", unlocks: "", promise: "", episode: "", dest: false });
+  const seen = useRef({
+    forged: false,
+    day: 0,
+    bosses: "",
+    unlocks: "",
+    promise: "",
+    episode: "",
+    dest: false,
+    kept: "",
+    loc: "",
+  });
 
   useEffect(() => {
     if (!hydrated || seen.current.dest) return;
@@ -67,15 +86,52 @@ export function WorldBridgeRuntime() {
     fetch("/api/hollow/chronicle", { credentials: "include", headers: headers() })
       .then((res) => (res.ok ? res.json() : null))
       .then((body) => {
-        if (!body?.memories?.length) return;
+        if (!body) return;
         useGame.setState((store) => {
           const semantic = [...store.s.tyrone.semantic];
-          for (const mem of body.memories as { id: string; kind: string; claim: string; tags?: string[] }[]) {
+          for (const mem of (body.memories ?? []) as { id: string; kind: string; claim: string; tags?: string[] }[]) {
             if (mem.kind !== "fact" && mem.kind !== "promise" && mem.kind !== "episode") continue;
             if (semantic.some((row) => row.id === mem.id)) continue;
             semantic.push({ id: mem.id, claim: mem.claim, evidence: 1, tags: mem.tags ?? [mem.kind] });
           }
-          return { s: { ...store.s, tyrone: { ...store.s.tyrone, semantic: semantic.slice(-24) } } };
+          const promises: TyronePromise[] = [...store.s.tyrone.promises];
+          for (const row of (body.promises ?? []) as {
+            id: string;
+            subject: string;
+            status: string;
+            locationId?: string | null;
+            poiId?: string | null;
+          }[]) {
+            const existing = promises.find((p) => p.id === row.id);
+            if (existing) {
+              existing.kept = row.status !== "active";
+              existing.locationId = row.locationId ?? existing.locationId;
+              existing.poiId = row.poiId ?? existing.poiId;
+              continue;
+            }
+            promises.push({
+              id: row.id,
+              text: row.subject,
+              locationId: row.locationId ?? undefined,
+              poiId: row.poiId ?? undefined,
+              day: store.s.day,
+              kept: row.status !== "active",
+            });
+          }
+          const relationship = body.relationship
+            ? ({ ...store.s.tyrone.relationship, ...body.relationship } as TyroneBond)
+            : store.s.tyrone.relationship;
+          return {
+            s: {
+              ...store.s,
+              tyrone: {
+                ...store.s.tyrone,
+                semantic: semantic.slice(-24),
+                promises: promises.slice(-12),
+                relationship,
+              },
+            },
+          };
         });
       })
       .catch(() => {});
@@ -175,9 +231,31 @@ export function WorldBridgeRuntime() {
         claim: ep.description,
         importance: ep.importance,
         tags: ep.tags,
+        locationId: ep.locationId,
       },
     });
   }, [discordId, lastEpisode]);
+
+  useEffect(() => {
+    if (!discordId || !loc) return;
+    if (seen.current.loc === loc) return;
+    seen.current.loc = loc;
+    postChronicle({
+      trigger: { type: "player.entered_region", region: loc, poi, combat: Boolean(useGame.getState().s.combat) },
+    });
+  }, [discordId, loc, poi]);
+
+  useEffect(() => {
+    if (!discordId || !kept || kept === seen.current.kept) {
+      seen.current.kept = kept;
+      return;
+    }
+    const prev = new Set(seen.current.kept.split(",").filter(Boolean));
+    seen.current.kept = kept;
+    for (const id of kept.split(",").filter((row) => row && !prev.has(row))) {
+      postChronicle({ promise: { action: "fulfill", id } });
+    }
+  }, [discordId, kept]);
 
   return null;
 }

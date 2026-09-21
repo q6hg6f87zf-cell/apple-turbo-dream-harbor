@@ -73,6 +73,15 @@ TyroneBot also keeps a per-guild sqlite seen list (`guild:hollow-feed-seen:{guil
 3. Redeploy both. Unauthorized `/api/bridge/*` stays `401` (wrong or missing bearer) or `503` (key not configured). The body never includes a soul.
 4. Two real Discord accounts: A cannot see B's memories. Unlink leaves the Moon Squad profile intact.
 
+## Tyrone continuity
+
+See `docs/TYRONE_CONTINUITY.md`.
+
+`GET /api/bridge/context` is the canonical Tyrone context service. It returns identity, relationship, relevant memories, active promises, recent major events, and a compact summary. It does not dump the ledger.
+
+Promises are structured rows. Relationship writes go through validated deltas. Private memories never leave the owning Discord User ID.
+
+
 ## Deep links
 
 `https://thehollowrealm.com/vault`

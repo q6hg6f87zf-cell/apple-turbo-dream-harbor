@@ -2,7 +2,6 @@ import { lookupSoul } from "@/lib/auth/hollow-soul.server";
 import { getSql } from "@/lib/db";
 import { lookupRider } from "@/lib/auth/discord-riders.server";
 import { relevantMemories } from "./memory.server";
-import { recentEventsFor } from "./events.server";
 
 export type SoulSummary = {
   linked: boolean;
@@ -80,50 +79,5 @@ export async function soulSummary(discordId: string, origin = "https://thehollow
     inventory: [],
     memories: memories.length,
     open: origin,
-  };
-}
-
-export async function tyroneContext(discordId: string, query?: string) {
-  const soul = await soulSummary(discordId);
-  const memories = await relevantMemories({ discordId, query, limit: 6 });
-  const events = await recentEventsFor(discordId, 6).catch(() => []);
-  const facts: { key: string; value: string }[] = [];
-  if (soul.playerName) facts.push({ key: "name", value: soul.playerName });
-  if (soul.handle) facts.push({ key: "handle", value: `@${soul.handle.replace(/^@/, "")}` });
-  if (soul.character) {
-    facts.push({ key: "character", value: soul.character.name });
-    facts.push({ key: "class", value: soul.character.classKey });
-    facts.push({ key: "status", value: soul.character.status });
-  }
-  facts.push({ key: "campaign", value: "Moon Squad" });
-  facts.push({ key: "caps", value: String(soul.caps) });
-  facts.push({ key: "xp", value: String(soul.xp) });
-  facts.push({ key: "level", value: String(soul.level) });
-  facts.push({ key: "link", value: soul.status });
-  for (const mem of memories) facts.push({ key: `memory.${mem.kind}`, value: mem.claim });
-  const unknown: string[] = [];
-  if (!soul.character) unknown.push("character");
-  if (!soul.region) unknown.push("region");
-  if (!soul.inventory.length) unknown.push("inventory");
-  if (!soul.bosses.length) unknown.push("bosses");
-  return {
-    soul,
-    facts,
-    unknown,
-    memories: memories.map((row) => ({
-      id: row.id,
-      kind: row.kind,
-      claim: row.claim,
-      importance: row.importance,
-      source: row.source,
-      at: row.created_at,
-    })),
-    events: events.map((row) => ({
-      type: row.event_type,
-      visibility: row.visibility,
-      at: row.created_at,
-      payload: row.payload,
-    })),
-    rule: "Only state values present in facts. If a key is missing, say you do not have that information. Do not invent inventory, deaths, bosses, caps, or promises.",
   };
 }
