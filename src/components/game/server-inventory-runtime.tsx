@@ -1,4 +1,5 @@
 import { cloneState } from "@/game/engine";
+import { isSnowflake } from "@/game/discord";
 import {
   buyServerExchange,
   buyServerVendor,
@@ -136,7 +137,7 @@ export function ServerInventoryRuntime() {
   const discordId = useGame((store) => store.s.discordId);
 
   useEffect(() => {
-    if (!discordId) {
+    if (!discordId || !isSnowflake(discordId)) {
       setServerInventoryAuthorityActive(false);
       return;
     }
@@ -200,7 +201,19 @@ export function ServerInventoryRuntime() {
 
     const boot = async () => {
       let snapshot = await pullServerInventory().catch(() => null);
-      if (!snapshot || cancelled) return;
+      if (cancelled) return;
+      if (!snapshot) {
+        useGame.setState({
+          forge: originalForge,
+          buyOffer: originalBuyOffer,
+          buyNpc: originalBuyNpc,
+          equipItem: originalEquipItem,
+          stashItem: originalStashItem,
+          takeFromVault: originalTakeFromVault,
+          repairItem: originalRepairItem,
+        });
+        return;
+      }
       if (!snapshot.migration.done) {
         const legacy = flattenLocalItems();
         const migratedSnapshot = await migrateLegacyServerInventory(legacy).catch(() => null);

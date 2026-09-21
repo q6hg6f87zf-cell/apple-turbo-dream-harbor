@@ -1,4 +1,5 @@
 import { locById } from "./data";
+import { isAuthStatus, isPlaceholderName, isSnowflake } from "./discord";
 import { ensureClocks } from "./inventory";
 import { isDiscordOnPorch, porchSignalLive } from "./presence";
 import { CARD_CLOCK_BASE, STARTER_PLATE } from "./rooms";
@@ -14,13 +15,17 @@ export const VACANT_NAMES = /^(commander|unclaimed|rider)$/i;
 
 export function isVacant(m: SquadMember | null | undefined): boolean {
   if (!m) return false;
-  return VACANT_NAMES.test(m.name);
+  if (VACANT_NAMES.test(m.name)) return true;
+  if (isPlaceholderName(m.name)) return true;
+  if (m.discordId && isAuthStatus(m.discordId)) return true;
+  return false;
 }
 
 export function normalizeHandle(raw?: string | null): string | null {
   const h = (raw ?? "").trim().replace(/^@/, "").replace(/\s+/g, "").slice(0, 24);
   if (h.length < 2) return null;
   if (/\s/.test((raw ?? "").trim())) return null;
+  if (isAuthStatus(h) || isSnowflake(h)) return null;
   return h;
 }
 
@@ -95,19 +100,20 @@ export function clockPlate(state: GameState): string | null {
 }
 
 export function bindDiscordIdentity(state: GameState, id: string, handle?: string | null) {
-  const snow = id.trim().replace(/[^\w.-]/g, "").slice(0, 32);
+  const snow = id.trim();
+  const usable = isSnowflake(snow) ? snow : "";
   let hid = normalizeHandle(handle);
-  if (hid && /^\d{17,22}$/.test(hid)) hid = null;
-  if (snow.length < 2 && !hid) return;
-  if (snow.length >= 2) state.discordId = snow;
+  if (hid && isSnowflake(hid)) hid = null;
+  if (!usable && !hid) return;
+  if (usable) state.discordId = usable;
   if (hid) {
     state.discordName = hid;
-    if (!normalizeHandle(state.playerHandle)) state.playerHandle = hid;
+    if (!normalizeHandle(state.playerHandle) || isPlaceholderName(state.playerHandle)) state.playerHandle = hid;
   }
   const seated = ensureSquad(state);
-  if (snow.length >= 2 && !seated.discordId) seated.discordId = snow;
+  if (usable && (!seated.discordId || !isSnowflake(seated.discordId))) seated.discordId = usable;
   if (hid) seated.discordHandle = `@${hid}`;
-  if (state.playerName?.trim()) stampSeatedPlate(state);
+  if (state.playerName?.trim() && !isPlaceholderName(state.playerName)) stampSeatedPlate(state);
 }
 
 

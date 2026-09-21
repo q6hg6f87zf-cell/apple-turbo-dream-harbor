@@ -38,6 +38,7 @@ export function SecureGameApp() {
   const hydrate = useGame((store) => store.hydrate);
   const hydrated = useGame((store) => store.hydrated);
   const screen = useGame((store) => store.s.screen);
+  const adoptVerifiedDiscord = useGame((store) => store.adoptVerifiedDiscord);
   const { access, pending } = useDiscordAccess();
 
   useLayoutEffect(() => {
@@ -48,6 +49,11 @@ export function SecureGameApp() {
     if (!hydrated) return;
     dismissSynapseSplash();
   }, [hydrated]);
+
+  useEffect(() => {
+    if (!hydrated || !access?.allowed || !access.discordId) return;
+    adoptVerifiedDiscord(access.discordId, access.name ?? "", access.handle ?? "");
+  }, [hydrated, access?.allowed, access?.discordId, access?.name, access?.handle, adoptVerifiedDiscord]);
 
   const allowed = !!access?.allowed;
 

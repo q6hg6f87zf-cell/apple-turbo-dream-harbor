@@ -24,6 +24,8 @@ export function TitleBackdrop({
   const videoRef = useRef<HTMLVideoElement>(null);
   const [reduced, setReduced] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [armed, setArmed] = useState(false);
 
   useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -40,8 +42,15 @@ export function TitleBackdrop({
   }, [live]);
 
   useEffect(() => {
+    if (!live || reduced) return;
+    const coarse = window.matchMedia("(pointer: coarse)").matches;
+    const t = window.setTimeout(() => setArmed(true), coarse ? 900 : 280);
+    return () => window.clearTimeout(t);
+  }, [live, reduced]);
+
+  useEffect(() => {
     const el = videoRef.current;
-    if (!el || reduced || !live) return;
+    if (!el || reduced || !live || !armed) return;
     el.muted = true;
     el.defaultMuted = true;
     el.playsInline = true;
@@ -57,7 +66,7 @@ export function TitleBackdrop({
       document.removeEventListener("pointerdown", kick);
       document.removeEventListener("touchstart", kick);
     };
-  }, [live, reduced]);
+  }, [live, reduced, armed]);
 
   const still = failed || reduced || !live;
 
@@ -76,7 +85,7 @@ export function TitleBackdrop({
         decoding="async"
         className="title-plate-hero absolute inset-0 size-full object-cover object-[center_28%] md:object-contain"
       />
-      {!still ? (
+      {!still && armed ? (
         <video
           ref={videoRef}
           src={TITLE_REEL.src}
@@ -85,11 +94,18 @@ export function TitleBackdrop({
           muted
           loop
           playsInline
-          preload="auto"
+          preload="metadata"
           data-title-reel="1"
-          className="absolute inset-0 size-full object-cover object-[center_28%] md:object-contain"
+          className={cn(
+            "absolute inset-0 size-full object-cover object-[center_28%] transition-opacity duration-500 md:object-contain",
+            ready ? "opacity-100" : "opacity-0",
+          )}
           onError={() => setFailed(true)}
-          onCanPlay={() => void videoRef.current?.play().catch(() => {})}
+          onPlaying={() => setReady(true)}
+          onCanPlay={() => {
+            setReady(true);
+            void videoRef.current?.play().catch(() => {});
+          }}
         />
       ) : null}
     </div>

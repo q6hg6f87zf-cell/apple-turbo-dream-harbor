@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { cloneState, hasPlayerProfile, seatSoul } from "@/game/engine";
+import { isPlaceholderName } from "@/game/discord";
 import { seatedMember } from "@/game/squad";
 import { sfx, unlockAudio } from "@/game/audio";
 import { useGame } from "@/game/store";
@@ -36,7 +37,7 @@ export function AuthenticatedMainMenu() {
   const assume = useGame((g) => g.assumeCommand);
   const resume = useGame((g) => g.resumeSession);
   const openTerminal = useGame((g) => g.openTerminal);
-  const linkDiscord = useGame((g) => g.linkDiscord);
+  const adoptVerifiedDiscord = useGame((g) => g.adoptVerifiedDiscord);
   const stamp = useGame((g) => g.stampProfile);
   const started = useGame((g) => g.s.started);
   const day = useGame((g) => g.s.day);
@@ -46,7 +47,6 @@ export function AuthenticatedMainMenu() {
   const xpToNext = useGame((g) => g.s.xpToNext);
   const ops = useGame((g) => g.s.operatives);
   const rooms = useGame((g) => g.s.rooms);
-  const riderId = useGame((g) => g.s.discordId);
   const playerName = useGame((g) => g.s.playerName);
   const playerHandle = useGame((g) => g.s.playerHandle);
   const me = useGame((g) => seatedMember(g.s));
@@ -58,24 +58,28 @@ export function AuthenticatedMainMenu() {
   const [signingIn, setSigningIn] = useState(false);
 
   const allowed = !!access?.allowed;
-  const discordHandle = (access?.handle || playerHandle || "").replace(/^@/, "");
-  const chosenName = playerName || access?.name || "";
+  const discordHandle = (() => {
+    const raw = (access?.handle || playerHandle || "").replace(/^@/, "");
+    return isPlaceholderName(raw) ? "" : raw;
+  })();
+  const chosenName =
+    (!isPlaceholderName(playerName) && playerName) ||
+    (!isPlaceholderName(access?.name) && access?.name) ||
+    "Rider";
   const roster = ops.filter((op) => op.status !== "dead").length;
   const beds = 3 + rooms.barracks * 2;
   const roomN = Object.values(rooms).filter((n) => n > 0).length;
 
   useEffect(() => {
     if (!allowed || !access?.discordId) return;
-    const handle = access.handle || (access.name && !/\s/.test(access.name) ? access.name : "");
-    if (riderId === access.discordId && (!handle || playerHandle === handle)) return;
-    linkDiscord(access.discordId, handle);
-  }, [access?.discordId, access?.handle, access?.name, allowed, linkDiscord, riderId, playerHandle]);
+    adoptVerifiedDiscord(access.discordId, access.name ?? "", access.handle ?? "");
+  }, [access?.discordId, access?.handle, access?.name, allowed, adoptVerifiedDiscord]);
 
   useEffect(() => {
     if (!allowed) return;
     const name = (access?.name ?? "").trim();
     const handle = (access?.handle ?? "").replace(/^@/, "");
-    if (name.length >= 2) {
+    if (!isPlaceholderName(name)) {
       stamp(name, handle);
       return;
     }
@@ -94,13 +98,15 @@ export function AuthenticatedMainMenu() {
 
   useEffect(() => {
     if (!allowed || !named || access?.devBypass || !access?.discordId) return;
+    if (isPlaceholderName(playerName) || isPlaceholderName(playerHandle)) return;
     void stampDiscordPlate(playerName ?? "", playerHandle ?? "");
   }, [allowed, named, access?.devBypass, access?.discordId, playerName, playerHandle]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const reason = params.get("reason");
-    if (params.get("discord") === "error") {
+    const failed = params.get("auth") === "error" || params.get("discord") === "error";
+    if (failed) {
       setAuthError(
         reason === "access_denied"
           ? "Discord sign-in was cancelled."
@@ -116,7 +122,7 @@ export function AuthenticatedMainMenu() {
     if (!named) {
       const name = (access?.name ?? "").trim() || (access?.devBypass ? "Rider" : "");
       const handle = (access?.handle ?? "").replace(/^@/, "") || (access?.devBypass ? "sandbox" : "");
-      if (name.length >= 2) stamp(name, handle);
+      if (!isPlaceholderName(name)) stamp(name, handle);
       else return;
     }
     unlockAudio();

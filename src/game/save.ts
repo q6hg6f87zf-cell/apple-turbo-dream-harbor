@@ -1,5 +1,5 @@
 import { SAVE_KEY, SAVE_VERSION, resolveLineage, resolveRaceName } from "./data";
-import { applyFloor, readWho, saveKeyFor, writeWho, type DiscordIdentity } from "./discord";
+import { applyFloor, isSnowflake, readWho, saveKeyFor, writeWho, type DiscordIdentity } from "./discord";
 import { defaultState } from "./engine";
 import { seedPackIfNeeded } from "./inventory";
 import { restoreHack, restoreTalk, restoreTerm } from "./terminal";
@@ -14,8 +14,35 @@ export function activeDiscordId() {
 }
 
 export function setActiveIdentity(who: DiscordIdentity | null) {
+  if (who && !isSnowflake(who.id)) {
+    activeId = null;
+    writeWho(null);
+    return;
+  }
   activeId = who?.id ?? null;
   writeWho(who);
+}
+
+/** Copy a poisoned `discord=ok` slot onto the real snowflake file once. */
+export function adoptSaveIdentity(fromId: string | null, toId: string) {
+  if (!isSnowflake(toId) || typeof localStorage === "undefined") return;
+  try {
+    const dest = saveKeyFor(toId, SAVE_KEY);
+    if (localStorage.getItem(dest)) return;
+    const candidates = [
+      fromId ? `${SAVE_KEY}:d:${fromId}` : null,
+      `${SAVE_KEY}:d:ok`,
+      SAVE_KEY,
+    ].filter((key): key is string => Boolean(key) && key !== dest);
+    for (const key of candidates) {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      localStorage.setItem(dest, raw);
+      return;
+    }
+  } catch {
+    /* private mode */
+  }
 }
 
 function key() {

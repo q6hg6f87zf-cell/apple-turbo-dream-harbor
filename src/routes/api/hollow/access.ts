@@ -6,6 +6,7 @@ import {
 import { enrollMoonSquad } from "@/lib/auth/enroll-campaign.server";
 import { lookupRider } from "@/lib/auth/discord-riders.server";
 import { lookupSoul } from "@/lib/auth/hollow-soul.server";
+import { isAuthStatus } from "@/game/discord";
 
 const HEADERS = { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" };
 
@@ -29,8 +30,10 @@ async function riderAccess(request: Request) {
   const session = readRiderSession(request);
   if (!session) return null;
   const stored = await lookupRider(session.did);
-  const name = stored?.name || session.name;
-  const handle = stored?.handle || session.handle;
+  const storedName = stored?.name && !isAuthStatus(stored.name) ? stored.name : "";
+  const storedHandle = stored?.handle && !isAuthStatus(stored.handle) ? stored.handle : "";
+  const name = storedName || session.name;
+  const handle = storedHandle || session.handle;
   const stamped = true;
   try {
     await enrollMoonSquad(session.did, name, handle);

@@ -62,10 +62,12 @@ import {
   type TermPage,
 } from "./terminal";
 import { settleArcade, stampHackWin } from "./arcade";
-import { clearSave, claimAnonymousIfNeeded, loadSave, setActiveIdentity, writeSave } from "./save";
+import { clearSave, claimAnonymousIfNeeded, loadSave, setActiveIdentity, writeSave, adoptSaveIdentity } from "./save";
 import {
   applyFloor,
+  consumeAuthQuery,
   deltaEmpty,
+  isPlaceholderName,
   isSnowflake,
   parseStampedLink,
   pullRemote,
@@ -126,6 +128,7 @@ interface Store {
   reset: () => void;
   stampProfile: (name: string, handle?: string) => string | null;
   linkDiscord: (id: string, name?: string) => void;
+  adoptVerifiedDiscord: (id: string, name?: string, handle?: string) => void;
   setScreen: (screen: Screen) => void;
   leaveTask: () => void;
   assumeCommand: () => void;
@@ -243,18 +246,25 @@ export const useGame = create<Store>((set, get) => ({
     if (get().hydrated) return;
     if (typeof window === "undefined") return;
     try {
+      consumeAuthQuery();
       const urlSnap = snapshotFromSearch();
       const who = urlSnap ? { id: urlSnap.id, name: urlSnap.name } : readWho();
-      if (who) {
+      if (who && isSnowflake(who.id)) {
         claimAnonymousIfNeeded(who.id);
         setActiveIdentity(who);
+      } else {
+        setActiveIdentity(null);
       }
       const loaded = loadSave();
-      if (who) {
+      if (who && isSnowflake(who.id)) {
         loaded.discordId = who.id;
-        loaded.discordName = who.name;
+        loaded.discordName = isPlaceholderName(who.name) ? loaded.discordName : who.name;
         bindDiscordIdentity(loaded, who.id, who.name);
+      } else if (loaded.discordId && !isSnowflake(loaded.discordId)) {
+        loaded.discordId = null;
       }
+      if (isPlaceholderName(loaded.playerName)) loaded.playerName = null;
+      if (isPlaceholderName(loaded.playerHandle)) loaded.playerHandle = null;
       const delta = applyFloor(loaded, urlSnap);
       ensureSquad(loaded);
       if (!deltaEmpty(delta)) {
@@ -317,19 +327,38 @@ export const useGame = create<Store>((set, get) => ({
     const stamped = parseStampedLink(id);
     const snow = (stamped?.id || (isSnowflake(id) ? id.trim() : "")).slice(0, 32);
     const handle = (name || stamped?.name || "").replace(/^@/, "").trim().slice(0, 32);
-    if (handle.length < 2 && snow.length < 2) return;
+    if (!isSnowflake(snow) && handle.length < 2) return;
+    if (!isSnowflake(snow)) return;
+    const prev = get().s.discordId;
+    if (prev && prev !== snow && !isSnowflake(prev)) adoptSaveIdentity(prev, snow);
+    setActiveIdentity({ id: snow, name: isPlaceholderName(handle) ? snow : handle });
     mutate(set, (st) => {
       const d = stamped ? applyFloor(st, { ...stamped, name: handle || stamped.name }) : { caps: 0, xp: 0, pack: {} };
-      bindDiscordIdentity(st, snow || st.discordId || "", handle || stamped?.name);
-      const seated = snow ? st.squad.find((m) => m.discordId === snow) : seatedMember(st);
+      bindDiscordIdentity(st, snow, handle);
+      const seated = st.squad.find((m) => m.discordId === snow);
       if (seated) switchMember(st, seated.id);
       if (d.caps) ensureSquad(st).personalCaps += d.caps;
       const plate = seatedMember(st);
-      st.toast = st.playerName
+      st.toast = st.playerName && !isPlaceholderName(st.playerName)
         ? `${st.playerName} sits the black card.`
         : `Discord @${(plate.discordHandle ?? handle ?? snow).replace(/^@/, "")} is on the plate. Stamp a name.`;
     });
     if (snow) get().pullArcade();
+  },
+  adoptVerifiedDiscord: (id, name, handle) => {
+    const snow = (id ?? "").trim();
+    if (!isSnowflake(snow)) return;
+    const cleanName = (name ?? "").trim().replace(/^@/, "").slice(0, 24);
+    const cleanHandle = (handle ?? "").trim().replace(/^@/, "").slice(0, 32);
+    const prev = get().s.discordId;
+    if (prev && prev !== snow) adoptSaveIdentity(prev, snow);
+    setActiveIdentity({ id: snow, name: isPlaceholderName(cleanName) ? cleanHandle || snow : cleanName });
+    mutate(set, (st) => {
+      bindDiscordIdentity(st, snow, cleanHandle);
+      if (!isPlaceholderName(cleanName)) stampPlayerProfile(st, cleanName, cleanHandle);
+      else if (!isPlaceholderName(cleanHandle)) stampPlayerProfile(st, cleanHandle, cleanHandle);
+    });
+    get().persist();
   },
   stampProfile: (name, handle) => {
     let msg: string | null = null;

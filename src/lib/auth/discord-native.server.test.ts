@@ -4,6 +4,7 @@ import {
   CANONICAL_REDIRECT,
   discordHandleFromUser,
   discordRedirectUri,
+  homeRedirect,
   isLiveRealmHost,
   riderCookie,
   readRiderSession,
@@ -52,6 +53,15 @@ test("discord handle prefers username and global name", () => {
   });
   assert.equal(profile?.handle, "brontosaurus");
   assert.equal(profile?.name, "Brent McDonald");
+});
+
+test("OAuth success bounce is auth=ok, not a Discord user id", () => {
+  const request = new Request("https://thehollowrealm.com/api/discord/callback", {
+    headers: { host: "thehollowrealm.com" },
+  });
+  const location = homeRedirect(request, { auth: "ok" });
+  assert.match(location, /[?&]auth=ok/);
+  assert.doesNotMatch(location, /[?&]discord=ok/);
 });
 
 test("signed rider cookies round-trip and reject tampers", () => {

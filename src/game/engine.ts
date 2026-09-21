@@ -67,6 +67,7 @@ import { scoreFromDice, STAT_ORDER } from "./stats-copy";
 import { freshClocks, grantPackLoot, starterPack } from "./inventory";
 import { queueTalk } from "./talk";
 import { ensureSquad, maybeSpendArcTurn, stampSeatedPlate } from "./squad";
+import { isPlaceholderName } from "./discord";
 
 export function uid(prefix = "id"): string {
   return `${prefix}-${Math.random().toString(36).slice(2, 9)}-${Date.now().toString(36)}`;
@@ -1499,18 +1500,25 @@ export function seatSoul(state: GameState, soul: Operative | null | undefined): 
 export const FORGE_REROLLS = 2;
 
 export function hasPlayerProfile(state: GameState): boolean {
-  return Boolean(state.playerName?.trim());
+  const name = state.playerName?.trim() ?? "";
+  if (name.length < 2) return false;
+  return !isPlaceholderName(name);
 }
 
 export function stampPlayerProfile(state: GameState, name: string, handle?: string | null): string | null {
   const clean = name.trim().replace(/^@/, "").slice(0, 24);
   const hid = (handle ?? "").trim().replace(/^@/, "").slice(0, 32);
-  if (state.playerName?.trim() && state.playerHandle) {
-    return null;
+  const locked =
+    Boolean(state.playerName?.trim()) &&
+    Boolean(state.playerHandle) &&
+    !isPlaceholderName(state.playerName) &&
+    !isPlaceholderName(state.playerHandle);
+  if (locked) return null;
+  if (isPlaceholderName(clean) || clean.length < 2) return "Stamp a name first, partner.";
+  if (isPlaceholderName(state.playerName) || !state.playerName?.trim()) state.playerName = clean;
+  if (hid.length >= 2 && !isPlaceholderName(hid) && (isPlaceholderName(state.playerHandle) || !state.playerHandle)) {
+    state.playerHandle = hid;
   }
-  if (clean.length < 2) return "Stamp a name first, partner.";
-  state.playerName = state.playerName?.trim() || clean;
-  if (hid.length >= 2 && !state.playerHandle) state.playerHandle = hid;
   return stampSeatedPlate(state);
 }
 

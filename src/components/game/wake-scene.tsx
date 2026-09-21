@@ -18,6 +18,8 @@ export function WakeScene({
   const videoRef = useRef<HTMLVideoElement>(null);
   const [reduced, setReduced] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [armed, setArmed] = useState(false);
 
   useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -28,8 +30,15 @@ export function WakeScene({
   }, []);
 
   useEffect(() => {
+    if (reduced) return;
+    const coarse = window.matchMedia("(pointer: coarse)").matches;
+    const t = window.setTimeout(() => setArmed(true), coarse ? 180 : 40);
+    return () => window.clearTimeout(t);
+  }, [reduced]);
+
+  useEffect(() => {
     const el = videoRef.current;
-    if (!el || reduced) return;
+    if (!el || reduced || !armed) return;
     el.muted = !sound;
     el.defaultMuted = !sound;
     el.loop = loop;
@@ -46,7 +55,7 @@ export function WakeScene({
       document.removeEventListener("pointerdown", kick);
       document.removeEventListener("touchstart", kick);
     };
-  }, [reduced, sound, loop]);
+  }, [reduced, sound, loop, armed]);
 
   const still = failed || reduced;
 
@@ -60,9 +69,10 @@ export function WakeScene({
         src={WAKE_REEL.poster}
         alt=""
         decoding="async"
+        fetchPriority="high"
         className="ms-wake-still absolute inset-0 size-full object-cover object-center"
       />
-      {!still ? (
+      {!still && armed ? (
         <video
           ref={videoRef}
           src={WAKE_REEL.src}
@@ -71,10 +81,17 @@ export function WakeScene({
           muted={!sound}
           loop={loop}
           playsInline
-          preload="auto"
-          className="absolute inset-0 size-full object-cover object-center md:object-contain"
+          preload="metadata"
+          className={cn(
+            "absolute inset-0 size-full object-cover object-center transition-opacity duration-500 md:object-contain",
+            ready ? "opacity-100" : "opacity-0",
+          )}
           onError={() => setFailed(true)}
-          onCanPlay={() => void videoRef.current?.play().catch(() => {})}
+          onPlaying={() => setReady(true)}
+          onCanPlay={() => {
+            setReady(true);
+            void videoRef.current?.play().catch(() => {});
+          }}
           onTimeUpdate={() => {
             const t = videoRef.current?.currentTime ?? 0;
             onTime?.(t);

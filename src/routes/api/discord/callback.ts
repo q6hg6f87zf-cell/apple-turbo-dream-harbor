@@ -22,7 +22,7 @@ export const Route = createFileRoute("/api/discord/callback")({
         const code = url.searchParams.get("code") ?? "";
         const state = url.searchParams.get("state") ?? "";
         const bounce = (reason: string) =>
-          redirectWithCookies(homeRedirect(request, { discord: "error", reason }), [expireCookie(OAUTH_COOKIE)]);
+          redirectWithCookies(homeRedirect(request, { auth: "error", reason }), [expireCookie(OAUTH_COOKIE)]);
 
         if (error) return bounce(error.slice(0, 40));
         if (!discordConfigured()) return bounce("not-configured");
@@ -43,7 +43,7 @@ export const Route = createFileRoute("/api/discord/callback")({
           } catch {
             /* cookie still seats the rider */
           }
-          return redirectWithCookies(homeRedirect(request, { discord: "ok" }), [
+          return redirectWithCookies(homeRedirect(request, { auth: "ok" }), [
             riderCookie({
               did: rider.discordId,
               handle: rider.handle,

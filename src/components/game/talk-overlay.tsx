@@ -27,7 +27,13 @@ export function TalkOverlay() {
   shownRef.current = shown;
 
   const revealOrAdvance = () => {
-    if (liveWake) return;
+    if (liveWake) {
+      const snap = getRadioSnapshot();
+      if (snap.mode === "intro" && snap.playing) return;
+      sfx.click();
+      advance();
+      return;
+    }
     if (shownRef.current.length < full.length) {
       skipType.current = true;
       setShown(full);
@@ -128,7 +134,7 @@ export function TalkOverlay() {
             "mx-auto flex w-full max-w-2xl items-end gap-3 rounded-[var(--radius-xl)] bg-ink/92 p-3 text-left shadow-[var(--shadow-border-hover)] backdrop-blur-md md:p-4",
             talk.script === "wake" && "ms-wake-card",
           )}
-          onClick={liveWake ? undefined : revealOrAdvance}
+          onClick={revealOrAdvance}
           data-wake-auto={liveWake ? "1" : undefined}
         >
           <img
@@ -162,8 +168,8 @@ export function TalkOverlay() {
             <p className="mt-2 font-display text-[10px] uppercase tracking-[0.18em] text-muted">
               {liveWake
                 ? last
-                  ? "The reel finishes on its own"
-                  : "Listening"
+                  ? "The reel finishes on its own · tap if it stalls"
+                  : "Listening · tap if the reel stalls"
                 : locked && last
                   ? talk.script === "welcome"
                     ? "Tap to enter the Machine Shop"

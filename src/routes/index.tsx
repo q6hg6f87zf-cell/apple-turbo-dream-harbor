@@ -24,12 +24,14 @@ export const Route = createFileRoute("/")({
     to?: "map" | "vault" | "hq" | "inventory" | "roster" | "market" | "profile";
     region?: string;
     discord?: string;
+    auth?: string;
     reason?: string;
     claim?: string;
   } => ({
     to: parseDeepTo(search.to) ?? undefined,
     region: typeof search.region === "string" ? search.region.slice(0, 24) : undefined,
     discord: typeof search.discord === "string" ? search.discord.slice(0, 24) : undefined,
+    auth: typeof search.auth === "string" ? search.auth.slice(0, 24) : undefined,
     reason: typeof search.reason === "string" ? search.reason.slice(0, 40) : undefined,
     claim: typeof search.claim === "string" ? search.claim.slice(0, 128) : undefined,
   }),

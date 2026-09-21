@@ -1,4 +1,5 @@
 import { getSql } from "@/lib/db";
+import { isAuthStatus } from "@/game/discord";
 import type { DiscordProfile, RiderSession } from "./discord-native.server";
 
 const globalRef = globalThis as typeof globalThis & { __hollowRidersSchema__?: Promise<void> };
@@ -53,8 +54,13 @@ export async function lookupRider(discordId: string): Promise<StoredRider | null
   }
 }
 
+function poisonedName(raw?: string | null) {
+  const value = String(raw ?? "").trim();
+  return !value || isAuthStatus(value);
+}
+
 export async function upsertRiderFromDiscord(profile: DiscordProfile, existing?: StoredRider | null) {
-  if (existing?.stamped) {
+  if (existing?.stamped && !poisonedName(existing.name) && !poisonedName(existing.handle)) {
     return existing;
   }
   const next: StoredRider = {
@@ -69,8 +75,8 @@ export async function upsertRiderFromDiscord(profile: DiscordProfile, existing?:
       insert into hollow_riders (discord_id, handle, display_name, stamped, created_at, updated_at)
       values (${next.discordId}, ${next.handle}, ${next.name}, ${next.stamped}, now(), now())
       on conflict (discord_id) do update set
-        handle = case when hollow_riders.stamped then hollow_riders.handle else excluded.handle end,
-        display_name = case when hollow_riders.stamped then hollow_riders.display_name else excluded.display_name end,
+        handle = excluded.handle,
+        display_name = excluded.display_name,
         stamped = true,
         updated_at = now()
     `;

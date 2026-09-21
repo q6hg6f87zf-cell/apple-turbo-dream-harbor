@@ -24,6 +24,16 @@ test("discord plate name and handle lock after the first stamp", () => {
   assert.equal(s.playerHandle, "brontosaurus");
 });
 
+test("OAuth ok tokens do not lock the black card", () => {
+  const s = defaultState();
+  s.playerName = "ok";
+  s.playerHandle = "ok";
+  s.discordId = "ok";
+  assert.equal(stampPlayerProfile(s, "Brent McDonald", "brontosaurus"), null);
+  assert.equal(s.playerName, "Brent McDonald");
+  assert.equal(s.playerHandle, "brontosaurus");
+});
+
 const soul = {
   id: "op-soul-1",
   name: "Brontosaurus",

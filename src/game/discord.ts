@@ -30,6 +30,13 @@ export interface HandshakeDelta {
   pack: Partial<PackCounts>;
 }
 
+/** OAuth bounce tokens that must never be treated as a Discord user id or name. */
+export const AUTH_STATUS = /^(ok|error|denied|access_denied|code|state|token|profile|exchange|not-configured)$/i;
+
+export function isAuthStatus(raw: string | null | undefined): boolean {
+  return AUTH_STATUS.test(String(raw ?? "").trim());
+}
+
 function params(): URLSearchParams {
   if (typeof window === "undefined") return new URLSearchParams();
   const q = new URLSearchParams(window.location.search);
@@ -44,17 +51,25 @@ function params(): URLSearchParams {
 
 function cleanId(raw: string | null): string | null {
   if (!raw) return null;
-  const id = raw.trim().replace(/[^\w.-]/g, "").slice(0, 32);
-  return id.length >= 2 ? id : null;
+  const id = raw.trim();
+  if (isAuthStatus(id) || !isSnowflake(id)) return null;
+  return id;
 }
 
 function cleanName(raw: string | null, fallback: string): string {
   const n = (raw ?? "").trim().replace(/^@/, "").slice(0, 32);
-  return n || fallback;
+  if (!n || isAuthStatus(n) || isSnowflake(n)) return fallback;
+  return n;
 }
 
 export function isSnowflake(raw: string): boolean {
   return /^\d{17,22}$/.test(raw.trim());
+}
+
+export function isPlaceholderName(raw?: string | null): boolean {
+  const n = (raw ?? "").trim().replace(/^@/, "");
+  if (n.length < 2) return true;
+  return isAuthStatus(n);
 }
 
 /**
@@ -62,15 +77,39 @@ export function isSnowflake(raw: string): boolean {
  *
  * Older links may still contain `caps`, `xp`, `lvl`, `pack`, `stim`, etc. They
  * are intentionally ignored. A URL is navigation, never an economy authority.
+ * `?discord=ok` is the OAuth success bounce — not a rider id.
  */
 export function snapFromParams(q: URLSearchParams): DiscordSnap | null {
-  const id = cleanId(q.get("d") || q.get("discord") || q.get("user_id") || q.get("uid"));
+  const id = cleanId(q.get("d") || q.get("user_id") || q.get("uid") || q.get("discord"));
   if (!id) return null;
+  const fallback = "Rider";
   return {
     id,
-    name: cleanName(q.get("n") || q.get("name") || q.get("nick") || q.get("username"), id),
+    name: cleanName(q.get("n") || q.get("name") || q.get("nick") || q.get("username"), fallback),
     source: "url",
   };
+}
+
+/** Drop OAuth success bounce so a refresh cannot reseat `discord=ok`. Errors stay until the gate reads them. */
+export function consumeAuthQuery() {
+  if (typeof window === "undefined") return;
+  try {
+    const url = new URL(window.location.href);
+    const discord = url.searchParams.get("discord");
+    const auth = url.searchParams.get("auth");
+    let dirty = false;
+    if (auth === "ok") {
+      url.searchParams.delete("auth");
+      dirty = true;
+    }
+    if (discord && discord.toLowerCase() === "ok") {
+      url.searchParams.delete("discord");
+      dirty = true;
+    }
+    if (dirty) window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+  } catch {
+    /* ignore */
+  }
 }
 
 export function parseStampedLink(raw: string): DiscordSnap | null {
@@ -100,8 +139,12 @@ export function readWho(): DiscordIdentity | null {
     const raw = localStorage.getItem(WHO_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as DiscordIdentity;
-    if (!parsed?.id) return null;
-    return { id: String(parsed.id).slice(0, 32), name: String(parsed.name || parsed.id).slice(0, 32) };
+    if (!parsed?.id || !isSnowflake(String(parsed.id))) return null;
+    const name = String(parsed.name || "").trim();
+    if (isPlaceholderName(name) && !isSnowflake(name)) {
+      return { id: String(parsed.id).slice(0, 32), name: String(parsed.id).slice(0, 32) };
+    }
+    return { id: String(parsed.id).slice(0, 32), name: (name || parsed.id).slice(0, 32) };
   } catch {
     return null;
   }
@@ -109,15 +152,19 @@ export function readWho(): DiscordIdentity | null {
 
 export function writeWho(who: DiscordIdentity | null) {
   try {
-    if (!who) localStorage.removeItem(WHO_KEY);
-    else localStorage.setItem(WHO_KEY, JSON.stringify(who));
+    if (!who || !isSnowflake(who.id)) {
+      localStorage.removeItem(WHO_KEY);
+      return;
+    }
+    const name = isPlaceholderName(who.name) ? who.id : who.name;
+    localStorage.setItem(WHO_KEY, JSON.stringify({ id: who.id, name }));
   } catch {
     /* private mode */
   }
 }
 
 export function saveKeyFor(id: string | null, base: string) {
-  return id ? `${base}:d:${id}` : base;
+  return id && isSnowflake(id) ? `${base}:d:${id}` : base;
 }
 
 export function fromDiscordClient(): boolean {
@@ -146,9 +193,9 @@ export function snapshotFromSearch(): DiscordSnap | null {
  */
 export function applyFloor(state: GameState, snap: DiscordSnap | null): HandshakeDelta {
   const delta: HandshakeDelta = { caps: 0, xp: 0, pack: {} };
-  if (!snap) return delta;
+  if (!snap || !isSnowflake(snap.id)) return delta;
   state.discordId = snap.id;
-  state.discordName = snap.name;
+  if (!isPlaceholderName(snap.name)) state.discordName = snap.name;
   return delta;
 }
 
