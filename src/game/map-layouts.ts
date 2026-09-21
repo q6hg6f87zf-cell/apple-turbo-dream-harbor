@@ -16,6 +16,8 @@ export type RegionMapAnchor = {
 export type RegionMapLayout = {
   id: RegionId;
   map: string;
+  /** Authored single-channel heightfield. Prefer over runtime luminance bake. */
+  height?: string;
   camera: { yaw: number; pitch: number; fov: number };
   bounds: { w: number; h: number };
   rim: { ember: number; teal: number };
@@ -30,10 +32,15 @@ const DEFAULT_LAYERS: RegionMapLayer[] = [
   { id: "smoke", z: 0.22, scroll: true },
 ];
 
+function heightUrl(id: RegionId) {
+  return `/map/regions/${id}.height.png?v=h1`;
+}
+
 const DEFAULTS: Record<RegionId, RegionMapLayout> = {
   ironclad: {
     id: "ironclad",
     map: "/map/regions/ironclad.jpg?v=town4k1",
+    height: heightUrl("ironclad"),
     camera: { yaw: 14, pitch: 54, fov: 30 },
     bounds: { w: 1, h: 1 },
     rim: { ember: 0.55, teal: 0 },
@@ -43,6 +50,7 @@ const DEFAULTS: Record<RegionId, RegionMapLayout> = {
   slagtown: {
     id: "slagtown",
     map: "/map/regions/slagtown.jpg?v=town4k1",
+    height: heightUrl("slagtown"),
     camera: { yaw: -10, pitch: 52, fov: 30 },
     bounds: { w: 1, h: 1 },
     rim: { ember: 0.72, teal: 0 },
@@ -52,6 +60,7 @@ const DEFAULTS: Record<RegionId, RegionMapLayout> = {
   blackspire: {
     id: "blackspire",
     map: "/map/regions/blackspire.jpg?v=town4k1",
+    height: heightUrl("blackspire"),
     camera: { yaw: 8, pitch: 50, fov: 28 },
     bounds: { w: 1, h: 1 },
     rim: { ember: 0.45, teal: 0.05 },
@@ -61,6 +70,7 @@ const DEFAULTS: Record<RegionId, RegionMapLayout> = {
   brasswater: {
     id: "brasswater",
     map: "/map/regions/brasswater.jpg?v=town4k1",
+    height: heightUrl("brasswater"),
     camera: { yaw: -6, pitch: 53, fov: 29 },
     bounds: { w: 1, h: 1 },
     rim: { ember: 0.28, teal: 0.55 },
@@ -70,6 +80,7 @@ const DEFAULTS: Record<RegionId, RegionMapLayout> = {
   veyra: {
     id: "veyra",
     map: "/map/regions/veyra.jpg?v=town4k1",
+    height: heightUrl("veyra"),
     camera: { yaw: 12, pitch: 55, fov: 28 },
     bounds: { w: 1, h: 1 },
     rim: { ember: 0.35, teal: 0.25 },
@@ -87,6 +98,7 @@ function normalize(raw: Partial<RegionMapLayout> | null | undefined, id: RegionI
   return {
     id,
     map: typeof raw.map === "string" ? raw.map : base.map,
+    height: typeof raw.height === "string" ? raw.height : base.height,
     camera: {
       yaw: Number.isFinite(raw.camera?.yaw) ? Number(raw.camera!.yaw) : base.camera.yaw,
       pitch: Number.isFinite(raw.camera?.pitch) ? Number(raw.camera!.pitch) : base.camera.pitch,

@@ -77,6 +77,8 @@ public/map/regions/<id>.layout.json
 
 If a heightfield PNG is generated, store it as `/public/map/regions/<id>.height.png` (single-channel, same aspect as the painting). Derive it from the painting. Do not hallucinate extra mountains.
 
+**Live:** all five regions ship authored `.height.png` (896×504, derived from the painting). `RegionMapStage` prefers `layout.height` / that file and only falls back to a runtime luminance bake if the asset is missing. Rebuild with `node scripts/bake-region-heights.mjs`.
+
 ## Visual lock
 
 Disco Elysium cartography × SYNAPSE war-room. Charcoal, rust, brass, ember, teal water only where Brasswater/Veyra already use it. Hard edges. Readable rooftops. No photoreal city, no mushy AI fog.

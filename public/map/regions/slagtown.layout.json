@@ -1,14 +1,38 @@
 {
   "id": "slagtown",
   "map": "/map/regions/slagtown.jpg?v=town4k1",
-  "camera": { "yaw": -10, "pitch": 52, "fov": 30 },
-  "bounds": { "w": 1, "h": 1 },
-  "rim": { "ember": 0.72, "teal": 0.0 },
+  "camera": {
+    "yaw": -10,
+    "pitch": 52,
+    "fov": 30
+  },
+  "bounds": {
+    "w": 1,
+    "h": 1
+  },
+  "rim": {
+    "ember": 0.72,
+    "teal": 0.0
+  },
   "layers": [
-    { "id": "ground", "z": 0 },
-    { "id": "districts", "z": 0.06 },
-    { "id": "roofs", "z": 0.14 },
-    { "id": "smoke", "z": 0.24, "scroll": true }
+    {
+      "id": "ground",
+      "z": 0
+    },
+    {
+      "id": "districts",
+      "z": 0.06
+    },
+    {
+      "id": "roofs",
+      "z": 0.14
+    },
+    {
+      "id": "smoke",
+      "z": 0.24,
+      "scroll": true
+    }
   ],
-  "anchors": []
+  "anchors": [],
+  "height": "/map/regions/slagtown.height.png?v=h1"
 }

@@ -34,13 +34,14 @@ for (let i = 0; i < 10; i++) {
 
 await page.waitForFunction(() => !!(window).__hollowQa?.openRegionMap, null, { timeout: 20000 });
 await page.evaluate(() => (window).__hollowQa.openRegionMap("ironclad"));
-await page.waitForTimeout(2500);
+await page.waitForTimeout(2800);
 
 const stage = await page.locator("[data-region-map]").count();
 const ready = await page.locator('[data-region-stage="ready"]').count();
 const fallback = await page.locator("[data-region-fallback]").count();
 const canvas = await page.locator("[data-region-map] canvas").count();
 const warTable = await page.getByRole("heading", { name: /Ironclad/i }).count();
+const heightSource = await page.locator("[data-height-source]").first().getAttribute("data-height-source");
 await page.screenshot({ path: "/workspace/screenshots/region-war-table-mobile.png" });
 
 await page.setViewportSize({ width: 1280, height: 800 });
@@ -55,6 +56,7 @@ console.log(
       fallback,
       canvas,
       warTable,
+      heightSource,
       errors: errors.slice(0, 10),
     },
     null,

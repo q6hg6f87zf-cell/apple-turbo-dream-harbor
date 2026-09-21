@@ -9,7 +9,7 @@ const MIN_ZOOM = 0.85;
 const MAX_ZOOM = 2.6;
 const YAW_LIMIT = 16 * DEG;
 const ASPECT = 1792 / 1008;
-const DISPLACE = 0.28;
+const DISPLACE = 0.34;
 
 export type MapPoiMark = RegionPointOfInterest & {
   known: boolean;
@@ -325,6 +325,36 @@ function bakeHeight(img: HTMLImageElement): { data: Uint8Array; w: number; h: nu
   return { data, w, h };
 }
 
+/** Read an authored grayscale height PNG into a CPU sample buffer + GPU-ready size. */
+function heightFromAuthored(img: HTMLImageElement): { data: Uint8Array; w: number; h: number } {
+  const w = img.naturalWidth || img.width;
+  const h = img.naturalHeight || img.height;
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return { data: new Uint8Array(Math.max(1, w * h)), w: Math.max(1, w), h: Math.max(1, h) };
+  ctx.drawImage(img, 0, 0);
+  const src = ctx.getImageData(0, 0, w, h).data;
+  const data = new Uint8Array(w * h);
+  for (let i = 0; i < w * h; i++) data[i] = src[i * 4]!;
+  return { data, w, h };
+}
+
+async function resolveHeight(
+  layout: RegionMapLayout,
+  regionId: RegionId,
+  mapImg: HTMLImageElement,
+): Promise<{ data: Uint8Array; w: number; h: number; source: "authored" | "baked" }> {
+  const url = layout.height || `/map/regions/${regionId}.height.png?v=h1`;
+  try {
+    const img = await loadImage(url);
+    return { ...heightFromAuthored(img), source: "authored" };
+  } catch {
+    return { ...bakeHeight(mapImg), source: "baked" };
+  }
+}
+
 function createTex(gl: WebGL2RenderingContext, withMips = false) {
   const tex = gl.createTexture();
   if (!tex) throw new Error("tex");
@@ -493,7 +523,8 @@ export function RegionMapStage({
 
         const img = await loadImage(layout.map || REGION_ART[regionId]);
         if (dead) return;
-        const height = bakeHeight(img);
+        const height = await resolveHeight(layout, regionId, img);
+        if (dead) return;
         heightField.current = height;
 
         const mapTex = createTex(gl, false);
@@ -507,7 +538,21 @@ export function RegionMapStage({
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, height.w, height.h, 0, gl.RED, gl.UNSIGNED_BYTE, height.data);
+        gl.texImage2D(
+          gl.TEXTURE_2D,
+          0,
+          gl.R8,
+          height.w,
+          height.h,
+          0,
+          gl.RED,
+          gl.UNSIGNED_BYTE,
+          height.data,
+        );
+        // Expose source for QA / debugging without noisy logs in prod.
+        if (typeof document !== "undefined") {
+          stage.dataset.heightSource = height.source;
+        }
 
         const uniforms: Record<string, WebGLUniformLocation | null> = {
           u_mvp: gl.getUniformLocation(program, "u_mvp"),

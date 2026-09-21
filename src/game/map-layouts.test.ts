@@ -14,6 +14,7 @@ describe("map-layouts", () => {
       assert.equal(layout.id, id);
       assert.ok(layout.camera.fov > 0);
       assert.ok(layout.map.includes(`/map/regions/${id}.jpg`));
+      assert.ok(layout.height?.includes(`/map/regions/${id}.height.png`));
     }
   });
 });
