@@ -81,6 +81,8 @@ See `docs/TYRONE_CONTINUITY.md`.
 
 Promises are structured rows. Relationship writes go through validated deltas. Private memories never leave the owning Discord User ID.
 
+Schema for bonds and promises is `migrations/0016_tyrone_continuity.sql`. The filesystem SQL smoke in `scripts/hollow-continuity-sql-smoke.test.mjs` applies every migration on PGlite and checks duplicate writes, two-user isolation, and fulfill.
+
 
 ## Deep links
 

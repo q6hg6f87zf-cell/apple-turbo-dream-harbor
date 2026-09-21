@@ -1,6 +1,8 @@
 import { characterForged } from "@/game/engine";
 import { parseDeepTo, screenForTo } from "@/lib/bridge/catalog";
 import { getBearerToken } from "@/lib/auth/client";
+import { cooling } from "@/game/tyrone-mind";
+import { speakTyrone } from "@/game/tyrone-voice";
 import { useGame } from "@/game/store";
 import { useEffect, useRef } from "react";
 import type { TyroneBond, TyronePromise } from "@/game/types";
@@ -14,14 +16,14 @@ function headers() {
 }
 
 function postChronicle(body: unknown) {
-  fetch("/api/hollow/chronicle", {
+  return fetch("/api/hollow/chronicle", {
     method: "POST",
     credentials: "include",
     headers: headers(),
     body: JSON.stringify(body),
-  }).catch(() => {
-    /* bridge never stalls the file */
-  });
+  })
+    .then((res) => (res.ok ? res.json() : null))
+    .catch(() => null);
 }
 
 export function WorldBridgeRuntime() {
@@ -240,8 +242,37 @@ export function WorldBridgeRuntime() {
     if (!discordId || !loc) return;
     if (seen.current.loc === loc) return;
     seen.current.loc = loc;
+    const live = useGame.getState().s;
     postChronicle({
-      trigger: { type: "player.entered_region", region: loc, poi, combat: Boolean(useGame.getState().s.combat) },
+      trigger: {
+        type: "player.entered_region",
+        region: loc,
+        poi,
+        combat: Boolean(live.combat),
+        assist: live.tyrone?.settings?.assist ?? "normal",
+      },
+    }).then((body) => {
+      const hit = Array.isArray(body?.surface) ? body.surface[0] : null;
+      if (!hit?.id || !hit?.text) return;
+      let said = false;
+      useGame.setState((store) => {
+        const s = store.s;
+        said = speakTyrone(s, {
+          text: String(hit.text),
+          concept: "promise-" + hit.id,
+          priority: 2,
+          reason: "canonical promise at this site",
+        });
+        if (said) {
+          cooling(s, "promise-" + hit.id, 80);
+          const row = s.tyrone.promises.find((p) => p.id === hit.id);
+          if (row && hit.fulfillOnSpeak) row.kept = true;
+        }
+        return { s };
+      });
+      if (!said) return;
+      postChronicle({ spoken: { promiseId: hit.id } });
+      if (hit.fulfillOnSpeak) postChronicle({ promise: { action: "fulfill", id: hit.id } });
     });
   }, [discordId, loc, poi]);
 
