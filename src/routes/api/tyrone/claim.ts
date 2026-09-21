@@ -1,8 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createHash } from "node:crypto";
 import { getSql } from "@/lib/db";
-import { assertSameSiteRequest } from "@/lib/auth/isolation.server";
-import { requireUserId } from "@/lib/auth/verify.server";
+import { hollowVerifiedUser } from "@/lib/hollow-identity.server";
 
 const CAMPAIGN_ID = "moon-squad";
 
@@ -19,18 +18,8 @@ function hashClaim(token: string) {
   return createHash("sha256").update(token).digest("hex");
 }
 
-async function verifiedUser(): Promise<{ userId?: string; response?: Response }> {
-  try {
-    assertSameSiteRequest();
-    return { userId: await requireUserId() };
-  } catch (error) {
-    const status =
-      typeof error === "object" && error && "status" in error && typeof error.status === "number"
-        ? error.status
-        : 503;
-    const message = error instanceof Error ? error.message : "identity unavailable";
-    return { response: json({ error: message }, status) };
-  }
+async function verifiedUser(request?: Request) {
+  return hollowVerifiedUser(request);
 }
 
 type LinkedSnapshotRow = {
@@ -93,8 +82,8 @@ function snapshotJson(row: LinkedSnapshotRow) {
 export const Route = createFileRoute("/api/tyrone/claim")({
   server: {
     handlers: {
-      GET: async () => {
-        const identity = await verifiedUser();
+      GET: async ({ request }) => {
+        const identity = await verifiedUser(request);
         if (identity.response) return identity.response;
         const row = await linkedSnapshot(identity.userId!);
         if (!row) return json({ error: "no linked Tyrone rider" }, 404);
@@ -103,7 +92,7 @@ export const Route = createFileRoute("/api/tyrone/claim")({
       },
 
       POST: async ({ request }) => {
-        const identity = await verifiedUser();
+        const identity = await verifiedUser(request);
         if (identity.response) return identity.response;
 
         let body: Record<string, unknown>;

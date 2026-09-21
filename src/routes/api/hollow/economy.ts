@@ -1,7 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { getSql } from "@/lib/db";
-import { assertSameSiteRequest } from "@/lib/auth/isolation.server";
-import { requireUserId } from "@/lib/auth/verify.server";
+import { hollowVerifiedUser } from "@/lib/hollow-identity.server";
 
 const CAMPAIGN_ID = "moon-squad";
 const MAX_TRANSFER = 10_000_000;
@@ -29,17 +28,8 @@ type EconomyRow = {
   display_name: string;
 };
 
-async function verifiedUser(): Promise<{ userId?: string; response?: Response }> {
-  try {
-    assertSameSiteRequest();
-    return { userId: await requireUserId() };
-  } catch (error) {
-    const status =
-      typeof error === "object" && error && "status" in error && typeof error.status === "number"
-        ? error.status
-        : 503;
-    return { response: json({ error: error instanceof Error ? error.message : "identity unavailable" }, status) };
-  }
+async function verifiedUser(request?: Request) {
+  return hollowVerifiedUser(request);
 }
 
 async function readEconomy(userId: string): Promise<EconomyRow | null> {
@@ -214,8 +204,8 @@ async function transferCard(
 export const Route = createFileRoute("/api/hollow/economy")({
   server: {
     handlers: {
-      GET: async () => {
-        const identity = await verifiedUser();
+      GET: async ({ request }) => {
+        const identity = await verifiedUser(request);
         if (identity.response) return identity.response;
         const row = await readEconomy(identity.userId!);
         if (!row) return json({ error: "link TyroneBot before using the shared Moon Squad economy" }, 404);
@@ -223,7 +213,7 @@ export const Route = createFileRoute("/api/hollow/economy")({
       },
 
       POST: async ({ request }) => {
-        const identity = await verifiedUser();
+        const identity = await verifiedUser(request);
         if (identity.response) return identity.response;
         const userId = identity.userId!;
 

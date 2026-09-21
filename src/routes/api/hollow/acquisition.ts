@@ -1,8 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createHash, randomBytes } from "node:crypto";
 import { getSql } from "@/lib/db";
-import { assertSameSiteRequest } from "@/lib/auth/isolation.server";
-import { requireUserId } from "@/lib/auth/verify.server";
+import { hollowVerifiedUser } from "@/lib/hollow-identity.server";
 import {
   authorityTemplate,
   npcVendorOffer,
@@ -24,17 +23,8 @@ function json(data: unknown, status = 200) {
   return Response.json(data, { status, headers: HEADERS });
 }
 
-async function verifiedUser(): Promise<{ userId?: string; response?: Response }> {
-  try {
-    assertSameSiteRequest();
-    return { userId: await requireUserId() };
-  } catch (error) {
-    const status =
-      typeof error === "object" && error && "status" in error && typeof error.status === "number"
-        ? error.status
-        : 503;
-    return { response: json({ error: error instanceof Error ? error.message : "identity unavailable" }, status) };
-  }
+async function verifiedUser(request?: Request) {
+  return hollowVerifiedUser(request);
 }
 
 async function linked(userId: string) {
@@ -251,8 +241,8 @@ async function grantBrokerSupply(userId: string, residentId: string) {
 export const Route = createFileRoute("/api/hollow/acquisition")({
   server: {
     handlers: {
-      GET: async () => {
-        const identity = await verifiedUser();
+      GET: async ({ request }) => {
+        const identity = await verifiedUser(request);
         if (identity.response) return identity.response;
         if (!(await linked(identity.userId!))) return json({ error: "Link TyroneBot before using Vault 13 acquisition." }, 404);
         try {
@@ -262,7 +252,7 @@ export const Route = createFileRoute("/api/hollow/acquisition")({
         }
       },
       POST: async ({ request }) => {
-        const identity = await verifiedUser();
+        const identity = await verifiedUser(request);
         if (identity.response) return identity.response;
         const userId = identity.userId!;
         if (!(await linked(userId))) return json({ error: "Link TyroneBot before using Vault 13 acquisition." }, 404);

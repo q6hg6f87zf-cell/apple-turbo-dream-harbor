@@ -1,11 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { getSql } from "@/lib/db";
-import { assertSameSiteRequest } from "@/lib/auth/isolation.server";
-import { requireUserId } from "@/lib/auth/verify.server";
-import { DISCORD_PROVIDER_ID } from "@/lib/auth/providers";
+import { hollowVerifiedUser } from "@/lib/hollow-identity.server";
 
 const MAX = 10;
-const STALE_SECONDS = 45;
 const HEADERS = { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" };
 
 const globalRef = globalThis as typeof globalThis & { __porchSchemaPromise__?: Promise<void> };
@@ -34,34 +31,9 @@ async function ensurePorch(sql: Awaited<ReturnType<typeof getSql>>) {
   return globalRef.__porchSchemaPromise__;
 }
 
-function authDisabled() {
-  return String(process.env.VITE_AUTH_ENABLED ?? "").trim() === "false";
-}
-
 function cleanScreen(raw: unknown) {
   const value = String(raw ?? "hq").toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 24);
   return value || "hq";
-}
-
-async function identity(userId: string) {
-  const sql = await getSql();
-  const links = await sql<{ discord_id: string }>`
-    select discord_id from hollow_identity_link where user_id = ${userId} limit 1
-  `;
-  if (links[0]) return { discordId: links[0].discord_id, name: "Rider" };
-  const accounts = await sql<{ account_id: string; name: string }>`
-    select a."accountId" as account_id, u."name" as name
-    from "account" a
-    join "user" u on u."id" = a."userId"
-    where a."userId" = ${userId} and a."providerId" = ${DISCORD_PROVIDER_ID}
-    order by a."createdAt" desc
-    limit 1
-  `;
-  const account = accounts[0];
-  if (account && /^\d{17,22}$/.test(account.account_id)) {
-    return { discordId: account.account_id, name: account.name || "Rider" };
-  }
-  return null;
 }
 
 async function snapshot(sql: Awaited<ReturnType<typeof getSql>>, selfId: string) {
@@ -88,32 +60,23 @@ async function snapshot(sql: Awaited<ReturnType<typeof getSql>>, selfId: string)
   };
 }
 
-async function user() {
-  if (authDisabled()) return { userId: "dev-preview", discordId: "dev-preview", name: "Preview" };
-  try {
-    assertSameSiteRequest();
-    const userId = await requireUserId();
-    const who = await identity(userId);
-    if (!who) return { response: json({ error: "Discord file not linked", seated: false, full: false, live: 0, max: MAX, seats: [] }, 403) };
-    return { userId, discordId: who.discordId, name: who.name };
-  } catch {
-    return { response: json({ error: "unauthorized", seated: false, full: false, live: 0, max: MAX, seats: [] }, 401) };
-  }
+function user(request?: Request) {
+  return hollowVerifiedUser(request);
 }
 
 export const Route = createFileRoute("/api/hollow/porch")({
   server: {
     handlers: {
-      GET: async () => {
-        const who = await user();
-        if ("response" in who && who.response) return who.response;
+      GET: async ({ request }) => {
+        const who = user(request);
+        if (who.response) return who.response;
         const sql = await getSql();
         await ensurePorch(sql);
         return json(await snapshot(sql, who.discordId!));
       },
       POST: async ({ request }) => {
-        const who = await user();
-        if ("response" in who && who.response) return who.response;
+        const who = user(request);
+        if (who.response) return who.response;
         let screen = "hq";
         let handle = "";
         let name = who.name ?? "Rider";
@@ -143,9 +106,9 @@ export const Route = createFileRoute("/api/hollow/porch")({
         `;
         return json(await snapshot(sql, who.discordId!));
       },
-      DELETE: async () => {
-        const who = await user();
-        if ("response" in who && who.response) return who.response;
+      DELETE: async ({ request }) => {
+        const who = user(request);
+        if (who.response) return who.response;
         const sql = await getSql();
         await ensurePorch(sql);
         await sql`delete from hollow_porch where discord_id = ${who.discordId}`;

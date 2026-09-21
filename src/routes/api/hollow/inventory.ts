@@ -1,8 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { randomBytes, randomInt } from "node:crypto";
 import { getSql } from "@/lib/db";
-import { assertSameSiteRequest } from "@/lib/auth/isolation.server";
-import { requireUserId } from "@/lib/auth/verify.server";
+import { hollowVerifiedUser } from "@/lib/hollow-identity.server";
 import {
   authorityTemplateByKey,
   itemFromAuthorityTemplate,
@@ -39,14 +38,8 @@ type MigrationRow = { state: "started" | "complete"; accepted_count: number; rej
 function json(data: unknown, status = 200) {
   return Response.json(data, { status, headers: HEADERS });
 }
-async function verifiedUser(): Promise<{ userId?: string; response?: Response }> {
-  try {
-    assertSameSiteRequest();
-    return { userId: await requireUserId() };
-  } catch (error) {
-    const status = typeof error === "object" && error && "status" in error && typeof error.status === "number" ? error.status : 503;
-    return { response: json({ error: error instanceof Error ? error.message : "identity unavailable" }, status) };
-  }
+async function verifiedUser(request?: Request) {
+  return hollowVerifiedUser(request);
 }
 function cleanRequestId(raw: unknown) {
   const value = String(raw ?? "").trim();
@@ -382,14 +375,14 @@ async function claimTreasure(userId: string, ticketId: string) {
 
 export const Route = createFileRoute("/api/hollow/inventory")({
   server: { handlers: {
-    GET: async () => {
-      const identity = await verifiedUser();
+    GET: async ({ request }) => {
+      const identity = await verifiedUser(request);
       if (identity.response) return identity.response;
       if (!(await linked(identity.userId!))) return json({ error: "Link TyroneBot before using server inventory." },404);
       return json(await snapshot(identity.userId!));
     },
     POST: async ({ request }) => {
-      const identity = await verifiedUser();
+      const identity = await verifiedUser(request);
       if (identity.response) return identity.response;
       const userId = identity.userId!;
       if (!(await linked(userId))) return json({ error: "Link TyroneBot before using server inventory." },404);

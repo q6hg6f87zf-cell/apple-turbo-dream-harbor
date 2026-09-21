@@ -1,15 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { assertSameSiteRequest } from "@/lib/auth/isolation.server";
-import { requireUserId } from "@/lib/auth/verify.server";
 
 const HEADERS = { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" };
 
 function json(data: unknown, status = 200) {
   return Response.json(data, { status, headers: HEADERS });
-}
-
-function authDisabled() {
-  return String(process.env.VITE_AUTH_ENABLED ?? "").trim() === "false";
 }
 
 /**
@@ -21,10 +16,7 @@ export const Route = createFileRoute("/api/tyrone/speak")({
     handlers: {
       POST: async ({ request }) => {
         try {
-          if (!authDisabled()) {
-            assertSameSiteRequest();
-            await requireUserId();
-          }
+          assertSameSiteRequest();
         } catch {
           return json({ error: "unauthorized" }, 401);
         }

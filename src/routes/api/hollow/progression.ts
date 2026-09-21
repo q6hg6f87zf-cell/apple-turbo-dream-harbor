@@ -1,8 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { randomBytes, randomInt } from "node:crypto";
 import { getSql } from "@/lib/db";
-import { assertSameSiteRequest } from "@/lib/auth/isolation.server";
-import { requireUserId } from "@/lib/auth/verify.server";
+import { hollowVerifiedUser } from "@/lib/hollow-identity.server";
 import {
   AUTHORITY_BOSS_GATES,
   authorityBossReward,
@@ -39,17 +38,8 @@ function json(data: unknown, status = 200) {
   return Response.json(data, { status, headers: HEADERS });
 }
 
-async function verifiedUser(): Promise<{ userId?: string; response?: Response }> {
-  try {
-    assertSameSiteRequest();
-    return { userId: await requireUserId() };
-  } catch (error) {
-    const status =
-      typeof error === "object" && error && "status" in error && typeof error.status === "number"
-        ? error.status
-        : 503;
-    return { response: json({ error: error instanceof Error ? error.message : "identity unavailable" }, status) };
-  }
+async function verifiedUser(request?: Request) {
+  return hollowVerifiedUser(request);
 }
 
 function cleanRequestId(raw: unknown) {
@@ -739,8 +729,8 @@ async function upgradeQuarter(userId: string, requestId: string, quarter: Quarte
 export const Route = createFileRoute("/api/hollow/progression")({
   server: {
     handlers: {
-      GET: async () => {
-        const identity = await verifiedUser();
+      GET: async ({ request }) => {
+        const identity = await verifiedUser(request);
         if (identity.response) return identity.response;
         const payload = await payloadFor(identity.userId!);
         if (!payload) return json({ error: "Link TyroneBot before using server campaign progression." }, 404);
@@ -748,7 +738,7 @@ export const Route = createFileRoute("/api/hollow/progression")({
       },
 
       POST: async ({ request }) => {
-        const identity = await verifiedUser();
+        const identity = await verifiedUser(request);
         if (identity.response) return identity.response;
         const userId = identity.userId!;
         let body: Record<string, unknown>;
