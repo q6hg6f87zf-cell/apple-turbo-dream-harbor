@@ -83,7 +83,18 @@ const context = await browser.newContext({
   hasTouch: true,
   locale: "en-CA"
 });
-await context.addInitScript(({ key, save }) => localStorage.setItem(key, JSON.stringify(save)), { key: saveKey, save: seed });
+await context.addInitScript(
+  ({ key, whoKey, save, who }) => {
+    localStorage.setItem(key, JSON.stringify(save));
+    localStorage.setItem(whoKey, JSON.stringify(who));
+  },
+  {
+    key: saveKey,
+    whoKey: `${saveKey}:who`,
+    save: seed,
+    who: { id: discord, name: "QA Rider" },
+  },
+);
 const page = await context.newPage();
 const errors = [];
 page.on("pageerror", (error) => errors.push(`pageerror: ${error.message}`));
