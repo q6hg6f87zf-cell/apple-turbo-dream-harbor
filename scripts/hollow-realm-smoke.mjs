@@ -140,7 +140,7 @@ const seedSave = {
     }
   ],
   activeMemberId: "qa-rider",
-  seenTalk: ["briefing", "resume", "inventory"],
+  seenTalk: ["briefing", "resume", "inventory", "kane", "wake"],
   talk: null,
   talkQueue: []
 };

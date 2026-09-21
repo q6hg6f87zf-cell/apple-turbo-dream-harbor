@@ -76,9 +76,11 @@ const seed = {
     lastTurnDay: 0,
   }],
   activeMemberId: "ux-rider",
-  seenTalk: ["briefing", "resume", "inventory", "roster"],
+  seenTalk: ["briefing", "resume", "inventory", "roster", "kane", "wake"],
   talk: null,
   talkQueue: [],
+  playerName: "UX Rider",
+  playerHandle: "ux",
 };
 
 const browser = await chromium.launch({ headless: true });
@@ -99,11 +101,21 @@ page.on("console", (message) => { if (message.type() === "error") errors.push(`c
 // Vite HMR keeps a websocket open — networkidle never settles in CI.
 await page.goto(baseURL, { waitUntil: "domcontentloaded", timeout: 60_000 });
 await page.locator('[data-ready="1"]').waitFor({ timeout: 20_000 });
+await page.waitForFunction(() => !!window.__hollowQa?.getState && !!window.__hollowQa?.setState, null, {
+  timeout: 20_000,
+});
+// Skip any talk overlay that hydrate may have queued despite seenTalk.
+for (let i = 0; i < 8; i++) {
+  const skip = page.getByRole("button", { name: /^SKIP$/i });
+  if (!(await skip.count())) break;
+  await skip.first().click().catch(() => {});
+  await page.waitForTimeout(150);
+}
 
 // Resident dossier: internal controls must not accidentally dismiss the sheet,
 // the mobile layout must expose a real backdrop gutter, and a genuine thumb tap
 // in that gutter must close it.
-await page.getByText("UX Runner", { exact: true }).first().click();
+await page.getByText("UX Runner", { exact: true }).first().click({ force: true });
 const dossierClose = page.getByRole("button", { name: "Close dossier" });
 await dossierClose.waitFor();
 const sheet = page.locator("aside.ms-sheet");
@@ -128,13 +140,14 @@ await dialog.waitFor({ state: "detached", timeout: 5_000 });
 
 // Dangerous-rest confirmation: outside tap is a cancel, never an accidental
 // destructive confirmation.
-await page.evaluate(async () => {
-  const mod = await import("/src/game/store.ts");
-  mod.useGame.setState((store) => ({
+await page.evaluate(() => {
+  window.__hollowQa.setState((store) => ({
     s: {
       ...store.s,
       rooms: { ...store.s.rooms, infirmary: 0 },
-      operatives: store.s.operatives.map((op) => op.id === "ux-op-1" ? { ...op, hp: 0, status: "downed" } : op),
+      operatives: store.s.operatives.map((op) =>
+        op.id === "ux-op-1" ? { ...op, hp: 0, status: "downed" } : op,
+      ),
     },
   }));
 });
@@ -145,12 +158,13 @@ await page.touchscreen.tap(4, 80);
 await dawnHeading.waitFor({ state: "detached", timeout: 5_000 });
 
 // Restore the resident so other screens stay usable.
-await page.evaluate(async () => {
-  const mod = await import("/src/game/store.ts");
-  mod.useGame.setState((store) => ({
+await page.evaluate(() => {
+  window.__hollowQa.setState((store) => ({
     s: {
       ...store.s,
-      operatives: store.s.operatives.map((op) => op.id === "ux-op-1" ? { ...op, hp: op.maxHp, status: "idle" } : op),
+      operatives: store.s.operatives.map((op) =>
+        op.id === "ux-op-1" ? { ...op, hp: op.maxHp, status: "idle" } : op,
+      ),
     },
   }));
 });
