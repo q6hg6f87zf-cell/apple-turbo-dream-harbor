@@ -40,7 +40,7 @@ const stage = await page.locator("[data-region-map]").count();
 const ready = await page.locator('[data-region-stage="ready"]').count();
 const fallback = await page.locator("[data-region-fallback]").count();
 const canvas = await page.locator("[data-region-map] canvas").count();
-const warTable = await page.getByText(/war table/i).count();
+const warTable = await page.getByRole("heading", { name: /Ironclad/i }).count();
 await page.screenshot({ path: "/workspace/screenshots/region-war-table-mobile.png" });
 
 await page.setViewportSize({ width: 1280, height: 800 });

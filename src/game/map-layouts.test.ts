@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { poiMapUv, regionLayoutSync } from "./map-layouts.ts";
+import { poiMapUv, poiShortLabel, regionLayoutSync } from "./map-layouts.ts";
 
 describe("map-layouts", () => {
   it("keeps percent POI coords as 0–1 UV", () => {
@@ -15,5 +15,14 @@ describe("map-layouts", () => {
       assert.ok(layout.camera.fov > 0);
       assert.ok(layout.map.includes(`/map/regions/${id}.jpg`));
     }
+  });
+});
+
+describe("poiShortLabel", () => {
+  it("keeps war-room names readable", () => {
+    assert.equal(poiShortLabel("Relay Tower Three"), "TOWER");
+    assert.equal(poiShortLabel("The Iron Gate"), "IRON GATE");
+    assert.equal(poiShortLabel("Rail Cut"), "RAIL CUT");
+    assert.equal(poiShortLabel("Vault 13"), "VAULT 13");
   });
 });

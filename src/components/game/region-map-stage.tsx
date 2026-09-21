@@ -1,19 +1,22 @@
 import { REGION_ART } from "@/game/art";
-import { loadRegionLayout, poiMapUv, type RegionMapLayout } from "@/game/map-layouts";
+import { loadRegionLayout, poiMapUv, poiShortLabel, type RegionMapLayout } from "@/game/map-layouts";
 import type { RegionId, RegionPointOfInterest } from "@/game/types";
 import { cn } from "@/lib/cn";
 import { useEffect, useRef, useState } from "react";
 
 const DEG = Math.PI / 180;
-const MIN_ZOOM = 0.8;
-const MAX_ZOOM = 2.4;
-const YAW_LIMIT = 18 * DEG;
+const MIN_ZOOM = 0.85;
+const MAX_ZOOM = 2.6;
+const YAW_LIMIT = 16 * DEG;
 const ASPECT = 1792 / 1008;
+const DISPLACE = 0.28;
 
 export type MapPoiMark = RegionPointOfInterest & {
   known: boolean;
   silhouette: boolean;
 };
+
+export { poiShortLabel };
 
 type ScreenPin = {
   id: string;
@@ -22,6 +25,8 @@ type ScreenPin = {
   known: boolean;
   silhouette: boolean;
   name: string;
+  short: string;
+  danger: number;
 };
 
 type Cam = {
@@ -43,6 +48,7 @@ type GlBundle = {
   mapTex: WebGLTexture;
   heightTex: WebGLTexture;
   uniforms: Record<string, WebGLUniformLocation | null>;
+  triCount: number;
   dispose: () => void;
 };
 
@@ -50,61 +56,115 @@ const VERT = `#version 300 es
 precision highp float;
 layout(location=0) in vec2 a_pos;
 uniform mat4 u_mvp;
+uniform mat4 u_model;
 uniform sampler2D u_height;
 uniform float u_displace;
+uniform vec2 u_texel;
 out vec2 v_uv;
 out float v_h;
+out vec3 v_world;
+out vec3 v_normal;
 void main() {
   vec2 uv = a_pos * 0.5 + 0.5;
   float h = texture(u_height, uv).r;
+  float hx = texture(u_height, uv + vec2(u_texel.x, 0.0)).r - texture(u_height, uv - vec2(u_texel.x, 0.0)).r;
+  float hy = texture(u_height, uv + vec2(0.0, u_texel.y)).r - texture(u_height, uv - vec2(0.0, u_texel.y)).r;
+  vec3 n = normalize(vec3(-hx * u_displace * 14.0, 1.0, hy * u_displace * 14.0));
   v_uv = uv;
   v_h = h;
-  vec3 p = vec3(a_pos.x * ${ASPECT.toFixed(4)}, -a_pos.y, h * u_displace);
-  gl_Position = u_mvp * vec4(p, 1.0);
+  vec3 local = vec3(a_pos.x * ${ASPECT.toFixed(4)}, h * u_displace, a_pos.y);
+  v_world = (u_model * vec4(local, 1.0)).xyz;
+  v_normal = mat3(u_model) * n;
+  gl_Position = u_mvp * vec4(local, 1.0);
 }`;
 
 const FRAG = `#version 300 es
 precision highp float;
 in vec2 v_uv;
 in float v_h;
+in vec3 v_world;
+in vec3 v_normal;
 out vec4 outColor;
 uniform sampler2D u_map;
 uniform float u_time;
 uniform float u_ember;
 uniform float u_teal;
 uniform float u_haze;
+uniform vec3 u_lightDir;
+uniform vec3 u_eye;
 uniform vec2 u_focus;
+
+float hash21(vec2 p) {
+  p = fract(p * vec2(123.34, 456.21));
+  p += dot(p, p + 45.32);
+  return fract(p.x * p.y);
+}
+float noise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  float a = hash21(i);
+  float b = hash21(i + vec2(1.0, 0.0));
+  float c = hash21(i + vec2(0.0, 1.0));
+  float d = hash21(i + vec2(1.0, 1.0));
+  return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+
 void main() {
-  vec3 base = texture(u_map, v_uv).rgb;
-  // Soft occlusion: rooftops (brighter paint) sit above streets.
-  float roof = smoothstep(0.28, 0.78, v_h);
-  float street = 1.0 - roof;
-  base *= mix(0.82, 1.08, roof);
-  base *= mix(1.0, 0.9, street * 0.55);
+  vec3 albedo = texture(u_map, v_uv).rgb;
+  // Keep paint fidelity — slight contrast lift, no muddy wash.
+  albedo = pow(max(albedo, 0.0), vec3(0.92));
+  albedo *= 1.06;
 
-  // Far haze / mid wash — war-room atmosphere, not fog mush.
+  vec3 N = normalize(v_normal);
+  vec3 L = normalize(u_lightDir);
+  vec3 V = normalize(u_eye - v_world);
+  vec3 H = normalize(L + V);
+
+  float ndl = max(dot(N, L), 0.0);
+  float wrap = ndl * 0.72 + 0.28;
+  float hemi = N.y * 0.5 + 0.5;
+  float ao = mix(0.62, 1.0, smoothstep(0.05, 0.55, v_h));
+  float roof = smoothstep(0.32, 0.78, v_h);
+  float spec = pow(max(dot(N, H), 0.0), mix(24.0, 56.0, roof)) * mix(0.08, 0.28, roof);
+
+  vec3 warmFill = vec3(0.28, 0.16, 0.08) * (0.4 + u_ember * 0.5);
+  vec3 coolFill = vec3(0.05, 0.09, 0.11) * (0.3 + u_teal * 0.55);
+  vec3 ambient = (warmFill + coolFill) * (0.7 + hemi * 0.4);
+  vec3 lit = albedo * (ambient + vec3(1.12, 0.98, 0.82) * wrap * 0.95) * ao;
+  lit += vec3(1.0, 0.85, 0.58) * spec * ao;
+
+  // Contact shade in valleys so districts read as relief.
+  float valley = 1.0 - smoothstep(0.0, 0.35, v_h);
+  lit *= mix(1.0, 0.78, valley * 0.55);
+
+  // Far atmospheric depth — charcoal, not mush.
   float dist = length(v_uv - u_focus);
-  float haze = smoothstep(0.15, 0.95, dist) * u_haze;
-  vec3 hazeCol = mix(vec3(0.08, 0.07, 0.06), vec3(0.18, 0.1, 0.05), u_ember);
-  hazeCol = mix(hazeCol, vec3(0.05, 0.12, 0.14), u_teal);
-  base = mix(base, hazeCol, haze * 0.42);
+  float haze = smoothstep(0.22, 1.05, dist) * u_haze;
+  vec3 hazeCol = mix(vec3(0.06, 0.05, 0.045), vec3(0.16, 0.08, 0.04), u_ember * 0.7);
+  hazeCol = mix(hazeCol, vec3(0.04, 0.1, 0.12), u_teal);
+  lit = mix(lit, hazeCol, haze * 0.38);
 
-  // Scroll smoke veil over industrial sites.
-  float smoke = sin((v_uv.x + u_time * 0.018) * 18.0 + v_uv.y * 9.0) * 0.5 + 0.5;
-  smoke *= sin((v_uv.y - u_time * 0.012) * 14.0) * 0.5 + 0.5;
-  smoke = pow(smoke, 2.4) * (0.1 + roof * 0.18) * (0.55 + u_ember);
-  base += vec3(0.12, 0.08, 0.05) * smoke;
+  // Industrial smoke sheets that scroll with wind.
+  float smoke = noise(v_uv * vec2(7.0, 4.5) + vec2(u_time * 0.035, -u_time * 0.02));
+  smoke *= noise(v_uv * vec2(13.0, 9.0) - vec2(u_time * 0.02, u_time * 0.015));
+  smoke = pow(smoke, 2.8) * (0.12 + roof * 0.22) * (0.45 + u_ember * 0.55);
+  lit += vec3(0.14, 0.09, 0.05) * smoke;
 
-  // Kane / watch rim tint — state as rim, never redraw the city.
-  float rim = pow(max(haze, 0.0), 1.6);
-  base += vec3(0.22, 0.08, 0.02) * rim * u_ember * 0.55;
-  base += vec3(0.02, 0.12, 0.14) * rim * u_teal * 0.45;
+  // Ember sparks near hot districts.
+  float spark = step(0.992, hash21(floor(v_uv * 90.0) + floor(u_time * 3.0)));
+  lit += vec3(1.0, 0.45, 0.12) * spark * roof * u_ember * 0.65;
 
-  // Subtle vignette for CRT war-room framing.
-  float vig = smoothstep(1.15, 0.35, dist);
-  base *= mix(0.72, 1.0, vig);
+  // Kane heat as outer rim only.
+  float rim = pow(haze, 1.45);
+  lit += vec3(0.28, 0.08, 0.02) * rim * u_ember * 0.5;
+  lit += vec3(0.02, 0.14, 0.16) * rim * u_teal * 0.4;
 
-  outColor = vec4(pow(clamp(base, 0.0, 1.4), vec3(0.96)), 1.0);
+  // Soft vignette — table focus, not CRT mush.
+  float vig = smoothstep(1.25, 0.28, dist);
+  lit *= mix(0.78, 1.0, vig);
+
+  outColor = vec4(clamp(lit, 0.0, 1.6), 1.0);
 }`;
 
 function compile(gl: WebGL2RenderingContext, type: number, src: string) {
@@ -166,7 +226,12 @@ function mat4Multiply(out: Float32Array, a: Float32Array, b: Float32Array) {
   out.set(o);
 }
 
-function mat4LookAt(out: Float32Array, eye: [number, number, number], target: [number, number, number], up: [number, number, number]) {
+function mat4LookAt(
+  out: Float32Array,
+  eye: [number, number, number],
+  target: [number, number, number],
+  up: [number, number, number],
+) {
   const zx = eye[0] - target[0];
   const zy = eye[1] - target[1];
   const zz = eye[2] - target[2];
@@ -212,10 +277,10 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
-/** Bake a soft heightfield from painting luminance — rooftops rise, ash plains sit low. */
+/** Contrast-stretched luminance height so rooftops lift and ash plains sit hard. */
 function bakeHeight(img: HTMLImageElement): { data: Uint8Array; w: number; h: number } {
-  const w = 256;
-  const h = Math.max(1, Math.round(256 / ASPECT));
+  const w = 384;
+  const h = Math.max(1, Math.round(384 / ASPECT));
   const canvas = document.createElement("canvas");
   canvas.width = w;
   canvas.height = h;
@@ -224,14 +289,22 @@ function bakeHeight(img: HTMLImageElement): { data: Uint8Array; w: number; h: nu
   ctx.drawImage(img, 0, 0, w, h);
   const src = ctx.getImageData(0, 0, w, h).data;
   const raw = new Float32Array(w * h);
+  let min = 1;
+  let max = 0;
   for (let i = 0; i < w * h; i++) {
     const o = i * 4;
-    const lum = (src[o]! * 0.3 + src[o + 1]! * 0.55 + src[o + 2]! * 0.15) / 255;
+    const lum = (src[o]! * 0.28 + src[o + 1]! * 0.52 + src[o + 2]! * 0.2) / 255;
     raw[i] = lum;
+    min = Math.min(min, lum);
+    max = Math.max(max, lum);
   }
-  // Box blur so displacement reads as districts, not noise.
+  const span = Math.max(0.08, max - min);
+  for (let i = 0; i < raw.length; i++) {
+    const n = (raw[i]! - min) / span;
+    raw[i] = Math.pow(Math.min(1, Math.max(0, n)), 0.85);
+  }
   const blur = new Float32Array(w * h);
-  const r = 2;
+  const r = 1;
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       let sum = 0;
@@ -252,11 +325,12 @@ function bakeHeight(img: HTMLImageElement): { data: Uint8Array; w: number; h: nu
   return { data, w, h };
 }
 
-function createTex(gl: WebGL2RenderingContext) {
+function createTex(gl: WebGL2RenderingContext, withMips = false) {
   const tex = gl.createTexture();
   if (!tex) throw new Error("tex");
   gl.bindTexture(gl.TEXTURE_2D, tex);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  // Region paintings are NPOT (1792×1008) — mipmaps go black on many GPUs.
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, withMips ? gl.LINEAR_MIPMAP_LINEAR : gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
@@ -272,8 +346,8 @@ function projectPin(
   heightPx: number,
 ): { x: number; y: number; visible: boolean } {
   const x = (u * 2 - 1) * ASPECT;
-  const y = -((v * 2 - 1));
-  const z = height;
+  const z = v * 2 - 1;
+  const y = height;
   const clipX = mvp[0]! * x + mvp[4]! * y + mvp[8]! * z + mvp[12]!;
   const clipY = mvp[1]! * x + mvp[5]! * y + mvp[9]! * z + mvp[13]!;
   const clipW = mvp[3]! * x + mvp[7]! * y + mvp[11]! * z + mvp[15]!;
@@ -283,7 +357,7 @@ function projectPin(
   return {
     x: (ndcX * 0.5 + 0.5) * width,
     y: (1 - (ndcY * 0.5 + 0.5)) * heightPx,
-    visible: ndcX > -1.15 && ndcX < 1.15 && ndcY > -1.2 && ndcY < 1.2,
+    visible: ndcX > -1.2 && ndcX < 1.2 && ndcY > -1.25 && ndcY < 1.25,
   };
 }
 
@@ -291,6 +365,24 @@ function sampleHeight(field: Uint8Array, fw: number, fh: number, u: number, v: n
   const x = Math.min(fw - 1, Math.max(0, Math.round(u * (fw - 1))));
   const y = Math.min(fh - 1, Math.max(0, Math.round(v * (fh - 1))));
   return (field[y * fw + x] ?? 0) / 255;
+}
+
+/**
+ * Distance so the landscape plane fills the viewport (cover, not letterbox).
+ * Plane spans X ∈ [-ASPECT, ASPECT], Z ∈ [-1, 1].
+ */
+function coverDistance(pitch: number, fovDeg: number, viewAspect: number, zoom: number): number {
+  const halfFov = (fovDeg * DEG) / 2;
+  const visibleH = 2 * Math.tan(halfFov); // at distance 1
+  const visibleW = visibleH * viewAspect;
+  // Projected footprint of the map when viewed at pitch (cos shrinks depth axis).
+  const cosP = Math.max(0.35, Math.cos(Math.PI / 2 - pitch));
+  const mapW = ASPECT * 2;
+  const mapD = 2 * cosP;
+  // Cover: pick distance from the AXIS that needs to be CROPPED (the tighter fill).
+  const distForW = mapW / Math.max(0.001, visibleW);
+  const distForD = mapD / Math.max(0.001, visibleH);
+  return (Math.min(distForW, distForD) * 0.96) / Math.max(0.5, zoom);
 }
 
 export function RegionMapStage({
@@ -319,10 +411,12 @@ export function RegionMapStage({
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const pinch = useRef<{ dist: number; zoom: number } | null>(null);
   const dragging = useRef(false);
+  const moved = useRef(false);
   const last = useRef<{ x: number; y: number } | null>(null);
   const [pins, setPins] = useState<ScreenPin[]>([]);
   const [ready, setReady] = useState(false);
   const mvpScratch = useRef(mat4Identity());
+  const modelScratch = useRef(mat4Identity());
   const projScratch = useRef(mat4Identity());
   const viewScratch = useRef(mat4Identity());
   const poisRef = useRef(pois);
@@ -332,6 +426,7 @@ export function RegionMapStage({
   const onFailedRef = useRef(onFailed);
   onFailedRef.current = onFailed;
   const lastFrame = useRef(0);
+  const eyeRef = useRef<[number, number, number]>([0, 2, 2]);
 
   useEffect(() => {
     const onZoom = (ev: Event) => {
@@ -357,11 +452,10 @@ export function RegionMapStage({
         layoutRef.current = layout;
         cam.current = {
           yaw: layout.camera.yaw * DEG,
-          pitch: layout.camera.pitch * DEG,
-          // Start clearly tilted so the war table never reads as a flat JPG.
-          zoom: 0.92,
+          pitch: Math.max(48, layout.camera.pitch) * DEG,
+          zoom: 1.05,
           targetYaw: layout.camera.yaw * DEG,
-          targetZoom: 1.05,
+          targetZoom: 1.12,
           panX: 0,
           panY: 0,
           targetPanX: 0,
@@ -381,8 +475,7 @@ export function RegionMapStage({
         if (!vao || !buf) throw new Error("geo");
         gl.bindVertexArray(vao);
         gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-        // Dense grid for soft displacement.
-        const segs = 64;
+        const segs = 96;
         const verts: number[] = [];
         for (let y = 0; y < segs; y++) {
           for (let x = 0; x < segs; x++) {
@@ -403,33 +496,33 @@ export function RegionMapStage({
         const height = bakeHeight(img);
         heightField.current = height;
 
-        const mapTex = createTex(gl);
+        const mapTex = createTex(gl, false);
         gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 0);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
 
-        const heightTex = createTex(gl);
-        gl.texImage2D(
-          gl.TEXTURE_2D,
-          0,
-          gl.R8,
-          height.w,
-          height.h,
-          0,
-          gl.RED,
-          gl.UNSIGNED_BYTE,
-          height.data,
-        );
+        const heightTex = gl.createTexture();
+        if (!heightTex) throw new Error("height tex");
+        gl.bindTexture(gl.TEXTURE_2D, heightTex);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, height.w, height.h, 0, gl.RED, gl.UNSIGNED_BYTE, height.data);
 
         const uniforms: Record<string, WebGLUniformLocation | null> = {
           u_mvp: gl.getUniformLocation(program, "u_mvp"),
+          u_model: gl.getUniformLocation(program, "u_model"),
           u_height: gl.getUniformLocation(program, "u_height"),
           u_displace: gl.getUniformLocation(program, "u_displace"),
+          u_texel: gl.getUniformLocation(program, "u_texel"),
           u_map: gl.getUniformLocation(program, "u_map"),
           u_time: gl.getUniformLocation(program, "u_time"),
           u_ember: gl.getUniformLocation(program, "u_ember"),
           u_teal: gl.getUniformLocation(program, "u_teal"),
           u_haze: gl.getUniformLocation(program, "u_haze"),
           u_focus: gl.getUniformLocation(program, "u_focus"),
+          u_lightDir: gl.getUniformLocation(program, "u_lightDir"),
+          u_eye: gl.getUniformLocation(program, "u_eye"),
         };
 
         bundle.current = {
@@ -439,6 +532,7 @@ export function RegionMapStage({
           mapTex,
           heightTex,
           uniforms,
+          triCount,
           dispose: () => {
             gl.deleteBuffer(buf);
             gl.deleteVertexArray(vao);
@@ -458,13 +552,13 @@ export function RegionMapStage({
           const dt = Math.min(0.05, (now - lastFrame.current) / 1000 || 0.016);
           lastFrame.current = now;
 
-          c.yaw += (c.targetYaw - c.yaw) * Math.min(1, dt * 8);
-          c.zoom += (c.targetZoom - c.zoom) * Math.min(1, dt * 8);
-          c.panX += (c.targetPanX - c.panX) * Math.min(1, dt * 10);
-          c.panY += (c.targetPanY - c.panY) * Math.min(1, dt * 10);
+          c.yaw += (c.targetYaw - c.yaw) * Math.min(1, dt * 9);
+          c.zoom += (c.targetZoom - c.zoom) * Math.min(1, dt * 9);
+          c.panX += (c.targetPanX - c.panX) * Math.min(1, dt * 11);
+          c.panY += (c.targetPanY - c.panY) * Math.min(1, dt * 11);
 
           const rect = stage.getBoundingClientRect();
-          const dpr = Math.min(2, window.devicePixelRatio || 1);
+          const dpr = Math.min(2.25, window.devicePixelRatio || 1);
           const w = Math.max(1, Math.floor(rect.width * dpr));
           const h = Math.max(1, Math.floor(rect.height * dpr));
           if (canvas.width !== w || canvas.height !== h) {
@@ -473,18 +567,21 @@ export function RegionMapStage({
           }
           b.gl.viewport(0, 0, w, h);
           b.gl.enable(b.gl.DEPTH_TEST);
-          b.gl.clearColor(0.04, 0.035, 0.03, 1);
+          b.gl.disable(b.gl.CULL_FACE);
+          b.gl.clearColor(0.035, 0.03, 0.028, 1);
           b.gl.clear(b.gl.COLOR_BUFFER_BIT | b.gl.DEPTH_BUFFER_BIT);
 
-          const dist = 2.55 / c.zoom;
+          const fov = Math.min(34, Math.max(26, L.camera.fov));
+          const dist = coverDistance(c.pitch, fov, w / h, c.zoom);
           const pitch = c.pitch;
           const eye: [number, number, number] = [
             Math.sin(c.yaw) * Math.cos(pitch) * dist + c.panX,
-            Math.sin(pitch) * dist + 0.15,
+            Math.sin(pitch) * dist + 0.08,
             Math.cos(c.yaw) * Math.cos(pitch) * dist + c.panY,
           ];
-          const target: [number, number, number] = [c.panX * 0.35, 0.02, c.panY * 0.35];
-          mat4Perspective(projScratch.current, L.camera.fov, w / h, 0.05, 40);
+          eyeRef.current = eye;
+          const target: [number, number, number] = [c.panX * 0.55, DISPLACE * 0.15, c.panY * 0.55];
+          mat4Perspective(projScratch.current, fov, w / h, 0.04, 50);
           mat4LookAt(viewScratch.current, eye, target, [0, 1, 0]);
           mat4Multiply(mvpScratch.current, projScratch.current, viewScratch.current);
 
@@ -497,20 +594,24 @@ export function RegionMapStage({
           b.gl.bindTexture(b.gl.TEXTURE_2D, b.heightTex);
           b.gl.uniform1i(b.uniforms.u_height, 1);
           b.gl.uniformMatrix4fv(b.uniforms.u_mvp, false, mvpScratch.current);
-          b.gl.uniform1f(b.uniforms.u_displace, 0.34);
+          b.gl.uniformMatrix4fv(b.uniforms.u_model, false, modelScratch.current);
+          b.gl.uniform1f(b.uniforms.u_displace, DISPLACE);
+          b.gl.uniform2f(b.uniforms.u_texel, 1 / Math.max(1, heightField.current?.w ?? 256), 1 / Math.max(1, heightField.current?.h ?? 144));
           b.gl.uniform1f(b.uniforms.u_time, (now - t0) / 1000);
           const ember = Math.min(1, L.rim.ember + heatRef.current / 40);
           b.gl.uniform1f(b.uniforms.u_ember, ember);
           b.gl.uniform1f(b.uniforms.u_teal, L.rim.teal);
-          b.gl.uniform1f(b.uniforms.u_haze, 0.55 + Math.min(0.35, heatRef.current / 50));
-          b.gl.uniform2f(b.uniforms.u_focus, 0.5 + c.panX * 0.08, 0.5 + c.panY * 0.08);
-          b.gl.drawArrays(b.gl.TRIANGLES, 0, triCount);
+          b.gl.uniform1f(b.uniforms.u_haze, 0.42 + Math.min(0.28, heatRef.current / 55));
+          b.gl.uniform2f(b.uniforms.u_focus, 0.5 + c.panX * 0.06, 0.5 + c.panY * 0.06);
+          b.gl.uniform3f(b.uniforms.u_lightDir, 0.45, 0.82, 0.28);
+          b.gl.uniform3f(b.uniforms.u_eye, eye[0], eye[1], eye[2]);
+          b.gl.drawArrays(b.gl.TRIANGLES, 0, b.triCount);
 
           const field = heightField.current;
           const next: ScreenPin[] = [];
           for (const p of poisRef.current) {
             const { u, v } = poiMapUv(p.x, p.y);
-            const hh = field ? sampleHeight(field.data, field.w, field.h, u, v) * 0.34 : 0.08;
+            const hh = field ? sampleHeight(field.data, field.w, field.h, u, v) * DISPLACE : 0.06;
             const scr = projectPin(u, v, hh, mvpScratch.current, rect.width, rect.height);
             if (!scr.visible) continue;
             next.push({
@@ -520,6 +621,8 @@ export function RegionMapStage({
               known: p.known,
               silhouette: p.silhouette,
               name: p.name,
+              short: poiShortLabel(p.name),
+              danger: p.danger ?? 1,
             });
           }
           setPins(next);
@@ -547,11 +650,12 @@ export function RegionMapStage({
   return (
     <div
       ref={stageRef}
-      className={cn("relative min-h-0 flex-1 touch-none overflow-hidden bg-ink", className)}
+      className={cn("relative min-h-0 flex-1 touch-none overflow-hidden bg-[#090807]", className)}
       data-region-stage={ready ? "ready" : "loading"}
       onPointerDown={(e) => {
         (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
         pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        moved.current = false;
         if (pointers.current.size === 1) {
           dragging.current = true;
           last.current = { x: e.clientX, y: e.clientY };
@@ -572,16 +676,17 @@ export function RegionMapStage({
           const pts = [...pointers.current.values()];
           const dist = Math.hypot(pts[0]!.x - pts[1]!.x, pts[0]!.y - pts[1]!.y);
           cam.current.targetZoom = clampZoom(pinch.current.zoom * (dist / Math.max(1, pinch.current.dist)));
+          moved.current = true;
           return;
         }
         if (!dragging.current || !last.current) return;
         const dx = e.clientX - last.current.x;
         const dy = e.clientY - last.current.y;
+        if (Math.hypot(dx, dy) > 2) moved.current = true;
         last.current = { x: e.clientX, y: e.clientY };
-        // One-finger pan on the table; small horizontal also orbits within ±18°.
-        cam.current.targetPanX = Math.max(-0.55, Math.min(0.55, cam.current.targetPanX - dx * 0.0022));
-        cam.current.targetPanY = Math.max(-0.4, Math.min(0.4, cam.current.targetPanY - dy * 0.0022));
-        cam.current.targetYaw = clampYaw(cam.current.targetYaw + dx * 0.0009);
+        cam.current.targetPanX = Math.max(-0.42, Math.min(0.42, cam.current.targetPanX - dx * 0.0018));
+        cam.current.targetPanY = Math.max(-0.32, Math.min(0.32, cam.current.targetPanY - dy * 0.0018));
+        cam.current.targetYaw = clampYaw(cam.current.targetYaw + dx * 0.0007);
       }}
       onPointerUp={(e) => {
         pointers.current.delete(e.pointerId);
@@ -600,60 +705,82 @@ export function RegionMapStage({
       onWheel={(e) => {
         if (!cam.current) return;
         e.preventDefault();
-        cam.current.targetZoom = clampZoom(cam.current.targetZoom * (e.deltaY > 0 ? 0.92 : 1.08));
+        cam.current.targetZoom = clampZoom(cam.current.targetZoom * (e.deltaY > 0 ? 0.93 : 1.07));
       }}
     >
       <canvas ref={canvasRef} className="absolute inset-0 size-full" aria-label={`${regionId} regional map`} />
       {!ready ? (
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-ink/80">
-          <p className="font-display text-[10px] uppercase tracking-[0.28em] text-ember">Seating war table…</p>
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-ink/85">
+          <p className="font-display text-[10px] uppercase tracking-[0.28em] text-ember">Seating the table…</p>
         </div>
       ) : null}
+
+      {/* Table vignette / war-room frame — no empty corner voids */}
+      <div className="pointer-events-none absolute inset-0 shadow-[inset_0_0_80px_rgba(0,0,0,0.55)]" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-ink/70 via-ink/20 to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-ink/75 via-ink/25 to-transparent" />
+
       {pins.map((pin) => {
         const on = selectedPoiId === pin.id;
+        if (pin.silhouette) {
+          return (
+            <div
+              key={pin.id}
+              data-poi={pin.id}
+              data-silhouette="1"
+              aria-hidden
+              style={{ left: pin.x, top: pin.y }}
+              className="pointer-events-none absolute z-[8] -translate-x-1/2 -translate-y-1/2"
+            >
+              <span className="block size-3 rotate-45 border border-moon/35 bg-ink/50 shadow-[0_0_16px_rgba(170,144,117,0.25)]" />
+            </div>
+          );
+        }
         return (
           <button
             key={pin.id}
             type="button"
             data-poi={pin.id}
-            data-silhouette={pin.silhouette ? "1" : undefined}
-            aria-label={pin.silhouette ? `Unmarked site` : pin.name}
+            aria-label={pin.name}
             onClick={(e) => {
               e.stopPropagation();
-              if (pin.silhouette) return;
               onSelectPoi(pin.id, e.clientX, e.clientY);
             }}
             style={{ left: pin.x, top: pin.y }}
             className={cn(
-              "absolute z-10 flex min-h-11 min-w-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border px-2 font-display text-[10px] uppercase tracking-[0.12em] shadow-xl backdrop-blur-md",
-              pin.silhouette
-                ? "pointer-events-none border-line/40 bg-ink/40 text-transparent opacity-70"
-                : on
-                  ? "border-ember bg-ember text-ink"
-                  : "border-ember/65 bg-ink/80 text-ember",
+              "absolute z-10 flex -translate-x-1/2 -translate-y-[70%] flex-col items-center gap-1",
+              "min-h-11 min-w-11",
             )}
           >
-            {pin.silhouette ? (
-              <span className="size-2.5 rounded-full bg-moon/50 shadow-[0_0_12px_rgba(241,227,194,0.35)]" />
-            ) : (
-              <>
-                <span className={on ? "max-w-[9rem] truncate" : "sr-only"}>{pin.name}</span>
-                {!on ? <span className="max-w-[4.6rem] truncate">{pin.name.split(" ").slice(-1)[0]}</span> : null}
-              </>
-            )}
+            <span
+              className={cn(
+                "rounded-[2px] border px-2 py-1 font-display text-[9px] uppercase tracking-[0.14em] shadow-xl backdrop-blur-md",
+                on
+                  ? "border-ember bg-ember text-ink"
+                  : "border-ember/55 bg-ink/88 text-ember",
+              )}
+            >
+              {pin.short}
+            </span>
+            <span
+              className={cn(
+                "h-3 w-px",
+                on ? "bg-ember" : "bg-ember/50",
+              )}
+            />
+            <span
+              className={cn(
+                "size-2.5 rotate-45 border shadow-[0_0_12px_rgba(201,133,69,0.45)]",
+                on ? "border-ember bg-ember" : "border-ember/70 bg-ink",
+              )}
+            />
           </button>
         );
       })}
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-ink/50 to-transparent" />
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-ink/55 to-transparent" />
-      <p className="pointer-events-none absolute left-3 top-3 z-20 rounded-[var(--radius-sm)] border border-ember/40 bg-ink/75 px-2 py-1 font-display text-[9px] uppercase tracking-[0.2em] text-ember backdrop-blur-md">
-        2.5D · drag · pinch
-      </p>
     </div>
   );
 }
 
 export function setRegionStageZoom(delta: number) {
-  // Imperative zoom hooks via custom event so chrome buttons stay outside the stage.
   window.dispatchEvent(new CustomEvent("hollow:region-zoom", { detail: { delta } }));
 }

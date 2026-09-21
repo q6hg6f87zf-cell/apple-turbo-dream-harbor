@@ -241,7 +241,7 @@ export function RegionMapOverlay() {
     if (fromOrbit) {
       sessionStorage.removeItem("hollow:region-dive");
       setDive(true);
-      const t = window.setTimeout(() => setDive(false), 900);
+      const t = window.setTimeout(() => setDive(false), 1050);
       return () => window.clearTimeout(t);
     }
     setDive(false);
@@ -250,63 +250,19 @@ export function RegionMapOverlay() {
   if (typeof document === "undefined") return null;
 
   const sheet = (
-    <div className="fixed inset-0 z-[140] flex flex-col bg-ink text-paper" data-region-map="1">
+    <div className="fixed inset-0 z-[140] flex flex-col bg-[#090807] text-paper" data-region-map="1">
       {dive ? (
-        <div
-          className="pointer-events-none absolute inset-0 z-50 ms-region-dive"
-          aria-hidden
-        >
-          <img src={art} alt="" className="absolute inset-0 size-full object-cover opacity-90" />
-          <div className="absolute inset-0 bg-gradient-to-b from-ink/30 via-transparent to-ink/70" />
-          <p className="absolute inset-x-0 bottom-[28%] text-center font-display text-sm uppercase tracking-[0.32em] text-ember">
-            Descending · {region.short}
-          </p>
+        <div className="pointer-events-none absolute inset-0 z-50 ms-region-dive" aria-hidden>
+          <img src={art} alt="" className="absolute inset-0 size-full scale-110 object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-b from-ink/50 via-ink/10 to-ink/80" />
+          <div className="absolute inset-x-0 bottom-[30%] text-center">
+            <p className="font-display text-[10px] uppercase tracking-[0.36em] text-ember">{region.continent}</p>
+            <p className="mt-2 font-display text-2xl tracking-[0.08em] text-paper">{region.short}</p>
+          </div>
         </div>
       ) : null}
 
-      <header className="flex shrink-0 items-center gap-2 border-b border-line bg-surface/95 px-2 py-2.5 backdrop-blur pt-[max(0.55rem,env(safe-area-inset-top))] sm:gap-3 sm:px-3 sm:py-3">
-        <button
-          type="button"
-          onClick={() => {
-            sfx.click();
-            close();
-          }}
-          className="flex size-12 shrink-0 items-center justify-center rounded-full border border-line text-moon"
-          aria-label="Close regional map"
-        >
-          <X className="size-5" />
-        </button>
-        <div className="min-w-0 flex-1">
-          <p className="font-display text-[10px] uppercase tracking-[0.22em] text-ember">{region.continent} · 2.5D war table</p>
-          <h2 className="truncate font-display text-lg sm:text-xl">{region.name}</h2>
-        </div>
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            aria-label="Zoom out"
-            onClick={() => {
-              if (useFlat) setScale((z) => Math.max(1, z - 0.25));
-              else setRegionStageZoom(-0.2);
-            }}
-            className="flex size-11 items-center justify-center rounded-[var(--radius-sm)] border border-line text-moon"
-          >
-            <Minus className="size-4" />
-          </button>
-          <button
-            type="button"
-            aria-label="Zoom in"
-            onClick={() => {
-              if (useFlat) setScale((z) => Math.min(2.8, z + 0.25));
-              else setRegionStageZoom(0.2);
-            }}
-            className="flex size-11 items-center justify-center rounded-[var(--radius-sm)] border border-line text-moon"
-          >
-            <Plus className="size-4" />
-          </button>
-        </div>
-      </header>
-
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="relative min-h-0 flex-1">
         {useFlat ? (
           <FlatRegionFallback
             regionId={regionId}
@@ -335,68 +291,117 @@ export function RegionMapOverlay() {
               selectPoi(id);
             }}
             onFailed={() => setUseFlat(true)}
+            className="absolute inset-0"
           />
         )}
 
-        {street ? (
-          <div className="relative hidden h-[22vh] min-h-[7.5rem] shrink-0 overflow-hidden border-t border-line sm:block sm:h-[26vh] sm:min-h-[9rem]">
-            <img src={street} alt={`${region.name} street`} className="absolute inset-0 size-full object-cover" />
-            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink/85 via-ink/35 to-transparent px-4 pb-3 pt-10">
-              <p className="font-display text-[10px] uppercase tracking-[0.2em] text-ember">{region.continent}</p>
-              <p className="text-sm text-paper">{region.name} · street</p>
-            </div>
+        {/* Floating war-room chrome over a full-bleed map */}
+        <header className="pointer-events-none absolute inset-x-0 top-0 z-30 flex items-start justify-between gap-2 px-3 pt-[max(0.65rem,env(safe-area-inset-top))]">
+          <button
+            type="button"
+            onClick={() => {
+              sfx.click();
+              close();
+            }}
+            className="pointer-events-auto flex size-12 shrink-0 items-center justify-center rounded-full border border-line/70 bg-ink/80 text-moon shadow-xl backdrop-blur-md"
+            aria-label="Close regional map"
+          >
+            <X className="size-5" />
+          </button>
+          <div className="pointer-events-none min-w-0 flex-1 pt-1 text-center">
+            <p className="font-display text-[9px] uppercase tracking-[0.28em] text-ember drop-shadow">{region.continent}</p>
+            <h2 className="truncate font-display text-xl text-paper drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)] sm:text-2xl">
+              {region.name}
+            </h2>
           </div>
-        ) : null}
-      </div>
+          <div className="pointer-events-auto flex items-center gap-1">
+            <button
+              type="button"
+              aria-label="Zoom out"
+              onClick={() => {
+                if (useFlat) setScale((z) => Math.max(1, z - 0.25));
+                else setRegionStageZoom(-0.18);
+              }}
+              className="flex size-11 items-center justify-center rounded-[var(--radius-sm)] border border-line/70 bg-ink/80 text-moon shadow-xl backdrop-blur-md"
+            >
+              <Minus className="size-4" />
+            </button>
+            <button
+              type="button"
+              aria-label="Zoom in"
+              onClick={() => {
+                if (useFlat) setScale((z) => Math.min(2.8, z + 0.25));
+                else setRegionStageZoom(0.18);
+              }}
+              className="flex size-11 items-center justify-center rounded-[var(--radius-sm)] border border-line/70 bg-ink/80 text-moon shadow-xl backdrop-blur-md"
+            >
+              <Plus className="size-4" />
+            </button>
+          </div>
+        </header>
 
-      {(() => {
-        const selected = pois.find((p) => p.id === s.selectedPoiId) ?? pois[0];
-        const used = selected ? poiUsedToday(s, selected.id) : false;
-        const act = selected ? poiActionOf(selected) : "scout";
-        const label =
-          act === "shop"
-            ? "Open stalls"
-            : act === "listen"
-              ? "Climb and listen · 1 watch"
-              : act === "home"
-                ? "Return to Vault 13"
-                : act === "boss"
-                  ? "Hold for deploy"
-                  : act === "bay"
-                    ? "Open Travis's bay"
-                  : act === "salvage"
-                    ? "Salvage · 1 watch"
-                    : "Scout · 1 watch";
-        return (
-          <div className="shrink-0 border-t border-line bg-surface/95 px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-4">
-            <p className="font-display text-[10px] uppercase tracking-[0.2em] text-ember">
-              {selected ? selected.name : region.name}
-            </p>
-            <p className="mt-1 line-clamp-2 text-sm text-moon">
-              {selected
-                ? siteCopyFor(selected, act === "salvage" ? "forage" : "scout").brief
-                : locById(loc).desc}
-            </p>
-            {selected ? (
-              <button
-                type="button"
-                data-poi-act={selected.id}
-                disabled={used && act !== "shop" && act !== "home" && act !== "boss" && act !== "bay"}
-                onClick={() => {
-                  sfx.unlock();
-                  const msg = useGame.getState().workSite(selected.id);
-                  if (msg) {
-                    useGame.setState((st) => ({ s: { ...st.s, toast: msg } }));
-                  }
-                }}
-                className="mt-3 flex min-h-12 w-full items-center justify-center rounded-[var(--radius-sm)] bg-ember px-3 font-display text-sm text-ink disabled:opacity-40"
-              >
-                {used && act !== "shop" && act !== "home" && act !== "boss" && act !== "bay" ? "Worked today" : label}
-              </button>
-            ) : null}
-          </div>
-        );
-      })()}
+        {(() => {
+          const selected = pois.find((p) => p.id === s.selectedPoiId) ?? pois[0];
+          const used = selected ? poiUsedToday(s, selected.id) : false;
+          const act = selected ? poiActionOf(selected) : "scout";
+          const label =
+            act === "shop"
+              ? "Open stalls"
+              : act === "listen"
+                ? "Climb and listen · 1 watch"
+                : act === "home"
+                  ? "Return to Vault 13"
+                  : act === "boss"
+                    ? "Hold for deploy"
+                    : act === "bay"
+                      ? "Open Travis's bay"
+                      : act === "salvage"
+                        ? "Salvage · 1 watch"
+                        : "Scout · 1 watch";
+          return (
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+              <div className="pointer-events-auto mx-auto w-full max-w-xl rounded-[var(--radius-md)] border border-line/70 bg-ink/88 px-3 py-3 shadow-2xl backdrop-blur-md sm:px-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-display text-[10px] uppercase tracking-[0.22em] text-ember">
+                      {selected ? selected.name : region.name}
+                    </p>
+                    <p className="mt-1 line-clamp-2 text-sm text-moon">
+                      {selected
+                        ? siteCopyFor(selected, act === "salvage" ? "forage" : "scout").brief
+                        : locById(loc).desc}
+                    </p>
+                  </div>
+                  {street ? (
+                    <img
+                      src={street}
+                      alt=""
+                      className="hidden size-14 shrink-0 rounded-[var(--radius-sm)] object-cover shadow-border sm:block"
+                    />
+                  ) : null}
+                </div>
+                {selected ? (
+                  <button
+                    type="button"
+                    data-poi-act={selected.id}
+                    disabled={used && act !== "shop" && act !== "home" && act !== "boss" && act !== "bay"}
+                    onClick={() => {
+                      sfx.unlock();
+                      const msg = useGame.getState().workSite(selected.id);
+                      if (msg) {
+                        useGame.setState((st) => ({ s: { ...st.s, toast: msg } }));
+                      }
+                    }}
+                    className="mt-3 flex min-h-12 w-full items-center justify-center rounded-[var(--radius-sm)] bg-ember px-3 font-display text-sm text-ink disabled:opacity-40"
+                  >
+                    {used && act !== "shop" && act !== "home" && act !== "boss" && act !== "bay" ? "Worked today" : label}
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          );
+        })()}
+      </div>
     </div>
   );
 

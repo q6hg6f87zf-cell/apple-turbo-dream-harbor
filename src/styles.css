@@ -2190,22 +2190,22 @@ body[data-region-map="1"] .ms-help,
 @keyframes ms-region-dive {
   0% {
     opacity: 1;
-    transform: scale(1.35);
+    transform: scale(1.55);
     filter: blur(0);
   }
-  55% {
+  40% {
     opacity: 1;
-    transform: scale(1.08);
-    filter: blur(0.5px);
+    transform: scale(1.12);
+    filter: blur(0.4px);
   }
   100% {
     opacity: 0;
     transform: scale(1);
-    filter: blur(1.5px);
+    filter: blur(2px);
   }
 }
 .ms-region-dive {
-  animation: ms-region-dive 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: ms-region-dive 1.05s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 @media (prefers-reduced-motion: reduce) {
   .ms-region-dive {

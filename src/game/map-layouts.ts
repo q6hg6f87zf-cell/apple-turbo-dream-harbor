@@ -135,6 +135,26 @@ export function regionLayoutSync(id: RegionId): RegionMapLayout {
   return cache.get(id) ?? DEFAULTS[id];
 }
 
+/** Short war-room label — never the awkward last-word truncate. */
+export function poiShortLabel(name: string): string {
+  const clean = name.replace(/^The\s+/i, "").trim();
+  const parts = clean.split(/\s+/);
+  if (parts.length <= 2) return clean.toUpperCase();
+  if (/vault/i.test(clean)) return "VAULT 13";
+  if (/relay|tower/i.test(clean)) return "TOWER";
+  if (/market/i.test(clean)) return "MARKET";
+  if (/gate/i.test(clean)) return "GATE";
+  if (/shop|mechanical|bay/i.test(clean)) return "SHOP";
+  if (/rail/i.test(clean)) return "RAIL CUT";
+  if (/highway/i.test(clean)) return "HIGHWAY";
+  if (/works|foundry/i.test(clean)) return "WORKS";
+  if (/berm/i.test(clean)) return "BERM";
+  if (/exchange/i.test(clean)) return "EXCHANGE";
+  if (/halo/i.test(clean)) return "HALO";
+  if (/pack|gravenor|boss/i.test(clean)) return "PACK";
+  return parts.slice(0, 2).join(" ").toUpperCase();
+}
+
 /** POI x/y in data are percent 0–100; layout anchors are 0–1. */
 export function poiMapUv(x: number, y: number): { u: number; v: number } {
   if (x <= 1.5 && y <= 1.5) return { u: x, v: y };
