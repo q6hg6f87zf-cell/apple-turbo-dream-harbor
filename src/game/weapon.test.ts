@@ -155,9 +155,17 @@ describe("arsenal catalog", () => {
     assert.equal(s.locations.veyra.unlocked, true);
   });
 
-  it("lists every roster model", () => {
-    assert.equal(CALIBER_ROSTER.length, 14);
+  // A count here only ever told us the roster had been edited. What matters is
+  // that every advertised model exists and every model's caliber is buyable.
+  it("lists every roster model, and every roster model exists", () => {
+    assert.ok(CALIBER_ROSTER.length >= 14);
     assert.ok(CALIBER_ROSTER.every((row) => FRAMES_HAVE(row.model)));
+    const boxes = new Set(
+      ARSENAL_CATALOG.filter((r) => r.kind === "consumable" && r.ammoType).map((r) => r.ammoType),
+    );
+    CALIBER_ROSTER.forEach((row) => {
+      assert.ok(boxes.has(row.ammo), `no ammo on sale for ${row.model} (${row.ammo})`);
+    });
   });
 });
 
@@ -381,5 +389,65 @@ describe("mag line", () => {
   it("prints chamber and caliber", () => {
     const rifle = gun();
     assert.match(magLine(rifle), /20\/20 · 5\.56/);
+  });
+});
+
+describe("the starting kit and the .30-06 shelf", () => {
+  it("starts the campaign on 150 caps", () => {
+    assert.equal(defaultState().coins, 150);
+  });
+
+  it("hands every forged rider the Vault 13 BB rifle and a tube for it", () => {
+    const op = forgeOperative({
+      name: "Ash",
+      cls: "Warrior",
+      race: "Human",
+      lineage: "",
+      origin: "Ironclad",
+      day: 1,
+    });
+    const bb = op.inventory.find((i) => i.name === "Vault 13 BB Rifle");
+    assert.ok(bb, "no BB rifle in the starting kit");
+    assert.equal(bb.ammoType, "bb");
+    assert.equal(bb.kind, "weapon");
+    assert.equal(bb.slot, "weapon");
+    assert.notEqual(bb.equipped, true, "the BB rifle is carried, not equipped over the class weapon");
+    assert.ok(bb.lore.length > 120, "the BB rifle needs a description worth reading");
+
+    const tube = op.inventory.find((i) => i.ammoType === "bb" && i.kind === "consumable");
+    assert.ok(tube, "no BBs to put in it");
+    assert.ok((tube.ammoCount ?? 0) > 0);
+
+    // The class weapon is still the one in hand.
+    const equipped = op.inventory.filter((i) => i.equipped && i.slot === "weapon");
+    assert.equal(equipped.length, 1);
+    assert.notEqual(equipped[0].name, "Vault 13 BB Rifle");
+  });
+
+  it("sells BBs, so the cheapest gun in the Realm is not a dead end", () => {
+    const boxes = ARSENAL_CATALOG.filter((r) => r.kind === "consumable" && r.ammoType === "bb");
+    assert.ok(boxes.length >= 2, "one BB tin is not a supply chain");
+    const cheap = boxes.filter((b) => b.value <= 60);
+    assert.ok(cheap.length >= 2, "BBs must stay affordable on a 150-cap start");
+  });
+
+  it("chambers real .30-06 rifles at both ends of the ladder", () => {
+    const guns = ARSENAL_CATALOG.filter((r) => r.kind === "weapon" && r.ammoType === ".30-06");
+    assert.ok(guns.length >= 3, `only ${guns.length} rifles in .30-06`);
+    assert.ok(guns.some((g) => g.name.includes("M70 Springfield")));
+    assert.ok(guns.some((g) => g.name.includes("M1903 Marksman")));
+    const covenant = guns.find((g) => g.name === "Ought-Six Covenant");
+    assert.ok(covenant, "no flagship .30-06");
+    assert.equal(covenant.rarity, "Legendary");
+    assert.ok((covenant.ap ?? 0) >= 3);
+    assert.ok(covenant.lore.length > 200, "a legendary rifle deserves more than one line");
+  });
+
+  it("describes what a gun is like to carry, not just what it costs", () => {
+    const springfield = arsenalByName("Watchworks M70 Springfield");
+    assert.ok(springfield);
+    assert.match(springfield.lore, /\.30-06/);
+    assert.match(springfield.lore, /Long is home/i);
+    assert.ok(springfield.lore.length > 200, "generated weapon lore is still a stub");
   });
 });

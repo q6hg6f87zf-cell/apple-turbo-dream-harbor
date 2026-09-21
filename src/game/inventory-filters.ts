@@ -26,6 +26,7 @@ export const WEAPON_LANES: { id: WeaponLane; label: string }[] = [
 ];
 
 export const CALIBERS: AmmoType[] = [
+  "bb",
   "9mm",
   ".45",
   "5.56",

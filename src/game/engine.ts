@@ -56,9 +56,12 @@ import {
   villainById,
   weaponDamageAvg,
 } from "./data";
-import { REGION_LOCATION, campaignOpenRegions } from "./arsenal";
+import { REGION_LOCATION, arsenalByName, campaignOpenRegions } from "./arsenal";
 import { applyArmor, fieldArmor, rangeHitMod, resolveWeapon } from "./weapon-ops";
 import { APPROACHES, locationToRegion, tacticsFor, type FieldDeploy } from "./field-ops";
+import { complicationFor, markFired, objectiveFor, objectiveMet, beatWhy } from "./mission-ai";
+import { inferRole, planEnemyTurn, readMorale, startMorale, tickEnemy } from "./enemy-ai";
+import { advanceThread, emptyRecon, leadById, spendLead } from "./recon";
 import { eventBriefing, beatPrompt, contactFlavor, debriefLines, radioFor, rollLines } from "./event-theater";
 import { emptyMarket } from "./market";
 import { emptyShift } from "./shift";
@@ -280,7 +283,9 @@ export function defaultState(): GameState {
     screen: "title",
     openedFrom: null,
     day: 1,
-    coins: 1400,
+    // The Realm starts you broke on purpose: 150 caps is one market decision,
+    // not a shopping trip. Everything else has to be earned off the ground.
+    coins: 150,
     ore: 0,
     moonFavor: 0,
     xp: 0,
@@ -335,6 +340,7 @@ export function defaultState(): GameState {
     poiWatch: { day: 1, used: [] },
     term: null,
     shift: emptyShift(1),
+    recon: emptyRecon(),
     arcade: {
       triviaSeen: [],
       tfSeen: [],
@@ -404,8 +410,51 @@ export function forgeOperative(opts: {
   const lineage = resolveLineage(raceName, opts.lineage);
   const hp = CLASS_HP[opts.cls];
   const weapon = makeItem({ ...starterWeapon(opts.cls), equipped: true });
+  // Every rider walks out of Vault 13 with the BB rifle Tyrone keeps by the
+  // door and one tube for it. It is the floor of the weapon ladder: silent,
+  // harmless, and the only gun you are given rather than sold.
+  const bbEntry = arsenalByName("Vault 13 BB Rifle");
+  const bbKit: Item[] = bbEntry
+    ? [
+        makeItem({
+          name: bbEntry.name,
+          kind: "weapon",
+          rarity: bbEntry.rarity,
+          condition: "Worn",
+          slot: "weapon",
+          classHint: bbEntry.classHint,
+          damage: bbEntry.damage,
+          effect: bbEntry.effect,
+          lore: bbEntry.lore,
+          value: bbEntry.value,
+          equipped: false,
+          sourceRegion: bbEntry.sourceRegion,
+          discoveredDay: opts.day,
+          weaponFamily: bbEntry.weaponFamily,
+          ammoType: bbEntry.ammoType,
+          rangeBand: bbEntry.rangeBand,
+          ap: bbEntry.ap,
+          accuracy: bbEntry.accuracy,
+          recoil: bbEntry.recoil,
+          magSize: bbEntry.magSize,
+          mag: bbEntry.magSize,
+        }),
+        makeItem({
+          name: "BB Tube",
+          kind: "consumable",
+          rarity: "Common",
+          condition: "Pristine",
+          effect: "60 steel BBs in a paper tube. Reloads any spring-air rifle.",
+          lore: "Tyrone hands one over with the rifle. He does not hand over a second.",
+          value: 15,
+          ammoType: "bb",
+          ammoCount: 60,
+        }),
+      ]
+    : [];
   const kit: Item[] = [
     weapon,
+    ...bbKit,
     ...race.kit.map((name) =>
       makeItem({
         name,
@@ -470,7 +519,10 @@ export function buildMission(
 ): MissionState {
   const L = locById(loc);
   const approach = APPROACHES.find((a) => a.id === field?.approach) ?? APPROACHES[1];
-  const dc = clamp(missionDc(state, loc, kind) + (approach?.dc ?? 0), 8, 19);
+  const reconLead = leadById(state, field?.leadId);
+  const usable = reconLead && !reconLead.spent && reconLead.expiresDay >= state.day ? reconLead : null;
+  const objective = objectiveFor(state, loc, kind, usable, field?.poiId ?? usable?.poiId);
+  const dc = clamp(missionDc(state, loc, kind) + (approach?.dc ?? 0) + (usable?.dcMod ?? 0), 8, 19);
   const lead = partyLead(state, partyIds);
   const theater = eventBriefing(state, loc, kind, partyIds);
   const beats: MissionBeat[] = [];
@@ -484,6 +536,7 @@ export function buildMission(
       id: uid("bt"),
       title,
       prompt: beatPrompt(state, loc, kind, k, title, partyIds),
+      why: beatWhy(kind, title, objective),
       stat,
       dc: clamp(dc + extra, 8, 19),
       kind: k,
@@ -516,6 +569,9 @@ export function buildMission(
     add("The name", PRIMARY_STAT[lead.cls], 3, "boss");
   }
 
+  const open = [...theater.open, `Orders · ${objective.title}. ${objective.detail}`];
+  if (usable) open.push(`Lead · ${usable.title}. ${usable.read}`);
+
   return {
     id: uid("ms"),
     locationId: loc,
@@ -526,13 +582,19 @@ export function buildMission(
     coins: 0,
     ore: 0,
     loot: [],
-    narrative: theater.open,
-    briefing: theater.briefing,
+    narrative: open,
+    briefing: usable ? `${usable.title} — ${usable.detail}` : theater.briefing,
     stakes: theater.stakes,
     waiting: true,
     regionId: locationToRegion(loc) ?? undefined,
-    poiId: field?.poiId,
+    poiId: field?.poiId ?? usable?.poiId,
     approach: field?.approach ?? approach.id,
+    objective,
+    leadId: usable?.id,
+    leadTitle: usable?.title,
+    hits: 0,
+    misses: 0,
+    fired: [],
   };
 }
 
@@ -643,6 +705,10 @@ export function applyRollToBeat(
       if (m.locationId === "caverns" || m.kind === "forage") ore = strong ? 2 : 1;
       if (beat.kind === "loot" || beat.kind === "merchant") {
         m.loot = [...m.loot, ...lootTable(m.locationId, m.kind, total)];
+        const bonusRolls = leadById(state, m.leadId)?.lootRolls ?? 0;
+        for (let i = 0; i < bonusRolls; i++) {
+          m.loot = [...m.loot, ...lootTable(m.locationId, m.kind, total)];
+        }
         const drop = grantPackLoot(state, { source: locById(m.locationId).short });
         if (drop) notes.push(`Vault · ${drop.replace("_", " ")}.`);
       }
@@ -731,6 +797,12 @@ export function applyRollToBeat(
     }
   }
 
+  if (beat.kind !== "boss") {
+    if (hit) m.hits = (m.hits ?? 0) + 1;
+    else m.misses = (m.misses ?? 0) + 1;
+  }
+  if (beat.injected) markFired(m, beat.title);
+
   m.coins += coins;
   m.ore += ore;
   m.lastRoll = {
@@ -755,13 +827,47 @@ export function applyRollToBeat(
 export function advanceBeat(state: GameState): GameState {
   if (!state.mission) return state;
   const m = { ...state.mission };
+  const justRolled = m.beats[m.beatIndex];
+  const band = m.lastRoll?.band ?? "success";
+
+  // The run answers back. A fumble, a hot trail or a breach can put a beat in
+  // front of the squad that the deploy screen never promised them.
+  const lead = partyLead(state, m.partyIds);
+  const hurt = m.partyIds.some((id) => {
+    const o = state.operatives.find((x) => x.id === id);
+    return !!o && o.hp > 0 && o.hp <= Math.ceil(o.maxHp / 3);
+  });
+  const extra = justRolled
+    ? complicationFor({
+        state,
+        mission: m,
+        band,
+        hit: (m.lastRoll?.total ?? 0) >= (m.lastRoll?.dc ?? 99),
+        lead,
+        heat: state.kaneHeat ?? 0,
+        hurt,
+        remaining: m.beats.length - 1 - m.beatIndex,
+      })
+    : null;
+  if (extra) {
+    m.beats = [...m.beats.slice(0, m.beatIndex + 1), extra, ...m.beats.slice(m.beatIndex + 1)];
+    m.narrative = [...m.narrative, `SYNAPSE · Unplanned. ${extra.title}.`];
+  }
+
   m.beatIndex += 1;
   m.lastRoll = undefined;
   if (m.beatIndex >= m.beats.length) {
+    state.mission = m;
     return completeMission(state);
   }
   m.waiting = true;
-  m.narrative = [...m.narrative, radioFor(m.kind, m.beatIndex), m.beats[m.beatIndex]?.prompt ?? ""].filter(Boolean);
+  const next = m.beats[m.beatIndex];
+  m.narrative = [
+    ...m.narrative,
+    radioFor(m.kind, m.beatIndex),
+    next?.prompt ?? "",
+    next?.why ? `Why · ${next.why}` : "",
+  ].filter(Boolean);
   state.mission = m;
   return state;
 }
@@ -775,6 +881,39 @@ export function completeMission(state: GameState): GameState {
     missions: state.locations[loc].missions + 1,
     intel: state.locations[loc].intel + (m.kind === "scout" ? 2 : 1),
   };
+
+  // The objective is the difference between "a sortie happened" and "the thing
+  // we were sent for got done". It pays, it is logged, and it moves the region
+  // story on rather than only the intel counter.
+  const met = objectiveMet(m);
+  if (m.objective) {
+    m.objective.met = met;
+    if (met && m.objective.bonus > 0) {
+      state.coins += m.objective.bonus;
+      m.coins += m.objective.bonus;
+      m.narrative = [
+        ...m.narrative,
+        `SYNAPSE · Objective met — ${m.objective.title}. +${m.objective.bonus} caps on the close.`,
+      ];
+      pushLog(state, "action", "SYNAPSE", `Objective met in ${locById(loc).short}: ${m.objective.title}.`);
+    } else if (!met) {
+      m.narrative = [
+        ...m.narrative,
+        `SYNAPSE · Objective missed — ${m.objective.title}. The ground keeps what we did not take.`,
+      ];
+    }
+  }
+  if (m.leadId) {
+    spendLead(state, m.leadId);
+    if (met) {
+      m.narrative = [...m.narrative, `Tyrone · That lead was good. File the next one the same way.`];
+    }
+  }
+  const threadLine = advanceThread(state, loc);
+  if (threadLine) {
+    m.narrative = [...m.narrative, `Hollow · ${threadLine}`];
+    pushLog(state, "note", "Archive", threadLine);
+  }
   const L = locById(loc);
   const survivors = m.partyIds.some((id) => {
     const o = state.operatives.find((x) => x.id === id);
@@ -876,6 +1015,8 @@ export function spawnCombat(state: GameState, opts: { boss?: boolean }): GameSta
         resist: v.resist,
         weakness: v.weakness,
         resistAmt: v.resistAmt,
+        role: "warden",
+        morale: startMorale("warden"),
       });
       applyPhase(enemies[enemies.length - 1]!, v, 0);
     }
@@ -891,13 +1032,18 @@ export function spawnCombat(state: GameState, opts: { boss?: boolean }): GameSta
       tags: ["bounty"],
       flavor: state.bounty.type,
       ...fieldArmor(state.bounty.name),
+      role: "skirmisher",
+      morale: startMorale("skirmisher"),
     });
   } else {
     const pool = ENEMIES[loc];
-    const n = 1 + (m.kind === "raid" ? 1 : 0);
+    // A raid draws a second body; a hot Kane trail draws a third. The field
+    // reacting to how the campaign is going is the cheapest depth there is.
+    const heat = state.kaneHeat ?? 0;
+    const n = 1 + (m.kind === "raid" ? 1 : 0) + (heat >= 14 && m.kind !== "scout" ? 1 : 0);
     for (let i = 0; i < n; i++) {
       const e = pick(pool);
-      enemies.push({
+      const body: Combatant = {
         id: uid("en"),
         name: e.name,
         hp: e.hp,
@@ -908,7 +1054,10 @@ export function spawnCombat(state: GameState, opts: { boss?: boolean }): GameSta
         tags: [],
         flavor: e.flavor,
         ...fieldArmor(e.name),
-      });
+      };
+      body.role = inferRole(body);
+      body.morale = startMorale(body.role);
+      enemies.push(body);
     }
   }
   const combat: CombatState = {
@@ -971,15 +1120,6 @@ function applyPhase(target: Combatant, v: NonNullable<ReturnType<typeof villainB
   target.atk = Math.max(1, v.atk + (fx?.atk ?? 0));
   target.def = Math.max(0, v.def + (fx?.def ?? 0));
   target.dc = Math.max(6, v.dc + (fx?.dc ?? 0));
-}
-
-function topThreat(combat: CombatState, party: Operative[]): Operative | null {
-  const threat = combat.threat ?? {};
-  let best: Operative | null = null;
-  for (const member of party) {
-    if (!best || (threat[member.id] ?? 0) > (threat[best.id] ?? 0)) best = member;
-  }
-  return best && (threat[best.id] ?? 0) > 0 ? best : null;
 }
 
 export function resolvePlayerAction(
@@ -1202,6 +1342,18 @@ export function resolvePlayerAction(
   return enemyTurn(state);
 }
 
+/**
+ * One round of hostile decisions.
+ *
+ * Each enemy reads the field through `planEnemyTurn` and gets what its
+ * doctrine wants: a marksman settles and then punches through cover, a
+ * skirmisher goes around the guard for whoever is bleeding, a pack presses
+ * while its friends are up and goes feral when they are not, and anything
+ * broken either calls for help once or leaves the field alive.
+ *
+ * The plan's reasoning is written into the log before the dice, so the player
+ * can see what the enemy decided and play against it next round.
+ */
 function enemyTurn(state: GameState): GameState {
   const combat = state.combat;
   if (!combat) return state;
@@ -1215,27 +1367,80 @@ function enemyTurn(state: GameState): GameState {
     return finishCombat(state, false);
   }
   const bossPhase = combat.bossId ? villainById(combat.bossId)?.phases : undefined;
+  const statsOf = (op: Operative) => computeStats(op);
+  const reinforcements: Combatant[] = [];
+
   combat.enemies
-    .filter((e) => e.hp > 0)
+    .filter((e) => e.hp > 0 && !e.fled)
     .forEach((e) => {
       const up = party.filter((p) => p.hp > 0);
-      const focused = e.isBoss && bossPhase?.[e.phase ?? 0]?.effect?.focus;
-      const target = (focused ? topThreat(combat, up.length ? up : party) : null)
-        ?? pick(up.length ? up : party);
+      if (!up.length) return;
+      const focused = !!(e.isBoss && bossPhase?.[e.phase ?? 0]?.effect?.focus);
+      const plan = planEnemyTurn({
+        enemy: e,
+        allies: combat.enemies,
+        party: up,
+        combat,
+        statsOf,
+        bossFocus: focused,
+      });
+      e.morale = readMorale(e, combat.enemies);
+      log.push(plan.note);
+      tickEnemy(e, plan);
+
+      if (plan.intent === "rout") {
+        e.fled = true;
+        e.hp = 0;
+        log.push(`${e.name} is off the field. Not down — gone.`);
+        return;
+      }
+      if (plan.intent === "call") {
+        e.calledFor = true;
+        const pool = ENEMIES[combat.locationId] ?? [];
+        const helper = pool.length ? pick(pool) : null;
+        if (helper) {
+          const spawned: Combatant = {
+            id: uid("en"),
+            name: helper.name,
+            hp: Math.max(3, Math.round(helper.hp * 0.7)),
+            maxHp: Math.max(3, Math.round(helper.hp * 0.7)),
+            atk: helper.atk,
+            def: helper.def,
+            dc: helper.dc,
+            tags: ["called"],
+            flavor: helper.flavor,
+            ...fieldArmor(helper.name),
+          };
+          spawned.role = inferRole(spawned);
+          spawned.morale = startMorale(spawned.role);
+          reinforcements.push(spawned);
+          log.push(`${helper.name} comes in off the shout. The fight just got longer.`);
+        }
+        return;
+      }
+      if (plan.skipsAttack) return;
+
+      const target = state.operatives.find((o) => o.id === plan.targetId && o.hp > 0) ?? pick(up);
       if (!target) return;
+
+      // Shield Block is one round of protection for the operative it was cast
+      // on, not a free miss for whichever enemy happens to swing first.
+      if (combat.shield && combat.shield === target.id) {
+        combat.shield = undefined;
+        log.push(`${e.name} hits nothing. ${target.name} was already behind the block.`);
+        return;
+      }
+
       const roll = d20();
       const stats = computeStats(target);
       const dc = 8 + Math.floor(stats.DEF / 2);
-      const guard = combat.guardId === target.id;
-      const shield = combat.shield;
-      if (shield) {
-        combat.shield = undefined;
-        log.push(`${e.name} hits nothing. Shield Block.`);
-        return;
-      }
-      const hit = roll + e.atk >= dc + (guard ? 2 : 0);
+      const guard = combat.guardId === target.id && !plan.piercesGuard;
+      const hit = roll + e.atk + plan.atkMod >= dc + (guard ? 2 : 0);
       if (hit) {
-        const dmg = Math.max(1, e.atk - Math.floor(stats.DEF / 4) + (roll >= 18 ? 2 : 0));
+        const dmg = Math.max(
+          1,
+          e.atk + plan.dmgMod - Math.floor(stats.DEF / 4) + (roll >= 18 ? 2 : 0),
+        );
         const i = state.operatives.findIndex((o) => o.id === target.id);
         const hp = Math.max(0, target.hp - dmg);
         state.operatives[i] = {
@@ -1245,16 +1450,31 @@ function enemyTurn(state: GameState): GameState {
         };
         target.hp = hp;
         log.push(`${e.name} hits ${target.name} for ${dmg}.`);
+        // A controller does not just hurt you, it costs you the next order.
+        if (plan.intent === "suppress") {
+          combat.incomingSoft = (combat.incomingSoft ?? 0) + 1;
+          log.push(`${target.name} is pinned. The next call out of this line comes late.`);
+        }
         if (hp <= 0) log.push(`${target.name} is downed.`);
       } else {
-        log.push(`${e.name} fails to land on ${target.name}.`);
+        log.push(
+          guard
+            ? `${e.name} comes in on ${target.name} and finds a guard already there.`
+            : `${e.name} fails to land on ${target.name}.`,
+        );
       }
     });
+
+  if (reinforcements.length) combat.enemies = [...combat.enemies, ...reinforcements];
   combat.guardId = undefined;
   combat.turn += 1;
   combat.actorIndex += 1;
-  combat.log = log.slice(-12);
+  combat.log = log.slice(-14);
   state.combat = combat;
+
+  // Everything that was going to fight has fled or fallen. That is a win, and
+  // the old loop had no way to notice it.
+  if (combat.enemies.every((e) => e.hp <= 0 || e.fled)) return finishCombat(state, true);
   const anyUp = combat.partyIds.some((id) => {
     const o = state.operatives.find((x) => x.id === id);
     return o && o.hp > 0;

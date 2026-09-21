@@ -14,6 +14,7 @@ import {
   Ellipsis,
   Globe2,
   Hammer,
+  IdCard,
   Landmark,
   LogOut,
   Moon,
@@ -27,11 +28,14 @@ import { useMemo, useState } from "react";
 import { MoonCardSheet } from "./card";
 import { MoonCrest } from "./primitives";
 
-export const NAV: { id: Screen; label: string; icon: typeof Landmark; hint?: string }[] = [
-  { id: "hq", label: "Vault 13", icon: Landmark },
+// `short` is what the phone dock shows. Six tabs do not fit "Thirty-Eight" at
+// 360px, and truncating a label is worse than naming it twice.
+export const NAV: { id: Screen; label: string; short?: string; icon: typeof Landmark; hint?: string }[] = [
+  { id: "hq", label: "Vault 13", short: "Vault", icon: Landmark },
   { id: "map", label: "World", icon: Globe2, hint: "sortie" },
-  { id: "arcade", label: "Thirty-Eight", icon: Spade },
-  { id: "inventory", label: "Inventory", icon: PackageOpen },
+  { id: "profile", label: "Profile", icon: IdCard },
+  { id: "arcade", label: "Thirty-Eight", short: "Arcade", icon: Spade },
+  { id: "inventory", label: "Inventory", short: "Stores", icon: PackageOpen },
   { id: "more", label: "More", icon: MoreHorizontal },
 ];
 
@@ -367,8 +371,13 @@ export function NavButtons({ compact }: { compact?: boolean }) {
                 />
               ) : null}
             </span>
-            <span className={cn("font-display uppercase tracking-[0.12em] text-label", compact && "leading-none")}>
-              {n.label}
+            <span
+              className={cn(
+                "font-display uppercase tracking-[0.12em] text-label",
+                compact && "leading-none tracking-[0.06em]",
+              )}
+            >
+              {compact ? (n.short ?? n.label) : n.label}
             </span>
           </button>
         );

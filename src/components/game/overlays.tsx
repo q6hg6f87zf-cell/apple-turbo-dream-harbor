@@ -11,6 +11,7 @@ import { STAT_COPY, STAT_ORDER } from "@/game/stats-copy";
 import { cn } from "@/lib/cn";
 import { CommandBar, EncounterBackdrop, EventChips, EventLog } from "./encounter-scene";
 import { KIND_LABEL, eventChips, eventStatHint, shiftRadio, dawnLines } from "@/game/event-theater";
+import { ROLE_DOCTRINE, ROLE_LABEL, roleOf } from "@/game/enemy-ai";
 import { currentPorch } from "@/game/porch";
 import {
   ClassGlyph,
@@ -133,6 +134,20 @@ export function MissionOverlay() {
             </div>
           </div>
           {mission.stakes ? <p className="mt-2 text-label text-muted">{mission.stakes}</p> : null}
+          {/* Orders, not decoration: the run pays a bonus for closing them. */}
+          {mission.objective ? (
+            <div className="mt-2 rounded-[var(--radius-sm)] bg-ink/60 px-3 py-2 shadow-[var(--shadow-border)]">
+              <p className="font-display text-label uppercase tracking-[0.18em] text-ember">
+                Orders · {mission.objective.title}
+                {mission.objective.bonus > 0 ? ` · +${mission.objective.bonus}c on the close` : ""}
+              </p>
+              <p className="mt-0.5 text-secondary leading-relaxed text-moon">{mission.objective.detail}</p>
+              {mission.leadTitle ? (
+                <p className="mt-1 text-label text-ok">Running a scout lead · {mission.leadTitle}</p>
+              ) : null}
+            </div>
+          ) : null}
+          {beat?.why ? <p className="mt-2 text-label text-muted">Why · {beat.why}</p> : null}
           <EventChips chips={chips} />
           {porchLive.length ? (
             <p className="mt-2 text-label text-muted">
@@ -249,6 +264,17 @@ export function MissionOverlay() {
     </div>
   );
 }
+
+const INTENT_LABEL: Record<import("@/game/types").EnemyIntent, string> = {
+  press: "pressing",
+  flank: "flanking",
+  aim: "settling the shot",
+  suppress: "pinning the plan",
+  regroup: "regrouping",
+  call: "shouting for help",
+  break: "all in",
+  rout: "broken",
+};
 
 const ACT_SHORT = {
   strike: "d20 vs DC",
@@ -471,6 +497,37 @@ export function CombatOverlay() {
             {float.n ? <FloatNum n={float.n} kind={float.n > 0 ? "dmg" : "heal"} tick={float.tick} /> : null}
           </div>
 
+          {/* What it is and what it just decided. A fight you can read is a
+              fight you can counter. */}
+          {enemy ? (
+            <div className="mt-2 rounded-[var(--radius-sm)] bg-ink/55 px-3 py-2 shadow-[var(--shadow-border)]">
+              <p className="font-display text-label uppercase tracking-[0.16em] text-danger">
+                {ROLE_LABEL[roleOf(enemy)]}
+                {typeof enemy.morale === "number" ? ` · morale ${enemy.morale}` : ""}
+                {enemy.intent ? ` · ${INTENT_LABEL[enemy.intent]}` : ""}
+              </p>
+              <p className="mt-0.5 text-secondary leading-relaxed text-moon">{ROLE_DOCTRINE[roleOf(enemy)]}</p>
+            </div>
+          ) : null}
+          {combat.enemies.length > 1 ? (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {combat.enemies.map((e) => (
+                <span
+                  key={e.id}
+                  className={cn(
+                    "rounded-full px-2.5 py-1 font-display text-label uppercase tracking-[0.12em]",
+                    e.fled
+                      ? "bg-ink/50 text-muted line-through"
+                      : e.hp > 0
+                        ? "bg-ink/70 text-paper"
+                        : "bg-ink/50 text-muted line-through",
+                  )}
+                >
+                  {e.name} · {Math.max(0, e.hp)}
+                </span>
+              ))}
+            </div>
+          ) : null}
           {combat.incomingSoft ? (
             <p className="mt-1 font-display text-label uppercase tracking-[0.16em] text-ember">
               Bracing · next hit lands softer
@@ -826,7 +883,9 @@ export function RestConfirm() {
   if (!open) return null;
   const many = downedNames.includes(",");
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/70 p-4 md:items-center">
+    // Above the region sheet (z-60) and the field report (z-62). Rest can now be
+    // taken from inside both, and a confirmation nobody can reach is a lock-up.
+    <div className="fixed inset-0 z-[70] flex items-end justify-center bg-ink/70 p-4 md:items-center" data-rest-confirm="1">
       <div className="ms-pop w-full max-w-md rounded-[var(--radius-xl)] bg-surface p-5 shadow-[var(--shadow-border)]">
         <h2 className="font-display text-xl">{downedNames ? "Dawn is a decision" : "Turn the shift in?"}</h2>
         {downedNames ? (

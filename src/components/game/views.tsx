@@ -88,6 +88,7 @@ import { MoonCard } from "./card";
 import { regionThumb } from "@/game/art";
 import { CALIBER_ROSTER, ARC_OPEN, campaignOpenRegions } from "@/game/arsenal";
 import { APPROACHES, KANE_STAKES, defaultPoi, kaneBand, knownPois, locationToRegion } from "@/game/field-ops";
+import { liveLeads, sweepsToday } from "@/game/recon";
 import { WATCH_LABEL } from "@/game/shift";
 import { className, displayRace } from "@/game/presentation";
 import { FATE_COPY, FATE_KEYS, STAT_ORDER, fateLanding } from "@/game/stats-copy";
@@ -1047,6 +1048,7 @@ export function MapView() {
   const [approach, setApproach] = useState<MissionApproach>("standard");
   const [orbit, setOrbit] = useState(false);
   const [sheet, setSheet] = useState(false);
+  const [leadId, setLeadId] = useState<string | null>(null);
   const touched = useRef(false);
   const progress = s.locations[loc] ?? EMPTY_PROGRESS;
   const merchant = NPCS.find((n) => n.loc === loc);
@@ -1056,6 +1058,15 @@ export function MapView() {
   const sites = knownPois(s, loc);
   const poi = defaultPoi(s, loc);
   const mapOpen = !!s.regionMapOpen;
+  const leads = liveLeads(s, loc);
+  const chosenLead = leads.find((l) => l.id === leadId) ?? null;
+
+  // Dawn invalidates the whole briefing — watches, board, market and every
+  // site's daily state. Leaving the sheet up over a new day shows stale ground.
+  useEffect(() => {
+    setSheet(false);
+    setLeadId(null);
+  }, [s.day]);
 
   const idleIds = idle.map((o) => o.id).join(",");
   const lastPartyKey = (s.lastParty ?? []).join(",");
@@ -1174,7 +1185,11 @@ export function MapView() {
               sound="none"
               disabled={!party.length || !progress.unlocked}
               onClick={(e) => {
-                const msg = deploy(loc, kind, party, { poiId: poi?.id, approach });
+                const msg = deploy(loc, chosenLead ? chosenLead.missionKind : kind, party, {
+                  poiId: chosenLead?.poiId ?? poi?.id,
+                  approach,
+                  leadId: chosenLead?.id,
+                });
                 if (msg) err(msg);
                 else {
                   punchClick(e.clientX, e.clientY);
@@ -1182,11 +1197,16 @@ export function MapView() {
                   sfx.deploy();
                   touched.current = false;
                   setParty([]);
+                  setLeadId(null);
                   setSheet(false);
                 }
               }}
             >
-              {party.length ? `Deploy ${party.length} to ${L.short}` : "Pick who walks"}
+              {!party.length
+                ? "Pick who walks"
+                : chosenLead
+                  ? `Run the lead · ${party.length} to ${chosenLead.poiName}`
+                  : `Deploy ${party.length} to ${L.short}`}
             </Button>
           }
         >
@@ -1212,6 +1232,7 @@ export function MapView() {
               {sites.map((site) => (
                 <Chip
                   key={site.id}
+                  chipId={site.id}
                   active={poi?.id === site.id}
                   onClick={() => {
                     sfx.click();
@@ -1242,15 +1263,61 @@ export function MapView() {
                 {poi.action === "shop" || poi.kind === "merchant"
                   ? "Open stalls"
                   : poi.action === "listen" || poi.kind === "radio"
-                    ? "Climb and listen"
+                    ? sweepsToday(s, poi.id)
+                      ? "Climb again · thinner signal"
+                      : "Climb and listen · 1 watch"
                     : poi.action === "home"
                       ? "Return to Vault 13"
                       : poi.action === "boss"
                         ? "This hill has a name"
-                        : poi.action === "salvage"
-                          ? "Salvage this site · 1 watch"
-                          : "Scout this site · 1 watch"}
+                        : sweepsToday(s, poi.id)
+                          ? "Sweep again · pays less"
+                          : poi.action === "salvage"
+                            ? "Salvage this site · 1 watch"
+                            : "Scout this site · 1 watch"}
               </Button>
+            ) : null}
+          </>
+        ) : null}
+
+        {leads.length ? (
+          <>
+            <SectionLabel>Leads from the field</SectionLabel>
+            <div className="space-y-2">
+              {leads.map((lead) => {
+                const active = chosenLead?.id === lead.id;
+                return (
+                  <button
+                    key={lead.id}
+                    type="button"
+                    data-lead-pick={lead.id}
+                    onClick={() => {
+                      sfx.click();
+                      setLeadId(active ? null : lead.id);
+                    }}
+                    className={cn(
+                      "w-full rounded-[var(--radius-md)] px-3 py-2.5 text-left transition-colors",
+                      active
+                        ? "bg-ember/15 shadow-[var(--shadow-border-hover)]"
+                        : "bg-ink/80 shadow-[var(--shadow-border)]",
+                    )}
+                  >
+                    <span className="block font-display text-body text-paper">{lead.title}</span>
+                    <span className="mt-0.5 block text-xs leading-relaxed text-moon">{lead.detail}</span>
+                    <span className="mt-1 block font-display text-[10px] uppercase tracking-[0.14em] text-muted">
+                      {lead.missionKind} · DC {lead.dcMod >= 0 ? "+" : ""}
+                      {lead.dcMod} · +{lead.capsBonus} caps
+                      {lead.lootRolls ? ` · +${lead.lootRolls} loot` : ""} · until day {lead.expiresDay}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            {chosenLead ? (
+              <p className="mt-2 text-xs text-ember">
+                Deploying on this lead. The job, the ground and the DC come from the report — the kind picker below is
+                overridden.
+              </p>
             ) : null}
           </>
         ) : null}
@@ -1896,7 +1963,15 @@ export function CodexView() {
       },
       {
         t: "Rifles",
-        d: "Real models, real chambers. M4 and M16 take 5.56. M94 and M336 take .30-30. M700 takes .270. M70 Springfield takes .30-06. M14, M10 and M24 take .308. M70 Magnum takes .300. Calibers do not mix. Improved loads (AP, Match, Soft Point, Hot, Bonded) stamp the mag when you reload.",
+        d: "Real models, real chambers. The BB rifle takes BBs and nothing else. M4 and M16 take 5.56. M94 and M336 take .30-30. M700 takes .270. M70 Springfield and the M1903 Marksman take .30-06. M14, M10 and M24 take .308. M70 Magnum takes .300. Calibers do not mix. Improved loads (AP, Match, Soft Point, Hot, Bonded) stamp the mag when you reload.",
+      },
+      {
+        t: "The .30-06",
+        d: "The Realm's honest cartridge. A century of load data, a case that will take anything from a soft point to a steel core, and enough powder behind it that plate becomes an opinion. The M70 Springfield is the cheap way in — five rounds, slow, every one of them arrives. The M1903 Marksman is what the round was designed around: AP 2, the longest reach of anything ballistic, and a liability inside a room. Black Tip is steel-core and Kane's plate was never rated for it.",
+      },
+      {
+        t: "The BB rifle",
+        d: "Tyrone keeps one by the Vault 13 door and hands it to every rider who walks in. Spring-air, forty in the tube, 1d3, and it will not kill anything that matters. What it does is put out a lamp, drop a bird and break a window across a yard without anyone coming to look. BBs cost almost nothing. The good riders never quite stop carrying it.",
       },
       {
         t: "Lasers",

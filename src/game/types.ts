@@ -53,6 +53,7 @@ export type AttachmentSlot =
   | "receiver";
 
 export type AmmoType =
+  | "bb"
   | "9mm"
   | ".45"
   | "5.56"
@@ -251,7 +252,8 @@ export type Screen =
   | "vault"
   | "squad"
   | "market"
-  | "gallery";
+  | "gallery"
+  | "profile";
 
 export type MissionKind =
   | "scout"
@@ -571,6 +573,127 @@ export interface PoiWatchLog {
   used: string[];
 }
 
+/* ------------------------------------------------------------------ *
+ * Recon — what a site actually tells you, and what you do next.
+ * ------------------------------------------------------------------ */
+
+export type ReconTone = "good" | "warn" | "bad" | "neutral";
+
+export type ReconLeadKind =
+  | "mission"
+  | "cache"
+  | "threat"
+  | "merchant"
+  | "boss"
+  | "story";
+
+/**
+ * A reason to go back out. Leads are the bridge between reading the ground and
+ * spending a watch on it: deploy on one and the mission is built around it.
+ */
+export interface ReconLead {
+  id: string;
+  kind: ReconLeadKind;
+  title: string;
+  detail: string;
+  /** What Tyrone thinks it is worth, in his own words. */
+  read: string;
+  locationId: LocationId;
+  regionId: RegionId;
+  poiId: string;
+  poiName: string;
+  missionKind: MissionKind;
+  /** Applied to every beat DC when the sortie is run on this lead. */
+  dcMod: number;
+  /** Flat caps on top of the run. */
+  capsBonus: number;
+  /** Extra loot rolls. */
+  lootRolls: number;
+  day: number;
+  expiresDay: number;
+  spent?: boolean;
+  /** Story thread id this lead pushes forward. */
+  thread?: string;
+}
+
+export interface ReconFinding {
+  key: string;
+  label: string;
+  detail: string;
+  tone: ReconTone;
+}
+
+export type ReconStepId =
+  | "another"
+  | "deploy"
+  | "market"
+  | "rest"
+  | "map"
+  | "home"
+  | "boss";
+
+export interface ReconStep {
+  id: ReconStepId;
+  label: string;
+  hint: string;
+  /** Primary command in the report footer. */
+  primary?: boolean;
+  poiId?: string;
+  leadId?: string;
+}
+
+/** How well the squad knows one site. Grows every time it is worked. */
+export interface SiteTrack {
+  poiId: string;
+  sweeps: number;
+  lastDay: number;
+  /** 0-4. Drives DC relief, loot quality and which lore tier is readable. */
+  depth: number;
+  totalCaps: number;
+  cleared: boolean;
+}
+
+export interface SiteReport {
+  id: string;
+  day: number;
+  watch: WatchId;
+  locationId: LocationId;
+  regionId: RegionId;
+  poiId: string;
+  poiName: string;
+  action: PoiAction;
+  /** Which sweep of this site today. 1 is the fresh one. */
+  sweep: number;
+  depth: number;
+  depthLabel: string;
+  headline: string;
+  findings: ReconFinding[];
+  leadIds: string[];
+  caps: number;
+  intel: number;
+  items: string[];
+  heat: number;
+  watchSpent: number;
+  /** Tyrone reading the ground out loud. */
+  tyrone: string;
+  /** The Realm's own line. Lore, not advice. */
+  hollow: string;
+  /** Story thread beat this sweep unlocked, if any. */
+  threadLine?: string;
+  steps: ReconStep[];
+  /** Nothing was spent and nothing found — the shift is over. */
+  blocked?: boolean;
+}
+
+export interface ReconState {
+  reports: SiteReport[];
+  leads: ReconLead[];
+  sites: Record<string, SiteTrack>;
+  openReportId: string | null;
+  /** Thread id -> stage reached, per region story. */
+  threads: Record<string, number>;
+}
+
 export interface Bounty {
   id: string;
   name: string;
@@ -591,6 +714,29 @@ export interface LogEntry {
   result?: number;
 }
 
+/**
+ * How a hostile thinks. The role decides what it wants from a round; the
+ * runtime state below is what it has already spent getting there.
+ */
+export type EnemyRole =
+  | "brawler"
+  | "skirmisher"
+  | "marksman"
+  | "controller"
+  | "pack"
+  | "machine"
+  | "warden";
+
+export type EnemyIntent =
+  | "press"
+  | "flank"
+  | "aim"
+  | "suppress"
+  | "regroup"
+  | "call"
+  | "break"
+  | "rout";
+
 export interface Combatant {
   id: string;
   name: string;
@@ -608,6 +754,22 @@ export interface Combatant {
   resist?: string[];
   weakness?: string[];
   resistAmt?: number;
+  /** Doctrine. Missing on old saves — inferred from the name at use. */
+  role?: EnemyRole;
+  /** What it decided to do this round, so the log can say why. */
+  intent?: EnemyIntent;
+  /** Rounds until its signature move is available again. */
+  cooldown?: number;
+  /** Stacking aim / rage bonus the AI has built up. */
+  charge?: number;
+  /** 0-100. Drops when allies fall. Low morale routs or calls for help. */
+  morale?: number;
+  /** Set once it has already called for help, so it cannot spam the field. */
+  calledFor?: boolean;
+  /** Who it is currently hunting. */
+  markId?: string;
+  /** It left the field alive. Not a kill, not a loss. */
+  fled?: boolean;
 }
 
 export interface CombatState {
@@ -651,6 +813,22 @@ export interface MissionBeat {
   kind: "check" | "combat" | "loot" | "merchant" | "boss";
   tactics?: MissionTactic[];
   tacticId?: string;
+  /** Why this beat exists in the story, shown under the prompt. */
+  why?: string;
+  /** Appended mid-run by the complication engine, not built at deploy. */
+  injected?: boolean;
+}
+
+/** What the squad was actually sent to do, in one line the player can hold. */
+export interface MissionObjective {
+  id: string;
+  title: string;
+  detail: string;
+  /** Region story thread this advances. */
+  thread?: string;
+  /** Bonus caps if the run closes with every beat hit. */
+  bonus: number;
+  met?: boolean;
 }
 
 export interface MissionState {
@@ -678,6 +856,15 @@ export interface MissionState {
   regionId?: RegionId;
   poiId?: string;
   approach?: MissionApproach;
+  objective?: MissionObjective;
+  /** Lead consumed from a scout report. Lower DC, richer haul, story beat. */
+  leadId?: string;
+  leadTitle?: string;
+  /** Beats hit vs rolled, for the objective and the debrief. */
+  hits?: number;
+  misses?: number;
+  /** Complications already fired, so one cannot repeat inside a run. */
+  fired?: string[];
 }
 
 export interface LocationProgress {
@@ -860,4 +1047,6 @@ export interface GameState {
   shift: ShiftState;
   arcade: ArcadeState;
   tyrone: TyroneMind;
+  /** Optional so saves written before recon existed still load. */
+  recon?: ReconState;
 }

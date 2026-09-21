@@ -18,7 +18,10 @@ test("deep links only accept known destinations", () => {
   assert.equal(parseDeepTo("world"), "map");
   assert.equal(parseDeepTo("https://evil.example"), null);
   assert.equal(parseDeepTo("../../admin"), null);
-  assert.equal(screenForTo("profile"), "hq");
+  // Profile is its own screen now, so the deep link lands on it rather than
+  // bouncing to the Vault.
+  assert.equal(screenForTo("profile"), "profile");
+  assert.equal(screenForTo("hq"), "hq");
   assert.equal(screenForTo("inventory"), "inventory");
   assert.equal(parseRegion("ironclad"), "ironclad");
   assert.equal(DEEP_LINKS.vault, "/vault");

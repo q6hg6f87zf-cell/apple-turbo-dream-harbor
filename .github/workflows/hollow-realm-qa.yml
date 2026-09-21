@@ -115,6 +115,11 @@ jobs:
           HOLLOW_QA_URL: http://127.0.0.1:8080
         run: node scripts/hollow-realm-smoke.mjs
 
+      - name: Gameplay loop and field reports
+        env:
+          HOLLOW_QA_URL: http://127.0.0.1:8080
+        run: node scripts/hollow-gameplay-loop-qa.mjs
+
       - name: Hub/Task chrome budget
         env:
           HOLLOW_QA_URL: http://127.0.0.1:8080

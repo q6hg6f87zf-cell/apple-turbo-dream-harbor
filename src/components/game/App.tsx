@@ -28,10 +28,12 @@ import {
   SquadView,
 } from "./views";
 import { InventoryView } from "./inventory-view";
+import { ProfileView } from "./profile-view";
 import { MoreView } from "./more-view";
 import { GalleryView } from "./gallery-view";
 import { ArcadeView } from "./arcade-view";
 import { RadioDeckSheet, RadioDirector } from "./radio-deck";
+import { ReconReportOverlay } from "./recon-report";
 import { Dock, GuidanceRow, HubHeader, Rail, SceneBreath, TaskHeader } from "./chrome";
 
 export function GameApp() {
@@ -201,6 +203,7 @@ export function GameApp() {
             {screen === "forge" && <ForgeView />}
             {screen === "map" && <MapView />}
             {screen === "inventory" && <InventoryView />}
+            {screen === "profile" && <ProfileView />}
             {screen === "more" && <MoreView />}
             {screen === "vault" && <VaultView />}
             {screen === "ledger" && <LedgerView />}
@@ -213,6 +216,7 @@ export function GameApp() {
       </div>
       {kind === "hub" ? <Dock /> : null}
       <RadioDirector />
+      <ReconReportOverlay />
       <MissionOverlay />
       <CombatOverlay />
       <OperativeSheet />

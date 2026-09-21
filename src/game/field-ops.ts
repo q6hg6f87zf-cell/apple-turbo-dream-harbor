@@ -1,5 +1,5 @@
 import { canonicalRegionId, regionById } from "./data";
-import { rumorFor } from "./market";
+import { sweepSite, sweepsToday } from "./recon";
 import type {
   GameState,
   LocationId,
@@ -16,6 +16,8 @@ import type {
 export interface FieldDeploy {
   poiId?: string;
   approach?: MissionApproach;
+  /** A scout report's lead. Builds the mission around what was found. */
+  leadId?: string;
 }
 
 export const APPROACHES: {
@@ -178,39 +180,13 @@ export function ensurePoiWatch(state: GameState) {
   return state.poiWatch;
 }
 
+/**
+ * Worked at least once today. Recon owns the count now — a second sweep is
+ * allowed and simply pays less, so this is a hint on the map, not a refusal.
+ */
 export function poiUsedToday(state: GameState, poiId: string) {
+  if (sweepsToday(state, poiId) > 0) return true;
   return ensurePoiWatch(state).used.includes(poiId);
-}
-
-function markUsed(state: GameState, poiId: string) {
-  const log = ensurePoiWatch(state);
-  if (!log.used.includes(poiId)) log.used = [...log.used, poiId];
-}
-
-function catalogSalvage(state: GameState, poi: RegionPointOfInterest) {
-  const name =
-    poi.regionId === "ironclad"
-      ? "Rail spike bundle"
-      : poi.regionId === "slagtown"
-        ? "Coke-brick scrap"
-        : poi.regionId === "blackspire"
-          ? "Lift-cage tooth"
-          : poi.regionId === "brasswater"
-            ? "Brine-cut brass"
-            : "Signal-cell shard";
-  state.vault.push({
-    id: `salv-${Math.random().toString(36).slice(2, 8)}`,
-    name,
-    kind: "material",
-    rarity: "Common",
-    condition: "Worn",
-    effect: "Salvage pulled off a marked site.",
-    lore: `${poi.name}. ${poi.description}`,
-    value: 40 + (poi.danger ?? 1) * 12,
-    sourceRegion: poi.regionId,
-    discoveredDay: state.day,
-  });
-  return name;
 }
 
 export function markFieldJob(state: GameState, kind: "market" | "tower" | "salvage", report: string, watches = 1) {
@@ -231,7 +207,20 @@ export function markFieldJob(state: GameState, kind: "market" | "tower" | "salva
   if (state.shift.watchesLeft <= 0) state.shift.watch = "night";
 }
 
-export function workPoi(state: GameState, loc: LocationId, poiId: string): string | null {
+/**
+ * Route a pin. Shop, home and boss hand control back to the shell; everything
+ * else is a recon sweep, and the sweep files a report rather than a toast.
+ *
+ * The old version returned refusal strings ("You already worked this site
+ * today", "Shift is over") that the UI showed as a toast and then had nothing
+ * to offer. That is where the loop used to end. `sweepSite` always returns a
+ * report with next steps on it, including out of a spent shift.
+ */
+export function workPoi(
+  state: GameState,
+  loc: LocationId,
+  poiId: string,
+): "shop" | "home" | "boss" | "report" | string {
   const poi = poiById(loc, poiId);
   if (!poi) return "That site is not on this map.";
   const known = knownPois(state, loc).some((p) => p.id === poi.id);
@@ -241,48 +230,11 @@ export function workPoi(state: GameState, loc: LocationId, poiId: string): strin
   if (action === "shop") return "shop";
   if (action === "boss") return "boss";
 
-  const left = state.shift?.watchesLeft ?? 0;
-  if (left <= 0) return "Shift is over. Rest until dawn.";
-  if (poiUsedToday(state, poi.id)) return "You already worked this site today. Dawn resets the ground.";
-
-  if (action === "listen") {
-    state.locations[loc] = { ...state.locations[loc], intel: state.locations[loc].intel + 2 };
-    const found = discoverNextPoi(state, loc);
-    const rumor = rumorFor(state.day, state.kaneHeat ?? 0);
-    markUsed(state, poi.id);
-    const report = found ? `${poi.name} talks. ${rumor} Marked ${found.name}.` : `${poi.name} talks. ${rumor}`;
-    markFieldJob(state, "tower", report, 1);
-    state.toast = report;
-    return null;
+  const report = sweepSite(state, loc, poiId);
+  if (!report.blocked) {
+    const job = action === "listen" ? "tower" : "salvage";
+    // The sweep already spent the watch, so the board closes for free.
+    markFieldJob(state, job, report.headline, 0);
   }
-
-  if (action === "salvage") {
-    const haul = catalogSalvage(state, poi);
-    const caps = 35 + (poi.danger ?? 1) * 15;
-    state.coins += caps;
-    if ((poi.danger ?? 1) >= 3 && Math.random() < 0.28) {
-      state.kaneHeat = Math.min(40, (state.kaneHeat ?? 0) + 1);
-    }
-    const found = Math.random() < 0.45 ? discoverNextPoi(state, loc) : null;
-    markUsed(state, poi.id);
-    const report = found
-      ? `${poi.name} paid ${haul} and ${caps} caps. Also marked ${found.name}.`
-      : `${poi.name} paid ${haul} and ${caps} caps.`;
-    markFieldJob(state, "salvage", report, 1);
-    state.toast = report;
-    return null;
-  }
-
-  state.locations[loc] = { ...state.locations[loc], intel: state.locations[loc].intel + 1 };
-  const found = discoverNextPoi(state, loc);
-  const caps = 20 + Math.round(Math.random() * 25);
-  state.coins += caps;
-  markUsed(state, poi.id);
-  const report = found
-    ? `${poi.name} walked. Intel +1. Marked ${found.name}. +${caps} caps in pockets.`
-    : `${poi.name} walked. Intel +1. +${caps} caps. The ground already knew us.`;
-  markFieldJob(state, "salvage", report, 1);
-  state.toast = report;
-  return null;
+  return "report";
 }
-

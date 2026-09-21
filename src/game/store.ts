@@ -99,6 +99,7 @@ import { fetchSoul, postSoul } from "./soul";
 import { buyMarketLot, ensureMarket, MARKET_POI_ID, rollMarket, TOWER_POI_ID } from "./market";
 import type { FieldDeploy } from "./field-ops";
 import { workPoi, markFieldJob } from "./field-ops";
+import { closeReport, leadById } from "./recon";
 import {
   canRestClean,
   ensureShift,
@@ -160,6 +161,8 @@ interface Store {
   buyOffer: (tier: "bargain" | "essential" | "artifact") => string | null;
   buyLot: (lotId: string) => string | null;
   workSite: (poiId?: string) => string | null;
+  dismissReport: () => void;
+  followStep: (step: import("./types").ReconStep) => string | null;
   openMarket: () => void;
   buyNpc: (name: string, price: number) => string | null;
   deploy: (loc: LocationId, kind: MissionKind, partyIds: string[], field?: FieldDeploy) => string | null;
@@ -843,9 +846,65 @@ export const useGame = create<Store>((set, get) => ({
         st.regionMapOpen = false;
         st.toast = "Pin the site. Pick an approach. Deploy. That hill has a name.";
         msg = null;
+        return;
       }
+      // "report" means the sweep filed one and the overlay owns the screen now.
+      // Nothing is toasted: the report is the feedback.
+      if (msg === "report") msg = null;
     });
     return msg;
+  },
+  dismissReport: () =>
+    mutate(set, (st) => {
+      closeReport(st);
+    }),
+  /**
+   * The buttons on the bottom of a report. Every one of them moves the game
+   * somewhere — the whole point is that a sweep never leaves the player with
+   * a read-only wall and no verb.
+   */
+  followStep: (step) => {
+    const before = get().s;
+    if (step.id === "rest") {
+      mutate(set, (st) => closeReport(st));
+      get().rest();
+      return null;
+    }
+    if (step.id === "home") {
+      mutate(set, (st) => {
+        closeReport(st);
+        st.screen = "hq";
+        st.regionMapOpen = false;
+      });
+      return null;
+    }
+    if (step.id === "market") {
+      mutate(set, (st) => closeReport(st));
+      get().openMarket();
+      return null;
+    }
+    if (step.id === "another" && step.poiId) {
+      mutate(set, (st) => closeReport(st));
+      return get().workSite(step.poiId);
+    }
+    if (step.id === "map" || step.id === "deploy" || step.id === "boss") {
+      mutate(set, (st) => {
+        closeReport(st);
+        if (step.poiId) st.selectedPoiId = step.poiId;
+        st.screen = "map";
+        st.regionMapOpen = false;
+        const lead = step.leadId ? leadById(st, step.leadId) : null;
+        st.toast = lead
+          ? `Lead live · ${lead.title}. Brief it and send somebody.`
+          : step.id === "boss"
+            ? "Pick the named raid in the region sheet."
+            : "Pick the job, the approach and who walks.";
+      });
+      return null;
+    }
+    void before;
+    mutate(set, (st) => closeReport(st));
+    return null;
   },
   buyNpc: (name, price) => {
     const s = get().s;

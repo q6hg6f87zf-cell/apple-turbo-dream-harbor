@@ -48,7 +48,9 @@ export function parseDeepTo(raw: unknown): DeepTo | null {
 }
 
 export function screenForTo(to: DeepTo) {
-  if (to === "profile" || to === "hq") return "hq" as const;
+  // Profile used to fall back to the Vault because there was no Profile
+  // screen to land on. There is one now.
+  if (to === "hq") return "hq" as const;
   return to;
 }
 

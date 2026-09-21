@@ -1,6 +1,7 @@
 import { locationToRegion } from "@/game/field-ops";
 import { REGION_STREET } from "@/game/item-art";
 import { roomArtFor } from "@/game/rooms";
+import { useGame } from "@/game/store";
 import type { LocationId } from "@/game/types";
 import { ChevronLeft } from "lucide-react";
 import { useEffect, type ReactNode } from "react";
@@ -32,6 +33,10 @@ export function RegionSheet({
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.repeat) return;
+      // A field report sits on top of this sheet. Both listen on window with
+      // capture, and this one is registered first, so without this check Escape
+      // would close the sheet underneath and leave the report stranded.
+      if (useGame.getState().s.recon?.openReportId) return;
       e.preventDefault();
       e.stopPropagation();
       onClose();

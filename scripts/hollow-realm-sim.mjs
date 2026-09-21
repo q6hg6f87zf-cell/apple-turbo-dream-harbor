@@ -89,7 +89,8 @@ function percentile(values, p) {
 
 function simulate(seed, horizon = 180) {
   const rand = mulberry32(seed);
-  let caps = 1400;
+  // Matches defaultState().coins — the campaign starts broke.
+  let caps = 150;
   let ore = 0;
   let favor = 0;
   let region = 0;

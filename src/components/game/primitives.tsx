@@ -443,16 +443,20 @@ export function Chip({
   onClick,
   disabled,
   className,
+  chipId,
 }: {
   active?: boolean;
   children: ReactNode;
   onClick?: () => void;
   disabled?: boolean;
   className?: string;
+  /** Stamped as `data-chip` so browser QA can pick one out by id. */
+  chipId?: string;
 }) {
   return (
     <button
       type="button"
+      data-chip={chipId}
       disabled={disabled}
       onClick={() => {
         if (disabled) return;

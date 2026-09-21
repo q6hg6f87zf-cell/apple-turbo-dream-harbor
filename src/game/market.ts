@@ -164,6 +164,16 @@ export function rollMarket(day: number, locations?: GameState["locations"]): Mar
     return toLot(item, qty, false, 1.05, `stall-${day}-${i}`);
   });
 
+  // A rider starts on 150 caps. A stall with nothing under 150 on it is a wall,
+  // not a market, so the cheapest thing in the pool is always on the table.
+  const AFFORDABLE = 150;
+  if (!lots.some((lot) => lot.price <= AFFORDABLE)) {
+    const cheapest = pool
+      .filter((c) => !lots.some((l) => l.name === c.name))
+      .sort((a, b) => a.value - b.value)[0];
+    if (cheapest) lots.unshift(toLot(cheapest, 2, false, 1.05, `stall-${day}-floor`));
+  }
+
   const visitor = visitorForDay(day);
   if (visitor) {
     const treasure = TREASURE_CATALOG.filter(
