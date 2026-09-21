@@ -1389,5 +1389,6 @@ if (typeof window !== "undefined") {
     },
     getState: () => useGame.getState().s,
     hackPick: (word: string) => useGame.getState().hackPick(word),
+    setState: (partial: Parameters<typeof useGame.setState>[0]) => useGame.setState(partial),
   };
 }

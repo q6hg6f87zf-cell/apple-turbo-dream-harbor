@@ -170,7 +170,7 @@ page.on("console", (message) => {
 // Vite HMR keeps a websocket open — networkidle never settles in CI.
 await page.goto(baseURL, { waitUntil: "domcontentloaded", timeout: 60_000 });
 await page.locator('[data-ready="1"]').waitFor({ timeout: 20_000 });
-await page.getByRole("heading", { name: "Inventory" }).waitFor();
+await page.locator('[data-inventory="1"]').waitFor({ timeout: 20_000 });
 
 const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 assert.ok(overflow <= 2, `Mobile page overflows horizontally by ${overflow}px.`);

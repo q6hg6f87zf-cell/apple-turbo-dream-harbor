@@ -158,10 +158,9 @@ await page.evaluate(async () => {
 // Primary navigation should be actual thumb-sized controls, not decorative
 // labels. Walk every destination and verify the screen state moves with it.
 const destinations = [
-  ["Vault 13", "hq"],
+  ["13", "hq"],
   ["World", "map"],
-  ["Squad", "roster"],
-  ["Inventory", "inventory"],
+  ["Pack", "inventory"],
   ["More", "more"],
 ];
 for (const [label, expected] of destinations) {
@@ -173,8 +172,8 @@ for (const [label, expected] of destinations) {
 }
 
 // Inventory local detail sheets must dismiss with Escape as well as backdrop/X.
-await page.getByRole("button", { name: "Inventory", exact: true }).last().click();
-await page.getByRole("heading", { name: "Inventory" }).waitFor();
+await page.getByRole("button", { name: "Pack", exact: true }).last().click();
+await page.locator('[data-inventory="1"]').waitFor();
 await page.getByRole("button", { name: /UX Rail Carbine/ }).click();
 const inventoryModal = page.locator("div.fixed.inset-0").filter({ hasText: "UX Rail Carbine" });
 await inventoryModal.waitFor();
