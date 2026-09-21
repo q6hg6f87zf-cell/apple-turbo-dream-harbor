@@ -6,6 +6,7 @@ import {
   bondDeltaForEvent,
   cleanBond,
   DEFAULT_BOND,
+  RELATIONSHIP_RULES,
   type BondField,
   type TyroneBondState,
 } from "./continuity-core";
@@ -39,12 +40,23 @@ export async function recordRelationshipEvent(input: {
   reason: string;
   source?: string;
   eventType?: string;
+  sourceEventId?: string | null;
+  origin?: string;
 }) {
   const current = await getBond(input.discordId);
   const applied = applyBondDelta(current, input.field, input.delta, input.reason);
   if (!applied.ok) return applied;
   try {
     const sql = await getSql();
+    if (input.sourceEventId) {
+      const prior = await sql.query<{ id: string }>(
+        `select id from hollow_tyrone_bond_event
+         where discord_id = $1 and field = $2 and source_event_id = $3
+         limit 1`,
+        [input.discordId, input.field, input.sourceEventId],
+      );
+      if (prior[0]) return { ok: false as const, error: "already applied", duplicate: true as const };
+    }
     const b = applied.bond;
     await sql`
       insert into hollow_tyrone_bond (
@@ -66,7 +78,7 @@ export async function recordRelationshipEvent(input: {
     `;
     await sql`
       insert into hollow_tyrone_bond_event (
-        id, discord_id, field, previous, next, reason, source, event_type
+        id, discord_id, field, previous, next, reason, source, event_type, source_event_id, origin
       ) values (
         ${`bnd-${randomBytes(8).toString("hex")}`},
         ${input.discordId},
@@ -75,7 +87,9 @@ export async function recordRelationshipEvent(input: {
         ${applied.next},
         ${applied.reason},
         ${input.source ?? "system"},
-        ${input.eventType ?? null}
+        ${input.eventType ?? null},
+        ${input.sourceEventId ?? null},
+        ${input.origin ?? "game"}
       )
     `;
     bridgeLog("bond.write", { discordId: input.discordId, field: input.field });
@@ -86,7 +100,7 @@ export async function recordRelationshipEvent(input: {
   }
 }
 
-export async function applyEventBond(discordId: string, eventType: string, source = "game") {
+export async function applyEventBond(discordId: string, eventType: string, source = "game", sourceEventId?: string) {
   const deltas = bondDeltaForEvent(eventType);
   const results = [];
   for (const [field, delta] of Object.entries(deltas) as [BondField, number][]) {
@@ -95,11 +109,29 @@ export async function applyEventBond(discordId: string, eventType: string, sourc
         discordId,
         field,
         delta,
-        reason: eventType,
+        reason: RELATIONSHIP_RULES[eventType]?.reason ?? eventType,
         source,
         eventType,
+        sourceEventId: sourceEventId ?? null,
+        origin: source,
       }),
     );
   }
   return results;
+}
+
+export async function recentBondEvents(discordId: string, limit = 12) {
+  try {
+    const sql = await getSql();
+    return await sql.query<{ field: string; reason: string; event_type: string | null; previous: number; next: number }>(
+      `select field, reason, event_type, previous, next
+       from hollow_tyrone_bond_event
+       where discord_id = $1
+       order by created_at desc
+       limit $2`,
+      [discordId, Math.max(1, Math.min(24, limit))],
+    );
+  } catch {
+    return [];
+  }
 }

@@ -316,7 +316,6 @@ export function considerTyroneHint(state: GameState, before: TyroneSnap) {
       });
       if (said) {
         cooling(state, "promise-" + promise.id, 80);
-        promise.kept = true;
       }
       return;
     }

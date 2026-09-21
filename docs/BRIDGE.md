@@ -79,7 +79,7 @@ See `docs/TYRONE_CONTINUITY.md`.
 
 `GET /api/bridge/context` is the canonical Tyrone context service. It returns identity, relationship, relevant memories, active promises, recent major events, and a compact summary. It does not dump the ledger.
 
-Promises are structured rows. Relationship writes go through validated deltas. Private memories never leave the owning Discord User ID.
+Promises are structured rows. Relationship writes go through validated deltas. Private memories never leave the owning Discord User ID. Gameplay events become memories only through `shouldCreateTyroneMemory` after `publishWorldEvent`; duplicate event ids cannot farm relationship or duplicate history.
 
 Schema for bonds and promises is `migrations/0016_tyrone_continuity.sql`. The filesystem SQL smoke in `scripts/hollow-continuity-sql-smoke.test.mjs` applies every migration on PGlite and checks duplicate writes, two-user isolation, and fulfill.
 

@@ -41,7 +41,7 @@ async function applyAll(pg) {
   return pending.map((row) => row.name);
 }
 
-test("filesystem migrations apply through 0016 and the promise/bond SQL path holds", { timeout: 60_000 }, async () => {
+test("filesystem migrations apply through 0017 and the event-memory SQL path holds", { timeout: 60_000 }, async () => {
   const pg = new PGlite();
   await pg.waitReady;
   const applied = await applyAll(pg);
@@ -248,5 +248,65 @@ test("filesystem migrations apply through 0016 and the promise/bond SQL path hol
     /kind|check/i,
   );
 
+  assert.ok(
+    applied.includes("0017_event_memories.sql") ||
+      (await pg.query("select name from _migrations where name = '0017_event_memories.sql'")).rows.length === 1,
+    "0017_event_memories.sql must apply",
+  );
+
+  await pg.query(
+    `insert into hollow_tyrone_memory (
+      id, discord_id, kind, claim, tags, importance, source, related_event_id, title, consolidation_group
+    ) values ($1,$2,'episode',$3,$4,9,'system',$5,$6,$7)`,
+    ["mem-evt-ev-boss-1", A, "We put Gravenor down in Ironclad.", ["boss", "ironclad"], "ev-boss-1", "Gravenor is down", "boss.defeated:ironclad"],
+  );
+  const memEventDup = await pg.query(
+    `insert into hollow_tyrone_memory (
+      id, discord_id, kind, claim, tags, importance, source, related_event_id
+    ) values ($1,$2,'episode',$3,'{}',9,'system',$4)
+    on conflict (discord_id, id) do nothing
+    returning id`,
+    ["mem-evt-ev-boss-1", A, "We put Gravenor down in Ironclad. again.", "ev-boss-1"],
+  );
+  assert.equal(memEventDup.rows.length, 0);
+  await assert.rejects(
+    () =>
+      pg.query(
+        `insert into hollow_tyrone_memory (
+          id, discord_id, kind, claim, tags, importance, source, related_event_id
+        ) values ($1,$2,'episode',$3,'{}',9,'system',$4)`,
+        ["mem-evt-other-id", A, "duplicate event memory", "ev-boss-1"],
+      ),
+    /unique|duplicate/i,
+  );
+
+  await pg.query(
+    `insert into hollow_tyrone_bond_event (
+      id, discord_id, field, previous, next, reason, source, event_type, source_event_id, origin
+    ) values ($1,$2,'respect',32,33,'shared victory','game','boss.defeated',$3,'game')`,
+    ["bnd-a1", A, "ev-boss-1"],
+  );
+  await assert.rejects(
+    () =>
+      pg.query(
+        `insert into hollow_tyrone_bond_event (
+          id, discord_id, field, previous, next, reason, source, event_type, source_event_id, origin
+        ) values ($1,$2,'respect',33,34,'shared victory','game','boss.defeated',$3,'game')`,
+        ["bnd-a2", A, "ev-boss-1"],
+      ),
+    /unique|duplicate/i,
+  );
+  const otherField = await pg.query(
+    `insert into hollow_tyrone_bond_event (
+      id, discord_id, field, previous, next, reason, source, event_type, source_event_id, origin
+    ) values ($1,$2,'sharedHistory',0,1,'shared victory','game','boss.defeated',$3,'game')
+    returning id`,
+    ["bnd-a3", A, "ev-boss-1"],
+  );
+  assert.equal(otherField.rows.length, 1);
+  const bBond = await pg.query(`select id from hollow_tyrone_bond_event where discord_id = $1`, [B]);
+  assert.equal(bBond.rows.length, 0);
+
   await pg.close();
 });
+

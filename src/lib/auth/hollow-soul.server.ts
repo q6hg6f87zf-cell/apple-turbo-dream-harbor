@@ -1,7 +1,6 @@
 import { getSql } from "@/lib/db";
 import type { ClassName, Operative } from "@/game/types";
 import { publishWorldEvent } from "@/lib/bridge/events.server";
-import { recordMemory } from "@/lib/bridge/memory.server";
 
 const CLASSES: ClassName[] = ["Warrior", "Wizard", "Rogue", "Healer", "Merchant", "Bard"];
 const CAMPAIGN_ID = "moon-squad";
@@ -88,17 +87,8 @@ export async function stampSoul(discordId: string, userId: string, raw: unknown)
   void publishWorldEvent({
     type: "character.forged",
     discordId,
-    payload: { name: operative.name, classKey: operative.cls },
+    payload: { name: operative.name, classKey: operative.cls, region: "ironclad" },
     idempotencyKey: `forge:${discordId}:${operative.id}`,
-  });
-  void recordMemory({
-    discordId,
-    kind: "episode",
-    id: `forge-${operative.id}`,
-    claim: `${operative.name} cut their file. The Machine Shop closed.`,
-    importance: 8,
-    tags: ["forge", "character"],
-    source: "game",
   });
   return { discordId, operative: sanitizeOperative(inserted[0].operative) ?? operative, forgedAt: inserted[0].forged_at };
 }

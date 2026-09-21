@@ -4,12 +4,21 @@ import {
   applyBondDelta,
   bondDeltaForEvent,
   bondLabel,
+  composeEventMemory,
   DEFAULT_BOND,
+  eventMemoryId,
+  explainRelationship,
+  inventedHistory,
   inventedPromise,
   matchPromiseToTrigger,
+  memoryTierForEvent,
   parsePromiseFromText,
   privateLeak,
+  promiseBrokenByEvent,
   promiseCallbackLine,
+  promiseSatisfiedByEvent,
+  shouldCreateTyroneMemory,
+  shouldRecallMemory,
   shouldSurfacePromise,
   type CanonicalPromise,
 } from "./continuity-core.ts";
@@ -125,7 +134,102 @@ test("end-to-end: Discord promise, Ironclad trigger, Discord recall, USER B isol
 
 test("duplicate promises keep the original source", () => {
   const first = promiseRow({ subject: "Ironclad radio tower", source: "discord" });
-  const dup = keepExistingMemory(first, { ...first, source: "game" });
+  const asMem = {
+    id: first.id,
+    source: first.source,
+    created_at: first.createdAt,
+  };
+  const dup = keepExistingMemory(asMem, { ...asMem, source: "game" });
   assert.equal(dup.duplicate, true);
   assert.equal(dup.row.source, "discord");
 });
+
+test("meaningful-memory policy keeps telemetry out of the ledger", () => {
+  assert.equal(shouldCreateTyroneMemory({ type: "campaign.day_advanced" }), false);
+  assert.equal(shouldCreateTyroneMemory({ type: "player.joined" }), false);
+  assert.equal(shouldCreateTyroneMemory({ type: "boss.engaged" }), false);
+  assert.equal(shouldCreateTyroneMemory({ type: "mission.completed", kind: "scout" }), false);
+  assert.equal(shouldCreateTyroneMemory({ type: "mission.completed", kind: "boss" }), true);
+  assert.equal(shouldCreateTyroneMemory({ type: "boss.defeated" }), true);
+  assert.equal(shouldCreateTyroneMemory({ type: "region.unlocked", region: "ironclad" }), false);
+  assert.equal(shouldCreateTyroneMemory({ type: "region.unlocked", region: "blackspire" }), true);
+  assert.equal(memoryTierForEvent("boss.defeated", { first: true }), "critical");
+});
+
+test("boss event composes one grounded memory and retries share the id", () => {
+  const event = { id: "ev-gravenor-1", type: "boss.defeated", payload: { region: "ironclad", boss: "Gravenor" } };
+  const first = composeEventMemory(event);
+  const again = composeEventMemory(event);
+  assert.ok(first);
+  assert.equal(first?.id, eventMemoryId("ev-gravenor-1"));
+  assert.equal(first?.id, again?.id);
+  assert.match(first?.summary || "", /Gravenor/);
+  assert.match(first?.summary || "", /Ironclad/);
+  assert.equal(composeEventMemory({ id: "ev-day", type: "campaign.day_advanced", payload: { day: 4 } }), null);
+});
+
+test("deferred promise recall is not consumed, then a real objective fulfills once", () => {
+  const row = promiseRow({ subject: "Ironclad radio tower" });
+  const combat = { type: "player.entered_region" as const, region: "ironclad", combat: true, assist: "normal" };
+  const open = { type: "player.entered_region" as const, region: "ironclad", combat: false, assist: "normal" };
+  const score = matchPromiseToTrigger(row, open);
+  assert.equal(shouldSurfacePromise(row, combat, score), false);
+  assert.equal(row.status, "active");
+  assert.equal(shouldSurfacePromise(row, open, score), true);
+  assert.equal(promiseSatisfiedByEvent(row, { type: "player.entered_region", region: "ironclad" }), false);
+  assert.equal(promiseSatisfiedByEvent(row, { type: "mission.completed", region: "ironclad" }), true);
+  assert.equal(promiseBrokenByEvent(row, { type: "mission.failed", region: "ironclad" }), false);
+  const keep = promiseRow({ kind: "keep", subject: "hold the line in Blackspire", regionId: "blackspire", locationId: "caverns" });
+  assert.equal(promiseBrokenByEvent(keep, { type: "mission.failed", region: "blackspire" }), true);
+});
+
+test("relationship deltas stay small and repeat farming is a no-op at the rule layer", () => {
+  const delta = bondDeltaForEvent("boss.defeated");
+  assert.ok(Object.values(delta).every((n) => Math.abs(n) <= 1));
+  const kept = bondDeltaForEvent("tyrone.promise_fulfilled");
+  assert.equal(kept.trust, 1);
+  assert.equal(kept.respect, 1);
+  const tooBig = applyBondDelta(DEFAULT_BOND, "trust", 9, "farm");
+  assert.equal(tooBig.ok, false);
+});
+
+test("relationship explanation uses real events and refuses invented history", () => {
+  const why = explainRelationship({
+    bond: DEFAULT_BOND,
+    memories: [{ claim: "We put Gravenor down in Ironclad.", tags: ["boss", "ironclad"] }],
+    promises: [{ subject: "Ironclad radio tower", status: "fulfilled" }],
+    events: [{ field: "trust", reason: "promise kept", eventType: "tyrone.promise_fulfilled" }],
+  });
+  assert.ok(why.some((line) => /tower|word/i.test(line)));
+  assert.ok(why.some((line) => /Gravenor/i.test(line)));
+  assert.equal(explainRelationship({ bond: DEFAULT_BOND, memories: [], promises: [], events: [] }).length, 0);
+  assert.equal(inventedHistory("We put Gravenor down in Ironclad.", []), true);
+  assert.equal(inventedHistory("We put Gravenor down in Ironclad.", ["We put Gravenor down in Ironclad."]), false);
+});
+
+test("memory recall does not spam", () => {
+  assert.equal(shouldRecallMemory({ importance: 9, combat: true }), false);
+  assert.equal(shouldRecallMemory({ importance: 9, assist: "off" }), false);
+  assert.equal(shouldRecallMemory({ importance: 6, recallCount: 3 }), false);
+  assert.equal(shouldRecallMemory({ importance: 9, lastRecalledAt: new Date().toISOString() }), false);
+  assert.equal(shouldRecallMemory({ importance: 9, recallCount: 0 }), true);
+});
+
+test("USER A event memory never reaches USER B", () => {
+  const mem: MemoryScoreRow = {
+    id: "mem-evt-ev-1",
+    discord_id: A,
+    kind: "episode",
+    claim: "We put Gravenor down in Ironclad.",
+    tags: ["boss", "ironclad"],
+    importance: 9,
+    location_id: "ironclad",
+    source: "system",
+    created_at: "2026-09-20T22:00:00.000Z",
+    visibility: "private",
+  };
+  assert.equal(pickRelevant([mem], { discordId: A, query: "Gravenor", limit: 4 }).length, 1);
+  assert.equal(pickRelevant([mem], { discordId: B, query: "Gravenor", limit: 4 }).length, 0);
+  assert.equal(privateLeak({ discord_id: A, visibility: "private" }, B), true);
+});
+

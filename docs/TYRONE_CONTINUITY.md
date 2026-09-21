@@ -15,15 +15,10 @@ TyroneBot `familiarity.js`, `relationshipLedger.js`, `riderMemory.js`, `conversa
 |---|---|
 | Important episodic memories (`importance >= 5` or `permanent`) | Shared history |
 | Semantic facts that were written as canonical memories | Player-true claims |
-| Promises | Primary feature of this phase |
-| `relationship.trust` | Bond |
-| `relationship.familiarity` | Bond |
-| `relationship.respect` | Bond |
-| `relationship.conflict` | Bond |
-| `relationship.sharedHistory` | Bond |
-| `relationship.concern` | Bond |
-| `relationship.loyalty` | Bond |
-| `relationship.humor` | Stored so both sides read the same number. No auto-mutation this phase |
+| Promises | Structured, not raw chat |
+| Event memories (boss, death, major sortie, rare find, kept/broken word) | What actually happened |
+| `relationship.*` except humor auto-mutation | Bond |
+| `relationship.humor` | Stored, read-only |
 
 Provenance on every canonical memory: `game` / `discord` / `system` / `admin` / `world`.
 Original source and `created_at` are never overwritten on duplicate write.
@@ -31,83 +26,76 @@ Default scope is `private`.
 
 ### Session-local (stay on the save file / process)
 
-| Field | Why |
-|---|---|
-| `cooldowns` | Speech / hint windows |
-| `lastSpeechAt`, `lastSpeechConcept`, `lastSilentReason`, `lastSpeakReason`, `speechCount` | Anti-spam |
-| `working` | Recent UI trail |
-| `utterance` | Current line |
-| `failedBeats` | Current sortie |
-| `settings.assist`, `settings.showNumbers` | Game chrome preference |
-| Dawn / roll / “steel came out” / market-buy episodes | Noise. Not a surveillance log |
-| Compact snapshot (`TyroneSnap`) | Diff fuel for ingest |
-| Live combat, screen, talk overlay, mission beat | Temporary |
-
-If a field was uncertain, it stayed local.
+Speech cooldowns, current combat, screen, utterance, failed beats, assist chrome,
+dawn/roll/market noise, compact snapshot, live overlay.
 
 ### TyroneBot-only (not this store)
 
-Porch Dust→Reckoned (`familiarity.js`), guild `relationshipLedger`, Smart Chat topic affinity,
-conversation sessions. Those are Moon Squad community manners. They are not Hollow bond.
+Porch Dust→Reckoned, guild `relationshipLedger`, Smart Chat, tickets, Moonhand, TikTok, Ethera.
 
-Do not copy caps, inventory, soul, or progression onto a Moon Squad profile.
-Do not move Moonhand / TikTok / Ethera / tickets into Hollow Realm.
+## Event architecture (reuse, do not duplicate)
 
-## Canonical service
+Authoritative table: `hollow_world_event`. Client posts through `/api/hollow/chronicle`.
+`publishWorldEvent` is the only writer. After a **new** insert it runs `afterEventPublished`:
+memory (if the policy says so) → relationship consequence → promise resolve.
+Retries with the same idempotency key return `duplicate: true` and do nothing else.
 
-`GET /api/bridge/context?discord=&q=` (TyroneBot bearer) and rider `GET /api/hollow/chronicle`
-assemble `getTyroneContext(discordId, query)`:
+| Event | Published | Memory | Bond | Notes |
+|---|---|---|---|---|
+| `boss.defeated` | yes | major/critical | small shared victory | payload must carry boss name if known |
+| `boss.failed` | catalog ready | major | shared failure | emit when a boss sortie wipes |
+| `character.forged` | yes | major | familiarity +1 | server ingest, not a second client memory |
+| `character.died` | yes | major | concern +1 | first death per operative id |
+| `mission.completed` | yes | raid/boss/bounty only | sharedHistory +1 | scout/forage excluded |
+| `mission.failed` | yes | raid/boss only | concern +1 | can break a `keep` promise on that ground |
+| `region.unlocked` | yes | notable except start Ironclad | familiarity +1 | |
+| `rare_item.found` / `legendary_item.found` | yes | if a real item name is on the payload | legendary only | no common loot |
+| `tyrone.promise_fulfilled` / `_broken` | yes | major | ±trust | private |
+| `campaign.day_advanced` | yes | **none** | none | telemetry |
+| `player.joined` / `boss.engaged` / `tyrone.memory_recorded` / `tyrone.promise_created` | catalog | **none** | none | noise or already represented |
 
-identity · relationship · relevant memories · active promises · recent major events ·
-campaign facts · character · region if known
+Game → memory never goes through a second event bus.
 
-Hard limit on memories. Relevance, not a dump. Failures degrade; they do not stall the game.
-The AI may only state values present in `facts`, `memories`, or `promises`.
+## Meaningful-memory policy
+
+`shouldCreateTyroneMemory` / `composeEventMemory` in `continuity-core.ts`.
+
+Tyrone remembers a life, not a telemetry stream. Claims are composed only from
+fields the event actually contains. Duplicate `related_event_id` cannot create a
+second row (`0017` unique index).
+
+Future consolidation: `consolidation_group` is stored now. Do not delete history
+in this phase.
+
+## Relationship consequence
+
+`RELATIONSHIP_RULES` maps an event type to **small** deltas (usually ±1) on the
+existing 0–100 scale. Humor stays read-only. Every mutation writes
+`hollow_tyrone_bond_event` with previous/next/reason/source event. Unique
+`(discord_id, field, source_event_id)` makes retry farming a no-op.
 
 ## Promises
 
-Structured rows in `hollow_tyrone_promise`. Created only from explicit intent
-(`parsePromiseFromText`) or a game `kind: "promise"` memory. Duplicate writes keep
-the original source.
-
-Statuses: `active` · `fulfilled` · `broken` · `cancelled` · `expired`.
-
-When the rider enters a matching region, the game asks `/api/hollow/chronicle` with
-`player.entered_region` (assist and combat included). If the server returns a
-surface hit, Tyrone speaks it and marks the promise surfaced. Assist off and live
-combat stay silent. Local `considerTyroneHint` may also speak from hydrated
-promises; the same concept cooldown stops a double line.
-
-Kept `prm-*` ids POST `{ promise: { action: "fulfill", id } }`. That writes a
-fulfilled row, a private episode, and a small trust/loyalty bump.
-
-## Relationship
-
-`hollow_tyrone_bond` is one row per Discord User ID. Mutations go through
-`recordRelationshipEvent` (validated field, bounded delta, required reason).
-Each change is logged on `hollow_tyrone_bond_event`. Humor is stored and readable
-on both sides; it is not auto-mutated this phase.
+Recall ≠ fulfill. Combat, assist-off, and live dialogue **do not consume** a
+recall. After combat, the same ground can surface the line. Fulfillment happens
+when a real event satisfies it (mission/boss on that ground, or matching POI).
+A return promise is not auto-broken by a wipe. Only `kind: keep` plus
+`mission.failed` on that ground, or an explicit break.
 
 ## Privacy
 
-Memories default to `private`. USER B never reads USER A's bond, promises, or
-memories. `/api/bridge/*` rejects browser cookies. Unlink does not destroy the
-Moon Squad profile.
+Event memories default **private**. Guild feed events (`boss.defeated` visibility
+guild) are announcements, not a public personal ledger. USER B cannot read
+USER A's bond, promises, or memories.
 
-## Proven vs remaining
+## Discord
 
-Proven in code and tests:
+`/hollow ask` answers "what have we been through", "why do you trust me",
+"did I keep my word", and boss/region questions from `relationshipWhy` and
+event memories. Missing history is "I do not have that information." Numbers
+like `trust: 7` are not spoken.
 
-- Identity split (Hollow fields rejected on Moon Squad profiles)
-- Promise parse / trigger / anti-spam / two-user isolation (in-memory)
-- SQL schema + insert/duplicate/fulfill/bond/isolation (PGlite applying `migrations/*.sql` from disk)
-- Unauthorized production context stays `401` with no soul
+## Failure
 
-Not yet live-proven as one person:
-
-- TyroneBot on Railway must use the same `HOLLOW_BRIDGE_KEY` already set on Vercel
-- Two real Discord accounts walking the Ironclad tower loop
-- Discord feed restart chaos (unit-proven; not a live restart)
-
-Do not claim Tyrone is fully unified until that two-user walk passes.
-Do not paste the bridge key into Discord, GitHub, chat, or logs.
+Ingest is fail-open. A memory/relationship error never blocks boss rewards,
+mission completion, or progression.

@@ -1,11 +1,12 @@
 import { characterForged } from "@/game/engine";
 import { parseDeepTo, screenForTo } from "@/lib/bridge/catalog";
+import { REGION_BOSSES } from "@/lib/bridge/continuity-core";
 import { getBearerToken } from "@/lib/auth/client";
 import { cooling } from "@/game/tyrone-mind";
 import { speakTyrone } from "@/game/tyrone-voice";
 import { useGame } from "@/game/store";
 import { useEffect, useRef } from "react";
-import type { TyroneBond, TyronePromise } from "@/game/types";
+import type { GameState, TyroneBond, TyronePromise } from "@/game/types";
 
 function headers() {
   const token = getBearerToken();
@@ -26,13 +27,32 @@ function postChronicle(body: unknown) {
     .catch(() => null);
 }
 
+function maybeSpeak(text: string, concept: string, reason: string) {
+  let said = false;
+  useGame.setState((store) => {
+    const s = store.s;
+    said = speakTyrone(s, { text, concept, priority: 2, reason });
+    if (said) cooling(s, concept, 80);
+    return { s };
+  });
+  return said;
+}
+
+function rareIds(s: GameState) {
+  return [...s.vault, ...s.operatives.flatMap((o) => o.inventory)]
+    .filter((item) => item.rarity === "Legendary" || item.rarity === "Mythic")
+    .map((item) => item.id);
+}
+
 export function WorldBridgeRuntime() {
   const discordId = useGame((g) => g.s.discordId);
   const started = useGame((g) => g.s.started);
   const day = useGame((g) => g.s.day);
   const loc = useGame((g) => g.s.selectedLoc);
   const poi = useGame((g) => g.s.selectedPoiId);
+  const combat = useGame((g) => Boolean(g.s.combat));
   const forged = useGame((g) => characterForged(g.s));
+  const missionId = useGame((g) => g.s.mission?.id ?? "");
   const bossFlags = useGame((g) =>
     Object.entries(g.s.locations)
       .filter(([, row]) => row.bossDefeated)
@@ -47,12 +67,13 @@ export function WorldBridgeRuntime() {
   );
   const lastPromise = useGame((g) => g.s.tyrone?.promises.at(-1)?.text ?? "");
   const lastEpisode = useGame((g) => g.s.tyrone?.episodic.at(-1)?.id ?? "");
-  const kept = useGame((g) =>
-    (g.s.tyrone?.promises ?? [])
-      .filter((row) => row.kept && String(row.id).startsWith("prm-"))
-      .map((row) => row.id)
+  const dead = useGame((g) =>
+    g.s.operatives
+      .filter((o) => o.status === "dead")
+      .map((o) => o.id)
       .join(","),
   );
+  const rares = useGame((g) => rareIds(g.s).join(","));
   const hydrated = useGame((g) => g.hydrated);
   const seen = useRef({
     forged: false,
@@ -62,9 +83,13 @@ export function WorldBridgeRuntime() {
     promise: "",
     episode: "",
     dest: false,
-    kept: "",
     loc: "",
+    poi: "",
+    deferredLoc: "",
+    dead: "",
+    rares: "",
   });
+  const missionMeta = useRef({ id: "", kind: "", loc: "", party: [] as string[] });
 
   useEffect(() => {
     if (!hydrated || seen.current.dest) return;
@@ -147,15 +172,10 @@ export function WorldBridgeRuntime() {
       event: {
         type: "character.forged",
         key: `forge:${discordId}:${op?.id ?? "file"}`,
-        payload: { name: op?.name, classKey: op?.cls },
+        payload: { name: op?.name, classKey: op?.cls, region: "ironclad" },
       },
-      memory: {
-        kind: "episode",
-        id: `forge-${op?.id ?? discordId}`,
-        claim: `${op?.name ?? "A rider"} cut their file. The Machine Shop closed.`,
-        importance: 8,
-        tags: ["forge", "character"],
-      },
+    }).then((body) => {
+      if (body?.utterance) maybeSpeak(String(body.utterance), "event-forge", "file cut");
     });
   }, [discordId, forged]);
 
@@ -179,15 +199,15 @@ export function WorldBridgeRuntime() {
     const prev = new Set(seen.current.bosses.split(",").filter(Boolean));
     seen.current.bosses = bossFlags;
     for (const id of bossFlags.split(",").filter((row) => row && !prev.has(row))) {
+      const boss = REGION_BOSSES[id];
       postChronicle({
-        event: { type: "boss.defeated", key: `boss:${discordId}:${id}`, payload: { region: id } },
-        memory: {
-          kind: "episode",
-          id: `boss-${id}`,
-          claim: `The named raid in ${id} is over.`,
-          importance: 9,
-          tags: ["boss", id],
+        event: {
+          type: "boss.defeated",
+          key: `boss:${discordId}:${id}`,
+          payload: { region: id, boss: boss?.name, bossId: boss?.id },
         },
+      }).then((body) => {
+        if (body?.utterance) maybeSpeak(String(body.utterance), `event-boss-${id}`, "named raid closed");
       });
     }
   }, [discordId, bossFlags]);
@@ -205,6 +225,77 @@ export function WorldBridgeRuntime() {
       });
     }
   }, [discordId, unlocked]);
+
+  useEffect(() => {
+    if (!discordId) return;
+    const m = useGame.getState().s.mission;
+    if (m?.id) {
+      missionMeta.current = { id: m.id, kind: m.kind, loc: m.locationId, party: [...m.partyIds] };
+      return;
+    }
+    if (!missionMeta.current.id) return;
+    const prev = missionMeta.current;
+    missionMeta.current = { id: "", kind: "", loc: "", party: [] };
+    const ops = useGame.getState().s.operatives;
+    const survivors = prev.party.some((id) => {
+      const o = ops.find((row) => row.id === id);
+      return Boolean(o && o.hp > 0 && o.status !== "dead");
+    });
+    postChronicle({
+      event: {
+        type: survivors ? "mission.completed" : "mission.failed",
+        key: `mission:${discordId}:${prev.id}`,
+        payload: { region: prev.loc, kind: prev.kind, survived: survivors },
+      },
+    }).then((body) => {
+      if (body?.utterance) maybeSpeak(String(body.utterance), `event-mission-${prev.id}`, "sortie closed");
+    });
+  }, [discordId, missionId]);
+
+  useEffect(() => {
+    if (!discordId || dead === seen.current.dead) {
+      seen.current.dead = dead;
+      return;
+    }
+    const prev = new Set(seen.current.dead.split(",").filter(Boolean));
+    seen.current.dead = dead;
+    const ops = useGame.getState().s.operatives;
+    for (const id of dead.split(",").filter((row) => row && !prev.has(row))) {
+      const who = ops.find((row) => row.id === id);
+      postChronicle({
+        event: {
+          type: "character.died",
+          key: `death:${discordId}:${id}`,
+          payload: { name: who?.name, region: loc },
+        },
+      }).then((body) => {
+        if (body?.utterance) maybeSpeak(String(body.utterance), `event-death-${id}`, "named death");
+      });
+    }
+  }, [discordId, dead, loc]);
+
+  useEffect(() => {
+    if (!discordId || rares === seen.current.rares) {
+      seen.current.rares = rares;
+      return;
+    }
+    const prev = new Set(seen.current.rares.split(",").filter(Boolean));
+    seen.current.rares = rares;
+    const s = useGame.getState().s;
+    const items = [...s.vault, ...s.operatives.flatMap((o) => o.inventory)];
+    for (const id of rares.split(",").filter((row) => row && !prev.has(row))) {
+      const item = items.find((row) => row.id === id);
+      if (!item) continue;
+      const type = item.rarity === "Mythic" || item.rarity === "Legendary" ? "legendary_item.found" : "rare_item.found";
+      postChronicle({
+        event: {
+          type,
+          key: `item:${discordId}:${id}`,
+          payload: { name: item.name, region: loc, rarity: item.rarity },
+        },
+      });
+    }
+  }, [discordId, rares, loc]);
 
   useEffect(() => {
     if (!discordId || !lastPromise || lastPromise === seen.current.promise) {
@@ -238,55 +329,70 @@ export function WorldBridgeRuntime() {
     });
   }, [discordId, lastEpisode]);
 
-  useEffect(() => {
-    if (!discordId || !loc) return;
-    if (seen.current.loc === loc) return;
-    seen.current.loc = loc;
+  function fireRegionTrigger(region: string, liveCombat: boolean) {
     const live = useGame.getState().s;
+    if (liveCombat) {
+      seen.current.deferredLoc = region;
+      return;
+    }
     postChronicle({
       trigger: {
         type: "player.entered_region",
-        region: loc,
+        region,
         poi,
-        combat: Boolean(live.combat),
+        combat: false,
         assist: live.tyrone?.settings?.assist ?? "normal",
+        dialogue: Boolean(live.talk),
       },
     }).then((body) => {
       const hit = Array.isArray(body?.surface) ? body.surface[0] : null;
       if (!hit?.id || !hit?.text) return;
-      let said = false;
-      useGame.setState((store) => {
-        const s = store.s;
-        said = speakTyrone(s, {
-          text: String(hit.text),
-          concept: "promise-" + hit.id,
-          priority: 2,
-          reason: "canonical promise at this site",
-        });
-        if (said) {
-          cooling(s, "promise-" + hit.id, 80);
-          const row = s.tyrone.promises.find((p) => p.id === hit.id);
-          if (row && hit.fulfillOnSpeak) row.kept = true;
-        }
-        return { s };
-      });
-      if (!said) return;
-      postChronicle({ spoken: { promiseId: hit.id } });
-      if (hit.fulfillOnSpeak) postChronicle({ promise: { action: "fulfill", id: hit.id } });
+      const said = maybeSpeak(String(hit.text), "promise-" + hit.id, "canonical promise at this site");
+      if (said) postChronicle({ spoken: { promiseId: hit.id } });
     });
-  }, [discordId, loc, poi]);
+  }
 
   useEffect(() => {
-    if (!discordId || !kept || kept === seen.current.kept) {
-      seen.current.kept = kept;
+    if (!discordId || !loc) return;
+    if (seen.current.loc === loc) return;
+    seen.current.loc = loc;
+    fireRegionTrigger(loc, combat);
+  }, [discordId, loc, poi, combat]);
+
+  useEffect(() => {
+    if (!discordId || combat) return;
+    if (!seen.current.deferredLoc) return;
+    if (seen.current.deferredLoc !== loc) {
+      seen.current.deferredLoc = "";
       return;
     }
-    const prev = new Set(seen.current.kept.split(",").filter(Boolean));
-    seen.current.kept = kept;
-    for (const id of kept.split(",").filter((row) => row && !prev.has(row))) {
-      postChronicle({ promise: { action: "fulfill", id } });
-    }
-  }, [discordId, kept]);
+    seen.current.deferredLoc = "";
+    fireRegionTrigger(loc ?? "", false);
+  }, [discordId, combat, loc]);
+
+  useEffect(() => {
+    if (!discordId || !poi) return;
+    if (seen.current.poi === poi) return;
+    seen.current.poi = poi;
+    const live = useGame.getState().s;
+    if (live.combat) return;
+    postChronicle({
+      trigger: {
+        type: "player.entered_poi",
+        region: loc,
+        poi,
+        combat: false,
+        assist: live.tyrone?.settings?.assist ?? "normal",
+        dialogue: Boolean(live.talk),
+      },
+    }).then((body) => {
+      const hit = Array.isArray(body?.surface) ? body.surface[0] : null;
+      if (hit?.id && hit?.text) {
+        const said = maybeSpeak(String(hit.text), "promise-" + hit.id, "canonical promise at this site");
+        if (said) postChronicle({ spoken: { promiseId: hit.id } });
+      }
+    });
+  }, [discordId, poi, loc]);
 
   return null;
 }

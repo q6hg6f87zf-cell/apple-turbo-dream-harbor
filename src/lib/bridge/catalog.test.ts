@@ -32,6 +32,8 @@ test("deep links only accept known destinations", () => {
 
 test("event types and visibility are locked", () => {
   assert.equal(isEventType("boss.defeated"), true);
+  assert.equal(isEventType("boss.failed"), true);
+  assert.equal(isEventType("tyrone.promise_broken"), true);
   assert.equal(isEventType("drop_table"), false);
   assert.equal(defaultVisibility("boss.defeated"), "guild");
   assert.equal(defaultVisibility("tyrone.promise_created"), "private");

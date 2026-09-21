@@ -34,6 +34,9 @@ export function scoreMemory(
   }
   if (q && row.tags.some((tag) => q.includes(String(tag).toLowerCase()) || tokenMatch(tag, tokens))) score += 2;
   if (intent === "promise" && row.kind === "promise") score += 6;
+  if (intent === "history" && row.kind === "episode") score += 4;
+  if (intent === "history" && row.importance >= 7) score += 2;
+  if (intent === "relationship" && /kept your word|trust|together/i.test(row.claim)) score += 4;
   if (intent === "boss" && (row.tags.includes("boss") || /gravenor|valdris|thessaly|sink|warden/i.test(row.claim))) {
     score += 5;
   }

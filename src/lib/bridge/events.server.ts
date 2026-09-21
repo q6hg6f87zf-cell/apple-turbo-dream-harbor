@@ -80,7 +80,19 @@ export async function publishWorldEvent(input: {
       detail: { type: input.type, visibility, id: inserted[0].id },
     });
     bridgeLog("event.publish", { type: input.type, duplicate: false, visibility, ms: Date.now() - started });
-    return { id: inserted[0].id, duplicate: false };
+    try {
+      const { afterEventPublished } = await import("./event-memory.server");
+      const extra = await afterEventPublished({
+        discordId: input.discordId ?? null,
+        eventId: inserted[0].id,
+        type: input.type,
+        payload,
+        duplicate: false,
+      });
+      return { id: inserted[0].id, duplicate: false, ...extra };
+    } catch {
+      return { id: inserted[0].id, duplicate: false };
+    }
   } catch (error) {
     bridgeLog("event.publish_failed", { type: input.type, db: true });
     return { error: error instanceof Error ? error.message : "event store unavailable" };

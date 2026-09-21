@@ -1,21 +1,28 @@
 import { soulSummary } from "./soul.server";
 import { relevantMemories } from "./memory.server";
 import { recentEventsFor } from "./events.server";
-import { getBond } from "./relationship.server";
+import { getBond, recentBondEvents } from "./relationship.server";
 import { listPromises, matchPromises } from "./promise.server";
-import { bondLabel, promiseCallbackLine, type ContinuityTrigger } from "./continuity-core";
+import { bondLabel, explainRelationship, promiseCallbackLine, type ContinuityTrigger } from "./continuity-core";
 import { bridgeLog } from "./log";
 
 export async function getTyroneContext(discordId: string, query = "") {
   const started = Date.now();
-  const [soul, relationship, memories, promises, events] = await Promise.all([
+  const [soul, relationship, memories, promises, events, bondEvents] = await Promise.all([
     soulSummary(discordId).catch(() => null),
     getBond(discordId),
     relevantMemories({ discordId, query, limit: 6 }).catch(() => []),
     listPromises(discordId).catch(() => []),
     recentEventsFor(discordId, 6).catch(() => []),
+    recentBondEvents(discordId, 12).catch(() => []),
   ]);
   const active = promises.filter((row) => row.status === "active");
+  const relationshipWhy = explainRelationship({
+    bond: relationship,
+    events: bondEvents.map((row) => ({ field: row.field, reason: row.reason, eventType: row.event_type })),
+    memories: memories.map((row) => ({ claim: row.claim, tags: row.tags })),
+    promises: promises.map((row) => ({ subject: row.subject, status: row.status })),
+  });
   const facts: { key: string; value: string }[] = [];
   if (soul?.playerName) facts.push({ key: "name", value: soul.playerName });
   if (soul?.handle) facts.push({ key: "handle", value: `@${soul.handle.replace(/^@/, "")}` });
@@ -32,8 +39,7 @@ export async function getTyroneContext(discordId: string, query = "") {
     facts.push({ key: "link", value: soul.status });
   }
   facts.push({ key: "relationship", value: bondLabel(relationship) });
-  facts.push({ key: "relationship.trust", value: String(Math.round(relationship.trust)) });
-  facts.push({ key: "relationship.familiarity", value: String(Math.round(relationship.familiarity)) });
+  for (const [i, line] of relationshipWhy.entries()) facts.push({ key: `history.${i + 1}`, value: line });
   facts.push({ key: "activePromises", value: String(active.length) });
   for (const row of active.slice(0, 4)) facts.push({ key: "promise", value: row.subject });
   for (const mem of memories) facts.push({ key: `memory.${mem.kind}`, value: mem.claim });
@@ -44,12 +50,14 @@ export async function getTyroneContext(discordId: string, query = "") {
   if (!soul?.inventory.length) unknown.push("inventory");
   if (!soul?.bosses.length) unknown.push("bosses");
   if (!active.length) unknown.push("promises");
+  if (!relationshipWhy.length && !memories.length) unknown.push("history");
 
   bridgeLog("context.assemble", { discordId, facts: facts.length, ms: Date.now() - started });
   return {
     soul: soul ?? { linked: false, status: "UNLINKED" as const, discordId, memories: 0, open: "https://thehollowrealm.com" },
     relationship,
     relationshipLabel: bondLabel(relationship),
+    relationshipWhy,
     facts,
     unknown,
     memories: memories.map((row) => ({
@@ -60,7 +68,8 @@ export async function getTyroneContext(discordId: string, query = "") {
       source: row.source,
       at: row.created_at,
       locationId: row.location_id,
-      visibility: "private",
+      tags: row.tags,
+      visibility: row.visibility || "private",
     })),
     promises: promises.map((row) => ({
       id: row.id,
@@ -86,9 +95,9 @@ export async function getTyroneContext(discordId: string, query = "") {
       relationship: bondLabel(relationship),
       activePromises: active.length,
       importantMemories: memories.filter((row) => row.importance >= 5).length,
-      lastMeaningful: memories[0]?.claim ?? null,
+      lastMeaningful: memories[0]?.claim ?? relationshipWhy[0] ?? null,
     },
-    rule: "Only state values present in facts, memories, or promises. If a key is missing or listed in unknown, say you do not have that information. Do not invent inventory, deaths, bosses, caps, promises, or relationship numbers.",
+    rule: "Only state values present in facts, memories, or promises. If a key is missing or listed in unknown, say you do not have that information. Do not invent inventory, deaths, bosses, caps, promises, or relationship numbers. Do not invent shared history. Prefer history.N and memory claims over relationship numbers.",
   };
 }
 
@@ -102,7 +111,7 @@ export async function surfaceForTrigger(discordId: string, trigger: ContinuityTr
   return hits.map((hit) => ({
     id: hit.row.id,
     text: promiseCallbackLine(hit.row),
-    fulfillOnSpeak: hit.row.kind === "return" || hit.row.kind === "intention",
+    fulfillOnSpeak: false,
     score: hit.score,
   }));
 }

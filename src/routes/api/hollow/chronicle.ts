@@ -3,9 +3,10 @@ import { hollowVerifiedUser } from "@/lib/hollow-identity.server";
 import { json, rateLimit } from "@/lib/bridge/auth.server";
 import { isEventType, type WorldEventType } from "@/lib/bridge/catalog";
 import { eventKey, publishWorldEvent, recentEventsFor } from "@/lib/bridge/events.server";
-import { recordMemory, relevantMemories, sanitizeClaim } from "@/lib/bridge/memory.server";
-import { getBond, applyEventBond } from "@/lib/bridge/relationship.server";
+import { recordMemory, sanitizeClaim } from "@/lib/bridge/memory.server";
+import { getBond } from "@/lib/bridge/relationship.server";
 import { createPromise, listPromises, markSurfaced, setPromiseStatus } from "@/lib/bridge/promise.server";
+import { resolvePromisesForTrigger } from "@/lib/bridge/event-memory.server";
 import { getTyroneContext, surfaceForTrigger } from "@/lib/bridge/tyrone-context.server";
 import { bondLabel, type ContinuityTrigger, type TriggerType, TRIGGER_TYPES } from "@/lib/bridge/continuity-core";
 
@@ -23,6 +24,7 @@ export const Route = createFileRoute("/api/hollow/chronicle")({
           events,
           promises: ctx.promises,
           relationship: ctx.relationship,
+          relationshipWhy: ctx.relationshipWhy,
           summary: ctx.summary,
         });
       },
@@ -35,7 +37,7 @@ export const Route = createFileRoute("/api/hollow/chronicle")({
           event?: { type?: unknown; payload?: unknown; key?: unknown };
           memory?: { kind?: unknown; claim?: unknown; tags?: unknown; importance?: unknown; id?: unknown; locationId?: unknown };
           promise?: { action?: unknown; id?: unknown; claim?: unknown };
-          trigger?: { type?: unknown; region?: unknown; poi?: unknown; combat?: unknown; assist?: unknown };
+          trigger?: { type?: unknown; region?: unknown; poi?: unknown; combat?: unknown; assist?: unknown; dialogue?: unknown };
           spoken?: { promiseId?: unknown };
         } = {};
         try {
@@ -46,15 +48,14 @@ export const Route = createFileRoute("/api/hollow/chronicle")({
         const out: Record<string, unknown> = { ok: true };
         if (body.event && isEventType(body.event.type)) {
           const key = String(body.event.key ?? eventKey(body.event.type, who.discordId, JSON.stringify(body.event.payload ?? {})));
-          out.event = await publishWorldEvent({
+          const published = await publishWorldEvent({
             type: body.event.type as WorldEventType,
             discordId: who.discordId,
             payload: body.event.payload && typeof body.event.payload === "object" ? (body.event.payload as Record<string, unknown>) : {},
             idempotencyKey: key,
           });
-          if (body.event.type === "boss.defeated" || body.event.type === "character.forged" || body.event.type === "character.died") {
-            await applyEventBond(who.discordId, String(body.event.type), "game");
-          }
+          out.event = published;
+          if ("utterance" in published) out.utterance = published.utterance;
         }
         if (body.memory && typeof body.memory.claim === "string") {
           const kind =
@@ -84,24 +85,28 @@ export const Route = createFileRoute("/api/hollow/chronicle")({
         if (body.promise?.action === "fulfill" && typeof body.promise.id === "string") {
           const updated = await setPromiseStatus(who.discordId, body.promise.id, "fulfilled", "game");
           out.promise = updated;
-          if ("row" in updated) {
-            await applyEventBond(who.discordId, "tyrone.promise_fulfilled", "game");
+          if ("row" in updated && updated.row) {
+            const row = updated.row;
             await publishWorldEvent({
               type: "tyrone.promise_fulfilled",
               discordId: who.discordId,
-              payload: { id: updated.row.id, subject: updated.row.subject },
+              payload: { id: row.id, subject: row.subject, region: row.regionId },
               visibility: "private",
-              idempotencyKey: `prom-kept:${updated.row.id}`,
+              idempotencyKey: `prom-kept:${row.id}`,
             });
-            await recordMemory({
+          }
+        }
+        if (body.promise?.action === "break" && typeof body.promise.id === "string") {
+          const updated = await setPromiseStatus(who.discordId, body.promise.id, "broken", "game");
+          out.promise = updated;
+          if ("row" in updated && updated.row) {
+            const row = updated.row;
+            await publishWorldEvent({
+              type: "tyrone.promise_broken",
               discordId: who.discordId,
-              kind: "episode",
-              claim: `Tyrone remembered: ${updated.row.subject}.`,
-              tags: ["promise", "fulfilled", ...(updated.row.tags || [])],
-              importance: 7,
-              locationId: updated.row.locationId,
-              source: "game",
-              id: `kept-${updated.row.id}`,
+              payload: { id: row.id, subject: row.subject, region: row.regionId },
+              visibility: "private",
+              idempotencyKey: `prom-broke:${row.id}`,
             });
           }
         }
@@ -115,8 +120,12 @@ export const Route = createFileRoute("/api/hollow/chronicle")({
             poi: typeof body.trigger.poi === "string" ? body.trigger.poi : null,
             combat: Boolean(body.trigger.combat),
             assist: typeof body.trigger.assist === "string" ? body.trigger.assist : "normal",
+            dialogue: Boolean(body.trigger.dialogue),
           };
           out.surface = await surfaceForTrigger(who.discordId, trigger);
+          if (trigger.type === "player.entered_poi") {
+            out.resolved = await resolvePromisesForTrigger(who.discordId, trigger);
+          }
         }
         if (typeof body.spoken?.promiseId === "string") {
           await markSurfaced(who.discordId, body.spoken.promiseId);

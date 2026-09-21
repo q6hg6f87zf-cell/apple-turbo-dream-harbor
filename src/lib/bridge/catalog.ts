@@ -7,6 +7,7 @@ export const EVENT_TYPES = [
   "mission.failed",
   "boss.engaged",
   "boss.defeated",
+  "boss.failed",
   "region.unlocked",
   "rare_item.found",
   "legendary_item.found",
@@ -14,6 +15,7 @@ export const EVENT_TYPES = [
   "tyrone.promise_created",
   "tyrone.promise_kept",
   "tyrone.promise_fulfilled",
+  "tyrone.promise_broken",
   "tyrone.memory_recorded",
 ] as const;
 
@@ -75,7 +77,7 @@ export function defaultVisibility(type: WorldEventType): EventVisibility {
 
 export function defaultImportance(type: WorldEventType) {
   if (type === "boss.defeated" || type === "legendary_item.found") return 9;
-  if (type === "character.forged" || type === "region.unlocked" || type === "boss.engaged" || type === "character.died") return 7;
-  if (type === "mission.completed" || type === "rare_item.found") return 5;
+  if (type === "character.forged" || type === "region.unlocked" || type === "boss.engaged" || type === "character.died" || type === "boss.failed") return 7;
+  if (type === "mission.completed" || type === "rare_item.found" || type === "tyrone.promise_fulfilled" || type === "tyrone.promise_broken" || type === "mission.failed") return 6;
   return 3;
 }
