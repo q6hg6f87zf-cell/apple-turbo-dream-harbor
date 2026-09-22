@@ -14,7 +14,10 @@ describe("SYNAPSE boot", () => {
   it("tracks CRT → file → uplink → porch", () => {
     const startedAt = 1_000;
     assert.equal(bootStageName({ hydrated: false, uplinkReady: false, porchLit: false }), "CRT");
-    assert.equal(bootStageLabel("CRT"), "Seating CRT");
+    assert.equal(bootStageLabel("CRT"), "Seating the CRT · Tyrone online");
+    assert.equal(bootStageLabel("PORCH"), "Porch lamps — Vault 13");
+    assert.equal(bootStageLabel("UPLINK"), "Discord uplink · file warm");
+    assert.equal(bootStageLabel("FILE"), "Reading resident file");
     const early = bootLoadPercent({
       hydrated: false,
       uplinkReady: false,

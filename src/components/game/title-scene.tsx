@@ -174,7 +174,15 @@ export function OpeningBoot({
   useEffect(() => {
     if (beat !== "boot" || !porchLit) return;
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const t = window.setTimeout(() => enterPorch(), reduced ? 60 : 380);
+    const t = window.setTimeout(() => {
+      try {
+        unlockAudio();
+        sfx.porch();
+      } catch {
+        /* audio may be blocked until gesture */
+      }
+      enterPorch();
+    }, reduced ? 60 : 380);
     return () => window.clearTimeout(t);
   }, [beat, porchLit]);
 
@@ -193,6 +201,7 @@ export function OpeningBoot({
       unlockAudio();
       void playScore("title");
       startAmbient();
+      sfx.porch();
       sfx.machine();
     } finally {
       enterPorch();
@@ -215,12 +224,15 @@ export function OpeningBoot({
         >
           <span className="font-display text-[11px] uppercase tracking-[0.48em] text-ember">Moon Squad HQ</span>
           <span className="mt-3 font-display text-3xl text-paper md:text-4xl">The Hollow Realm</span>
-          <span className="mt-2 font-display text-[11px] uppercase tracking-[0.28em] text-ember">S.Y.N.A.P.S.E T-0880</span>
+          <span className="mt-2 max-w-[16rem] text-center text-sm leading-snug text-moon md:max-w-sm">
+            Tyrone found you east of the highway. Vault 13 is waiting. Listen first — then stamp your one file.
+          </span>
+          <span className="mt-3 font-display text-[11px] uppercase tracking-[0.28em] text-ember">S.Y.N.A.P.S.E T-0880</span>
           <div className="mt-8 w-[min(18rem,70vw)]" data-boot-stage={stage} data-boot-pct={Math.round(pct)}>
             <SynapseLoadBar value={pct} label={bootStageLabel(stage)} />
           </div>
           <span className="mt-4 font-display text-[11px] uppercase tracking-[0.28em] text-muted">
-            {porchLit ? "Porch open" : "Tap to enter"}
+            {porchLit ? "Porch open · tap to enter" : "Tap to wake the porch"}
           </span>
         </button>
       ) : null}

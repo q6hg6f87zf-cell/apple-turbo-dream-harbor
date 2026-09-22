@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { sfx } from "@/game/audio";
 import { wakeLineAt } from "@/game/opening-reel";
 import { getRadioSnapshot, subscribeRadio } from "@/game/radio";
-import { TALK, MANUAL, isPregameTalk, isTalkLocked, renderTalk, scriptForScreen } from "@/game/talk";
+import { TALK, MANUAL, MANUAL_PROMPTS, isPregameTalk, isTalkLocked, renderTalk, scriptForScreen } from "@/game/talk";
 import { speakerArt } from "@/game/cast";
 import { useGame } from "@/game/store";
 import type { TyroneAssist } from "@/game/types";
@@ -259,6 +259,7 @@ export function FieldManual() {
 
   useEffect(() => {
     if (!open) return;
+    sfx.manual();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
@@ -273,6 +274,7 @@ export function FieldManual() {
   if (isPregameTalk(state) && isTalkLocked(state)) return null;
   const id = state.talk?.script === "wake" ? "wake" : scriptForScreen(state);
   const card = MANUAL[id] ?? MANUAL.hq;
+  const prompts = MANUAL_PROMPTS[id] ?? MANUAL_PROMPTS.hq ?? [];
 
   const submitAsk = () => {
     const text = question.trim();
@@ -339,6 +341,26 @@ export function FieldManual() {
             </li>
           ))}
         </ul>
+        {!combat && prompts.length > 0 ? (
+          <div className="mt-4">
+            <p className="font-display text-[10px] uppercase tracking-[0.18em] text-muted">Try asking</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {prompts.map((prompt) => (
+                <button
+                  key={prompt}
+                  type="button"
+                  onClick={() => {
+                    sfx.click();
+                    setQuestion(prompt);
+                  }}
+                  className="min-h-10 rounded-[var(--radius-sm)] bg-ink/70 px-3 font-display text-[10px] uppercase tracking-[0.12em] text-ember shadow-[var(--shadow-border)]"
+                >
+                  {prompt}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
         <label className="mt-5 block">
           <span className="font-display text-[10px] uppercase tracking-[0.18em] text-muted">Ask him</span>
           <textarea
@@ -352,7 +374,7 @@ export function FieldManual() {
             }}
             rows={2}
             maxLength={180}
-            placeholder="What do I roll? Can we take the boss? What happened to…"
+            placeholder="What do I do first? Who is Kane? How does a day work?"
             className="mt-2 min-h-16 w-full rounded-[var(--radius-sm)] bg-ink px-3 py-2 text-sm text-paper shadow-[var(--shadow-border)] outline-none"
           />
         </label>

@@ -201,4 +201,16 @@ describe("Tyrone companion intelligence", () => {
     s.terminalDrained = true;
     assert.match(answerTyroneQuestion(s, "Remember the SYNAPSE box?"), /S\.Y\.N\.A\.P\.S\.E/);
   });
+
+  it("orients a new file on first-day asks", () => {
+    const s = file();
+    s.operatives = [];
+    s.seenTalk = [];
+    assert.match(answerTyroneQuestion(s, "What do I do first?"), /Machine Shop|porch|stamp/i);
+    assert.match(answerTyroneQuestion(s, "Where am I?"), /Vault 13/);
+    assert.match(answerTyroneQuestion(s, "Who is Kane?"), /Vesper Kane|Project Vesper/i);
+    assert.match(answerTyroneQuestion(s, "How does a day work?"), /Dawn|board|watches/i);
+    assert.match(answerTyroneQuestion(s, "How do I get help?"), /question mark|field manual/i);
+    assert.match(answerTyroneQuestion(s, "How do I roll?"), /Two rerolls|Machine Shop/i);
+  });
 });
