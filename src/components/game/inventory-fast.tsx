@@ -31,7 +31,7 @@ import { ITEM_KIND_PRESENTATION, classLabel } from "@/game/presentation";
 import { grantItemMastery, previewItem, residentProgress, residentPower } from "@/game/resident-progression";
 import { useGame } from "@/game/store";
 import { isTravisPart } from "@/game/travis";
-import { canAttachPart, hydrateWeapon, magLine } from "@/game/weapon-ops";
+import { canAttachPart, magLine } from "@/game/weapon-ops";
 import { sfx } from "@/game/audio";
 import type {
   AttachmentSlot,
@@ -177,7 +177,6 @@ function tyroneCopy(row: Row, target: Operative | null, mode: HelpMode) {
     if (mode === "action") return "Catalogue only. Find it in the Hollow before the buttons light up.";
     return `${row.name}. ${row.effect} Field record — not a live bag item.`;
   }
-  hydrateWeapon(item);
   if (mode === "fit") return tyroneFitItem(item, target);
   if (mode === "action") return tyroneHowToUse(item);
   return tyroneExplainItem(item, target);

@@ -10,6 +10,7 @@ import {
   attachPart,
   canAttachPart,
   magLine,
+  peekWeapon,
   rangeHitMod,
   reloadWeapon,
   resolveWeapon,
@@ -381,5 +382,20 @@ describe("mag line", () => {
   it("prints chamber and caliber", () => {
     const rifle = gun();
     assert.match(magLine(rifle), /20\/20 · 5\.56/);
+  });
+});
+
+describe("peekWeapon purity", () => {
+  it("never mutates the live bag item during repeated magLine reads", () => {
+    const rifle = gun();
+    delete (rifle as { mag?: number }).mag;
+    delete (rifle as { weaponFamily?: string }).weaponFamily;
+    const before = JSON.stringify(rifle);
+    const peeked = peekWeapon(rifle);
+    assert.equal(JSON.stringify(rifle), before);
+    assert.ok(peeked.weaponFamily);
+    assert.ok(peeked.mag != null);
+    for (let i = 0; i < 20; i++) magLine(rifle);
+    assert.equal(JSON.stringify(rifle), before);
   });
 });

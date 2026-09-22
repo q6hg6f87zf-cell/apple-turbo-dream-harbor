@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { CAST } from "@/game/cast";
 import { AUTHORITY_ITEM_CATALOG } from "@/game/authority-items";
 import { CANONICAL_REGION_IDS, regionById } from "@/game/data";
 import { cloneState } from "@/game/engine";
@@ -14,6 +15,16 @@ import {
   type WeaponLane,
 } from "@/game/inventory-filters";
 import { itemArt, itemThumbUrl, preloadItemArt } from "@/game/item-art";
+import {
+  inventoryStoryFilter,
+  inventoryStoryPulse,
+  storyBadge,
+  travisCanFavorWeld,
+  travisReadItem,
+  tyroneExplainItem,
+  tyroneFitItem,
+  tyroneHowToUse,
+} from "@/game/item-story";
 import { ITEM_KIND_PRESENTATION, classLabel } from "@/game/presentation";
 import { magLine } from "@/game/weapon-ops";
 import { previewItem, residentProgress, type ActiveItemEffect, type ProgressiveOperative } from "@/game/resident-progression";
@@ -26,19 +37,23 @@ import {
   stashServerItem,
 } from "@/game/server-inventory";
 import { useGame } from "@/game/store";
+import { isTravisPart } from "@/game/travis";
 import type { AmmoType, InventoryCategory, Item, Operative, Rarity, RegionId } from "@/game/types";
 import { cn } from "@/lib/cn";
-import { Archive, Check, Crosshair, PackageCheck, Search, Sparkles, Wrench, Zap } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Archive, Check, Crosshair, MapPin, PackageCheck, Search, Sparkles, Wrench, X, Zap } from "lucide-react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ItemThumb } from "./item-thumb";
 import { inventorySession, rememberInventory } from "@/game/inventory-session";
 import { ItemInspectShell } from "./item-inspect";
 import { ChipScroller, FilterChip, InventoryFrame, InventoryRow, ModeToggle } from "./inventory-chrome";
 import { Panel, RarityMark, SectionLabel } from "./primitives";
+import { sfx } from "@/game/audio";
 
 const SESSION_ID = "inventory-server";
 
 type Mode = "owned" | "catalogue";
+type HelpMode = "explain" | "fit" | "action";
+type StoryLane = "all" | "travis" | "damaged" | "parts";
 type Row = {
   key: string;
   item: Item;
@@ -84,18 +99,6 @@ function applyConsumableFieldEffect(item: Item, targetId: string) {
   });
 }
 
-function tyrone(item: Item, target: Operative | null) {
-  if (item.kind === "material") return "Construction stock. Leave it in Vault 13. The server ledger will spend it only when an expansion actually calls for it.";
-  if (item.kind === "special") return "Tagged relic or key item. Do not sell it to a machine with a blinking light just because the machine asked politely.";
-  if (item.kind === "enchantment") return "Pick a resident and a compatible piece of gear. Attach consumes this physical instance. The server records the socket, so refreshing the browser cannot bring the coil back.";
-  if (item.kind === "attachment") return "Optics, muzzles, barrels, mags, stocks, grips, receivers. Seat it on a firearm. One per slot. The server keeps the socket.";
-  if (item.kind === "consumable") return item.ammoType ? `Ammunition. ${item.ammoCount ?? "?"} rounds of ${item.ammoType}. Issue it to the shooter. Do not drink it.` : "Use is permanent. The server consumes the item first, then I apply its field effect to the resident. Double taps cannot drink the same syringe twice.";
-  if (!target) return "Pick a resident. I will compare the item against their live loadout before we move anything.";
-  const fit = item.classHint ? (item.classHint === target.cls ? `Built for ${classLabel(target.cls)}.` : `Designed for ${classLabel(item.classHint)}, not ${classLabel(target.cls)}.`) : "Universal fit.";
-  const p = previewItem(target, item);
-  return `${fit} Power ${p.currentPower} → ${p.projectedPower}${p.powerDelta ? ` (${p.powerDelta > 0 ? "+" : ""}${p.powerDelta})` : ""}. ${p.replaced ? `Replaces ${p.replaced.name}.` : "Open slot."}`;
-}
-
 function chamberLine(item: Item): string | null {
   if (item.kind === "weapon" && item.weaponFamily !== "melee") return magLine(item);
   if (item.kind === "weapon" && item.ammoType) return `Chambers ${item.ammoType}`;
@@ -106,19 +109,33 @@ function chamberLine(item: Item): string | null {
   return null;
 }
 
+function helpCopy(item: Item, target: Operative | null, mode: HelpMode) {
+  if (mode === "fit") return tyroneFitItem(item, target);
+  if (mode === "action") return tyroneHowToUse(item);
+  return tyroneExplainItem(item, target);
+}
+
 export function ServerInventoryView() {
   const state = useGame((g) => g.s);
+  const setScreen = useGame((g) => g.setScreen);
+  const selectPoi = useGame((g) => g.selectPoi);
+  const selectLoc = useGame((g) => g.selectLoc);
+  const workSite = useGame((g) => g.workSite);
+  const showTravis = useGame((g) => g.showTravisItem);
   const session = inventorySession(SESSION_ID);
   const [mode, setMode] = useState<Mode>(session.mode);
   const [category, setCategory] = useState<InventoryCategory>(session.category);
   const [lane, setLane] = useState<WeaponLane>(session.lane);
   const [caliber, setCaliber] = useState<AmmoType | "all">(session.caliber);
   const [region, setRegion] = useState<RegionId | "all">(session.region);
+  const [storyLane, setStoryLane] = useState<StoryLane>("all");
   const [query, setQuery] = useState(session.query);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [targetId, setTargetId] = useState("");
   const [targetGearId, setTargetGearId] = useState("");
   const [pending, setPending] = useState(false);
+  const [helpMode, setHelpMode] = useState<HelpMode | null>(null);
+  const [travisLines, setTravisLines] = useState<string[] | null>(null);
   const showCaliber = category === "ammo";
 
   useEffect(() => {
@@ -126,10 +143,15 @@ export function ServerInventoryView() {
   }, [mode, category, lane, caliber, region, query]);
 
   const residents = state.operatives.filter((op) => op.status !== "dead" && op.location === "hq");
-  const owned = useMemo<Row[]>(() => [
-    ...state.vault.map((item) => ({ key: `v:${item.id}`, item, source: "vault" as const, owner: "Vault 13" })),
-    ...state.operatives.flatMap((op) => op.inventory.map((item) => ({ key: `r:${op.id}:${item.id}`, item, source: "resident" as const, owner: op.name, residentId: op.id }))),
-  ], [state.vault, state.operatives]);
+  const owned = useMemo<Row[]>(
+    () => [
+      ...state.vault.map((item) => ({ key: `v:${item.id}`, item, source: "vault" as const, owner: "Vault 13" })),
+      ...state.operatives.flatMap((op) =>
+        op.inventory.map((item) => ({ key: `r:${op.id}:${item.id}`, item, source: "resident" as const, owner: op.name, residentId: op.id })),
+      ),
+    ],
+    [state.vault, state.operatives],
+  );
 
   useEffect(() => {
     preloadItemArt(
@@ -146,48 +168,73 @@ export function ServerInventoryView() {
     );
   }, [owned]);
 
-  const catalogue = useMemo<Row[]>(() => AUTHORITY_ITEM_CATALOG.map((template) => ({
-    key: `c:${template.key}`,
-    source: "catalogue" as const,
-    owner: template.sourceRegion ? `${regionById(template.sourceRegion).name} record` : "Vault 13 record",
-    item: {
-      id: `catalogue:${template.key}`,
-      name: template.name,
-      kind: template.kind,
-      rarity: template.rarity,
-      condition: "Pristine" as const,
-      slot: template.slot,
-      classHint: template.classHint,
-      damage: template.damage,
-      defense: template.defense,
-      effect: template.effect,
-      lore: template.lore,
-      value: template.value,
-      sourceRegion: template.sourceRegion,
-      ammoType: template.ammoType,
-      weaponFamily: template.weaponFamily,
-      ammoCount: template.ammoCount,
-      ammoGrade: template.ammoGrade ?? gradeFromLoad(template.name),
-      mag: template.mag,
-      magSize: template.magSize,
-      ap: template.ap,
-      accuracy: template.accuracy,
-      rangeBand: template.rangeBand,
-    },
-  })), []);
+  const catalogue = useMemo<Row[]>(
+    () =>
+      AUTHORITY_ITEM_CATALOG.map((template) => ({
+        key: `c:${template.key}`,
+        source: "catalogue" as const,
+        owner: template.sourceRegion ? `${regionById(template.sourceRegion).name} record` : "Vault 13 record",
+        item: {
+          id: `catalogue:${template.key}`,
+          name: template.name,
+          kind: template.kind,
+          rarity: template.rarity,
+          condition: "Pristine" as const,
+          slot: template.slot,
+          classHint: template.classHint,
+          damage: template.damage,
+          defense: template.defense,
+          effect: template.effect,
+          lore: template.lore,
+          value: template.value,
+          sourceRegion: template.sourceRegion,
+          ammoType: template.ammoType,
+          weaponFamily: template.weaponFamily,
+          ammoCount: template.ammoCount,
+          ammoGrade: template.ammoGrade ?? gradeFromLoad(template.name),
+          mag: template.mag,
+          magSize: template.magSize,
+          ap: template.ap,
+          accuracy: template.accuracy,
+          rangeBand: template.rangeBand,
+        },
+      })),
+    [],
+  );
 
+  const pulse = useMemo(() => inventoryStoryPulse(state), [state.vault, state.operatives]);
   const base = mode === "owned" ? owned : catalogue;
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return base.filter((row) => {
-      if (!matchesInventoryCategory(row.item.kind, row.item.ammoType, category)) return false;
-      if (category === "weapon" && !matchesWeaponLane({ name: row.item.name, weaponFamily: row.item.weaponFamily, ammoType: row.item.ammoType }, lane)) return false;
-      if (showCaliber && !matchesCaliber(row.item.ammoType, caliber)) return false;
-      if (!matchesRegion(row.item.sourceRegion, region)) return false;
-      if (!q) return true;
-      return [row.item.name, row.item.effect, row.item.rarity, row.item.kind, row.owner, row.item.ammoType ?? "", row.item.classHint ? classLabel(row.item.classHint) : "", row.item.sourceRegion ? regionById(row.item.sourceRegion).name : ""].join(" ").toLowerCase().includes(q);
-    }).sort((a, b) => RARITY_RANK[b.item.rarity] - RARITY_RANK[a.item.rarity] || b.item.value - a.item.value);
-  }, [base, category, caliber, region, query, showCaliber, lane]);
+    return base
+      .filter((row) => {
+        if (!matchesInventoryCategory(row.item.kind, row.item.ammoType, category)) return false;
+        if (
+          category === "weapon" &&
+          !matchesWeaponLane({ name: row.item.name, weaponFamily: row.item.weaponFamily, ammoType: row.item.ammoType }, lane)
+        )
+          return false;
+        if (showCaliber && !matchesCaliber(row.item.ammoType, caliber)) return false;
+        if (!matchesRegion(row.item.sourceRegion, region)) return false;
+        if (mode === "owned" && !inventoryStoryFilter(row.item, storyLane)) return false;
+        if (!q) return true;
+        return [
+          row.item.name,
+          row.item.effect,
+          row.item.rarity,
+          row.item.kind,
+          row.owner,
+          row.item.ammoType ?? "",
+          row.item.classHint ? classLabel(row.item.classHint) : "",
+          row.item.sourceRegion ? regionById(row.item.sourceRegion).name : "",
+          storyBadge(row.item) ?? "",
+        ]
+          .join(" ")
+          .toLowerCase()
+          .includes(q);
+      })
+      .sort((a, b) => RARITY_RANK[b.item.rarity] - RARITY_RANK[a.item.rarity] || b.item.value - a.item.value);
+  }, [base, category, caliber, region, query, showCaliber, lane, storyLane, mode]);
 
   const selected = base.find((row) => row.key === selectedKey) ?? null;
   const owner = selected?.residentId ? state.operatives.find((op) => op.id === selected.residentId) ?? null : null;
@@ -225,12 +272,19 @@ export function ServerInventoryView() {
     }
   };
 
+  const choose = (row: Row) => {
+    setSelectedKey(row.key);
+    setHelpMode(null);
+    setTravisLines(null);
+    setTargetGearId("");
+    if (!targetId && residents[0]) setTargetId(residents[0].id);
+  };
+
   return (
     <InventoryFrame
       sessionId={SESSION_ID}
       header={
         <>
-          {/* The dock already says Inventory; the list gets the space instead. */}
           <div className="flex items-center gap-2">
             <label className="relative min-w-0 flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
@@ -242,7 +296,6 @@ export function ServerInventoryView() {
               />
             </label>
           </div>
-
 
           <ModeToggle
             value={mode}
@@ -258,7 +311,15 @@ export function ServerInventoryView() {
 
           <ChipScroller>
             {INVENTORY_FILTERS.map((chip) => (
-              <FilterChip key={chip.id} active={category === chip.id} onClick={() => { setCategory(chip.id); if (chip.id !== "weapon") setLane("all"); if (chip.id !== "ammo") setCaliber("all"); }}>
+              <FilterChip
+                key={chip.id}
+                active={category === chip.id}
+                onClick={() => {
+                  setCategory(chip.id);
+                  if (chip.id !== "weapon") setLane("all");
+                  if (chip.id !== "ammo") setCaliber("all");
+                }}
+              >
                 {chip.label}
               </FilterChip>
             ))}
@@ -276,46 +337,101 @@ export function ServerInventoryView() {
 
           {showCaliber ? (
             <ChipScroller>
-              <FilterChip compact active={caliber === "all"} onClick={() => setCaliber("all")}>Any cartridge</FilterChip>
+              <FilterChip compact active={caliber === "all"} onClick={() => setCaliber("all")}>
+                Any cartridge
+              </FilterChip>
               {CALIBERS.map((id) => (
-                <FilterChip key={id} compact active={caliber === id} onClick={() => setCaliber(id)}>{id}</FilterChip>
+                <FilterChip key={id} compact active={caliber === id} onClick={() => setCaliber(id)}>
+                  {id}
+                </FilterChip>
               ))}
             </ChipScroller>
           ) : null}
 
           <ChipScroller>
-            <FilterChip compact active={region === "all"} onClick={() => setRegion("all")}>All continents</FilterChip>
+            <FilterChip compact active={region === "all"} onClick={() => setRegion("all")}>
+              All continents
+            </FilterChip>
             {CANONICAL_REGION_IDS.map((id) => {
               const def = regionById(id);
-              return <FilterChip key={id} compact active={region === id} onClick={() => setRegion(id)}>{def.short} · {def.continent}</FilterChip>;
+              return (
+                <FilterChip key={id} compact active={region === id} onClick={() => setRegion(id)}>
+                  {def.short} · {def.continent}
+                </FilterChip>
+              );
             })}
           </ChipScroller>
 
+          {mode === "owned" ? (
+            <ChipScroller>
+              <FilterChip compact active={storyLane === "all"} onClick={() => setStoryLane("all")}>
+                Story · all
+              </FilterChip>
+              <FilterChip compact active={storyLane === "travis"} onClick={() => setStoryLane("travis")}>
+                Travis bay{pulse.travis ? ` · ${pulse.travis}` : ""}
+              </FilterChip>
+              <FilterChip compact active={storyLane === "damaged"} onClick={() => setStoryLane("damaged")}>
+                Needs weld{pulse.damaged ? ` · ${pulse.damaged}` : ""}
+              </FilterChip>
+              <FilterChip compact active={storyLane === "parts"} onClick={() => setStoryLane("parts")}>
+                Parts{pulse.attachments || pulse.travis ? ` · ${pulse.attachments + pulse.travis}` : ""}
+              </FilterChip>
+            </ChipScroller>
+          ) : null}
         </>
       }
     >
       <div className="space-y-1.5 pb-4">
         {rows.map((row) => {
           const chamber = chamberLine(row.item);
+          const badge = storyBadge(row.item);
           return (
-            <InventoryRow key={row.key} onOpen={() => { setSelectedKey(row.key); setTargetGearId(""); if (!targetId && residents[0]) setTargetId(residents[0].id); }} className="flex min-h-14 w-full min-w-0 items-center gap-2.5 overflow-hidden rounded-[var(--radius-md)] bg-raised px-2.5 py-2 text-left shadow-[var(--shadow-border)]">
+            <InventoryRow
+              key={row.key}
+              onOpen={() => choose(row)}
+              className="flex min-h-14 w-full min-w-0 items-center gap-2.5 overflow-hidden rounded-[var(--radius-md)] bg-raised px-2.5 py-2 text-left shadow-[var(--shadow-border)]"
+            >
               <ItemThumb kind={row.item.kind} name={row.item.name} ammoType={row.item.ammoType} weaponFamily={row.item.weaponFamily} size="sm" />
               <div className="min-w-0 flex-1 overflow-hidden">
-                <div className="flex min-w-0 items-center justify-between gap-2"><span className="min-w-0 truncate font-display text-sm">{row.item.name}</span><RarityMark rarity={row.item.rarity} /></div>
+                <div className="flex min-w-0 items-center justify-between gap-2">
+                  <span className="min-w-0 truncate font-display text-sm">{row.item.name}</span>
+                  <RarityMark rarity={row.item.rarity} />
+                </div>
                 {chamber ? <p className="min-w-0 truncate font-display text-[9px] uppercase tracking-[0.08em] text-ember">{chamber}</p> : null}
-                <p className="truncate text-[10px] text-muted">{row.owner}{row.item.equipped ? " · Equipped" : ""}</p>
+                {badge ? (
+                  <p className="mt-0.5 truncate font-display text-[9px] uppercase tracking-[0.12em] text-ember/90">
+                    {badge}
+                    {row.item.condition && row.item.condition !== "Pristine" ? ` · ${row.item.condition}` : ""}
+                  </p>
+                ) : null}
+                <p className="truncate text-[10px] text-muted">
+                  {row.owner}
+                  {row.item.equipped ? " · Equipped" : ""}
+                </p>
               </div>
             </InventoryRow>
           );
         })}
-        {!rows.length ? <Panel><p className="text-sm text-muted">Nothing matches that filter.</p></Panel> : null}
+        {!rows.length ? (
+          <Panel>
+            <p className="text-sm text-muted">Nothing matches that filter.</p>
+          </Panel>
+        ) : null}
       </div>
 
       {selected ? (
         <ItemInspectShell
           onClose={() => !pending && setSelectedKey(null)}
           heroSrc={selectedArt}
-          hero={<ItemThumb kind={selected.item.kind} name={selected.item.name} ammoType={selected.item.ammoType} weaponFamily={selected.item.weaponFamily} size="hero" />}
+          hero={
+            <ItemThumb
+              kind={selected.item.kind}
+              name={selected.item.name}
+              ammoType={selected.item.ammoType}
+              weaponFamily={selected.item.weaponFamily}
+              size="hero"
+            />
+          }
           eyebrow={<SectionLabel>{selected.owner}</SectionLabel>}
           title={<h3 className="font-display text-xl">{selected.item.name}</h3>}
           badges={
@@ -329,47 +445,363 @@ export function ServerInventoryView() {
           actions={
             selected.source !== "catalogue" ? (
               <>
-                {selected.source === "vault" && selected.item.slot && target ? <Button variant="ember" className="w-full" disabled={pending} onClick={() => void act(() => issueEquipServerItem(selected.item.id, target.id), `${selected.item.name} issued and equipped to ${target.name}.`)}><PackageCheck className="size-4" /> Issue & Equip to {target.name}</Button> : null}
-                {selected.source === "resident" && selected.item.slot ? <Button variant={selected.item.equipped ? "quiet" : "ember"} className="w-full" disabled={pending} onClick={() => void act(() => setServerItemEquipped(selected.item.id, !selected.item.equipped), `${selected.item.name} ${selected.item.equipped ? "unequipped" : "equipped"}.`)}>{selected.item.equipped ? <><Check className="size-4" /> Unequip</> : <><Zap className="size-4" /> Equip</>}</Button> : null}
-                {selected.item.kind === "consumable" && target && !selected.item.ammoType ? <Button variant="ember" className="w-full" disabled={pending} onClick={() => void act(() => consumeServerItem(selected.item.id, target.id), `${selected.item.name} used on ${target.name}.`, () => applyConsumableFieldEffect(selected.item, target.id))}><Zap className="size-4" /> Use on {target.name}</Button> : null}
-                {selected.item.kind === "enchantment" && target && resolvedGearId ? <Button variant="ember" className="w-full" disabled={pending} onClick={() => void act(() => attachServerEnchantment(selected.item.id, resolvedGearId, target.id), `${selected.item.name} fused into the selected gear.`)}><Sparkles className="size-4" /> Attach to gear</Button> : null}
-                {selected.item.kind === "attachment" && target && resolvedGearId ? <Button variant="ember" className="w-full" disabled={pending} onClick={() => void act(() => attachServerEnchantment(selected.item.id, resolvedGearId, target.id), `${selected.item.name} seated on the firearm.`)}><Crosshair className="size-4" /> Seat on firearm</Button> : null}
-                {selected.item.condition !== "Pristine" ? <Button variant="ghost" className="w-full" disabled={pending} onClick={() => void act(() => repairServerItem(selected.item.id), `${selected.item.name} repaired by the Machine Shop.`)}><Wrench className="size-4" /> Repair</Button> : null}
-                {selected.source === "resident" && !selected.item.equipped ? <Button variant="quiet" className="w-full" disabled={pending} onClick={() => void act(() => stashServerItem(selected.item.id), `${selected.item.name} returned to Vault 13.`)}><Archive className="size-4" /> Move to Vault 13</Button> : null}
-                {pending ? <p className="text-center font-mono text-[10px] uppercase tracking-[0.18em] text-ember">Tyrone settling server serial…</p> : null}
+                {selected.source === "vault" && selected.item.slot && target ? (
+                  <Button
+                    variant="ember"
+                    className="w-full"
+                    disabled={pending}
+                    onClick={() =>
+                      void act(() => issueEquipServerItem(selected.item.id, target.id), `${selected.item.name} issued and equipped to ${target.name}.`)
+                    }
+                  >
+                    <PackageCheck className="size-4" /> Issue & Equip to {target.name}
+                  </Button>
+                ) : null}
+                {selected.source === "resident" && selected.item.slot ? (
+                  <Button
+                    variant={selected.item.equipped ? "quiet" : "ember"}
+                    className="w-full"
+                    disabled={pending}
+                    onClick={() =>
+                      void act(
+                        () => setServerItemEquipped(selected.item.id, !selected.item.equipped),
+                        `${selected.item.name} ${selected.item.equipped ? "unequipped" : "equipped"}.`,
+                      )
+                    }
+                  >
+                    {selected.item.equipped ? (
+                      <>
+                        <Check className="size-4" /> Unequip
+                      </>
+                    ) : (
+                      <>
+                        <Zap className="size-4" /> Equip
+                      </>
+                    )}
+                  </Button>
+                ) : null}
+                {selected.item.kind === "consumable" && target && !selected.item.ammoType ? (
+                  <Button
+                    variant="ember"
+                    className="w-full"
+                    disabled={pending}
+                    onClick={() =>
+                      void act(
+                        () => consumeServerItem(selected.item.id, target.id),
+                        `${selected.item.name} used on ${target.name}.`,
+                        () => applyConsumableFieldEffect(selected.item, target.id),
+                      )
+                    }
+                  >
+                    <Zap className="size-4" /> Use on {target.name}
+                  </Button>
+                ) : null}
+                {selected.item.kind === "enchantment" && target && resolvedGearId ? (
+                  <Button
+                    variant="ember"
+                    className="w-full"
+                    disabled={pending}
+                    onClick={() =>
+                      void act(
+                        () => attachServerEnchantment(selected.item.id, resolvedGearId, target.id),
+                        `${selected.item.name} fused into the selected gear.`,
+                      )
+                    }
+                  >
+                    <Sparkles className="size-4" /> Attach to gear
+                  </Button>
+                ) : null}
+                {selected.item.kind === "attachment" && target && resolvedGearId ? (
+                  <Button
+                    variant="ember"
+                    className="w-full"
+                    disabled={pending}
+                    onClick={() =>
+                      void act(
+                        () => attachServerEnchantment(selected.item.id, resolvedGearId, target.id),
+                        `${selected.item.name} seated on the firearm.`,
+                      )
+                    }
+                  >
+                    <Crosshair className="size-4" /> Seat on firearm
+                  </Button>
+                ) : null}
+                {isTravisPart(selected.item) ? (
+                  <Button
+                    variant="ember"
+                    className="w-full"
+                    disabled={pending}
+                    onClick={() => {
+                      sfx.click();
+                      setSelectedKey(null);
+                      selectLoc("ironclad");
+                      selectPoi("ironclad-shop");
+                      setScreen("map");
+                      window.setTimeout(() => {
+                        const msg = workSite("ironclad-shop");
+                        if (msg) toast(msg);
+                      }, 120);
+                    }}
+                  >
+                    <MapPin className="size-4" /> Take to Travis · Mechanical Shop
+                  </Button>
+                ) : null}
+                {selected.item.kind === "weapon" || selected.item.kind === "armor" ? (
+                  <Button
+                    variant="ghost"
+                    className="w-full"
+                    disabled={pending}
+                    onClick={() => {
+                      sfx.click();
+                      const err = showTravis(selected.item.id);
+                      if (typeof err === "string") {
+                        toast(err);
+                        return;
+                      }
+                      const beat = travisReadItem(useGame.getState().s, selected.item);
+                      setTravisLines(beat.lines);
+                      setHelpMode(null);
+                    }}
+                  >
+                    Ask Travis what he sees
+                  </Button>
+                ) : null}
+                {selected.item.condition !== "Pristine" && travisCanFavorWeld(state) ? (
+                  <Button
+                    variant="ghost"
+                    className="w-full"
+                    disabled={pending}
+                    onClick={() =>
+                      void act(() => repairServerItem(selected.item.id), `${selected.item.name} — Travis favor weld sealed on the server.`)
+                    }
+                  >
+                    <Wrench className="size-4" /> Travis favor weld
+                  </Button>
+                ) : null}
+                {selected.item.condition !== "Pristine" ? (
+                  <Button
+                    variant="ghost"
+                    className="w-full"
+                    disabled={pending}
+                    onClick={() => void act(() => repairServerItem(selected.item.id), `${selected.item.name} repaired by the Machine Shop.`)}
+                  >
+                    <Wrench className="size-4" /> Repair at Machine Shop
+                  </Button>
+                ) : null}
+                {selected.source === "resident" && !selected.item.equipped ? (
+                  <Button
+                    variant="quiet"
+                    className="w-full"
+                    disabled={pending}
+                    onClick={() => void act(() => stashServerItem(selected.item.id), `${selected.item.name} returned to Vault 13.`)}
+                  >
+                    <Archive className="size-4" /> Move to Vault 13
+                  </Button>
+                ) : null}
+                {pending ? (
+                  <p className="text-center font-mono text-[10px] uppercase tracking-[0.18em] text-ember">Tyrone settling server serial…</p>
+                ) : null}
               </>
             ) : (
               <p className="text-center text-xs text-muted">Catalogue record only. Find the real item in the Hollow Realm.</p>
             )
           }
         >
-            <p className="text-sm leading-relaxed text-paper">{selected.item.effect}</p>
-            <p className="mt-2 text-xs leading-relaxed text-muted">{selected.item.lore}</p>
-            {chamberLine(selected.item) ? (
-              <p className="mt-2 min-w-0 break-words font-display text-[10px] uppercase tracking-[0.08em] text-ember">{chamberLine(selected.item)}{selected.item.rangeBand ? ` · ${selected.item.rangeBand}` : ""}</p>
-            ) : null}
-            {couple ? (
-              <div className="mt-3 rounded-[var(--radius-sm)] border border-ember/25 bg-ember/5 px-3 py-2">
-                <p className="font-display text-[9px] uppercase tracking-[0.16em] text-ember">Load matrix</p>
-                <p className="mt-1 text-xs text-paper">{selected.item.ammoType} · {gradeLabel(selected.item.ammoGrade ?? gradeFromLoad(selected.item.ammoLoad ?? selected.item.name))} · {Math.round(couple.efficiency * 100)}% of this barrel</p>
-                <p className="mt-1 text-xs text-muted">Die {diceHint >= 0 ? "+" : ""}{diceHint} · Acc {couple.accuracy >= 0 ? "+" : ""}{couple.accuracy} · Dmg {couple.damage >= 0 ? "+" : ""}{couple.damage}{couple.ap ? ` · AP ${couple.ap}` : ""}{couple.wasted > 0.15 ? " · this rifle cannot hold the extra quality" : ""}</p>
+          <p className="text-sm leading-relaxed text-paper">{selected.item.effect}</p>
+          <p className="mt-2 text-xs leading-relaxed text-muted">{selected.item.lore}</p>
+          {isTravisPart(selected.item) ? (
+            <div className="mt-3 rounded-[var(--radius-md)] border border-ember/35 bg-ember/10 px-3 py-3">
+              <p className="font-display text-[9px] uppercase tracking-[0.2em] text-ember">Story · Travis bay</p>
+              <p className="mt-1 text-sm leading-relaxed text-paper">
+                This is TyroneBot chassis work, not resident kit. Deliver it at the Ironclad Mechanical Shop — Travis pays caps and seats the part.
+              </p>
+            </div>
+          ) : null}
+          {travisLines ? (
+            <div className="mt-3 flex gap-3 rounded-[var(--radius-lg)] border border-line bg-ink/70 p-3">
+              <img src={CAST.travis.portrait} alt="" className="size-12 shrink-0 rounded-[var(--radius-sm)] object-cover" />
+              <div className="min-w-0 flex-1">
+                <p className="font-display text-[9px] uppercase tracking-[0.2em] text-ember">Travis · reads the steel</p>
+                {travisLines.map((line) => (
+                  <p key={line} className="mt-1 text-sm leading-relaxed text-paper">
+                    {line}
+                  </p>
+                ))}
               </div>
-            ) : null}
-            {selected.item.kind === "consumable" && selected.item.ammoType ? (
-              <p className="mt-2 text-xs text-muted">{AMMO_GRADE_META[selected.item.ammoGrade ?? gradeFromLoad(selected.item.name)].blurb}</p>
-            ) : null}
+              <button type="button" onClick={() => setTravisLines(null)} className="flex size-8 shrink-0 items-center justify-center text-muted">
+                <X className="size-3.5" />
+              </button>
+            </div>
+          ) : null}
+          {chamberLine(selected.item) ? (
+            <p className="mt-2 min-w-0 break-words font-display text-[10px] uppercase tracking-[0.08em] text-ember">
+              {chamberLine(selected.item)}
+              {selected.item.rangeBand ? ` · ${selected.item.rangeBand}` : ""}
+            </p>
+          ) : null}
+          {couple ? (
+            <div className="mt-3 rounded-[var(--radius-sm)] border border-ember/25 bg-ember/5 px-3 py-2">
+              <p className="font-display text-[9px] uppercase tracking-[0.16em] text-ember">Load matrix</p>
+              <p className="mt-1 text-xs text-paper">
+                {selected.item.ammoType} · {gradeLabel(selected.item.ammoGrade ?? gradeFromLoad(selected.item.ammoLoad ?? selected.item.name))} ·{" "}
+                {Math.round(couple.efficiency * 100)}% of this barrel
+              </p>
+              <p className="mt-1 text-xs text-muted">
+                Die {diceHint >= 0 ? "+" : ""}
+                {diceHint} · Acc {couple.accuracy >= 0 ? "+" : ""}
+                {couple.accuracy} · Dmg {couple.damage >= 0 ? "+" : ""}
+                {couple.damage}
+                {couple.ap ? ` · AP ${couple.ap}` : ""}
+                {couple.wasted > 0.15 ? " · this rifle cannot hold the extra quality" : ""}
+              </p>
+            </div>
+          ) : null}
+          {selected.item.kind === "consumable" && selected.item.ammoType ? (
+            <p className="mt-2 text-xs text-muted">{AMMO_GRADE_META[selected.item.ammoGrade ?? gradeFromLoad(selected.item.name)].blurb}</p>
+          ) : null}
 
-            {selected.source !== "catalogue" && residents.length ? <div className="mt-4"><SectionLabel>Resident</SectionLabel><select value={resolvedTargetId} onChange={(e) => { setTargetId(e.target.value); setTargetGearId(""); }} disabled={!!selected.residentId || pending} className="mt-1 min-h-11 w-full rounded-[var(--radius-sm)] bg-ink px-3 text-sm text-paper shadow-[var(--shadow-border)]">{residents.map((op) => <option key={op.id} value={op.id}>{op.name} · Lv {residentProgress(op).level} · {classLabel(op.cls)}</option>)}</select></div> : null}
+          {selected.source !== "catalogue" && residents.length ? (
+            <div className="mt-4">
+              <SectionLabel>Resident</SectionLabel>
+              <select
+                value={resolvedTargetId}
+                onChange={(e) => {
+                  setTargetId(e.target.value);
+                  setTargetGearId("");
+                }}
+                disabled={!!selected.residentId || pending}
+                className="mt-1 min-h-11 w-full rounded-[var(--radius-sm)] bg-ink px-3 text-sm text-paper shadow-[var(--shadow-border)]"
+              >
+                {residents.map((op) => (
+                  <option key={op.id} value={op.id}>
+                    {op.name} · Lv {residentProgress(op).level} · {classLabel(op.cls)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
 
-            {preview ? <div className="mt-3 grid grid-cols-2 gap-2"><Panel className="bg-raised"><SectionLabel>Level</SectionLabel><p className="font-display text-xl">{preview.currentLevel}<span className="text-xs text-muted"> · mastery verified server-side</span></p></Panel><Panel className="bg-raised"><SectionLabel>Power preview</SectionLabel><p className={cn("font-display text-xl", preview.powerDelta > 0 ? "text-ok" : preview.powerDelta < 0 ? "text-danger" : "text-paper")}>{preview.currentPower} → {preview.projectedPower}</p><p className="text-xs text-muted">{preview.powerDelta >= 0 ? "+" : ""}{preview.powerDelta} loadout</p></Panel></div> : null}
+          {preview ? (
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <Panel className="bg-raised">
+                <SectionLabel>Level</SectionLabel>
+                <p className="font-display text-xl">
+                  {preview.currentLevel}
+                  <span className="text-xs text-muted"> · mastery verified server-side</span>
+                </p>
+              </Panel>
+              <Panel className="bg-raised">
+                <SectionLabel>Power preview</SectionLabel>
+                <p
+                  className={cn(
+                    "font-display text-xl",
+                    preview.powerDelta > 0 ? "text-ok" : preview.powerDelta < 0 ? "text-danger" : "text-paper",
+                  )}
+                >
+                  {preview.currentPower} → {preview.projectedPower}
+                </p>
+                <p className="text-xs text-muted">
+                  {preview.powerDelta >= 0 ? "+" : ""}
+                  {preview.powerDelta} loadout
+                </p>
+              </Panel>
+            </div>
+          ) : null}
 
-            {selected.item.kind === "enchantment" && target && gear.length ? <div className="mt-4"><SectionLabel>Attach to</SectionLabel><select value={resolvedGearId} onChange={(e) => setTargetGearId(e.target.value)} disabled={pending} className="mt-1 min-h-11 w-full rounded-[var(--radius-sm)] bg-ink px-3 text-sm text-paper shadow-[var(--shadow-border)]">{gear.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.rarity}</option>)}</select></div> : null}
+          {selected.item.kind === "enchantment" && target && gear.length ? (
+            <div className="mt-4">
+              <SectionLabel>Attach to</SectionLabel>
+              <select
+                value={resolvedGearId}
+                onChange={(e) => setTargetGearId(e.target.value)}
+                disabled={pending}
+                className="mt-1 min-h-11 w-full rounded-[var(--radius-sm)] bg-ink px-3 text-sm text-paper shadow-[var(--shadow-border)]"
+              >
+                {gear.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name} · {item.rarity}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
 
-            {selected.item.kind === "attachment" && target && guns.length ? <div className="mt-4"><SectionLabel>Seat on firearm</SectionLabel><select value={resolvedGearId} onChange={(e) => setTargetGearId(e.target.value)} disabled={pending} className="mt-1 min-h-11 w-full rounded-[var(--radius-sm)] bg-ink px-3 text-sm text-paper shadow-[var(--shadow-border)]">{guns.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.rarity}</option>)}</select></div> : null}
+          {selected.item.kind === "attachment" && target && guns.length ? (
+            <div className="mt-4">
+              <SectionLabel>Seat on firearm</SectionLabel>
+              <select
+                value={resolvedGearId}
+                onChange={(e) => setTargetGearId(e.target.value)}
+                disabled={pending}
+                className="mt-1 min-h-11 w-full rounded-[var(--radius-sm)] bg-ink px-3 text-sm text-paper shadow-[var(--shadow-border)]"
+              >
+                {guns.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name} · {item.rarity}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
 
-            <Panel className="mt-4 border-ember/20 bg-ember/5"><div className="flex gap-3"><img src="/art/tyrone.jpg" alt="" className="size-11 rounded-[var(--radius-sm)] object-cover" /><p className="text-sm leading-relaxed text-moon">{tyrone(selected.item, target)}</p></div></Panel>
+          {helpMode ? (
+            <div className="mt-3 flex gap-3 rounded-[var(--radius-lg)] border border-ember/30 bg-ink/70 p-3">
+              <img src="/art/tyrone.jpg" alt="" className="size-12 shrink-0 rounded-[var(--radius-sm)] object-cover" />
+              <div className="min-w-0 flex-1">
+                <p className="font-display text-[9px] uppercase tracking-[0.2em] text-ember">TyroneBot · quick help</p>
+                <p className="mt-1 text-sm leading-relaxed text-paper">{helpCopy(selected.item, target, helpMode)}</p>
+              </div>
+              <button type="button" onClick={() => setHelpMode(null)} className="flex size-8 shrink-0 items-center justify-center text-muted">
+                <X className="size-3.5" />
+              </button>
+            </div>
+          ) : null}
+          <div className="mt-3 grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-3">
+            <HelpButton
+              active={helpMode === "explain"}
+              onClick={() => {
+                setHelpMode("explain");
+                setTravisLines(null);
+              }}
+            >
+              Explain
+            </HelpButton>
+            <HelpButton
+              active={helpMode === "fit"}
+              onClick={() => {
+                setHelpMode("fit");
+                setTravisLines(null);
+              }}
+            >
+              Best fit
+            </HelpButton>
+            <HelpButton
+              active={helpMode === "action"}
+              onClick={() => {
+                setHelpMode("action");
+                setTravisLines(null);
+              }}
+            >
+              How to use
+            </HelpButton>
+          </div>
         </ItemInspectShell>
       ) : null}
     </InventoryFrame>
+  );
+}
+
+function HelpButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "min-h-10 rounded-[var(--radius-sm)] border px-2 font-display text-[9px] uppercase tracking-[0.1em]",
+        active ? "border-ember bg-ember/10 text-ember" : "border-line text-muted",
+      )}
+    >
+      {children}
+    </button>
   );
 }
