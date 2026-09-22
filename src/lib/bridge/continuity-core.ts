@@ -467,13 +467,19 @@ export function composeEventMemory(event: {
 
 export function promiseSatisfiedByEvent(
   row: CanonicalPromise,
-  event: { type: string; region?: string | null; poi?: string | null },
+  event: { type: string; region?: string | null; poi?: string | null; tags?: string[] },
 ) {
   if (row.status !== "active") return false;
   const region = event.region || "";
   const sameGround = Boolean(region && (row.regionId === region || row.locationId === region));
   if (event.type === "boss.defeated" || event.type === "mission.completed") return sameGround;
   if (event.type === "player.entered_poi") return Boolean(event.poi && row.poiId && event.poi === row.poiId);
+  if (event.type === "story_flag_changed") {
+    const tags = event.tags ?? [];
+    if (!tags.length) return false;
+    // Promise tags that name a story flag (or share a tag) close when that flag sets.
+    return row.tags.some((t) => tags.includes(t) || tags.includes(`flag:${t}`));
+  }
   return false;
 }
 

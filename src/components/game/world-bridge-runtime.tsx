@@ -74,6 +74,13 @@ export function WorldBridgeRuntime() {
       .join(","),
   );
   const rares = useGame((g) => rareIds(g.s).join(","));
+  const narrativeFlags = useGame((g) =>
+    Object.entries(g.s.narrative?.flags ?? {})
+      .filter(([, on]) => on)
+      .map(([id]) => id)
+      .sort()
+      .join(","),
+  );
   const hydrated = useGame((g) => g.hydrated);
   const seen = useRef({
     forged: false,
@@ -88,6 +95,7 @@ export function WorldBridgeRuntime() {
     deferredLoc: "",
     dead: "",
     rares: "",
+    flags: "",
   });
   const missionMeta = useRef({ id: "", kind: "", loc: "", party: [] as string[] });
 
@@ -225,6 +233,44 @@ export function WorldBridgeRuntime() {
       });
     }
   }, [discordId, unlocked]);
+
+  // Narrative spine flags → continuity trigger (closes tagged promises, surfaces recall).
+  useEffect(() => {
+    if (!discordId) {
+      seen.current.flags = narrativeFlags;
+      return;
+    }
+    if (!seen.current.flags) {
+      seen.current.flags = narrativeFlags;
+      return;
+    }
+    if (narrativeFlags === seen.current.flags) return;
+    const prev = new Set(seen.current.flags.split(",").filter(Boolean));
+    seen.current.flags = narrativeFlags;
+    const region = useGame.getState().s.selectedLoc;
+    const poi = useGame.getState().s.selectedPoiId;
+    for (const flag of narrativeFlags.split(",").filter((row) => row && !prev.has(row))) {
+      postChronicle({
+        trigger: {
+          type: "story_flag_changed",
+          region: region && region !== "hq" ? region : null,
+          poi: poi ?? null,
+          tags: [flag, `flag:${flag}`],
+        },
+        memory: {
+          kind: "fact",
+          claim: `Story mark: ${flag.replaceAll("_", " ")}.`,
+          tags: ["story", flag],
+          importance: 6,
+          id: `flag:${discordId}:${flag}`,
+          locationId: region && region !== "hq" ? region : undefined,
+        },
+      }).then((body) => {
+        const hit = (body?.surface as { text?: string }[] | undefined)?.[0];
+        if (hit?.text) maybeSpeak(String(hit.text), `flag-${flag}`, `story flag ${flag}`);
+      });
+    }
+  }, [discordId, narrativeFlags]);
 
   useEffect(() => {
     if (!discordId) return;

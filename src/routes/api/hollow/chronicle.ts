@@ -37,7 +37,7 @@ export const Route = createFileRoute("/api/hollow/chronicle")({
           event?: { type?: unknown; payload?: unknown; key?: unknown };
           memory?: { kind?: unknown; claim?: unknown; tags?: unknown; importance?: unknown; id?: unknown; locationId?: unknown };
           promise?: { action?: unknown; id?: unknown; claim?: unknown };
-          trigger?: { type?: unknown; region?: unknown; poi?: unknown; combat?: unknown; assist?: unknown; dialogue?: unknown };
+          trigger?: { type?: unknown; region?: unknown; poi?: unknown; combat?: unknown; assist?: unknown; dialogue?: unknown; tags?: unknown };
           spoken?: { promiseId?: unknown };
         } = {};
         try {
@@ -118,12 +118,13 @@ export const Route = createFileRoute("/api/hollow/chronicle")({
             type: body.trigger.type as TriggerType,
             region: typeof body.trigger.region === "string" ? body.trigger.region : null,
             poi: typeof body.trigger.poi === "string" ? body.trigger.poi : null,
+            tags: Array.isArray(body.trigger.tags) ? body.trigger.tags.map(String) : [],
             combat: Boolean(body.trigger.combat),
             assist: typeof body.trigger.assist === "string" ? body.trigger.assist : "normal",
             dialogue: Boolean(body.trigger.dialogue),
           };
           out.surface = await surfaceForTrigger(who.discordId, trigger);
-          if (trigger.type === "player.entered_poi") {
+          if (trigger.type === "player.entered_poi" || trigger.type === "story_flag_changed") {
             out.resolved = await resolvePromisesForTrigger(who.discordId, trigger);
           }
         }
