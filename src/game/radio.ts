@@ -412,6 +412,7 @@ function makeDeck(c: AudioContext, bus: GainNode): Deck {
   fade.connect(bus);
   el.addEventListener("timeupdate", () => {
     if (el !== live?.el) return;
+    if (introChapter === "kane" && !kaneVoiceStarted) return;
     currentTime = el.currentTime;
     if (el.duration && Number.isFinite(el.duration)) duration = el.duration;
     const now = typeof performance !== "undefined" ? performance.now() : Date.now();

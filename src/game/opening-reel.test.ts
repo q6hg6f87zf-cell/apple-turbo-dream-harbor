@@ -75,8 +75,14 @@ describe("Kane recording and Tyrone reply", () => {
     assert.match(script, /They walked packages/);
     assert.match(script, /Orion-7/);
     assert.match(script, /you were supposed to stay retired/);
+    assert.ok(KANE_CUES[14]!.at > 80 && KANE_CUES[14]!.at < 81);
     assert.ok(KANE_CUES[17]!.at > 104 && KANE_CUES[17]!.at < 107);
-    assert.ok(KANE_CUES[20]!.at > 120 && KANE_CUES[20]!.at < 122);
+    assert.match(TALK.kane[17]!.text, /^Human-operated super suits\.?$/);
+    assert.doesNotMatch(TALK.kane[17]!.text, /Not an Old World/);
+    assert.match(TALK.kane[18]!.text, /Purpose-built frames/);
+    assert.match(TALK.kane[20]!.text, /person inside the plate/);
+    assert.match(TALK.kane[21]!.text, /Not an Old World/);
+    assert.ok(KANE_CUES[23]!.at > 120 && KANE_CUES[23]!.at < 122);
     assert.ok(KANE_CUES[KANE_CUES.length - 1]!.at > 199);
     assert.equal(KANE_REEL.src, "/art/opening/kane-intro.mp4");
     assert.ok(KANE_REEL.duration >= 210);
