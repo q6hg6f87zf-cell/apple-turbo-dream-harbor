@@ -89,40 +89,88 @@ export function inferFamily(item: Item): WeaponFamily {
   return "melee";
 }
 
-export function hydrateWeapon(item: Item): Item {
+/**
+ * Pure hydrated view of an item — never mutates the live bag object.
+ * Safe to call during React render (magLine, Explain copy, list rows).
+ */
+export function peekWeapon(item: Item): Item {
   if (item.kind !== "weapon") {
     if (item.kind === "attachment" && !item.attachmentSlot) {
       const cat = arsenalByName(item.name);
-      if (cat) Object.assign(item, copyWeaponSpec(cat));
+      if (cat) return { ...item, ...copyWeaponSpec(cat) };
     }
     if (item.kind === "consumable" && item.ammoType && item.ammoCount == null) {
       const cat = arsenalByName(item.name);
-      if (cat?.ammoCount) item.ammoCount = cat.ammoCount;
+      if (cat?.ammoCount) return { ...item, ammoCount: cat.ammoCount };
     }
     return item;
   }
+
   const cat = arsenalByName(item.name);
+  const patch: Partial<Item> = {};
   if (cat) {
-    item.weaponFamily ??= cat.weaponFamily;
-    item.ammoType ??= cat.ammoType;
-    item.rangeBand ??= cat.rangeBand;
-    item.ap ??= cat.ap;
-    item.accuracy ??= cat.accuracy;
-    item.recoil ??= cat.recoil;
-    item.magSize ??= cat.magSize;
-    item.damage ??= cat.damage;
+    if (item.weaponFamily == null && cat.weaponFamily != null) patch.weaponFamily = cat.weaponFamily;
+    if (item.ammoType == null && cat.ammoType != null) patch.ammoType = cat.ammoType;
+    if (item.rangeBand == null && cat.rangeBand != null) patch.rangeBand = cat.rangeBand;
+    if (item.ap == null && cat.ap != null) patch.ap = cat.ap;
+    if (item.accuracy == null && cat.accuracy != null) patch.accuracy = cat.accuracy;
+    if (item.recoil == null && cat.recoil != null) patch.recoil = cat.recoil;
+    if (item.magSize == null && cat.magSize != null) patch.magSize = cat.magSize;
+    if (item.damage == null && cat.damage != null) patch.damage = cat.damage;
   }
-  const family = inferFamily(item);
-  item.weaponFamily = family;
+
+  const seeded = Object.keys(patch).length ? { ...item, ...patch } : item;
+  const family = inferFamily(seeded);
   if (family === "melee") {
-    item.magSize = 0;
-    item.mag = 0;
-    item.rangeBand ??= "close";
+    const needs =
+      seeded.weaponFamily !== family ||
+      seeded.magSize !== 0 ||
+      seeded.mag !== 0 ||
+      seeded.rangeBand == null;
+    if (!needs) return seeded;
+    return {
+      ...seeded,
+      weaponFamily: family,
+      magSize: 0,
+      mag: 0,
+      rangeBand: seeded.rangeBand ?? "close",
+    };
+  }
+
+  const magSize = seeded.magSize ?? MAG_SIZE[family];
+  const mag = seeded.mag ?? magSize;
+  const rangeBand =
+    seeded.rangeBand ??
+    (family === "sniper" || family === "heavy" ? "long" : family === "shotgun" || family === "smg" ? "close" : "mid");
+  const needs =
+    seeded.weaponFamily !== family ||
+    seeded.magSize == null ||
+    seeded.mag == null ||
+    seeded.rangeBand == null;
+  if (!needs) return seeded;
+  return { ...seeded, weaponFamily: family, magSize, mag, rangeBand };
+}
+
+/**
+ * Mutating hydrate for combat / store mutations only — never call from React render.
+ * Prefer peekWeapon() when you only need to read chamber/family.
+ */
+export function hydrateWeapon(item: Item): Item {
+  const peeked = peekWeapon(item);
+  if (peeked === item) return item;
+  if (item.kind !== "weapon") {
+    Object.assign(item, peeked);
     return item;
   }
-  item.magSize ??= MAG_SIZE[family];
-  if (item.mag == null) item.mag = item.magSize;
-  item.rangeBand ??= family === "sniper" || family === "heavy" ? "long" : family === "shotgun" || family === "smg" ? "close" : "mid";
+  item.weaponFamily = peeked.weaponFamily;
+  item.ammoType = peeked.ammoType;
+  item.rangeBand = peeked.rangeBand;
+  item.ap = peeked.ap;
+  item.accuracy = peeked.accuracy;
+  item.recoil = peeked.recoil;
+  item.magSize = peeked.magSize;
+  item.mag = peeked.mag;
+  if (peeked.damage != null) item.damage = peeked.damage;
   return item;
 }
 
@@ -173,19 +221,19 @@ export function resolveWeapon(item: Item | undefined): WeaponProfile {
       dry: false,
     };
   }
-  hydrateWeapon(item);
-  const family = inferFamily(item);
-  const mods = parseMods(socketText(item));
-  const magSize = Math.max(0, (item.magSize ?? MAG_SIZE[family]) + mods.mag);
-  const mag = family === "melee" ? 0 : Math.max(0, item.mag ?? magSize);
-  const spend = roundsPerShot(item, family);
+  const live = peekWeapon(item);
+  const family = inferFamily(live);
+  const mods = parseMods(socketText(live));
+  const magSize = Math.max(0, (live.magSize ?? MAG_SIZE[family]) + mods.mag);
+  const mag = family === "melee" ? 0 : Math.max(0, live.mag ?? magSize);
+  const spend = roundsPerShot(live, family);
   return {
     family,
-    ammoType: item.ammoType,
-    rangeBand: mods.range ?? item.rangeBand ?? "mid",
-    ap: (item.ap ?? 0) + mods.ap,
-    accuracy: (item.accuracy ?? 0) + mods.accuracy,
-    recoil: (item.recoil ?? 0) + mods.recoil,
+    ammoType: live.ammoType,
+    rangeBand: mods.range ?? live.rangeBand ?? "mid",
+    ap: (live.ap ?? 0) + mods.ap,
+    accuracy: (live.accuracy ?? 0) + mods.accuracy,
+    recoil: (live.recoil ?? 0) + mods.recoil,
     mag,
     magSize,
     damageBonus: mods.damage,
@@ -207,18 +255,18 @@ export function magLine(item: Item | undefined): string {
 export function canAttachPart(weapon: Item, part: Item): string | null {
   if (weapon.kind !== "weapon") return "That is not a firearm or a blade.";
   if (part.kind !== "attachment") return "That is not an attachment.";
-  hydrateWeapon(weapon);
-  hydrateWeapon(part);
-  const slot = part.attachmentSlot;
+  const liveWeapon = peekWeapon(weapon);
+  const livePart = peekWeapon(part);
+  const slot = livePart.attachmentSlot;
   if (!slot) return "That part has no slot stamped.";
-  const family = inferFamily(weapon);
-  const fits = part.fitsFamilies;
+  const family = inferFamily(liveWeapon);
+  const fits = livePart.fitsFamilies;
   if (fits && fits.length) {
-    if (!fits.includes(family)) return `${part.name} does not fit a ${family}.`;
+    if (!fits.includes(family)) return `${livePart.name} does not fit a ${family}.`;
   } else if (family === "melee") {
     if (slot !== "underbarrel") return "Blades take a bayonet. Not an optic.";
   }
-  const taken = weapon.sockets?.[slot];
+  const taken = liveWeapon.sockets?.[slot];
   if (taken) return `${slot} already holds ${taken}. Strip it at the Machine Shop first.`;
   return null;
 }

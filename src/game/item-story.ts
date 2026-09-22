@@ -16,7 +16,7 @@ import {
   type TravisModule,
 } from "./travis";
 import type { Condition, GameState, Item, Operative } from "./types";
-import { hydrateWeapon, inferFamily, magLine } from "./weapon-ops";
+import { peekWeapon, inferFamily, magLine } from "./weapon-ops";
 
 export type ItemSpeaker = "tyrone" | "travis";
 
@@ -96,13 +96,13 @@ function regionLine(item: Item): string {
 
 /** Tyrone Explain — lore first, then one tactical sentence. */
 export function tyroneExplainItem(item: Item, target: Operative | null): string {
-  hydrateWeapon(item);
+  const live = peekWeapon(item);
   const bits: string[] = [];
-  if (item.lore?.trim()) bits.push(item.lore.trim());
-  else bits.push(`${item.name}. ${item.effect}`);
+  if (live.lore?.trim()) bits.push(live.lore.trim());
+  else bits.push(`${live.name}. ${live.effect}`);
 
-  if (isTravisPart(item)) {
-    const mod = travisModFor(item);
+  if (isTravisPart(live)) {
+    const mod = travisModFor(live);
     bits.push(
       mod
         ? `Marked for Travis at the Ironclad Mechanical Shop. He pays ${mod.pay} caps and seats the ${mod.part} in me. That is not Vault inventory clutter — that is my chassis.`
@@ -111,36 +111,36 @@ export function tyroneExplainItem(item: Item, target: Operative | null): string 
     return bits.join(" ");
   }
 
-  if (item.kind === "attachment") {
+  if (live.kind === "attachment") {
     bits.push(
-      `Attachment · ${item.attachmentSlot ?? "slot"}. Seat it on a matching firearm. One part per socket. Strip at the Vault Machine Shop when the forge is lit.`,
+      `Attachment · ${live.attachmentSlot ?? "slot"}. Seat it on a matching firearm. One part per socket. Strip at the Vault Machine Shop when the forge is lit.`,
     );
-  } else if (item.kind === "weapon") {
-    const fam = inferFamily(item);
-    const chamber = magLine(item);
+  } else if (live.kind === "weapon") {
+    const fam = inferFamily(live);
+    const chamber = magLine(live);
     bits.push(
       fam === "melee"
         ? "Blade work. Close band. No mag to babysit."
-        : `Family ${fam}. ${chamber && chamber !== "melee" ? `Chamber ${chamber}. ` : ""}${conditionStory(item.condition)}`,
+        : `Family ${fam}. ${chamber && chamber !== "melee" ? `Chamber ${chamber}. ` : ""}${conditionStory(live.condition)}`,
     );
-  } else if (item.kind === "armor") {
-    bits.push(`${conditionStory(item.condition)} Defense is only a number if somebody is wearing it.`);
-  } else if (item.kind === "consumable" && item.ammoType) {
-    bits.push(`Ammunition · ${item.ammoType}. Issue it to the shooter. Do not drink it.`);
-  } else if (item.kind === "material") {
+  } else if (live.kind === "armor") {
+    bits.push(`${conditionStory(live.condition)} Defense is only a number if somebody is wearing it.`);
+  } else if (live.kind === "consumable" && live.ammoType) {
+    bits.push(`Ammunition · ${live.ammoType}. Issue it to the shooter. Do not drink it.`);
+  } else if (live.kind === "material") {
     bits.push("Construction stock. Expansion Protocol eats the right pile when you build.");
-  } else if (item.kind === "special") {
+  } else if (live.kind === "special") {
     bits.push("Special means a door, a boss, or a later system will ask. Keep it tagged.");
   }
 
-  const rare = rarityLine(item);
+  const rare = rarityLine(live);
   if (rare) bits.push(rare);
-  const region = regionLine(item);
+  const region = regionLine(live);
   if (region) bits.push(region);
 
-  if (target && item.classHint) {
+  if (target && live.classHint) {
     bits.push(
-      item.classHint === target.cls
+      live.classHint === target.cls
         ? `${target.name} is the right class for this kit.`
         : `${target.name} can carry it, but it was cut for a different class.`,
     );
@@ -182,11 +182,11 @@ export function tyroneHowToUse(item: Item): string {
 
 /** Travis reads the steel — dialogue depends on the item. */
 export function travisReadItem(state: GameState, item: Item): ItemStoryBeat {
-  hydrateWeapon(item);
+  const live = peekWeapon(item);
   const who = CAST.travis.name;
   const portrait = CAST.travis.portrait;
 
-  if (isTravisPart(item)) {
+  if (isTravisPart(live)) {
     const mod = travisModFor(item)!;
     const pending = pendingModules(state).some((p) => p.mod.id === mod.id);
     return {
@@ -206,20 +206,21 @@ export function travisReadItem(state: GameState, item: Item): ItemStoryBeat {
     };
   }
 
-  if (item.kind === "weapon") {
-    const fam = inferFamily(item);
+  if (live.kind === "weapon") {
+    const fam = inferFamily(live);
     const lines: string[] = [];
-    if (item.tags?.some((t) => /kane|aegis|vesper|2753/i.test(t)) || /kane|aegis|vesper|2753/i.test(item.name)) {
+    if (live.tags?.some((t) => /kane|aegis|vesper|2753/i.test(t)) || /kane|aegis|vesper|2753/i.test(live.name)) {
       lines.push("Kane steel. I will weld a friend. I will not polish her invoice.");
     }
-    if (fam === "energy" || item.ammoType === "laser") {
+    if (fam === "energy" || live.ammoType === "laser") {
       lines.push("Coherent light. Blackspire talk. My jig still thinks in tubes and tread — but I can straighten a mount.");
     } else if (fam === "melee") {
       lines.push("Blade. Honest. No mag to lie to you mid-fight.");
     } else {
-      lines.push(`${fam} work. ${magLine(item) !== "melee" ? `Chamber looks like ${magLine(item)}. ` : ""}${conditionStory(item.condition)}`);
+      const chamber = magLine(live);
+      lines.push(`${fam} work. ${chamber !== "melee" ? `Chamber looks like ${chamber}. ` : ""}${conditionStory(live.condition)}`);
     }
-    if (item.condition === "Broken" || item.condition === "Damaged") {
+    if (live.condition === "Broken" || live.condition === "Damaged") {
       lines.push(
         (state.travis?.fitted.length ?? 0) >= 1
           ? "Jig trusts you. Lay it here and I will favor-weld a step toward pristine. Vault Machine Shop still does the long jobs and the strip."
@@ -228,45 +229,45 @@ export function travisReadItem(state: GameState, item: Item): ItemStoryBeat {
     } else {
       lines.push("Looks like it will hold. If it starts cracking, the Vault forge or my favor weld — not Kane's buyers.");
     }
-    const rare = rarityLine(item);
+    const rare = rarityLine(live);
     if (rare) lines.push(rare.replace("The Hollow", "Ironclad"));
     return {
       speaker: "travis",
       who,
       portrait,
-      headline: item.name,
+      headline: live.name,
       lines,
-      route: item.condition !== "Pristine" ? "travis-bay" : "none",
-      cta: item.condition !== "Pristine" ? "Ask for a favor weld" : undefined,
+      route: live.condition !== "Pristine" ? "travis-bay" : "none",
+      cta: live.condition !== "Pristine" ? "Ask for a favor weld" : undefined,
     };
   }
 
-  if (item.kind === "armor") {
+  if (live.kind === "armor") {
     return {
       speaker: "travis",
       who,
       portrait,
-      headline: item.name,
+      headline: live.name,
       lines: [
-        `Plate talk. ${conditionStory(item.condition)}`,
+        `Plate talk. ${conditionStory(live.condition)}`,
         (state.travis?.fitted.length ?? 0) >= 1
           ? "I can favor-weld armor the same as a rifle — one step. Full rebuild stays at Vault 13."
           : "Seat a part in him first. Then we talk plate.",
-        item.lore || item.effect,
+        live.lore || live.effect,
       ],
-      route: item.condition !== "Pristine" ? "travis-bay" : "none",
-      cta: item.condition !== "Pristine" ? "Ask for a favor weld" : undefined,
+      route: live.condition !== "Pristine" ? "travis-bay" : "none",
+      cta: live.condition !== "Pristine" ? "Ask for a favor weld" : undefined,
     };
   }
 
-  if (item.kind === "attachment") {
+  if (live.kind === "attachment") {
     return {
       speaker: "travis",
       who,
       portrait,
-      headline: item.name,
+      headline: live.name,
       lines: [
-        `Socket part · ${item.attachmentSlot ?? "unknown"}. That seats on a firearm at Vault 13 — Machine Shop strip, inventory seat.`,
+        `Socket part · ${live.attachmentSlot ?? "unknown"}. That seats on a firearm at Vault 13 — Machine Shop strip, inventory seat.`,
         "My jig is for T-0880 chassis, not optics. Do not confuse the two shops.",
       ],
       route: "machine-shop",
@@ -278,10 +279,10 @@ export function travisReadItem(state: GameState, item: Item): ItemStoryBeat {
     speaker: "travis",
     who,
     portrait,
-    headline: item.name,
+    headline: live.name,
     lines: [
       "That is not bay work. Caps and scrap maybe. Tyrone's clipboard for the rest.",
-      item.lore || item.effect,
+      live.lore || live.effect,
     ],
     route: "none",
   };
