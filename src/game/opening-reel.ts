@@ -30,14 +30,14 @@ export const KANE_TAPE = {
 export const KANE_ARM = 1.88;
 
 /**
- * Kane intro picture. Drop the file here — the tape stays on the radio.
- * Mute is intentional: captions follow kane-recording.mp3.
- * `loop: true` covers a short clip. Set false if the file is the full ~3:23.
+ * Kane intro picture. Office clips, concatenated. Mute is intentional —
+ * captions follow kane-recording.mp3. Loop covers the 3:23 tape until
+ * more office clips land; stills remain the fallback if the mp4 404s.
  */
 export const KANE_REEL = {
   src: "/art/opening/kane-intro.mp4",
   poster: "/art/opening/kane-01.jpg",
-  duration: 204.72,
+  duration: 97.6,
   loop: true,
 } as const;
 
@@ -247,11 +247,14 @@ export const GALLERY: GalleryItem[] = [
   },
   {
     id: "kane-recording",
-    kind: "still",
+    kind: "reel",
     title: "A recording you were not meant to hear",
     eyebrow: "Kane tape",
     blurb: "Hull plate. A chassis that named himself. Super suits waiting in the dark.",
-    src: "/art/opening/kane-01.jpg",
+    src: KANE_REEL.src,
+    poster: KANE_REEL.poster,
+    duration: KANE_REEL.duration,
+    captions: true,
   },
   {
     id: "t0880-line",
