@@ -9,6 +9,7 @@ import type { Screen, TyroneAssist } from "@/game/types";
 import { cn } from "@/lib/cn";
 import {
   AudioLines,
+  BookOpen,
   ChevronLeft,
   CircleHelp,
   Ellipsis,
@@ -196,6 +197,18 @@ function OverflowMenu({
         >
           <CircleHelp className="size-4 text-ember" />
           Assist · {assist}
+        </button>
+        <button
+          type="button"
+          className="flex min-h-11 w-full items-center gap-3 rounded-[var(--radius-sm)] px-3 text-left text-body text-paper hover:bg-raised"
+          onClick={() => {
+            sfx.click();
+            window.dispatchEvent(new CustomEvent("hollow:open-journal"));
+            onClose();
+          }}
+        >
+          <BookOpen className="size-4 text-ember" />
+          Field journal
         </button>
         <button
           type="button"

@@ -1,13 +1,30 @@
 import type { GameState, Screen } from "./types";
 import { characterForged, nextObjective } from "./engine";
+import { storyObjective } from "./story-spine";
+import { ensureNarrative } from "./narrative-state";
+import { locationToRegion } from "./field-ops";
+import { regionThemeId } from "./narrative-state";
 
 export const HUB_SCREENS = ["hq", "file", "roster", "squad", "map", "arcade", "inventory", "more"] as const;
 export const TASK_SCREENS = ["market", "forge", "ledger", "vault", "codex"] as const;
 
 export type HubScreen = (typeof HUB_SCREENS)[number];
 export type TaskScreen = (typeof TASK_SCREENS)[number];
-export type ChromeKind = "hub" | "task" | "none";
+export type ChromeKind = "hub" | "task" | "none" | "world";
 export type GuidanceMode = "guided" | "urgent" | "quiet";
+
+/** Diegetic pause menu — progressive disclosure of systems. */
+export const GAME_MENU = [
+  { id: "file" as Screen, label: "Character", blurb: "S.Y.N.A.P.S.E plate and file" },
+  { id: "inventory" as Screen, label: "Inventory", blurb: "Pack and vault steel" },
+  { id: "journal" as const, label: "Journal", blurb: "Story, promises, discoveries" },
+  { id: "map" as Screen, label: "Map", blurb: "Orbit and regions" },
+  { id: "roster" as Screen, label: "Companions", blurb: "People who walk with you" },
+  { id: "ledger" as Screen, label: "Ledger", blurb: "Debts, wagers, obligations" },
+  { id: "settings" as const, label: "Settings", blurb: "Assist, radio, rest" },
+] as const;
+
+export type GameMenuId = (typeof GAME_MENU)[number]["id"];
 
 export const TASK_META: Record<TaskScreen, { title: string; plate: boolean }> = {
   market: { title: "Market", plate: true },
@@ -25,10 +42,17 @@ export function isTaskScreen(screen: Screen): screen is TaskScreen {
   return (TASK_SCREENS as readonly Screen[]).includes(screen);
 }
 
-export function chromeKind(screen: Screen): ChromeKind {
+export function chromeKind(screen: Screen, state?: GameState): ChromeKind {
+  if (state?.regionMapOpen && screen === "map") return "world";
+  if (screen === "map") return "world";
   if (isHubScreen(screen)) return "hub";
   if (isTaskScreen(screen)) return "task";
   return "none";
+}
+
+/** World-first: dock stays for reachability but can fade during immersion. */
+export function chromeImmersive(state: GameState): boolean {
+  return !!state.regionMapOpen || !!state.mission || !!state.combat;
 }
 
 export function livingCount(state: GameState): number {
@@ -126,4 +150,27 @@ export function guidanceSignal(state: GameState): {
     };
   }
   return null;
+}
+
+/** Compact HUD payload for the world-first overlay. */
+export function worldHudModel(state: GameState): {
+  day: number;
+  objective: string;
+  act: string;
+  regionTheme: string;
+  heat: number;
+  tyroneLine: string | null;
+  watchesLeft: number;
+} {
+  ensureNarrative(state);
+  const region = locationToRegion(state.selectedLoc ?? "ironclad");
+  return {
+    day: state.day,
+    objective: storyObjective(state),
+    act: state.narrative?.act ?? "prologue",
+    regionTheme: regionThemeId(region),
+    heat: state.kaneHeat ?? 0,
+    tyroneLine: state.tyrone?.utterance ?? null,
+    watchesLeft: state.shift?.watchesLeft ?? 0,
+  };
 }

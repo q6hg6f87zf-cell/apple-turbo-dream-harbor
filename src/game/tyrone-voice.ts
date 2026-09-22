@@ -25,6 +25,7 @@ import {
 } from "./tyrone-rules";
 import type { GameState, LocationId, RoomId, TyroneAssist } from "./types";
 import { promiseCallbackLine } from "@/lib/bridge/continuity-core";
+import { activeStoryBeat } from "./story-spine";
 
 const WHO = "Tyrone Bot";
 
@@ -296,6 +297,18 @@ export function considerTyroneHint(state: GameState, before: TyroneSnap) {
         priority: 0,
         reason: `Dawn death, ${deaths[0].name}`,
       });
+      return;
+    }
+    // Story spine: reference the active beat without lecturing.
+    const beat = activeStoryBeat(state);
+    if (beat && !onCooldown(state, "story-dawn")) {
+      const said = speakTyrone(state, {
+        text: `${beat.title}. ${beat.objective}`,
+        concept: `story-${beat.id}`,
+        priority: 2,
+        reason: `Dawn story beat ${beat.id}`,
+      });
+      if (said) cooling(state, "story-dawn", 48);
       return;
     }
   }

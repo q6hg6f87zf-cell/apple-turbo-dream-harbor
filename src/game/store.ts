@@ -13,6 +13,8 @@ import type {
 } from "./types";
 import { BASE_ROOMS, COMPANIONS, QUARTERS, locById } from "./data";
 import { chromeKind, isHubScreen, isTaskScreen } from "./shell";
+import { resolveScenarioApproach } from "./scenario";
+import { syncStorySpine } from "./story-spine";
 import {
   advanceBeat,
   applyRollToBeat,
@@ -206,6 +208,7 @@ interface Store {
   toggleTyroneNumbers: () => void;
   openGuide: () => void;
   closeGuide: () => void;
+  resolveScenario: (scenarioId: string, approachId: string) => string | null;
   openExpansion: () => void;
   closeExpansion: () => void;
   openWork: (job: WorkJob) => void;
@@ -529,6 +532,19 @@ export const useGame = create<Store>((set, get) => ({
     }),
   openGuide: () => set({ guideOpen: true }),
   closeGuide: () => set({ guideOpen: false }),
+  resolveScenario: (scenarioId, approachId) => {
+    let err: string | null = null;
+    mutate(set, (st) => {
+      const result = resolveScenarioApproach(st, scenarioId, approachId);
+      if (!result) {
+        err = "That approach is not open.";
+        st.toast = err;
+        return;
+      }
+      syncStorySpine(st);
+    });
+    return err;
+  },
   openExpansion: () => set({ expansionOpen: true }),
   closeExpansion: () => set({ expansionOpen: false }),
   openWork: (job) => set({ work: job }),

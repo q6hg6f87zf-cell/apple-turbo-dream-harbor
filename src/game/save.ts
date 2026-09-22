@@ -1,3 +1,5 @@
+import { restoreNarrative } from "./narrative-state";
+import { bootstrapNarrative } from "./story-spine";
 import { SAVE_KEY, SAVE_VERSION, resolveLineage, resolveRaceName } from "./data";
 import { applyFloor, isSnowflake, readWho, saveKeyFor, writeWho, type DiscordIdentity } from "./discord";
 import { defaultState } from "./engine";
@@ -154,8 +156,10 @@ export function loadSave(): GameState {
     };
     merged.tyrone = restoreTyrone((parsed as GameState).tyrone);
     merged.travis = restoreTravis((parsed as GameState).travis);
+    merged.narrative = restoreNarrative((parsed as GameState).narrative);
     seedPackIfNeeded(merged);
     ensureSquad(merged);
+    bootstrapNarrative(merged);
     return merged;
   } catch {
     return base;

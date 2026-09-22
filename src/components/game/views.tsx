@@ -1034,7 +1034,7 @@ export function MapView() {
       <div>
         <SectionLabel>The Hollow Realm</SectionLabel>
         <h2 className="font-display text-2xl">World</h2>
-        <p className="mt-1 text-secondary text-muted">Pick a region to brief the sortie. Orbit is the planet.</p>
+        <p className="mt-1 text-secondary text-muted">The planet is the board. Orbit first. Brief on the ground.</p>
       </div>
 
       <div className="grid grid-cols-1 gap-2">

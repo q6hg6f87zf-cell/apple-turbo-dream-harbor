@@ -66,9 +66,9 @@ describe("guidanceMode", () => {
 });
 
 describe("chromeKind", () => {
-  it("classifies hub and task", () => {
+  it("classifies hub, world, and task", () => {
     assert.equal(chromeKind("hq"), "hub");
-    assert.equal(chromeKind("map"), "hub");
+    assert.equal(chromeKind("map"), "world");
     assert.equal(chromeKind("arcade"), "hub");
     assert.equal(chromeKind("inventory"), "hub");
     assert.equal(chromeKind("more"), "hub");
