@@ -30,7 +30,11 @@ export function PauseMenu({ open, onClose, initial = "menu" }: { open: boolean; 
   const scenarios = availableScenarios(s);
   const beat = activeStoryBeat(s);
   const journal = s.narrative?.journal ?? [];
-  const openScenario = scenarios[0];
+  const pinned =
+    scenarios.find((x) => x.poiId && x.poiId === s.selectedPoiId) ??
+    scenarios.find((x) => x.locationId && x.locationId === s.selectedLoc) ??
+    scenarios[0];
+  const openScenario = pinned;
 
   if (!open) return null;
 

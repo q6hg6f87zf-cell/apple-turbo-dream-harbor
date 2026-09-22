@@ -13,8 +13,9 @@ import type {
 } from "./types";
 import { BASE_ROOMS, COMPANIONS, QUARTERS, locById } from "./data";
 import { chromeKind, isHubScreen, isTaskScreen } from "./shell";
-import { resolveScenarioApproach } from "./scenario";
+import { resolveScenarioApproach, scenarioAtPoi } from "./scenario";
 import { syncStorySpine } from "./story-spine";
+import { queueCastPresence, presenceLineForSituation } from "./cast-presence";
 import {
   advanceBeat,
   applyRollToBeat,
@@ -48,6 +49,7 @@ import {
   seatSoul,
   spawnCombat,
   spawnAegisYard,
+  spawnScenarioCombat,
   stampPlayerProfile,
   finishCombat,
 } from "./engine";
@@ -542,6 +544,13 @@ export const useGame = create<Store>((set, get) => ({
         return;
       }
       syncStorySpine(st);
+      if (result.spawnCombat) {
+        spawnScenarioCombat(st, scenarioId);
+      }
+      if (result.followUpId) {
+        const cue = presenceLineForSituation(st, result.followUpId);
+        if (cue && st.tyrone) st.tyrone.utterance = cue;
+      }
     });
     return err;
   },
@@ -875,6 +884,7 @@ export const useGame = create<Store>((set, get) => ({
       ensureMarket(st);
       meetCast(st, "holt");
       if (st.market?.visitor?.id) meetCast(st, st.market.visitor.id);
+      queueCastPresence(st, "holt");
       st.screen = "market";
       st.regionMapOpen = false;
       markFieldJob(st, "market", "Walked the Moon Squad Market under the Iron Gate.", 1);
@@ -886,7 +896,20 @@ export const useGame = create<Store>((set, get) => ({
     if (!id) return "Pin a site first.";
     let msg: string | null = null;
     let openBay = false;
+    let openSituation = false;
     mutate(set, (st) => {
+      const sit = scenarioAtPoi(st, loc, id);
+      if (sit && !st.combat && !st.mission) {
+        st.selectedLoc = loc;
+        st.selectedPoiId = id;
+        const cue = presenceLineForSituation(st, sit.id);
+        if (cue && st.tyrone) st.tyrone.utterance = cue;
+        if (sit.id === "travis_bay") queueCastPresence(st, "travis");
+        if (sit.id === "halo_yard") queueCastPresence(st, "lyra");
+        openSituation = true;
+        msg = null;
+        return;
+      }
       msg = workPoi(st, loc, id);
       if (msg === "shop") {
         if (isHubScreen(st.screen) && !st.openedFrom) st.openedFrom = st.screen;
@@ -895,6 +918,7 @@ export const useGame = create<Store>((set, get) => ({
         ensureMarket(st);
         meetCast(st, "holt");
         if (st.market?.visitor?.id) meetCast(st, st.market.visitor.id);
+        queueCastPresence(st, "holt");
         st.screen = "market";
         st.regionMapOpen = false;
         markFieldJob(st, "market", "Walked the Moon Squad Market under the Iron Gate.", 1);
@@ -909,6 +933,7 @@ export const useGame = create<Store>((set, get) => ({
       }
       if (msg === "bay") {
         meetCast(st, "travis");
+        queueCastPresence(st, "travis");
         st.selectedLoc = loc;
         st.selectedPoiId = id;
         st.regionMapOpen = false;
@@ -921,8 +946,18 @@ export const useGame = create<Store>((set, get) => ({
         st.toast = "Pin the site. Pick an approach. Deploy. That hill has a name.";
         msg = null;
       }
+      // Tower listen — Rourke presence after workPoi mutates
+      if (!msg && id.includes("tower")) {
+        queueCastPresence(st, "rourke");
+      }
+      if (!msg && id.includes("berm")) {
+        queueCastPresence(st, "lyra");
+      }
     });
     if (openBay) set({ work: { kind: "travis" } });
+    if (openSituation && typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("hollow:open-situation"));
+    }
     return msg;
   },
   deliverTravis: (itemId) => {

@@ -458,6 +458,158 @@ export const TALK: Record<string, TalkLine[]> = {
       text: "I do not sell those plates to Kane's buyers. I will not start. File tab, PEOPLE, if you forget a face. The guitar stays.",
     },
   ],
+  travis_open: [
+    {
+      who: "Travis",
+      castId: "travis",
+      portrait: CAST.travis.portrait,
+      still: CAST.travis.still,
+      text: "Jig's empty. You can see that. I am not asking for charity. I am asking whether Tyrone stays a customer.",
+    },
+    {
+      who: "Travis",
+      castId: "travis",
+      portrait: CAST.travis.portrait,
+      still: CAST.travis.still,
+      text: "Bring campaign parts or walk. Kane's buyers never needed my permission. You still might.",
+    },
+  ],
+  travis_filled: [
+    {
+      who: "Travis",
+      castId: "travis",
+      portrait: CAST.travis.portrait,
+      still: CAST.travis.still,
+      text: "Bay's lit. He lists less to port. Keep the parts coming and I keep the serial quiet.",
+    },
+  ],
+  travis_cold: [
+    {
+      who: "Travis",
+      castId: "travis",
+      portrait: CAST.travis.portrait,
+      still: CAST.travis.still,
+      text: "You walked out empty. The jig stays dark. I still tune the guitar. Do not ask me to pretend that is the same as seating him.",
+    },
+  ],
+  lyra_berm: [
+    {
+      who: "Lyra Voss",
+      castId: "lyra",
+      portrait: CAST.lyra.portrait,
+      still: CAST.lyra.still,
+      text: "White light on the ridge is not weather. If you are Vault 13, you already know my frequency. Do not make me write your name twice.",
+    },
+  ],
+  lyra_shadow: [
+    {
+      who: "Lyra Voss",
+      castId: "lyra",
+      portrait: CAST.lyra.portrait,
+      still: CAST.lyra.still,
+      text: "You hid. Smart. The wing still has an outline. Outlines get filled in.",
+    },
+  ],
+  lyra_scar: [
+    {
+      who: "Lyra Voss",
+      castId: "lyra",
+      portrait: CAST.lyra.portrait,
+      still: CAST.lyra.still,
+      text: "You answered armed. So did I. Orion will have the transcript. Sleep lightly.",
+    },
+  ],
+  lyra_lie: [
+    {
+      who: "Lyra Voss",
+      castId: "lyra",
+      portrait: CAST.lyra.portrait,
+      still: CAST.lyra.still,
+      text: "Salvage outfit. Cute. The band stays open whether your story does or not.",
+    },
+  ],
+  lyra_halo: [
+    {
+      who: "Lyra Voss",
+      castId: "lyra",
+      portrait: CAST.lyra.portrait,
+      still: CAST.lyra.still,
+      text: "Halo Yard. You walked where the replacement wing drills. That was not nostalgia. That was inventory.",
+    },
+  ],
+  rourke_mast: [
+    {
+      who: "Calder Rourke",
+      castId: "rourke",
+      portrait: CAST.rourke.portrait,
+      still: CAST.rourke.still,
+      text: "ICR 88. Ironclad. If you can hear this, the mast still holds. I sell a minute. Climb when the board says listen.",
+    },
+  ],
+  rourke_vesper: [
+    {
+      who: "Calder Rourke",
+      castId: "rourke",
+      portrait: CAST.rourke.portrait,
+      still: CAST.rourke.still,
+      text: "Station will neither confirm nor stop saying V-E-S-P-E-R. You did not hear that from me. You heard it from the air.",
+    },
+  ],
+  rourke_caravan: [
+    {
+      who: "Calder Rourke",
+      castId: "rourke",
+      portrait: CAST.rourke.portrait,
+      still: CAST.rourke.still,
+      text: "Missing weigh-in is on every tongue. Half the town wants steel. Half wants a villain. Pick carefully which half you feed.",
+    },
+  ],
+  rourke_invoice: [
+    {
+      who: "Calder Rourke",
+      castId: "rourke",
+      portrait: CAST.rourke.portrait,
+      still: CAST.rourke.still,
+      text: "Gatehouse chatter says a page moved. Copied, burned, or sold — the mast does not moralize. It only repeats.",
+    },
+  ],
+  holt_gate: [
+    {
+      who: "Holt Kade",
+      castId: "holt",
+      portrait: CAST.holt.portrait,
+      still: CAST.holt.still,
+      text: "Moon Squad Market. Dawn reprint. Qty is not a suggestion. Black card pays. Kane weigh-chits do not.",
+    },
+  ],
+  holt_vesper: [
+    {
+      who: "Holt Kade",
+      castId: "holt",
+      portrait: CAST.holt.portrait,
+      still: CAST.holt.still,
+      text: "People are asking for hull plate with a stencil I will not read out loud. Buy what you can carry. Leave the politics on the porch.",
+    },
+  ],
+  holt_heat: [
+    {
+      who: "Holt Kade",
+      castId: "holt",
+      portrait: CAST.holt.portrait,
+      still: CAST.holt.still,
+      text: "Surveyors have been counting crates twice. When AEGIS shops, prices lie. Take what you need and get off my floor.",
+    },
+  ],
+  ending: [
+    {
+      who: WHO,
+      text: "The tape loops, {name}. Your version of the Hollow is already on the air. I will not pretend the porch is bigger than it is.",
+    },
+    {
+      who: WHO,
+      text: "Read the journal if you forget what you chose. I remember. That is the job.",
+    },
+  ],
 };
 
 export const MANUAL: Record<string, FieldCard> = {

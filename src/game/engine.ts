@@ -1675,4 +1675,93 @@ export function spawnAegisYard(state: GameState): GameState {
   return state;
 }
 
+/** Live fight kicked from an authored situation (no mission required). */
+export function spawnScenarioCombat(state: GameState, scenarioId: string): GameState {
+  const idle = idleAtHq(state);
+  const party = (idle.length ? idle : living(state)).slice(0, 3).map((o) => o.id);
+  if (!party.length) {
+    state.toast = "No one to send. The situation went loud without you.";
+    return state;
+  }
+  const loc =
+    (scenarioId.includes("halo") || scenarioId.includes("caravan") || scenarioId.includes("vesper")
+      ? "ironclad"
+      : scenarioId.includes("slag")
+        ? "kingdom"
+        : scenarioId.includes("spire")
+          ? "caverns"
+          : (state.selectedLoc ?? "ironclad")) as LocationId;
+
+  let enemies: Combatant[] = [];
+  if (scenarioId.includes("halo") || scenarioId.includes("vesper")) {
+    const person = aegisOnDuty(state.day, state.kaneHeat ?? 0);
+    meetCast(state, person.id);
+    const runner = aegisRunner(person);
+    enemies = [
+      {
+        id: uid("sc-aegis"),
+        name: runner.name,
+        hp: runner.hp,
+        maxHp: runner.hp,
+        atk: runner.atk,
+        def: runner.def,
+        dc: runner.dc,
+        tags: ["aegis", "scenario"],
+        flavor: runner.flavor,
+        portrait: runner.portrait,
+        castId: runner.castId,
+        armorClass: "powered",
+        preferredRange: "mid",
+        resist: ["pistol"],
+        weakness: ["energy", "rifle"],
+      },
+    ];
+  } else {
+    const pack = ENEMIES[loc]?.length ? ENEMIES[loc] : YARD_ENEMIES;
+    const e = pick(pack.length ? pack : YARD_ENEMIES);
+    enemies = [
+      {
+        id: uid("sc-field"),
+        name: e.name,
+        hp: e.hp,
+        maxHp: e.hp,
+        atk: e.atk,
+        def: e.def,
+        dc: e.dc,
+        tags: ["scenario", "pack"],
+        flavor: e.flavor,
+        ...fieldArmor(e.name),
+      },
+    ];
+  }
+
+  state.regionMapOpen = false;
+  state.combat = {
+    locationId: loc,
+    missionKind: "raid",
+    partyIds: party,
+    enemies,
+    turn: 1,
+    actorIndex: 0,
+    log: [
+      `Situation · ${scenarioId.replaceAll("_", " ")} went hot.`,
+      `Hollow · ${enemies.map((e) => e.name).join(" & ")} — ${enemies[0]?.flavor ?? "the field notices."}`,
+      `Tyrone · Magazines matter. Shame is cheaper than a grave.`,
+    ],
+    rewardMult: 1.35,
+  };
+  party.forEach((id) => {
+    const i = state.operatives.findIndex((o) => o.id === id);
+    if (i >= 0) {
+      state.operatives[i] = {
+        ...state.operatives[i],
+        battles: state.operatives[i].battles + 1,
+        status: "deployed",
+        location: loc,
+      };
+    }
+  });
+  return state;
+}
+
 export type { ShopOffer, Resident };

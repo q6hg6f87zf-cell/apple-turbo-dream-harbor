@@ -91,6 +91,21 @@ const BULLETINS: Bulletin[] = [
     flag: "ending_ready",
     line: "Vault 13 porch · The tape loops. Your version of the Hollow is already on the air.",
   },
+  {
+    id: "slag-chit",
+    flag: "slag_chit_paid",
+    line: "ICR 88 · Furnace Court cleared a Vault 13 chit. Kane's buyers smiled. That is never free.",
+  },
+  {
+    id: "slag-forge",
+    flag: "slag_chit_forged",
+    line: "ICR 88 · Twin slag chits in circulation. Ledger clerks are counting twice.",
+  },
+  {
+    id: "spire-ride",
+    flag: "spire_cage_ridden",
+    line: "ICR 88 · Empty cage, extra passenger. Blackspire ore crews want hazard pay.",
+  },
 ];
 
 /** Pick a bulletin that matches current flags (newest journal-adjacent first). */
