@@ -12,7 +12,7 @@ import {
   type NarrativeFlagId,
 } from "./narrative-state";
 import { rememberTyrone } from "./tyrone-mind";
-import type { GameState, StatKey } from "./types";
+import type { GameState, LocationId, StatKey } from "./types";
 export type ScenarioApproachId = string;
 
 export type ScenarioOutcomeKind =
@@ -49,6 +49,10 @@ export interface ScenarioDef {
   title: string;
   setup: string;
   locationLabel: string;
+  /** War-table pin — situations live on the map, not only in menus. */
+  poiId?: string;
+  /** Region / location id for map focus (legacy aliases ok). */
+  locationId?: LocationId;
   hidden?: string;
   trigger: NarrativeCheck[];
   /** Once resolved (any terminal flag), do not re-offer. */
@@ -64,6 +68,8 @@ export const SCENARIOS: ScenarioDef[] = [
     setup:
       "A weigh-in never arrived outside Ironclad. Tracks in the slag. Witnesses who will not meet your eye. Kane's buyers are already asking who took the steel.",
     locationLabel: "East of the Iron Gate",
+    poiId: "ironclad-rail",
+    locationId: "ironclad",
     hidden: "The caravan may have staged its own vanishing — or AEGIS painted the route.",
     trigger: [
       { type: "min_day", day: 4 },
@@ -217,6 +223,8 @@ export const SCENARIOS: ScenarioDef[] = [
     title: "Culvert Cache",
     setup: "The doubled tracks end at a culvert stuffed with empty plate crates and a white cell.",
     locationLabel: "Highway culvert",
+    poiId: "ironclad-highway",
+    locationId: "ironclad",
     trigger: [
       { type: "flag", id: "caravan_investigated" },
       { type: "not_flag", id: "caravan_survived" },
@@ -271,6 +279,8 @@ export const SCENARIOS: ScenarioDef[] = [
     setup:
       "Travis keeps the last T-0880 bay Kane did not melt. The jig is empty. He will seat campaign parts — or lock the bay if you waste his time.",
     locationLabel: "Ironclad Mechanical Shop",
+    poiId: "ironclad-shop",
+    locationId: "ironclad",
     hidden: "Travis still tunes the guitar. He is not asking for charity. He is asking whether Tyrone stays a customer.",
     trigger: [
       { type: "min_day", day: 2 },
@@ -354,6 +364,8 @@ export const SCENARIOS: ScenarioDef[] = [
     setup:
       "Scorched outlines of 2753 frames. A spent cell still warm. Someone is drilling where Orion trained the wing that replaced Tyrone.",
     locationLabel: "Halo Yard",
+    poiId: "ironclad-halo",
+    locationId: "ironclad",
     trigger: [
       { type: "min_day", day: 5 },
       { type: "kane_heat_gte", n: 8 },
@@ -456,6 +468,8 @@ export const SCENARIOS: ScenarioDef[] = [
     setup:
       "A weigh-chit and a page of hull serials sit on a gatehouse table Kane's people left warm. The stencil says VESPER. What you do with the page becomes the story Kane tells about Vault 13.",
     locationLabel: "Iron Gate gatehouse",
+    poiId: "ironclad-gate",
+    locationId: "ironclad",
     trigger: [
       { type: "flag", id: "vesper_named" },
       { type: "min_day", day: 6 },
@@ -535,6 +549,168 @@ export const SCENARIOS: ScenarioDef[] = [
       },
     ],
   },
+  {
+    id: "slag_ledger",
+    title: "Furnace Chit",
+    setup:
+      "Valdris's court still stamps slag chits Kane honors. A runner offers you one hot enough to burn through a glove — pay, forge a copy, or feed it to the furnace.",
+    locationLabel: "Furnace Court",
+    poiId: "slag-tithe",
+    locationId: "kingdom",
+    trigger: [
+      { type: "min_day", day: 5 },
+      { type: "location_unlocked", id: "kingdom" },
+      { type: "not_flag", id: "slag_chit_paid" },
+      { type: "not_flag", id: "slag_chit_forged" },
+      { type: "not_flag", id: "slag_chit_burned" },
+      {
+        type: "any",
+        of: [
+          { type: "flag", id: "slag_entered" },
+          { type: "min_day", day: 6 },
+        ],
+      },
+    ],
+    resolvedWhen: [
+      {
+        type: "any",
+        of: [
+          { type: "flag", id: "slag_chit_paid" },
+          { type: "flag", id: "slag_chit_forged" },
+          { type: "flag", id: "slag_chit_burned" },
+        ],
+      },
+    ],
+    approaches: [
+      {
+        id: "pay_chit",
+        label: "Honor the chit",
+        blurb: "Caps now. Kane's buyers nod. Valdris remembers a debtor who paid.",
+        reason: "Caps",
+        outcome: "partial_success",
+        flagsSet: ["slag_entered", "slag_chit_paid"],
+        faction: { kane: 2, ironclad: -1 },
+        heatDelta: -1,
+        journal: {
+          title: "Paid in slag",
+          body: "The chit cleared. Furnace Court marked Vault 13 as solvent. Kane marked you as useful.",
+          tags: ["scenario", "slag"],
+        },
+        toast: "Chit honored. Kane notices. The furnace does too.",
+      },
+      {
+        id: "forge_copy",
+        label: "Forge a twin chit",
+        blurb: "INT work. One chit for Kane's book. One for yours.",
+        reason: "INT — forgery",
+        check: { stat: "INT", dc: 13, label: "Forge" },
+        outcome: "full_success",
+        flagsSet: ["slag_entered", "slag_chit_forged", "kane_invoice_stolen"],
+        faction: { vault13: 2, kane: -2 },
+        heatDelta: 2,
+        journal: {
+          title: "Twin ledgers",
+          body: "Two chits. One lie. Furnace Court has not noticed — yet.",
+          tags: ["scenario", "slag"],
+        },
+        toast: "Forged twin. Useful. Loud if they count.",
+      },
+      {
+        id: "burn_chit",
+        label: "Feed it to the furnace",
+        blurb: "Deny Valdris. Deny Kane. Smoke is honest.",
+        outcome: "fail_forward",
+        flagsSet: ["slag_entered", "slag_chit_burned"],
+        faction: { kane: -1, pack: 1 },
+        heatDelta: 1,
+        journal: {
+          title: "Ash chit",
+          body: "The furnace ate the debt. Valdris will invent a new one. You bought a night of clean gloves.",
+          tags: ["scenario", "slag"],
+        },
+        toast: "Chit burned. Debt becomes rumor.",
+      },
+    ],
+  },
+  {
+    id: "spire_lift",
+    title: "Lift Cage Rattle",
+    setup:
+      "Blackspire's cage rattles on an empty shift. Ore crews swear something rides without a ticket. Climb, seal, or leave the mountain its secret.",
+    locationLabel: "Blackspire lift",
+    poiId: "blackspire-lift",
+    locationId: "caverns",
+    trigger: [
+      { type: "min_day", day: 7 },
+      { type: "location_unlocked", id: "caverns" },
+      { type: "flag", id: "blackspire_entered" },
+      { type: "not_flag", id: "spire_cage_ridden" },
+      { type: "not_flag", id: "spire_cage_sealed" },
+      { type: "not_flag", id: "spire_cage_ignored" },
+    ],
+    resolvedWhen: [
+      {
+        type: "any",
+        of: [
+          { type: "flag", id: "spire_cage_ridden" },
+          { type: "flag", id: "spire_cage_sealed" },
+          { type: "flag", id: "spire_cage_ignored" },
+        ],
+      },
+    ],
+    approaches: [
+      {
+        id: "ride_cage",
+        label: "Ride the empty cage",
+        blurb: "Something wants a witness. Be one.",
+        reason: "WIS — nerve",
+        check: { stat: "WIS", dc: 12, label: "Ride" },
+        outcome: "unexpected",
+        flagsSet: ["spire_cage_ridden", "t0880_secret_hinted", "blackspire_entered"],
+        faction: { vault13: 1, aegis: -1 },
+        heatDelta: 2,
+        journal: {
+          title: "Passenger without a ticket",
+          body: "Charge in the coil housing. A serial ghost that almost fits Tyrone. The mountain keeps the rest.",
+          tags: ["scenario", "blackspire", "tyrone"],
+        },
+        tyroneLine: "I felt that charge. Do not ask me to name it yet.",
+        toast: "Cage rode true. Something rode with you.",
+      },
+      {
+        id: "seal_cage",
+        label: "Weld the gate shut",
+        blurb: "Deny the mountain its elevator. Loud. Final for a watch.",
+        reason: "STR — weld",
+        check: { stat: "STR", dc: 12, label: "Weld" },
+        outcome: "partial_success",
+        flagsSet: ["spire_cage_sealed", "blackspire_entered"],
+        faction: { ironclad: 1 },
+        heatDelta: 1,
+        journal: {
+          title: "Sealed lift",
+          body: "No passengers. No answers. Ore crews will cut it open by next week. You bought silence, not truth.",
+          tags: ["scenario", "blackspire"],
+        },
+        toast: "Lift sealed. The rattle stops — for now.",
+      },
+      {
+        id: "leave_spire",
+        label: "Leave the cage alone",
+        blurb: "Not every rattle is your war.",
+        outcome: "retreat",
+        flagsSet: ["spire_cage_ignored"],
+        faction: { aegis: 1 },
+        heatDelta: 1,
+        journal: {
+          title: "Unwatched cage",
+          body: "The mountain keeps its passenger. ICR will invent a miner story by dawn.",
+          tags: ["scenario", "blackspire", "consequence"],
+        },
+        toast: "Cage keeps its secret. So does the mountain.",
+      },
+    ],
+  },
 ];
 
 export function scenarioById(id: string): ScenarioDef | undefined {
@@ -550,6 +726,20 @@ export function availableScenarios(state: GameState): ScenarioDef[] {
   });
 }
 
+/** Open situation anchored to a war-table pin. */
+export function scenarioAtPoi(
+  state: GameState,
+  loc: LocationId,
+  poiId: string | null | undefined,
+): ScenarioDef | null {
+  if (!poiId) return null;
+  const open = availableScenarios(state);
+  const hit =
+    open.find((s) => s.poiId === poiId) ??
+    open.find((s) => s.locationId === loc && s.poiId && poiId.startsWith(s.poiId.split("-")[0]!));
+  return hit ?? null;
+}
+
 export function availableApproaches(state: GameState, scenario: ScenarioDef): ScenarioApproach[] {
   return scenario.approaches.filter((a) => checksPass(state, a.require));
 }
@@ -562,6 +752,10 @@ export interface ScenarioResolveResult {
   dc?: number;
   toast: string;
   failForward: boolean;
+  /** Kick a live field fight (store calls spawnScenarioCombat). */
+  spawnCombat?: boolean;
+  /** Next authored situation unlocked by this approach. */
+  followUpId?: string;
 }
 
 function leadStat(state: GameState, stat: StatKey): number {
@@ -661,18 +855,33 @@ export function resolveScenarioApproach(
     state.tyrone.utterance = approach.tyroneLine;
   }
 
-  const toast =
+  const finalOutcome =
+    checkPassed === false && outcome === approach.outcome ? "fail_forward" : outcome;
+  const spawnCombat = finalOutcome === "combat";
+  const followUpId =
+    approach.followUpScenarioId && (checkPassed === undefined || checkPassed)
+      ? approach.followUpScenarioId
+      : undefined;
+
+  let toast =
     approach.toast ??
     (checkPassed === false ? "It went sideways. The story continues." : "Resolved.");
+  if (followUpId) {
+    const next = scenarioById(followUpId);
+    if (next) toast = `${toast} Follow-up open: ${next.title}.`;
+  }
+  if (spawnCombat) toast = `${toast} Contact!`;
 
   state.toast = toast;
   return {
     approachId,
-    outcome: checkPassed === false && outcome === approach.outcome ? "fail_forward" : outcome,
+    outcome: finalOutcome,
     checkPassed,
     total,
     dc,
     toast,
-    failForward: checkPassed === false || outcome === "fail_forward",
+    failForward: checkPassed === false || finalOutcome === "fail_forward",
+    spawnCombat,
+    followUpId,
   };
 }

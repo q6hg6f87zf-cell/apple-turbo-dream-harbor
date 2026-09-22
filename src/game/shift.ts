@@ -5,6 +5,7 @@ import { CAST, meetCast } from "./cast";
 import { queueTalk } from "./talk";
 import { applyAegisChoice } from "./consequences";
 import { syncStorySpine } from "./story-spine";
+import { bumpFaction, setFlag } from "./narrative-state";
 import type {
   DayTask,
   GameState,
@@ -461,6 +462,28 @@ function finish(state: GameState, task: DayTask, report: string, watches = task.
   note(state, report);
   state.toast = report;
   state.shift.activeId = null;
+  // Board work writes the story — Oblivion radiant jobs leave marks.
+  if (task.kind === "tower") {
+    setFlag(state, "gate_watched", true);
+    bumpFaction(state, "ironclad", 1);
+  }
+  if (task.kind === "aegis") {
+    setFlag(state, "aegis_contact_survived", true);
+  }
+  if (task.kind === "tribute") {
+    setFlag(state, "kane_weigh_in_seen", true);
+    bumpFaction(state, "kane", 1);
+  }
+  if (task.kind === "market") {
+    bumpFaction(state, "ironclad", 1);
+  }
+  if (task.kind === "crisis") {
+    bumpFaction(state, "vault13", 1);
+  }
+  if (task.loc === "kingdom" || task.kind === "salvage") {
+    if (state.locations.kingdom?.unlocked) setFlag(state, "slag_entered", true);
+  }
+  syncStorySpine(state);
   if (state.shift.watchesLeft <= 0) {
     state.shift.watch = "night";
     state.toast = `${report} Shift over. Rest when you are ready.`;

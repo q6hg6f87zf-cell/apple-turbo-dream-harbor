@@ -7,12 +7,12 @@ import { cn } from "@/lib/cn";
 import { BookOpen, CircleHelp } from "lucide-react";
 
 /**
- * Minimal world HUD — objective + day + situation chip + Tyrone whisper.
- * Sits above the environment; fades when mission/combat owns the screen.
+ * Minimal world HUD — objective + day + situation + ICR bulletin + Tyrone whisper.
  */
 export function WorldHUD({ onJournal, onPause }: { onJournal?: () => void; onPause?: () => void }) {
   const s = useGame((g) => g.s);
   const openGuide = useGame((g) => g.openGuide);
+  const selectPoi = useGame((g) => g.selectPoi);
   if (s.mission || s.combat) return null;
   const hud = worldHudModel(s);
   const actLabel = actTitle(hud.act as StoryActId);
@@ -40,6 +40,7 @@ export function WorldHUD({ onJournal, onPause }: { onJournal?: () => void; onPau
               className="mt-2 flex w-full flex-col items-start border-t border-ember/30 pt-2 text-left"
               onClick={() => {
                 sfx.click();
+                if (hud.situation?.poiId) selectPoi(hud.situation.poiId);
                 window.dispatchEvent(new CustomEvent("hollow:open-situation"));
               }}
             >
@@ -47,6 +48,14 @@ export function WorldHUD({ onJournal, onPause }: { onJournal?: () => void; onPau
               <span className="truncate font-display text-body text-paper">{hud.situation.title}</span>
               <span className="truncate font-mono text-[10px] text-muted">{hud.situation.place}</span>
             </button>
+          ) : null}
+          {hud.bulletin ? (
+            <p
+              data-world-bulletin="1"
+              className="mt-2 border-t border-line/40 pt-2 font-mono text-[10px] leading-relaxed text-moon"
+            >
+              {hud.bulletin}
+            </p>
           ) : null}
         </div>
         <div className="flex shrink-0 gap-1">

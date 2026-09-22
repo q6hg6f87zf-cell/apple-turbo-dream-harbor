@@ -60,6 +60,13 @@ export const NARRATIVE_FLAG_IDS = [
   "tyrone_trust_broken",
   "tyrone_loyalty_high",
   "ending_ready",
+  // Regional situations
+  "slag_chit_paid",
+  "slag_chit_forged",
+  "slag_chit_burned",
+  "spire_cage_ridden",
+  "spire_cage_sealed",
+  "spire_cage_ignored",
 ] as const;
 
 export type NarrativeFlagId = (typeof NARRATIVE_FLAG_IDS)[number];

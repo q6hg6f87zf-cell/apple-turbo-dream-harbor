@@ -2,13 +2,15 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { defaultState } from "./engine.ts";
 import { bumpFaction, emptyNarrative, hasFlag, setFlag } from "./narrative-state.ts";
-import { availableScenarios, resolveScenarioApproach } from "./scenario.ts";
+import { availableScenarios, resolveScenarioApproach, scenarioAtPoi } from "./scenario.ts";
 import { applyEnding, endingEligible, pickEndingId } from "./endings.ts";
 import { radioBulletinFor } from "./radio-world.ts";
 import { advanceTalk } from "./talk.ts";
 import { discoverNextPoi, discoverPoi, poisForLocation } from "./field-ops.ts";
 import { worldHudModel } from "./shell.ts";
 import { answerTyroneQuestion } from "./tyrone-voice.ts";
+import { spawnScenarioCombat } from "./engine.ts";
+import { pickCastScript } from "./cast-presence.ts";
 
 describe("authored scenarios pass 2", () => {
   it("opens Travis bay when the file is cut", () => {
@@ -160,5 +162,107 @@ describe("oblivion depth hardenings", () => {
     assert.ok(s.narrative!.journal.some((j) => j.id === "fac-kane-6"));
     bumpFaction(s, "kane", -20);
     assert.ok(s.narrative!.journal.some((j) => j.id === "fac-kane--6"));
+  });
+});
+
+describe("immersion depth pass", () => {
+  it("anchors Travis bay to the shop pin", () => {
+    const s = defaultState();
+    s.started = true;
+    s.day = 3;
+    s.narrative = emptyNarrative();
+    s.narrative.act = "act_i";
+    setFlag(s, "file_cut", true);
+    s.operatives = [{ id: "op1", name: "Ash", status: "idle" } as never];
+    const sit = scenarioAtPoi(s, "ironclad", "ironclad-shop");
+    assert.ok(sit);
+    assert.equal(sit!.id, "travis_bay");
+  });
+
+  it("spawns combat from a combat-outcome approach", () => {
+    const s = defaultState();
+    s.started = true;
+    s.day = 6;
+    s.kaneHeat = 10;
+    s.narrative = emptyNarrative();
+    s.narrative.act = "act_ii";
+    setFlag(s, "vesper_named", true);
+    s.operatives = [
+      {
+        id: "op1",
+        name: "Ash",
+        status: "idle",
+        location: "hq",
+        hp: 20,
+        maxHp: 20,
+        battles: 0,
+        cls: "Warrior",
+        statDice: { STR: 14, SPD: 10, INT: 10, WIS: 10, CHA: 10, LCK: 10 },
+      } as never,
+    ];
+    const result = resolveScenarioApproach(s, "halo_yard", "kick_the_nest", { forceRoll: 20 });
+    assert.ok(result?.spawnCombat);
+    spawnScenarioCombat(s, "halo_yard");
+    assert.ok(s.combat);
+    assert.ok(s.combat!.enemies.length >= 1);
+  });
+
+  it("chains caravan tracks into culvert follow-up toast", () => {
+    const s = defaultState();
+    s.started = true;
+    s.day = 5;
+    s.narrative = emptyNarrative();
+    s.narrative.act = "act_ii";
+    setFlag(s, "vesper_named", true);
+    s.kaneHeat = 6;
+    s.operatives = [
+      {
+        id: "op1",
+        name: "Ash",
+        status: "idle",
+        location: "hq",
+        hp: 20,
+        maxHp: 20,
+        battles: 0,
+        cls: "Ranger",
+        statDice: { STR: 10, SPD: 12, INT: 10, WIS: 14, CHA: 10, LCK: 10 },
+      } as never,
+    ];
+    const result = resolveScenarioApproach(s, "caravan_missing", "tracks", { forceRoll: 20 });
+    assert.equal(result?.followUpId, "caravan_culvert");
+    assert.match(result!.toast, /Culvert/i);
+    assert.ok(availableScenarios(s).some((x) => x.id === "caravan_culvert"));
+  });
+
+  it("queues ending talk when an epilogue applies", () => {
+    const s = defaultState();
+    s.started = true;
+    s.day = 10;
+    s.kaneHeat = 16;
+    s.narrative = emptyNarrative();
+    s.narrative.act = "act_iii";
+    setFlag(s, "lyra_ridge_handled", true);
+    setFlag(s, "caravan_investigated", true);
+    setFlag(s, "halo_reported", true);
+    setFlag(s, "invoice_sold", true);
+    const ending = applyEnding(s);
+    assert.ok(ending);
+    assert.equal(s.talk?.script, "ending");
+  });
+
+  it("picks reactive Travis presence from flags", () => {
+    const s = defaultState();
+    s.narrative = emptyNarrative();
+    setFlag(s, "travis_jig_filled", true);
+    assert.equal(pickCastScript(s, "travis"), "travis_filled");
+  });
+
+  it("exposes ICR bulletin on the World HUD", () => {
+    const s = defaultState();
+    s.narrative = emptyNarrative();
+    setFlag(s, "invoice_copied", true);
+    const hud = worldHudModel(s);
+    assert.ok(hud.bulletin);
+    assert.match(hud.bulletin!, /ICR|Vesper|serial/i);
   });
 });

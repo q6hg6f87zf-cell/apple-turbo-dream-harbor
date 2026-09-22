@@ -1,6 +1,7 @@
 import { REGION_ART } from "@/game/art";
 import { CANONICAL_REGION_IDS, locById, regionById } from "@/game/data";
 import { knownPois, locationToRegion, mapPoisForTable, poiActionOf, poiUsedToday } from "@/game/field-ops";
+import { scenarioAtPoi } from "@/game/scenario";
 import { siteCopyFor } from "@/game/story";
 import { REGION_STREET } from "@/game/item-art";
 import { sfx } from "@/game/audio";
@@ -344,8 +345,10 @@ export function RegionMapOverlay() {
           const selected = pois.find((p) => p.id === s.selectedPoiId) ?? pois[0];
           const used = selected ? poiUsedToday(s, selected.id) : false;
           const act = selected ? poiActionOf(selected) : "scout";
-          const label =
-            act === "shop"
+          const sit = selected ? scenarioAtPoi(s, loc, selected.id) : null;
+          const label = sit
+            ? `Face · ${sit.title}`
+            : act === "shop"
               ? "Open stalls"
               : act === "listen"
                 ? "Climb and listen · 1 watch"
@@ -360,16 +363,23 @@ export function RegionMapOverlay() {
                         : "Scout · 1 watch";
           return (
             <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-              <div className="pointer-events-auto mx-auto w-full max-w-xl rounded-[var(--radius-md)] border border-line/70 bg-ink/88 px-3 py-3 shadow-2xl backdrop-blur-md sm:px-4">
+              <div
+                className={cn(
+                  "pointer-events-auto mx-auto w-full max-w-xl rounded-[var(--radius-md)] border bg-ink/88 px-3 py-3 shadow-2xl backdrop-blur-md sm:px-4",
+                  sit ? "border-ember/60" : "border-line/70",
+                )}
+              >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="font-display text-[10px] uppercase tracking-[0.22em] text-ember">
-                      {selected ? selected.name : region.name}
+                      {sit ? "Situation on site" : selected ? selected.name : region.name}
                     </p>
                     <p className="mt-1 line-clamp-2 text-sm text-moon">
-                      {selected
-                        ? siteCopyFor(selected, act === "salvage" ? "forage" : "scout").brief
-                        : locById(loc).desc}
+                      {sit
+                        ? sit.setup
+                        : selected
+                          ? siteCopyFor(selected, act === "salvage" ? "forage" : "scout").brief
+                          : locById(loc).desc}
                     </p>
                   </div>
                   {street ? (
@@ -384,7 +394,8 @@ export function RegionMapOverlay() {
                   <button
                     type="button"
                     data-poi-act={selected.id}
-                    disabled={used && act !== "shop" && act !== "home" && act !== "boss" && act !== "bay"}
+                    data-poi-situation={sit ? sit.id : undefined}
+                    disabled={!sit && used && act !== "shop" && act !== "home" && act !== "boss" && act !== "bay"}
                     onClick={() => {
                       sfx.unlock();
                       const msg = useGame.getState().workSite(selected.id);
@@ -394,7 +405,9 @@ export function RegionMapOverlay() {
                     }}
                     className="mt-3 flex min-h-12 w-full items-center justify-center rounded-[var(--radius-sm)] bg-ember px-3 font-display text-sm text-ink disabled:opacity-40"
                   >
-                    {used && act !== "shop" && act !== "home" && act !== "boss" && act !== "bay" ? "Worked today" : label}
+                    {!sit && used && act !== "shop" && act !== "home" && act !== "boss" && act !== "bay"
+                      ? "Worked today"
+                      : label}
                   </button>
                 ) : null}
               </div>

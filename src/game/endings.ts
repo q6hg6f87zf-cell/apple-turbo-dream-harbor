@@ -11,6 +11,7 @@ import {
 } from "./narrative-state";
 import { rememberTyrone } from "./tyrone-mind";
 import { completeBeat, syncStorySpine } from "./story-spine";
+import { queueTalk } from "./talk";
 import type { GameState } from "./types";
 
 export type EndingId =
@@ -137,6 +138,7 @@ export function applyEnding(state: GameState, id?: EndingId): EndingDef | null {
   completeBeat(state, "convergence_choice");
   syncStorySpine(state);
   state.toast = `Epilogue · ${def.title}`;
+  queueTalk(state, "ending", true);
   return def;
 }
 
