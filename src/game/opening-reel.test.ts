@@ -80,16 +80,25 @@ describe("Kane recording and Tyrone reply", () => {
   it("cuts Tyrone footage onto the lines that name him", () => {
     assert.ok(KANE_SHOTS[0]!.at === 0);
     assert.ok(KANE_SHOTS.every((shot, i) => i === 0 || shot.at > KANE_SHOTS[i - 1]!.at));
+    assert.equal(kaneShotAt(0).subject, "kane");
+    assert.ok(kaneShotAt(0).src.includes("kane-look"));
     assert.equal(kaneShotAt(KANE_CUES[4]!.at).subject, "tyrone");
     assert.ok(kaneShotAt(KANE_CUES[4]!.at).src.includes("tyrone-line"));
     assert.equal(kaneShotAt(KANE_CUES[10]!.at).subject, "tyrone");
+    assert.equal(kaneShotAt(KANE_CUES[12]!.at).subject, "tyrone");
+    assert.ok(kaneShotAt(KANE_CUES[12]!.at).src.includes("tyrone-market"));
     assert.equal(kaneShotAt(KANE_CUES[13]!.at).subject, "tyrone");
-    assert.ok(kaneShotAt(KANE_CUES[13]!.at).src.includes("tyrone-vault"));
+    assert.ok(kaneShotAt(KANE_CUES[13]!.at).src.includes("tyrone-found"));
+    assert.equal(kaneShotAt(KANE_CUES[14]!.at).subject, "kane");
+    assert.ok(kaneShotAt(KANE_CUES[14]!.at).src.includes("kane-records"));
     assert.equal(kaneShotAt(KANE_CUES[16]!.at).subject, "aegis");
     assert.equal(kaneShotAt(KANE_CUES[19]!.at).subject, "tyrone");
+    assert.equal(kaneShotAt(KANE_CUES[20]!.at).subject, "kane");
+    assert.ok(kaneShotAt(KANE_CUES[20]!.at).src.includes("kane-look"));
     assert.equal(kaneShotAt(KANE_CUES[23]!.at).subject, "tyrone");
     assert.equal(kaneShotAt(KANE_CUES[24]!.at).subject, "tyrone");
-    assert.ok(kaneShotAt(0).src.includes("kane-desk-01"));
+    assert.ok(kaneShotAt(KANE_CUES[24]!.at).src.includes("tyrone-market"));
+    assert.equal(kaneShotAt(KANE_CUES[24]!.at).startAt, 8);
     const mid = (KANE_SHOTS[2]!.at + KANE_SHOTS[3]!.at) / 2;
     assert.ok(kaneEdgeFade(mid) < 0.15);
     assert.ok(kaneEdgeFade(KANE_CUES[4]!.at) > 0.9);

@@ -147,7 +147,7 @@ export function KaneIntro({ time }: { time: number }) {
       />
       {!showStill ? (
         <KaneShotVideo
-          key={`${shot.at}:${shot.src}`}
+          key={`${shot.at}:${shot.src}:${shot.startAt ?? 0}`}
           shot={shot}
           onFail={() => setFailed((map) => ({ ...map, [shot.src]: true }))}
         />
@@ -184,17 +184,30 @@ function KaneShotVideo({
     el.playsInline = true;
     el.setAttribute("playsinline", "true");
     el.setAttribute("webkit-playsinline", "true");
+    const seek = () => {
+      if (shot.startAt && Number.isFinite(shot.startAt)) {
+        try {
+          el.currentTime = shot.startAt;
+        } catch {
+          /* seek is best-effort before play */
+        }
+      }
+    };
     const kick = () => {
+      seek();
       void el.play().catch(() => {});
     };
+    seek();
     kick();
+    el.addEventListener("loadedmetadata", seek);
     document.addEventListener("pointerdown", kick);
     document.addEventListener("touchstart", kick, { passive: true });
     return () => {
+      el.removeEventListener("loadedmetadata", seek);
       document.removeEventListener("pointerdown", kick);
       document.removeEventListener("touchstart", kick);
     };
-  }, [armed, shot.src]);
+  }, [armed, shot.src, shot.startAt]);
 
   if (!armed) return null;
 

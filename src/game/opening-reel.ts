@@ -35,9 +35,9 @@ export const KANE_ARM = 1.88;
  * the fallback if a clip 404s.
  */
 export const KANE_REEL = {
-  src: "/art/opening/kane-clips/kane-desk-01.mp4",
+  src: "/art/opening/kane-clips/kane-look.mp4",
   poster: "/art/opening/kane-01.jpg",
-  duration: 25,
+  duration: 15.04,
   loop: false,
 } as const;
 
@@ -61,6 +61,8 @@ export type KaneShot = {
   poster: string;
   subject: "kane" | "tyrone" | "aegis";
   blend?: "fade" | "hold";
+  /** Seconds into the clip. Used so one Tyrone file can cover two tape lines. */
+  startAt?: number;
 };
 
 /** Spoken-line starts, mapped from tyrone-found-you.mp3. Captions follow the tape, not the cut. */
@@ -110,6 +112,7 @@ const CLIP = {
   desk1: "/art/opening/kane-clips/kane-desk-01.mp4",
   desk2: "/art/opening/kane-clips/kane-desk-02.mp4",
   desk3: "/art/opening/kane-clips/kane-desk-03.mp4",
+  look: "/art/opening/kane-clips/kane-look.mp4",
   vesper: "/art/opening/kane-clips/kane-vesper.mp4",
   schematic: "/art/opening/kane-clips/kane-schematic.mp4",
   records: "/art/opening/kane-clips/kane-records.mp4",
@@ -117,12 +120,15 @@ const CLIP = {
   aegis: "/art/opening/kane-clips/kane-aegis.mp4",
   line: "/art/opening/kane-clips/tyrone-line.mp4",
   vault: "/art/opening/kane-clips/tyrone-vault.mp4",
+  found: "/art/opening/kane-clips/tyrone-found.mp4",
+  market: "/art/opening/kane-clips/tyrone-market.mp4",
 } as const;
 
 const POST = {
   desk1: "/art/opening/kane-clips/kane-desk-01.jpg",
   desk2: "/art/opening/kane-clips/kane-desk-02.jpg",
   desk3: "/art/opening/kane-clips/kane-desk-03.jpg",
+  look: "/art/opening/kane-clips/kane-look.jpg",
   vesper: "/art/opening/kane-clips/kane-vesper.jpg",
   schematic: "/art/opening/kane-clips/kane-schematic.jpg",
   records: "/art/opening/kane-clips/kane-records.jpg",
@@ -131,6 +137,10 @@ const POST = {
   line: "/art/opening/kane-clips/tyrone-line.jpg",
   vault: "/art/opening/kane-clips/tyrone-vault.jpg",
   vaultEnd: "/art/opening/kane-clips/tyrone-vault-end.jpg",
+  found: "/art/opening/kane-clips/tyrone-found.jpg",
+  foundEnd: "/art/opening/kane-clips/tyrone-found-end.jpg",
+  market: "/art/opening/kane-clips/tyrone-market.jpg",
+  marketWheel: "/art/opening/kane-clips/tyrone-market-wheel.jpg",
   hunt: "/art/opening/kane-04.jpg",
 } as const;
 
@@ -139,20 +149,20 @@ const POST = {
  * the last frame. Tyrone footage lands on the lines that name him.
  */
 export const KANE_SHOTS: readonly KaneShot[] = [
-  { at: 0, kind: "clip", src: CLIP.desk1, poster: POST.desk1, subject: "kane", blend: "hold" },
+  { at: 0, kind: "clip", src: CLIP.look, poster: POST.look, subject: "kane", blend: "hold" },
   { at: KANE_CUES[2].at, kind: "clip", src: CLIP.vesper, poster: POST.vesper, subject: "kane" },
   { at: KANE_CUES[4].at, kind: "clip", src: CLIP.line, poster: POST.line, subject: "tyrone" },
   { at: KANE_CUES[8].at, kind: "clip", src: CLIP.desk3, poster: POST.desk3, subject: "kane" },
   { at: KANE_CUES[10].at, kind: "clip", src: CLIP.photo, poster: POST.photo, subject: "tyrone" },
-  { at: KANE_CUES[12].at, kind: "clip", src: CLIP.schematic, poster: POST.schematic, subject: "kane" },
-  { at: KANE_CUES[13].at, kind: "clip", src: CLIP.vault, poster: POST.vault, subject: "tyrone" },
+  { at: KANE_CUES[12].at, kind: "clip", src: CLIP.market, poster: POST.market, subject: "tyrone" },
+  { at: KANE_CUES[13].at, kind: "clip", src: CLIP.found, poster: POST.found, subject: "tyrone" },
+  { at: KANE_CUES[14].at, kind: "clip", src: CLIP.records, poster: POST.records, subject: "kane" },
   { at: KANE_CUES[16].at, kind: "clip", src: CLIP.aegis, poster: POST.aegis, subject: "aegis" },
   { at: KANE_CUES[18].at, kind: "clip", src: CLIP.desk2, poster: POST.desk2, subject: "kane" },
   { at: KANE_CUES[19].at, kind: "clip", src: CLIP.vault, poster: POST.vault, subject: "tyrone" },
-  { at: KANE_CUES[20].at, kind: "clip", src: CLIP.records, poster: POST.records, subject: "kane" },
-  { at: KANE_CUES[22].at, kind: "still", src: POST.hunt, poster: POST.hunt, subject: "kane" },
-  { at: KANE_CUES[23].at, kind: "still", src: POST.vaultEnd, poster: POST.vaultEnd, subject: "tyrone" },
-  { at: KANE_CUES[24].at, kind: "clip", src: CLIP.photo, poster: POST.photo, subject: "tyrone" },
+  { at: KANE_CUES[20].at, kind: "clip", src: CLIP.look, poster: POST.look, subject: "kane" },
+  { at: KANE_CUES[23].at, kind: "still", src: POST.foundEnd, poster: POST.foundEnd, subject: "tyrone" },
+  { at: KANE_CUES[24].at, kind: "clip", src: CLIP.market, poster: POST.marketWheel, subject: "tyrone", startAt: 8 },
 ];
 
 export const KANE_SHOT_FADE = 0.62;
