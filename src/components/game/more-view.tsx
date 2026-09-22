@@ -91,12 +91,13 @@ const ROUTES: {
 ];
 
 export function MoreView() {
+  const s = useGame((g) => g.s);
   const setScreen = useGame((g) => g.setScreen);
-  const forged = useGame((g) => characterForged(g.s));
-  const act = useGame((g) => g.s.narrative?.act ?? "prologue");
-  const objective = useGame((g) => storyObjective(g.s));
-  const endingId = useGame((g) => g.s.narrative?.endingId ?? null);
-  const scenarios = useGame((g) => availableScenarios(g.s));
+  const forged = characterForged(s);
+  const act = s.narrative?.act ?? "prologue";
+  const objective = storyObjective(s);
+  const endingId = s.narrative?.endingId ?? null;
+  const scenarios = availableScenarios(s);
   const open = scenarios[0];
   const routes = ROUTES.filter((r) => (r.needUnforged ? !forged : true));
 

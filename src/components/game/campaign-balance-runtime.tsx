@@ -1,7 +1,7 @@
 import {
+  applyBossRegionGates,
   bossBlockReason,
   consumeUpgradeRequirements,
-  RAID_PROFILES,
   raidProfileForLocation,
   roomUpgradeQuote,
   scoreMission,
@@ -42,10 +42,11 @@ function cloneForMutation(state: GameState): GameState {
   };
 }
 
-function mutateState(fn: (state: GameState) => void) {
+function mutateState(fn: (state: GameState) => boolean | void) {
   useGame.setState((store) => {
     const s = cloneForMutation(store.s);
-    fn(s);
+    const changed = fn(s);
+    if (changed === false) return store;
     return { s };
   });
 }
@@ -132,22 +133,8 @@ function makeItem(def: CatalogItem, day: number): Item {
   };
 }
 
-function enforceRegionGates(state: GameState): boolean {
-  const desired: Partial<Record<LocationId, boolean>> = {
-    ironclad: true,
-    kingdom: !!state.locations.ironclad?.bossDefeated,
-    caverns: !!state.locations.kingdom?.bossDefeated,
-    library: !!state.locations.caverns?.bossDefeated,
-    veyra: !!state.locations.library?.bossDefeated,
-  };
-  let changed = false;
-  for (const [id, unlocked] of Object.entries(desired) as [LocationId, boolean][]) {
-    if (state.locations[id] && state.locations[id].unlocked !== unlocked) {
-      state.locations[id] = { ...state.locations[id], unlocked };
-      changed = true;
-    }
-  }
-  return changed;
+function authorityOwnsCampaign(state: GameState) {
+  return !!(state as GameState & { authorityCampaign?: { active?: boolean } }).authorityCampaign?.active;
 }
 
 function rewardBoss(state: GameState, loc: LocationId) {
@@ -284,16 +271,22 @@ export function CampaignBalanceRuntime() {
         }
       }
 
-      if (!needsGatePass) {
-        const snapshot = useGame.getState().s;
-        const test = cloneForMutation(snapshot);
-        if (enforceRegionGates(test)) mutateState((state) => void enforceRegionGates(state));
-      } else {
-        mutateState((state) => void enforceRegionGates(state));
-      }
+      if (authorityOwnsCampaign(next)) return;
+
+      const bossFlip = bossLocs.some(
+        (loc) => !!prev.locations[loc]?.bossDefeated !== !!next.locations[loc]?.bossDefeated,
+      );
+      const unlockFlip = bossLocs.some(
+        (loc) => !!prev.locations[loc]?.unlocked !== !!next.locations[loc]?.unlocked,
+      );
+      if (!needsGatePass && !bossFlip && !unlockFlip) return;
+
+      mutateState((state) => applyBossRegionGates(state));
     });
 
-    mutateState((state) => void enforceRegionGates(state));
+    if (!authorityOwnsCampaign(useGame.getState().s)) {
+      mutateState((state) => applyBossRegionGates(state));
+    }
 
     return () => {
       unsubscribe();

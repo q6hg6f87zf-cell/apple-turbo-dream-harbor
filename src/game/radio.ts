@@ -293,8 +293,30 @@ function readSnapshot(): RadioSnapshot {
   };
 }
 
+function snapshotsEqual(a: RadioSnapshot, b: RadioSnapshot) {
+  return (
+    a.tape === b.tape &&
+    a.bed === b.bed &&
+    a.follow === b.follow &&
+    a.playing === b.playing &&
+    a.unlocked === b.unlocked &&
+    a.deckOpen === b.deckOpen &&
+    a.currentTime === b.currentTime &&
+    a.duration === b.duration &&
+    a.muted === b.muted &&
+    a.music === b.music &&
+    a.sfx === b.sfx &&
+    a.mode === b.mode &&
+    a.headline === b.headline &&
+    a.subline === b.subline &&
+    a.score === b.score
+  );
+}
+
 function emit() {
-  snapshot = readSnapshot();
+  const next = readSnapshot();
+  if (snapshotsEqual(snapshot, next)) return;
+  snapshot = next;
   listeners.forEach((fn) => fn());
 }
 
@@ -757,8 +779,10 @@ export function setRadioBed(next: RadioBed) {
 
 /** First visit to a region cuts to that tape. Menus never skip the live song. */
 export function arriveRegion(region: RadioBed) {
-  bed = region;
-  emit();
+  if (bed !== region) {
+    bed = region;
+    emit();
+  }
   if (mode === "intro" || mode === "spot" || mode === "score") return;
   if (!follow || !unlocked) return;
   if (heardPlaces.has(region)) return;

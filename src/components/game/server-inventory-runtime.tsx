@@ -111,11 +111,21 @@ function expectedFingerprint(snapshot: ServerInventorySnapshot) {
 function currentFingerprint(state: GameState) {
   const map = new Map<string, Fingerprint>();
   for (const item of state.vault) {
-    map.set(item.id, { ownerType: "vault", residentId: null, equipped: false, condition: item.condition });
+    map.set(item.id, {
+      ownerType: "vault",
+      residentId: null,
+      equipped: !!item.equipped,
+      condition: item.condition,
+    });
   }
   for (const op of state.operatives) {
     for (const item of op.inventory) {
-      map.set(item.id, { ownerType: "resident", residentId: op.id, equipped: !!item.equipped, condition: item.condition });
+      map.set(item.id, {
+        ownerType: "resident",
+        residentId: op.id,
+        equipped: !!item.equipped,
+        condition: item.condition,
+      });
     }
   }
   return map;
@@ -177,9 +187,16 @@ export function ServerInventoryRuntime() {
     });
 
     const acceptSnapshot = (snapshot: ServerInventorySnapshot, message?: string) => {
-      if (cancelled) return;
+      if (cancelled || applying) return;
+      const nextExpected = expectedFingerprint(snapshot);
+      if (!unauthorizedMutation(currentFingerprint(useGame.getState().s), nextExpected)) {
+        lastSnapshot = snapshot;
+        expected = nextExpected;
+        setServerInventoryAuthorityActive(true);
+        return;
+      }
       lastSnapshot = snapshot;
-      expected = expectedFingerprint(snapshot);
+      expected = nextExpected;
       conditionInFlight.clear();
       setServerInventoryAuthorityActive(true);
       applySnapshot(snapshot, message);

@@ -554,8 +554,14 @@ export const useGame = create<Store>((set, get) => ({
       if (!s.tyrone) s.tyrone = emptyTyrone();
       s.tyrone.settings.showNumbers = !s.tyrone.settings.showNumbers;
     }),
-  openGuide: () => set({ guideOpen: true }),
-  closeGuide: () => set({ guideOpen: false }),
+  openGuide: () => {
+    if (get().guideOpen) return;
+    set({ guideOpen: true });
+  },
+  closeGuide: () => {
+    if (!get().guideOpen) return;
+    set({ guideOpen: false });
+  },
   resolveScenario: (scenarioId, approachId) => {
     let err: string | null = null;
     mutate(set, (st) => {
@@ -598,10 +604,12 @@ export const useGame = create<Store>((set, get) => ({
       s.tutorial = "forge";
       queueTalk(s, "forge");
     }),
-  toastClear: () =>
+  toastClear: () => {
+    if (!get().s.toast) return;
     mutate(set, (s) => {
       s.toast = null;
-    }),
+    });
+  },
   selectOp: (id) =>
     mutate(set, (s) => {
       s.selectedId = id;

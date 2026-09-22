@@ -149,6 +149,26 @@ export const RAID_PROFILES: Record<RegionId, RaidProfile> = {
   veyra: { region: "veyra", minRiders: 4, minRiderXp: 80, minParty: 3, minClasses: 3, minIntel: 14, minReadiness: 805, vaultReward: 350000, cardReward: 35000, oreReward: 90, favorReward: 35 },
 };
 
+/** Local boss-chain unlocks. Discord authority owns this once the server ledger is live. */
+export function applyBossRegionGates(state: GameState): boolean {
+  const desired: Partial<Record<LocationId, boolean>> = {
+    ironclad: true,
+    kingdom: !!state.locations.ironclad?.bossDefeated,
+    caverns: !!state.locations.kingdom?.bossDefeated,
+    library: !!state.locations.caverns?.bossDefeated,
+    veyra: !!state.locations.library?.bossDefeated,
+  };
+  let changed = false;
+  for (const [id, unlocked] of Object.entries(desired) as [LocationId, boolean][]) {
+    const loc = state.locations[id];
+    if (!loc) continue;
+    if (!!loc.unlocked === !!unlocked) continue;
+    state.locations[id] = { ...loc, unlocked: !!unlocked };
+    changed = true;
+  }
+  return changed;
+}
+
 export function raidProfileForLocation(loc: LocationId): RaidProfile | null {
   const region = canonicalRegionId(loc);
   return region ? RAID_PROFILES[region] : null;
