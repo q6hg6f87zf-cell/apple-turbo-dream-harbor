@@ -168,8 +168,16 @@ export function GameApp() {
       setPausePane("journal");
       setPauseOpen(true);
     };
+    const onSituation = () => {
+      setPausePane("scenario");
+      setPauseOpen(true);
+    };
     window.addEventListener("hollow:open-journal", onJournal);
-    return () => window.removeEventListener("hollow:open-journal", onJournal);
+    window.addEventListener("hollow:open-situation", onSituation);
+    return () => {
+      window.removeEventListener("hollow:open-journal", onJournal);
+      window.removeEventListener("hollow:open-situation", onSituation);
+    };
   }, []);
 
   if (!hydrated || screen === "title") return <MainMenu />;

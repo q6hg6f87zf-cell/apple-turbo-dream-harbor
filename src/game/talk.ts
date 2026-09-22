@@ -821,8 +821,16 @@ export function advanceTalk(state: GameState): "next" | "done" | "idle" {
       state.screen = "hq";
       state.tutorial = "forge";
     } else if (script === "resume") {
+      const forged = state.operatives.some((o) => o.status !== "dead");
       const dest: Screen =
-        state.tutorial === "forge" ? "forge" : state.tutorial === "sortie" ? "map" : "hq";
+        state.tutorial === "forge" && !forged
+          ? "forge"
+          : state.tutorial === "sortie" ||
+              state.tutorial === "done" ||
+              state.tutorial === "rest" ||
+              (forged && state.day >= 1)
+            ? "map"
+            : "hq";
       state.screen = dest;
       const next = SCREEN_SCRIPT[dest];
       if (next) queueTalk(state, next);

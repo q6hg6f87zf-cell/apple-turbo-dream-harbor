@@ -1,194 +1,166 @@
 import { useGame } from "@/game/store";
 import { characterForged } from "@/game/engine";
+import { availableScenarios } from "@/game/scenario";
+import { actTitle, storyObjective } from "@/game/story-spine";
+import type { StoryActId } from "@/game/narrative-state";
 import type { Screen } from "@/game/types";
 import { cn } from "@/lib/cn";
 import {
   Archive,
   AudioLines,
   BookOpen,
-  Bot,
-  CreditCard,
   Film,
   Hammer,
-  IdCard,
   ScrollText,
   Settings2,
-  Users,
 } from "lucide-react";
 import { sfx } from "@/game/audio";
 import { openRadioDeck } from "@/game/radio";
-import { Panel, SectionLabel } from "./primitives";
-import { TyroneHandshake } from "./menu";
+import { SectionLabel } from "./primitives";
 
-const TOOLS: {
+/**
+ * Field systems — not a SaaS "More" grid. Destinations and one open situation.
+ * Journal / companions live in the Pause field menu (Escape / World HUD).
+ */
+const ROUTES: {
   screen?: Screen;
-  action?: "radio";
+  action?: "radio" | "journal";
   name: string;
-  eyebrow: string;
+  place: string;
   desc: string;
   icon: typeof Archive;
+  needUnforged?: boolean;
 }[] = [
   {
+    action: "journal",
+    name: "Field journal",
+    place: "What you know",
+    desc: "Story marks, situations, and the ledger of what you chose.",
+    icon: BookOpen,
+  },
+  {
     action: "radio",
-    name: "Tyrone's Radio",
-    eyebrow: "Holotape deck",
-    desc: "Keep the Radio On. Ironclad dust. Slag Town neon. Original tapes, more coming.",
+    name: "Tyrone's radio",
+    place: "Porch deck",
+    desc: "ICR tapes and station breaks. The Hollow argues with itself here.",
     icon: AudioLines,
   },
   {
-    screen: "gallery",
-    name: "Vault Reels",
-    eyebrow: "Media",
-    desc: "Rewatch the opening. Title plate. Stills from the east highway. It is not dead after the first play.",
-    icon: Film,
-  },
-  {
-    screen: "file",
-    name: "S.Y.N.A.P.S.E OS",
-    eyebrow: "Rider plate",
-    desc: "Tyrone's operating system. STAT, black card, roster, today's data. Developed by S.Y.N.A.P.S.E.",
-    icon: IdCard,
-  },
-  {
-    screen: "squad",
-    name: "Campaign registry",
-    eyebrow: "Who sits",
-    desc: "Riders sharing this Vault 13 file. Lives on the File tab now.",
-    icon: Users,
-  },
-  {
     screen: "forge",
-    name: "Character Forge",
-    eyebrow: "One file",
-    desc: "Cut your body once. Two rerolls. Then the Machine Shop closes for good.",
+    name: "Machine Shop",
+    place: "One file",
+    desc: "Cut your body once. Two rerolls. Then it locks.",
     icon: Hammer,
+    needUnforged: true,
   },
   {
     screen: "market",
-    name: "Moon Squad Market",
-    eyebrow: "Ironclad stalls",
-    desc: "The Exchange is closed. Buy under the Iron Gate. Limited stock. Dawn reset. Visiting merchants sit the high table.",
+    name: "Iron Gate stalls",
+    place: "Moon Squad Market",
+    desc: "Limited stock. Dawn reset. Kane's surveyors already bought a table.",
     icon: ScrollText,
   },
   {
     screen: "ledger",
-    name: "Quartermaster Exchange",
-    eyebrow: "Caps & plate",
-    desc: "Black card, compound vault, bounty board. Gear moved to the Moon Squad Market.",
-    icon: CreditCard,
-  },
-  {
-    screen: "vault",
-    name: "Salvage Depot",
-    eyebrow: "Legacy Stores",
-    desc: "The old crate-and-pack view. Inventory is now the primary stores screen.",
+    name: "Quartermaster",
+    place: "Caps & plate",
+    desc: "Debts, the black card, and what the compound still owes.",
     icon: Archive,
   },
   {
     screen: "codex",
-    name: "Archive Terminal",
-    eyebrow: "Lore",
-    desc: "Kane, AEGIS 2753, villains, races, rifle models and what the Hollow remembers.",
+    name: "Archive terminal",
+    place: "Lore",
+    desc: "Kane, AEGIS, villains, and what the Hollow remembers.",
     icon: BookOpen,
   },
   {
+    screen: "gallery",
+    name: "Vault reels",
+    place: "Media",
+    desc: "Wake film. Title plate. Stills from the east highway.",
+    icon: Film,
+  },
+  {
     screen: "rules",
-    name: "Field Manual",
-    eyebrow: "Systems",
-    desc: "Rules, roll bands, combat basics and survival notes.",
+    name: "Field manual",
+    place: "Systems",
+    desc: "Roll bands, combat basics, survival notes.",
     icon: Settings2,
   },
 ];
 
 export function MoreView() {
   const setScreen = useGame((g) => g.setScreen);
-  const openGuide = useGame((g) => g.openGuide);
-  const residentCount = useGame((g) => g.s.operatives.filter((o) => o.status !== "dead").length);
-  const staffCount = useGame((g) => g.s.residents.length);
   const forged = useGame((g) => characterForged(g.s));
-  const tools = forged ? TOOLS.filter((tool) => tool.screen !== "forge") : TOOLS;
+  const act = useGame((g) => g.s.narrative?.act ?? "prologue");
+  const objective = useGame((g) => storyObjective(g.s));
+  const endingId = useGame((g) => g.s.narrative?.endingId ?? null);
+  const scenarios = useGame((g) => availableScenarios(g.s));
+  const open = scenarios[0];
+  const routes = ROUTES.filter((r) => (r.needUnforged ? !forged : true));
 
   return (
-    <div className="space-y-4 pb-8">
+    <div className="space-y-5 pb-8">
       <div>
-        <SectionLabel>Vault 13 · systems</SectionLabel>
-        <h2 className="font-display text-2xl">More</h2>
-        <p className="mt-1 text-sm text-muted">
-          Secondary systems live here so the main navigation stays focused on playing the game.
+        <SectionLabel>Vault 13 · field systems</SectionLabel>
+        <h2 className="font-display text-2xl">Systems</h2>
+        <p className="mt-1 text-secondary text-muted">
+          {actTitle(act as StoryActId)}. Secondary routes only — the world stays on World.
         </p>
       </div>
 
-      <Panel className="glass-strong bg-transparent">
-        <div className="flex items-center gap-3">
-          <span className="flex size-12 items-center justify-center rounded-[var(--radius-md)] bg-ink">
-            <Bot className="size-6 text-ember" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="font-display text-sm text-paper">Ask TyroneBot</p>
-            <p className="text-xs text-muted">Context help, current objective and Vault 13 guidance.</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              sfx.click();
-              openGuide();
-            }}
-            className="flex min-h-11 items-center gap-2 rounded-[var(--radius-sm)] border border-ember/40 bg-ember/10 px-3 font-display text-[10px] uppercase tracking-[0.14em] text-ember"
-          >
-            <Bot className="size-4" /> Talk
-          </button>
-        </div>
-      </Panel>
+      <p className="border-l-2 border-ember/70 pl-3 text-secondary text-paper">
+        <span className="font-display text-label uppercase tracking-[0.12em] text-ember">Objective</span>
+        <br />
+        {endingId ? `Epilogue recorded · ${endingId.replaceAll("_", " ")}` : objective}
+      </p>
 
-      <div className="grid gap-2 sm:grid-cols-2">
-        {tools.map((tool) => {
+      {open ? (
+        <button
+          type="button"
+          data-more-situation="1"
+          className="flex w-full flex-col items-start gap-1 border border-ember/50 bg-ember/10 px-3 py-3 text-left"
+          onClick={() => {
+            sfx.click();
+            window.dispatchEvent(new CustomEvent("hollow:open-situation"));
+          }}
+        >
+          <span className="font-display text-[10px] uppercase tracking-[0.14em] text-ember">Open situation</span>
+          <span className="font-display text-body text-paper">{open.title}</span>
+          <span className="text-label text-muted">{open.locationLabel} — choices matter.</span>
+        </button>
+      ) : null}
+
+      <ul className="divide-y divide-line/50 border-y border-line/50">
+        {routes.map((tool) => {
           const Icon = tool.icon;
           return (
-            <button
-              key={`${tool.screen ?? tool.action}-${tool.name}`}
-              type="button"
-              onClick={() => {
-                sfx.click();
-                if (tool.action === "radio") openRadioDeck();
-                else if (tool.screen) setScreen(tool.screen);
-              }}
-              className={cn(
-                "flex min-h-[8rem] items-start gap-3 rounded-[var(--radius-lg)] border border-line/80 bg-raised p-4 text-left shadow-[var(--shadow-border)]",
-                "transition-[border-color,transform] hover:border-ember/55 active:scale-[0.99]",
-              )}
-            >
-              <span className="flex size-12 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-ink text-ember shadow-[inset_0_0_0_1px_var(--color-line)]">
-                <Icon className="size-5" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="flex items-center gap-2 font-display text-[9px] uppercase tracking-[0.18em] text-ember">
-                  <Icon className="size-3.5" /> {tool.eyebrow}
+            <li key={`${tool.screen ?? tool.action}-${tool.name}`}>
+              <button
+                type="button"
+                className={cn(
+                  "flex min-h-14 w-full items-start gap-3 py-3 text-left hover:bg-raised/60",
+                )}
+                onClick={() => {
+                  sfx.click();
+                  if (tool.action === "radio") openRadioDeck();
+                  else if (tool.action === "journal") {
+                    window.dispatchEvent(new CustomEvent("hollow:open-journal"));
+                  } else if (tool.screen) setScreen(tool.screen);
+                }}
+              >
+                <Icon className="mt-0.5 size-5 shrink-0 text-ember" />
+                <span className="min-w-0 flex-1">
+                  <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted">{tool.place}</span>
+                  <span className="block font-display text-body text-paper">{tool.name}</span>
+                  <span className="block text-label text-muted">{tool.desc}</span>
                 </span>
-                <span className="mt-1 block font-display text-base text-paper">{tool.name}</span>
-                <span className="mt-1 block text-xs leading-relaxed text-muted">{tool.desc}</span>
-              </span>
-            </button>
+              </button>
+            </li>
           );
         })}
-      </div>
-
-      <Panel className="bg-raised">
-        <SectionLabel>Vault census</SectionLabel>
-        <div className="grid grid-cols-2 gap-2">
-          <div className="rounded-[var(--radius-md)] bg-ink p-3">
-            <Users className="size-4 text-ember" />
-            <div className="mt-2 font-display text-2xl text-paper">{residentCount}</div>
-            <div className="text-xs text-muted">Playable residents</div>
-          </div>
-          <div className="rounded-[var(--radius-md)] bg-ink p-3">
-            <IdCard className="size-4 text-moon" />
-            <div className="mt-2 font-display text-2xl text-paper">{staffCount}</div>
-            <div className="text-xs text-muted">Vault staff</div>
-          </div>
-        </div>
-      </Panel>
-
-      <TyroneHandshake />
+      </ul>
     </div>
   );
 }
