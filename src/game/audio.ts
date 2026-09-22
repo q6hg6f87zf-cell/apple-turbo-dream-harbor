@@ -391,6 +391,7 @@ const SAMPLE_URLS: Record<string, string> = {
   lever: "/sfx/ui-metal.wav",
   manual: "/sfx/book-open.ogg",
   porch: "/sfx/door-creak.ogg",
+  recorder: "/audio/recorder-click.mp3",
   step: "/sfx/step.ogg",
   bookClose: "/sfx/book-close.ogg",
   bookFlip: "/sfx/book-flip.ogg",
@@ -670,6 +671,11 @@ const sfxProcedural = {
   porch: () => {
     rumble(10);
   },
+  recorder: () => {
+    noise(0.05, 0.045, 1800);
+    tone({ freq: 210, dur: 0.07, type: "square", gain: 0.04, freqEnd: 70 });
+    rumble(10);
+  },
 };
 
 export const sfx = {
@@ -714,6 +720,7 @@ export const sfx = {
   reel: () => sfxProcedural.reel(),
   manual: () => withSample("manual", sfxProcedural.manual, 0.36),
   porch: () => withSample("porch", sfxProcedural.porch, 0.3),
+  recorder: () => withSample("recorder", sfxProcedural.recorder, 0.72),
   step: () =>
     withSample("step", () => {
       noise(0.04, 0.02, 400);

@@ -143,7 +143,7 @@ export function TalkOverlay() {
   return (
     <>
       {pregame || cinematic ? (
-        <div className={cn("fixed inset-0 z-[44] overflow-hidden", talk.script === "wake" ? "bg-ink/20" : "bg-ink/80")} aria-hidden>
+        <div className={cn("fixed inset-0 z-[44] overflow-hidden", talk.script === "wake" || talk.script === "kane" || talk.script === "tyrone-reply" ? "bg-transparent" : "bg-ink/80")} aria-hidden>
           {still && cinematic ? (
             <img src={still} alt="" className="absolute inset-0 size-full object-cover object-top" />
           ) : null}

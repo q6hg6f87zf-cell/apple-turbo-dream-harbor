@@ -325,9 +325,18 @@ export const useGame = create<Store>((set, get) => ({
         loaded.talk?.script !== "wake" &&
         loaded.talk?.script !== "kane"
       ) {
+        loaded.screen = "briefing";
+        loaded.tutorial = "briefing";
         queueTalk(loaded, "kane", true);
       }
+      const introTalk = loaded.talk?.script;
+      if (introTalk === "wake" || introTalk === "kane" || introTalk === "tyrone-reply") {
+        loaded.screen = "briefing";
+      }
       set({ s: loaded, hydrated: true, handshake: deltaEmpty(delta) ? (urlSnap ? delta : null) : delta });
+      if (introTalk === "wake" || introTalk === "kane" || introTalk === "tyrone-reply") {
+        enterWake();
+      }
       void syncRemoteSoul();
     } catch (err) {
       console.error("Hollow file failed to boot. Starting a clean porch.", err);

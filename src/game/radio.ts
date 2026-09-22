@@ -8,10 +8,11 @@ import {
   musicMix,
   setMusicMix,
   setSfxMix,
+  sfx,
   sfxMix,
   toggleMute,
 } from "./audio";
-import { SCORE, KANE_TAPE, TYRONE_REPLY_TAPE, type IntroChapter } from "./opening-reel";
+import { SCORE, KANE_AUDIO_AT, KANE_TAPE, TYRONE_REPLY_TAPE, type IntroChapter } from "./opening-reel";
 import type { RegionId, Screen } from "./types";
 
 export type RadioBed =
@@ -195,6 +196,9 @@ let lastSpotId: string | null = null;
 let spotLabel = "ICR 88 · Market Square";
 let scoreReason: "title" | "boss" | null = null;
 let swapGen = 0;
+let kaneVoiceStarted = false;
+let kaneClickPlayed = false;
+let kaneLeadGen = 0;
 const heardPlaces = new Set<string>();
 const REGION_BEDS: RadioBed[] = ["ironclad", "slagtown", "blackspire", "brasswater", "veyra"];
 
@@ -554,12 +558,13 @@ async function playSpot(spot: RadioSpot) {
 async function onLiveEnded() {
   if (mode === "intro") {
     if (introChapter === "found-you") {
-      introChapter = "kane";
-      await swapTo(INTRO_CHAPTER.kane.src, INTRO_CHAPTER.kane.duration, true, 0.12);
+      armKanePicture();
       return;
     }
     if (introChapter === "kane") {
       introChapter = "reply";
+      kaneVoiceStarted = false;
+      kaneClickPlayed = false;
       await swapTo(INTRO_CHAPTER.reply.src, INTRO_CHAPTER.reply.duration, true, 0.45);
       return;
     }
@@ -629,25 +634,101 @@ export async function playFoundYou() {
   unlocked = true;
   mode = "intro";
   introChapter = "found-you";
+  kaneVoiceStarted = false;
+  kaneClickPlayed = false;
+  kaneLeadGen += 1;
   pendingTapeId = null;
   currentId = null;
   await swapTo(INTRO_SRC, INTRO_DURATION, true);
 }
 
+export function armKanePicture() {
+  const my = ++kaneLeadGen;
+  kaneVoiceStarted = false;
+  kaneClickPlayed = false;
+  introChapter = "kane";
+  mode = "intro";
+  currentTime = 0;
+  duration = KANE_TAPE.duration;
+  playing = false;
+  pendingTapeId = null;
+  currentId = null;
+  if (live) {
+    fadeTo(live.fade, 0.0001, 0.45);
+    laterPause(live, 550);
+  }
+  emit();
+  if (typeof window !== "undefined") {
+    window.setTimeout(() => {
+      if (my !== kaneLeadGen || introChapter !== "kane") return;
+      cueKaneVoiceFromPicture(KANE_AUDIO_AT - 1.45);
+    }, Math.max(0, (KANE_AUDIO_AT - 1.5) * 1000));
+    window.setTimeout(() => {
+      if (my !== kaneLeadGen || introChapter !== "kane") return;
+      void startKaneVoice();
+    }, KANE_AUDIO_AT * 1000 + 400);
+  }
+}
+
+export function cueKaneVoiceFromPicture(t: number) {
+  if (introChapter !== "kane") return;
+  if (!kaneClickPlayed && t >= KANE_AUDIO_AT - 1.52) {
+    kaneClickPlayed = true;
+    sfx.recorder();
+  }
+  if (t >= KANE_AUDIO_AT) void startKaneVoice();
+}
+
+export async function startKaneVoice() {
+  if (introChapter !== "kane" || kaneVoiceStarted) return;
+  kaneVoiceStarted = true;
+  if (!kaneClickPlayed) {
+    kaneClickPlayed = true;
+    sfx.recorder();
+  }
+  await swapTo(INTRO_CHAPTER.kane.src, INTRO_CHAPTER.kane.duration, true, 0.18);
+}
+
 export async function skipIntroTo(chapter: IntroChapter) {
   if (mode !== "intro") return;
   if (introChapter === chapter) return;
-  introChapter = chapter;
   if (chapter === "kane") {
-    await swapTo(INTRO_CHAPTER.kane.src, INTRO_CHAPTER.kane.duration, true, 0.12);
+    armKanePicture();
     return;
   }
+  introChapter = chapter;
+  kaneVoiceStarted = false;
+  kaneClickPlayed = false;
+  kaneLeadGen += 1;
   if (chapter === "reply") {
     await swapTo(INTRO_CHAPTER.reply.src, INTRO_CHAPTER.reply.duration, true, 0.45);
     return;
   }
   playing = false;
   emit();
+}
+
+/** Keep the tape on the chapter the captions are showing. No-ops if already there. */
+export async function ensureIntroChapter(chapter: IntroChapter) {
+  if (chapter === "done") {
+    if (mode === "intro") stopFoundYou();
+    return;
+  }
+  if (chapter === "found-you") {
+    if (mode === "intro" && introChapter === "found-you") {
+      if (!playing) await resumeRadio();
+      return;
+    }
+    await playFoundYou();
+    return;
+  }
+  if (mode !== "intro") armIntro();
+  if (introChapter === chapter) {
+    if (chapter === "kane" && !kaneVoiceStarted) return;
+    if (!playing) await resumeRadio();
+    return;
+  }
+  await skipIntroTo(chapter);
 }
 
 export function stopFoundYou() {

@@ -22,7 +22,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { CapMark, Coin, Panel, RarityMark, SectionLabel } from "./primitives";
 import { HelpChrome, TalkOverlay } from "./talk-overlay";
 import { OpeningBoot, TitleBackdrop } from "./title-scene";
-import { WakeScene } from "./wake-scene";
+import { KaneIntro, WakeScene } from "./wake-scene";
 import { useOpeningBeat } from "@/game/opening";
 
 export { TitleBackdrop };
@@ -243,6 +243,9 @@ export function MainMenu() {
   const playerName = useGame((g) => g.s.playerName);
   const beat = useOpeningBeat();
   const waking = talkScript === "wake" || beat === "wake";
+  const kaneTape = talkScript === "kane";
+  const replyTape = talkScript === "tyrone-reply";
+  const introFilm = waking || kaneTape || replyTape;
   const [ask, setAsk] = useState(false);
   const [link, setLink] = useState(false);
   const [did, setDid] = useState("");
@@ -274,10 +277,10 @@ export function MainMenu() {
 
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden bg-ink text-paper" data-ready="1">
-      {waking ? <WakeScene /> : <TitleBackdrop />}
-      {waking ? null : <div className="title-veil pointer-events-none absolute inset-0 z-[1]" />}
+      {kaneTape ? <KaneIntro time={0} /> : waking ? <WakeScene /> : <TitleBackdrop />}
+      {introFilm ? null : <div className="title-veil pointer-events-none absolute inset-0 z-[1]" />}
       <OpeningBoot>
-      <div className={cn("relative z-[2] flex min-h-0 flex-1 flex-col justify-end px-4 pb-8 pt-16 md:px-10 md:pb-10", waking && "pointer-events-none opacity-0")}>
+      <div className={cn("relative z-[2] flex min-h-0 flex-1 flex-col justify-end px-4 pb-8 pt-16 md:px-10 md:pb-10", introFilm && "pointer-events-none opacity-0")}>
         <div className="mx-auto flex w-full max-w-lg flex-col gap-3 md:max-w-xl">
           <div className="ms-title-dock rounded-[var(--radius-xl)] bg-ink/62 p-4 shadow-[var(--shadow-border)] backdrop-blur-md md:p-5">
             <p className="font-display text-[11px] uppercase tracking-[0.42em] text-ember">S.Y.N.A.P.S.E T-0880</p>
@@ -414,7 +417,7 @@ export function MainMenu() {
         }}
         className={cn(
           "absolute right-3 top-3 z-[2] w-[7.5rem] overflow-hidden rounded-[var(--radius-md)] shadow-[var(--shadow-border)] transition-[box-shadow] hover:shadow-[var(--shadow-border-hover)] md:right-6 md:top-6 md:w-40",
-          waking && "pointer-events-none opacity-0",
+          introFilm && "pointer-events-none opacity-0",
         )}
         aria-label="Sit the SYNAPSE terminal"
         data-sit-crt="1"

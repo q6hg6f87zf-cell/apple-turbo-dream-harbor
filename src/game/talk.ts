@@ -1160,6 +1160,10 @@ export function isPregameTalk(state: GameState): boolean {
   return !!state.talk && PREGAME.has(state.talk.script);
 }
 
+export function isIntroTalk(script: string | null | undefined): boolean {
+  return !!script && PREGAME.has(script);
+}
+
 export function queueTalk(state: GameState, script: string, force = false) {
   if (!TALK[script]) return;
   if (!force && state.seenTalk.includes(script)) return;
