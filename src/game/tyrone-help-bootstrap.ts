@@ -49,4 +49,8 @@ export function bootstrapTyroneHelp() {
   if (TALK.deploy?.[3]) {
     TALK.deploy[3].text = "Bosses are Moon Squad raids. Scout for intel, build rider contribution XP, keep the party healthy, and bring different classes. If the Raid Matrix says no, I mean no. Improve the team before you feed me paperwork.";
   }
+  if (MANUAL.welcome) {
+    MANUAL.welcome.blurb =
+      "Kane's tape is filed. This is the shelter. Stamp your one resident in the Machine Shop, then read the dawn board. Tap Ask anytime — I live for this.";
+  }
 }

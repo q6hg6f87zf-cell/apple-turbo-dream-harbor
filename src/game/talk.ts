@@ -25,31 +25,31 @@ export const TALK: Record<string, TalkLine[]> = {
     },
     {
       who: WHO,
-      text: "Easy now. Don't try standing up just yet. Name's Tyrone. Tyrone Bot, model T-0880 if we're being formal.",
+      text: "Easy now. Don't try standing up just yet. Name's Tyrone. Tyrone Bot, model T-0880 if we're being formal. I am the CRT with a mouth. You are the one who still bleeds.",
     },
     {
       who: WHO,
-      text: "I found you about three miles east of the old highway. Facedown in the dirt. No supplies. No weapon. Not a clue how you got there, partner.",
+      text: "I found you about three miles east of the old highway. Facedown in the dirt. No supplies. No weapon. Not a clue how you got there, partner. That is not a metaphor. That is the file.",
     },
     {
       who: WHO,
-      text: "Funny thing is, there weren't any tracks leading to you. No caravan. No footprints. No vehicle marks. Just you. Naturally I considered leaving you there. Then you started breathing.",
+      text: "Funny thing is, there weren't any tracks leading to you. No caravan. No footprints. No vehicle marks. Just you. Naturally I considered leaving you there. Then you started breathing, and I made a bad decision I am still paying for.",
     },
     {
       who: WHO,
-      text: "So against my better judgment, here we are. You're inside an old shelter now. Roof leaks. Door sticks. Something has been scratching at the eastern wall since sundown. I call it Vault 13.",
+      text: "So against my better judgment, here we are. You're inside an old shelter now. Roof leaks. Door sticks. Something has been scratching at the eastern wall since sundown. I call it Vault 13. It is home until it isn't.",
     },
     {
       who: WHO,
-      text: "Outside that door is the Hollow Realm. Ironclad lies west. Slag Town burns beyond the southern ridge. Brasswater sits along the flooded lowlands. Veyra shines somewhere past the horizon. And Blackspire… we'll talk about Blackspire another time.",
+      text: "Outside that door is the Hollow Realm. Ironclad lies west — forges, the Gate, people who still argue. Slag Town burns beyond the southern ridge. Brasswater sits along the flooded lowlands. Veyra shines somewhere past the horizon. And Blackspire… we'll talk about Blackspire another time.",
     },
     {
       who: WHO,
-      text: "For now, the important things. Can you stand? Do you remember your name? The file says {name}. And do you remember what happened to the world? No? Yeah. I was afraid you'd say that.",
+      text: "For now, the important things. Can you stand? Do you remember your name? The file says {name}. Do you remember what happened to the world? No? Yeah. I was afraid you'd say that. Listen anyway. The next face you see is not a friend.",
     },
     {
       who: WHO,
-      text: "Come on, wanderer. Let's figure out who you are before Kane's people decide for us. When I finish talking, I am going to show you her face. Dr. Vesper Kane already wants this town.",
+      text: "Come on, wanderer. Let's figure out who you are before Kane's people decide for us. When I finish talking, I am going to show you her face. Dr. Vesper Kane already wants this town. After her, I walk you through the porch — then you cut your one file in the Machine Shop.",
     },
   ],
   kane: [
@@ -92,23 +92,39 @@ export const TALK: Record<string, TalkLine[]> = {
   welcome: [
     {
       who: WHO,
-      text: "On your feet, {name}. This is Vault 13, outside Ironclad. I hold the CRT. You hold the squad. I am T-0880. The only one of my line with a name. The rest of Kane's delivery chassis are scrap. I reside here.",
+      text: "On your feet, {name}. Porch lamps are lit. This is Vault 13 — outskirts of Ironclad, not a country. I hold the CRT. You hold the squad. I am T-0880. The only one of my line with a name. The rest of Kane's delivery chassis are scrap. I reside here.",
     },
     {
       who: WHO,
-      text: "That recording was Dr. Vesper Kane. She signed my death warrant, then built human-operated super suits to do the job cleaner. AEGIS 2753. File tab, PEOPLE: I am first. Kane is second. The visors sit under her. Then Ironclad — Travis, Holt, Sister Vex, Calder Rourke. Then the names on the hills.",
+      text: "That recording was Dr. Vesper Kane. She signed my death warrant, then built human-operated super suits to do the job cleaner. AEGIS 2753 — people inside the plate, not chassis pretending. File tab PEOPLE: I am first. Kane is second. The visors sit under her. Then Ironclad — Travis, Holt, Sister Vex, Calder Rourke. Then the names on the hills.",
     },
     {
       who: WHO,
-      text: "Ironclad is west. East highway is where I found you. Under the Iron Gate is the Moon Squad Market — Holt Kade reprints at dawn. West of that, Travis keeps the last T-0880 bay Kane did not melt. Campaigns pull his parts. He pays caps and puts them in me. Relay Tower Three is Calder Rourke. Climb it when the board says listen.",
+      text: "Here is how a day works before you panic. Dawn, I post a board. Six watches. Most jobs are decisions — who you send, what you say, which crate you open, which site you work. The sortie is the one that still uses a die. You do not sleep until the shift is done. Rest reprints the board.",
     },
     {
       who: WHO,
-      text: "That chip with the waveform is the radio. Tap it when you want to change the air. Original tapes. ICR buys a minute between songs — you cannot request those. That is the point.",
+      text: "Vault 13 rooms: Salvage Depot, Resident Quarters, Machine Shop, Med Bay, Perimeter Control, Quartermaster desk. Upgrade them when you have the caps and the proof. Idle is still work. Downed residents need Med Bay before dawn or I write a closed file.",
     },
     {
       who: WHO,
-      text: "First job is a resident. The Machine Shop is waiting. Pick who you are. Then we work. Tap the question mark if you get lost. After you, partner.",
+      text: "Ironclad is west. East highway is where I found you. Under the Iron Gate is the Moon Squad Market — Holt Kade reprints crates at dawn. West of that, Travis keeps the last T-0880 bay Kane did not melt. Relay Tower Three is Calder Rourke. Climb it when the board says listen.",
+    },
+    {
+      who: WHO,
+      text: "That chip with the waveform is the radio. Tap it when you want to change the air. Original tapes. Follow the Hollow and I change the bed with the room. ICR buys a minute between songs — you cannot request those. That is the point.",
+    },
+    {
+      who: WHO,
+      text: "Anytime you get lost, tap the mark that looks like a question — or Ask in the header once we are inside. That opens my field manual for the room you are standing in. Type a question if you want a straight answer. Assist level and numbers live on that card. No charge. I live for this.",
+    },
+    {
+      who: WHO,
+      text: "First job is a resident. The Machine Shop is waiting. Women or men, a face, then the dice. Two rerolls for the whole sheet. Discord name is already locked. When you stamp, the shop goes dark — one file, partner. Then the Hollow Realm opens west of the porch.",
+    },
+    {
+      who: WHO,
+      text: "After the stamp: read the dawn board, walk the Market if you need a crate, pin a site on the World map, and keep somebody breathing. Kane wants hull plate. Do not make the first day a simulation. Make it a job. After you, partner.",
     },
   ],
   briefing: [
@@ -230,15 +246,19 @@ export const TALK: Record<string, TalkLine[]> = {
   forge: [
     {
       who: WHO,
-      text: "Howdy. Welcome to the Machine Shop. Women or men first. Then a face. Generic kit. Class, blood, and the dice still belong to you.",
+      text: "Howdy. Welcome to the Machine Shop — the only door that stamps a soul. Women or men first. Then a face. Generic kit. Class, bloodline, and the dice still belong to you.",
     },
     {
       who: WHO,
-      text: "Women or men first. Then a face. No headphones. No glasses. Pick who walks out of this shop. After a number lands, you get two rerolls for the whole sheet. Then it stamps and the shop closes.",
+      text: "No headphones. No glasses. Pick who walks out of this shop. Tap a die face to roll it. After the sheet lands, you get two rerolls for the whole page — not per die. Spend them like they matter. Then stamp.",
     },
     {
       who: WHO,
-      text: "The Discord name is already on the black card. When you lock the file, they get a bunk in Vault 13. The Machine Shop does not open again.",
+      text: "The Discord name is already on the black card. When you lock the file, they get a bunk in Vault 13 and this shop goes dark. There is no second character. There is no later reroll. Name them like you mean it.",
+    },
+    {
+      who: WHO,
+      text: "If the Hollow rolled a face you cannot love, use the two rerolls. If you freeze, ask me — tap the question mark and I will walk the sheet again. After the stamp we work the board, not the mirror.",
     },
   ],
   deploy: [
@@ -615,39 +635,43 @@ export const TALK: Record<string, TalkLine[]> = {
 export const MANUAL: Record<string, FieldCard> = {
   wake: {
     title: "Found you",
-    blurb: "Tyrone hauled you off the east highway. No tracks. Vault 13. Listen first.",
+    blurb: "Tyrone hauled you off the east highway. No tracks. Vault 13. The reel runs itself — listen before you walk.",
     tips: [
-      "Lines follow the tape. You do not tap to continue.",
-      "Skip if you already know the porch.",
-      "Rewatch it later under More · Vault Reels.",
+      "Captions follow the spoken tape. You do not tap to continue unless it stalls.",
+      "Kane's face comes next. Then the porch welcome. Then the Machine Shop.",
+      "Skip only if you already know the porch. Rewatch later under More · Vault Reels.",
+      "Ask him anything after the porch opens — question mark, or type it in this manual.",
     ],
   },
   kane: {
     title: "Dr. Vesper Kane",
-    blurb: "A recording you were not meant to hear. T-0880s delivered tasks. She built human-operated super suits instead.",
+    blurb: "A recording you were not meant to hear. T-0880s delivered tasks. She built human-operated super suits instead — and she wants Ironclad first.",
     tips: [
-      "TyroneBot is the only T-0880 with a name. He lives here.",
-      "AEGIS 2753 are people in suits, not robots.",
-      "File tab, PEOPLE: TyroneBot, Kane, then the visors. Then Ironclad. Then the hills.",
+      "TyroneBot is the only T-0880 with a name. He lives on this porch.",
+      "AEGIS 2753 are people in suits, not robots. Visors sit under Kane in PEOPLE.",
+      "File tab PEOPLE: TyroneBot, Kane, the wing, then Ironclad, then the hills.",
+      "Project Vesper needs hull plate. Your first days are not a tutorial — they are invoice time.",
     ],
   },
   briefing: {
     title: "Vault 13 orientation",
-    blurb: "Tyrone walks you through the shelter before the Hollow Realm opens up. Tap his panel to continue. The first briefing cannot be skipped.",
+    blurb: "Tyrone walks you through the shelter before the Hollow Realm opens. Tap his panel to continue. The first briefing cannot be skipped.",
     tips: [
       "Every resident starts in Ironclad and lives at Vault 13.",
-      "Cut your one file. Two rerolls. Then the Machine Shop closes.",
-      "Deploy them. Caps and salvage come home, or they do not.",
+      "Cut your one file. Two rerolls for the whole sheet. Then the Machine Shop closes.",
+      "Dawn board → watches → Market / tower / map sites. The sortie still uses a die.",
       "Keep the Med Bay online before you rest the downed.",
     ],
   },
   welcome: {
-    title: "Vault 13",
-    blurb: "The porch is behind you. This is the shelter. PEOPLE holds TyroneBot, Kane, the visors, then Ironclad. Travis is in the bay. The Machine Shop is waiting.",
+    title: "Vault 13 porch",
+    blurb: "Kane's tape is filed. This is the shelter. Tyrone holds the CRT. You hold the squad. The Machine Shop stamps your one resident — then the Hollow opens.",
     tips: [
-      "Open File · PEOPLE. TyroneBot first. Kane second. Then AEGIS. Then Travis.",
-      "The radio chip changes the air. Tap the waveform.",
-      "Cut your file in the Machine Shop. Then the Hollow Realm opens.",
+      "First move: Machine Shop. Face, dice, two rerolls, stamp. Shop goes dark after.",
+      "Open File · PEOPLE. TyroneBot first. Kane second. Then AEGIS. Then Travis and Ironclad.",
+      "Dawn posts a board of watches. Required jobs bite if you sleep on them.",
+      "Question mark / Ask opens this manual. Type questions about Kane, the board, or the next move.",
+      "Radio chip under the cabinet changes the air. ICR ads are not on the deck.",
     ],
   },
   resume: {
@@ -701,12 +725,12 @@ export const MANUAL: Record<string, FieldCard> = {
   },
   forge: {
     title: "Machine Shop",
-    blurb: "One file. Discord name locked. Two rerolls. Then the shop goes dark.",
+    blurb: "One file. Discord name locked. Two rerolls for the whole sheet. Then the shop goes dark forever.",
     tips: [
-      "Tap a die face to roll it. Two rerolls after that. Then stamp.",
-      "Let the Hollow decide if you do not want to own the first throw.",
-      "Discord name is locked. The shop closes after this file.",
-      "There is no second character. There is no later reroll.",
+      "Women or men → face → class and blood. Then tap each die face to roll.",
+      "Two rerolls cover the whole page, not one die each. Spend them, then stamp.",
+      "Discord name is already on the black card. The shop closes after this file.",
+      "There is no second character. There is no later reroll. Ask Tyrone if you freeze.",
     ],
   },
   deploy: {
@@ -829,18 +853,22 @@ export const MANUAL: Record<string, FieldCard> = {
   },
   companion: {
     title: "Tyrone is on the line",
-    blurb: "He is in Vault 13, watching the CRT. Ask about the roll, the Raid Matrix, a name on the roster, or a promise you made.",
+    blurb: "He is in Vault 13, watching the CRT. Ask what to do first, about Kane, the dawn board, the roll, the Raid Matrix, a name on the roster, or a promise you made.",
     tips: [
       "He only quotes live rules. He will not invent a DC.",
       "Assistance off means he stays quiet unless you ask.",
       "Turn numbers off if you want the check described, not counted.",
+      "Starter asks: What do I do first? Who is Kane? How does a day work?",
     ],
   },
   rules: {
     title: "How you play",
-    blurb: "Vault 13 orientation in long form. The question mark on other screens is the short version.",
+    blurb: "Vault 13 orientation in long form. The question mark on other screens is the short version — type a question if you want him to answer straight.",
     tips: [
-      "Forge. Deploy. Salvage. Recover. Repeat.",
+      "Stamp one file in the Machine Shop. Then read the dawn board.",
+      "Most watches are decisions. The sortie still uses a die.",
+      "Market under the Gate. Relay Tower Three. Sites on the World map.",
+      "Forge. Deploy. Salvage. Recover. Keep Med Bay online before you rest the downed.",
       "The world is the Hollow Realm. Home is Vault 13.",
     ],
   },
@@ -855,6 +883,21 @@ export const MANUAL: Record<string, FieldCard> = {
       "ICR 88 ads play between songs only. You cannot request them.",
     ],
   },
+};
+
+/** Starter asks for the field manual — keyed by talk/script id. */
+export const MANUAL_PROMPTS: Record<string, string[]> = {
+  wake: ["Where am I?", "Who are you?", "What do I do first?"],
+  kane: ["Who is Kane?", "What is AEGIS?", "What do I do first?"],
+  welcome: ["What do I do first?", "How does a day work?", "Who is Kane?", "How do I get help?"],
+  briefing: ["What do I do first?", "How does a day work?", "Where is the market?"],
+  resume: ["What's on the board?", "How is the roster?", "What do I do first?"],
+  forge: ["How do I roll?", "What happens after I stamp?", "What do I do first?"],
+  hq: ["What's on the board?", "Where is the market?", "What do I do first?", "How do I get help?"],
+  deploy: ["What do I do first?", "Should I scout?", "Where is the market?"],
+  menu: ["What do I do first?", "Who are you?", "Where am I?"],
+  companion: ["What do I do first?", "What's on the board?", "Who is Kane?"],
+  rules: ["How does a day work?", "What do I do first?", "How do I get help?"],
 };
 
 export const SCREEN_SCRIPT: Partial<Record<Screen, string>> = {

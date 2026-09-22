@@ -61,10 +61,10 @@ export function bootStageName(input: {
 }
 
 export function bootStageLabel(stage: BootStage) {
-  if (stage === "PORCH") return "Porch lamps";
-  if (stage === "UPLINK") return "Discord uplink";
-  if (stage === "FILE") return "Reading file";
-  return "Seating CRT";
+  if (stage === "PORCH") return "Porch lamps — Vault 13";
+  if (stage === "UPLINK") return "Discord uplink · file warm";
+  if (stage === "FILE") return "Reading resident file";
+  return "Seating the CRT · Tyrone online";
 }
 
 /** Real work drives the checkpoints. Elapsed time only creeps toward the next one so the bar never looks frozen. */

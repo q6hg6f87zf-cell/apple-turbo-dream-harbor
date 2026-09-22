@@ -158,13 +158,56 @@ export function answerTyroneQuestion(state: GameState, raw: string): string {
     return "I'll hold you to that. The file remembers.";
   }
 
+  if (
+    /what do i do first|first (job|step|move)|where do i start|how (do i |to )?begin|new (here|file)|just (woke|started)|tutorial|how (do i |to )?play|explain (the )?game|what is (this|the) game/.test(
+      low,
+    )
+  ) {
+    if (!state.seenTalk.includes("welcome") && !state.seenTalk.includes("briefing") && state.operatives.length === 0) {
+      return "Listen to the porch. Kane's face. Then welcome. Then Machine Shop — stamp your one file. After that: dawn board, Market under the Gate, pin a site. Question mark any time.";
+    }
+    if (state.operatives.filter((o) => o.status !== "dead").length === 0) {
+      return "Machine Shop first. Face, dice, two rerolls for the whole sheet, stamp. The shop goes dark after. Then the board decides the day.";
+    }
+    const openSit = availableScenarios(state)[0];
+    if (openSit) return `${openSit.title} is open. Board, World strip, or ask me about the situation. That is the next honest move.`;
+    if ((state.shift?.board.filter((t) => t.status === "open") ?? []).length)
+      return "Read the dawn board. Required watches bite if you sleep on them. Market, tower, then a site on the map.";
+    return "Forge or recover, then Deploy. Salvage comes home or it does not. I put the next smart move on the strip up top.";
+  }
+
+  if (/where am i|what is (this|vault ?13)|what.?s vault|this (place|shelter|vault)/.test(low)) {
+    return "Vault 13. Shelter on the outskirts of Ironclad. Roof leaks. Door sticks. I hold the CRT. You hold the squad. Outside is the Hollow Realm.";
+  }
+
+  if (/who (are|is) you|what are you|tyrone bot|t-?0880\b/.test(low)) {
+    return "Tyrone Bot. T-0880. Only one of the delivery line with a name. Kane signed the shutdown. I walked off the scrap list. I live on this porch.";
+  }
+
+  if (/who is kane|who.?s kane|dr\.? vesper kane|why (does )?kane/.test(low)) {
+    return "Dr. Vesper Kane. Project Vesper wants hull plate for intergalactic travel. Ironclad is the first invoice. She built AEGIS 2753 — people in suits — after she scrap-listed my line.";
+  }
+
+  if (/how does (a |the )?day work|dawn board|what.*(board|watch|shift)|six watches/.test(low)) {
+    return "Dawn posts a board. Six watches. Most jobs are decisions — who you send, what you say, which crate or site. The sortie still uses a die. Rest until dawn reprints. Do the shift first.";
+  }
+
+  if (/question mark|field manual|how (do i |to )?ask|how (do i |to )?get help|assist(ance)?/.test(low)) {
+    return "Tap the question mark or Ask in the header. That is my field manual for this room. Type a straight question. Assist and Numbers live on that card. I will not talk over a live fight.";
+  }
+
   if (/how many cap|how rich|bottle cap|treasury|how much (do i|we) have/.test(low)) {
     return `${state.coins.toLocaleString()} bottle caps on the Vault 13 ledger, ${name}. Ore ${state.ore}. Moon Favor ${state.moonFavor}.`;
   }
 
-  if (/what (do i |should i )?roll|what roll|this beat|this check|dc\b|what is the dc/.test(low)) {
+  if (/what (do i |should i )?roll|how (do i |to )?roll|what roll|this beat|this check|dc\b|what is the dc/.test(low)) {
     const beat = currentBeat(state);
-    if (!beat) return "No die on the table. The sortie is the one that still uses it.";
+    if (!beat) {
+      if (state.screen === "forge" || state.operatives.filter((o) => o.status !== "dead").length === 0) {
+        return "Machine Shop: tap each die face to roll. Two rerolls for the whole sheet — not per die. Then stamp. Discord name is locked. Shop goes dark after.";
+      }
+      return "No die on the table. The sortie is the one that still uses it.";
+    }
     const phrase = dcPhrase(state, beat.dc, beat.stat);
     return `${beat.stat} check. ${beat.title}. ${phrase} after Perimeter Control and the scout watch. ${beat.lead}'s ${beat.stat} modifier is the thing that matters, partner.`;
   }
@@ -175,7 +218,14 @@ export function answerTyroneQuestion(state: GameState, raw: string): string {
     return `Raid Matrix says no. ${gate} I am not being colorful.`;
   }
 
-  if (/machine shop|forge locked|why is the (machine|forge|shop)|upgrade/.test(low)) {
+  if (/machine shop|forge locked|why is the (machine|forge|shop)|upgrade|reroll|stamp (the )?file|cut (my |a )?file|character creat/.test(low)) {
+    if (
+      /reroll|stamp|cut (my |a )?file|character|how (do i |to )?roll/.test(low) ||
+      state.screen === "forge" ||
+      state.operatives.filter((o) => o.status !== "dead").length === 0
+    ) {
+      return "Machine Shop: women or men, a face, then tap each die. Two rerolls for the whole sheet. Discord name is locked. Stamp once — shop goes dark. No second soul.";
+    }
     const room: RoomId = /med|infirm/.test(low) ? "infirmary" : /watch|perim/.test(low) ? "watchtower" : /barrack|quarter/.test(low) ? "barracks" : /ledger|exchange/.test(low) ? "ledger" : /salvage|vault/.test(low) ? "vault" : "forge";
     const reason = roomGate(state, room);
     if (!reason) return `${BASE_ROOMS[room].name} will take the caps.`;
@@ -245,10 +295,6 @@ export function answerTyroneQuestion(state: GameState, raw: string): string {
     const mem = retrieveMemories(state, { limit: 1, touch: true })[0];
     if (!mem) return "I've got nothing in my records on that.";
     return `Yeah. I remember. ${mem.description}`;
-  }
-
-  if (/who are you|what are you/.test(low)) {
-    return "Name's Tyrone. S.Y.N.A.P.S.E unit T-0880. I live in Vault 13. You hold the squad.";
   }
 
   // Story / world Q&A — Oblivion-style: companion answers the plot, not only the UI.
@@ -355,7 +401,7 @@ export function answerTyroneQuestion(state: GameState, raw: string): string {
 
   const mem = retrieveMemories(state, { limit: 1 })[0];
   if (mem && /we|last time|before/.test(low)) return `Yeah. ${mem.description}`;
-  return "I've got nothing in my records on that. Ask me about the story, a situation, Kane, the roll, the Matrix, a name on the roster, or this place.";
+  return "I've got nothing in my records on that. Ask me what to do first, Kane, the board, the roll, the Matrix, a name on the roster, Vault 13, or this place.";
 }
 
 export function isUnknownTyroneReply(text: string) {

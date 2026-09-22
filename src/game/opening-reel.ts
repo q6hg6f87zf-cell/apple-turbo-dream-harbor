@@ -71,7 +71,7 @@ export const GALLERY: GalleryItem[] = [
     kind: "reel",
     title: "Found You",
     eyebrow: "Opening",
-    blurb: "East of the old highway. Tyrone talks. The reel runs itself.",
+    blurb: "East of the old highway. Tyrone talks. Captions follow the tape. Kane waits after.",
     src: WAKE_REEL.src,
     poster: WAKE_REEL.poster,
     duration: WAKE_REEL.duration,

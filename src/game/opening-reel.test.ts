@@ -25,6 +25,13 @@ describe("opening reel cues", () => {
     assert.equal(WAKE_CUES.length, 8);
     assert.equal(WAKE_CUES[WAKE_CUES.length - 1]?.i, 7);
   });
+
+  it("keeps wake dialogue locked to the spoken tape", async () => {
+    const { TALK } = await import("./talk");
+    assert.equal(TALK.wake.length, 8);
+    assert.ok(TALK.welcome.length >= 7);
+    assert.ok(TALK.forge.length >= 4);
+  });
 });
 
 describe("score stays off the radio deck", () => {

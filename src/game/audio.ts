@@ -93,6 +93,7 @@ export function addMuteHook(fn: (next: boolean) => void) {
 
 export function unlockAudio() {
   ac();
+  warmSfxSamples();
   unlockHooks.forEach((fn) => fn());
   if (!muted) startAmbient();
 }
@@ -360,7 +361,112 @@ export function stopHeartBed() {
   }
 }
 
-export const sfx = {
+function rumble(ms = 16) {
+  if (typeof navigator === "undefined" || muted) return;
+  try {
+    navigator.vibrate?.(ms);
+  } catch {
+    /* no haptic */
+  }
+}
+
+/** Kenney CC0 samples under /sfx — procedural synth remains the fallback. */
+const SAMPLE_URLS: Record<string, string> = {
+  click: "/sfx/ui-click.wav",
+  coin: "/sfx/coins.ogg",
+  hit: "/sfx/impact-chop.ogg",
+  hurt: "/sfx/blade.ogg",
+  unlock: "/sfx/metal-latch.ogg",
+  machine: "/sfx/ui-metal.wav",
+  dice: "/sfx/gear-belt.ogg",
+  forge: "/sfx/metal-click.ogg",
+  deploy: "/sfx/door-open.ogg",
+  whoosh: "/sfx/door-creak.ogg",
+  win: "/sfx/ui-confirm.wav",
+  deny: "/sfx/ui-toggle.wav",
+  swipe: "/sfx/ui-switch.wav",
+  dawn: "/sfx/book-open.ogg",
+  lockIn: "/sfx/metal-latch.ogg",
+  chip: "/sfx/metal-click.ogg",
+  lever: "/sfx/ui-metal.wav",
+  manual: "/sfx/book-open.ogg",
+  porch: "/sfx/door-creak.ogg",
+  step: "/sfx/step.ogg",
+  bookClose: "/sfx/book-close.ogg",
+  bookFlip: "/sfx/book-flip.ogg",
+  doorClose: "/sfx/door-close.ogg",
+  draw: "/sfx/draw.ogg",
+  impactMetal: "/sfx/impact-metal.ogg",
+  uiHover: "/sfx/ui-hover.wav",
+  uiTap: "/sfx/ui-tap.wav",
+};
+
+const sampleCache = new Map<string, AudioBuffer | null>();
+let samplesWarm = false;
+
+async function decodeSample(url: string): Promise<AudioBuffer | null> {
+  if (sampleCache.has(url)) return sampleCache.get(url) ?? null;
+  const c = ac();
+  if (!c) return null;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+      sampleCache.set(url, null);
+      return null;
+    }
+    const raw = await res.arrayBuffer();
+    const buf = await c.decodeAudioData(raw.slice(0));
+    sampleCache.set(url, buf);
+    return buf;
+  } catch {
+    sampleCache.set(url, null);
+    return null;
+  }
+}
+
+export function warmSfxSamples() {
+  if (samplesWarm || typeof window === "undefined") return;
+  samplesWarm = true;
+  const urls = [...new Set(Object.values(SAMPLE_URLS).filter(Boolean))];
+  void Promise.all(urls.map((u) => decodeSample(u)));
+}
+
+function playSample(url: string, gain = 0.42): boolean {
+  const c = ac();
+  if (!c || !sfxBus || muted) return false;
+  const buf = sampleCache.get(url);
+  if (!buf) {
+    void decodeSample(url);
+    return false;
+  }
+  const src = c.createBufferSource();
+  src.buffer = buf;
+  const g = c.createGain();
+  g.gain.value = gain;
+  src.connect(g);
+  g.connect(sfxBus);
+  src.start();
+  src.onended = () => {
+    try {
+      src.disconnect();
+      g.disconnect();
+    } catch {
+      /* noop */
+    }
+  };
+  return true;
+}
+
+function withSample(key: string, procedural: () => void, gain = 0.42, alsoProcedural = false) {
+  const url = SAMPLE_URLS[key];
+  if (url && playSample(url, gain)) {
+    if (alsoProcedural) procedural();
+    return;
+  }
+  procedural();
+}
+
+const sfxProcedural = {
   click: () => {
     tone({ freq: jitter(88, 0.08), dur: 0.05, type: "sine", gain: 0.048, freqEnd: 52 });
     tone({ freq: jitter(620, 0.06), dur: 0.045, type: "triangle", gain: 0.032 });
@@ -556,13 +662,64 @@ export const sfx = {
     tone({ freq: jitter(190, 0.08), dur: 0.05, type: "triangle", gain: 0.035, freqEnd: 90 });
     rumble(7);
   },
+  /** Soft open for Tyrone's field manual / journal. */
+  manual: () => {
+    rumble(6);
+  },
+  /** Porch lamp / boot settle. */
+  porch: () => {
+    rumble(10);
+  },
 };
 
-export function rumble(ms = 16) {
-  if (typeof navigator === "undefined" || muted) return;
-  try {
-    navigator.vibrate?.(ms);
-  } catch {
-    /* no haptic */
-  }
-}
+export const sfx = {
+  click: () => withSample("click", sfxProcedural.click, 0.38),
+  machine: () => withSample("machine", sfxProcedural.machine, 0.32),
+  dice: () => withSample("dice", sfxProcedural.dice, 0.45),
+  coin: () => withSample("coin", sfxProcedural.coin, 0.4),
+  hit: () => withSample("hit", sfxProcedural.hit, 0.48),
+  hurt: () => withSample("hurt", sfxProcedural.hurt, 0.4),
+  miss: () => sfxProcedural.miss(),
+  crit: () => {
+    withSample("hit", sfxProcedural.crit, 0.35, true);
+  },
+  win: () => withSample("win", sfxProcedural.win, 0.36),
+  jackpot: () => sfxProcedural.jackpot(),
+  dry: () => sfxProcedural.dry(),
+  lever: () => withSample("lever", sfxProcedural.lever, 0.34),
+  reelTick: () => sfxProcedural.reelTick(),
+  reelStop: () => sfxProcedural.reelStop(),
+  heart: () => sfxProcedural.heart(),
+  hold: () => sfxProcedural.hold(),
+  clockTick: () => sfxProcedural.clockTick(),
+  clockWarn: () => sfxProcedural.clockWarn(),
+  lockTick: () => sfxProcedural.lockTick(),
+  pinSet: () => sfxProcedural.pinSet(),
+  chip: () => withSample("chip", sfxProcedural.chip, 0.35),
+  plateDrain: () => sfxProcedural.plateDrain(),
+  nearMiss: () => sfxProcedural.nearMiss(),
+  bankPop: () => sfxProcedural.bankPop(),
+  lockIn: () => withSample("lockIn", sfxProcedural.lockIn, 0.4),
+  countTick: () => sfxProcedural.countTick(),
+  dawn: () => withSample("dawn", sfxProcedural.dawn, 0.35),
+  deploy: () => withSample("deploy", sfxProcedural.deploy, 0.4),
+  forge: () => withSample("forge", sfxProcedural.forge, 0.42),
+  whoosh: () => withSample("whoosh", sfxProcedural.whoosh, 0.38),
+  hack: () => sfxProcedural.hack(),
+  termKey: () => sfxProcedural.termKey(),
+  termType: (n = 4) => sfxProcedural.termType(n),
+  deny: () => withSample("deny", sfxProcedural.deny, 0.34),
+  unlock: () => withSample("unlock", sfxProcedural.unlock, 0.4),
+  swipe: () => withSample("swipe", sfxProcedural.swipe, 0.32),
+  reel: () => sfxProcedural.reel(),
+  manual: () => withSample("manual", sfxProcedural.manual, 0.36),
+  porch: () => withSample("porch", sfxProcedural.porch, 0.3),
+  step: () =>
+    withSample("step", () => {
+      noise(0.04, 0.02, 400);
+    }, 0.28),
+  bookFlip: () => withSample("bookFlip", () => noise(0.03, 0.018, 900), 0.3),
+  draw: () => withSample("draw", () => tone({ freq: 220, dur: 0.08, type: "triangle", gain: 0.03 }), 0.34),
+};
+
+export { rumble };
