@@ -70,6 +70,9 @@ import { isPlaceholderName } from "./discord";
 import { CAST, aegisOnDuty, meetCast } from "./cast";
 import { aegisRunner, dawnDispatch, nightTale, resolveMissionSite } from "./story";
 import { rollLoot } from "./loot";
+import { emptyNarrative } from "./narrative-state";
+import { bootstrapNarrative, syncStorySpine } from "./story-spine";
+import { setFlag } from "./narrative-state";
 
 export function uid(prefix = "id"): string {
   return `${prefix}-${Math.random().toString(36).slice(2, 9)}-${Date.now().toString(36)}`;
@@ -349,6 +352,7 @@ export function defaultState(): GameState {
     },
     tyrone: emptyTyrone(),
     travis: emptyTravis(),
+    narrative: emptyNarrative(),
   };
 }
 
@@ -881,6 +885,14 @@ export function completeMission(state: GameState): GameState {
     queueTalk(state, "wing");
   }
   state.toast = `Sortie complete. +${m.coins} caps${cut ? ` · +${cut} on the card` : ""}${m.ore ? ` · +${m.ore} ore` : ""}.`;
+  setFlag(state, "first_sortie_done", true);
+  if (m.poiId === "ironclad-rail" || (m.locationId === "ironclad" && firstWatch)) {
+    setFlag(state, m.kind === "forage" ? "rail_cut_foraged" : "rail_cut_scouted", true);
+  }
+  if (m.poiId === "ironclad-gate") setFlag(state, "gate_watched", true);
+  if (m.poiId === "ironclad-halo") setFlag(state, "halo_yard_scouted", true);
+  if (m.poiId === "ironclad-shop") setFlag(state, "travis_met", true);
+  syncStorySpine(state);
   return state;
 }
 
@@ -1469,6 +1481,8 @@ export function restOvernight(state: GameState): GameState {
   if (state.tutorial === "rest") state.tutorial = "done";
   state.toast = `Dawn of day ${state.day}.`;
   queueTalk(state, "dawn");
+  setFlag(state, "first_dawn_survived", true);
+  syncStorySpine(state);
   return state;
 }
 

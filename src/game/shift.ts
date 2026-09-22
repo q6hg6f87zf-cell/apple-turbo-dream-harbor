@@ -3,6 +3,8 @@ import { discoverNextPoi, KANE_STAKES, locationToRegion } from "./field-ops";
 import { aegisJob, boardPostedLine, sortieJob } from "./story";
 import { CAST, meetCast } from "./cast";
 import { queueTalk } from "./talk";
+import { applyAegisChoice } from "./consequences";
+import { syncStorySpine } from "./story-spine";
 import type {
   DayTask,
   GameState,
@@ -681,6 +683,7 @@ export function resolveTask(state: GameState, taskId: string, payload: TaskPaylo
         state.kaneHeat = Math.min(40, (state.kaneHeat ?? 0) + 2);
         finish(state, task, `No cameras. ${person.name} walked a bunk. Heat up. I stayed in the walls.`);
       }
+      applyAegisChoice(state, "hide", person.id);
     } else if (choice.id === "lie") {
       if (talker) {
         finish(state, task, `${talker.name} sold ${person.name} the salvage-outfit line. They bought it. For now.`);
@@ -688,13 +691,16 @@ export function resolveTask(state: GameState, taskId: string, payload: TaskPaylo
         state.kaneHeat = Math.min(40, (state.kaneHeat ?? 0) + 3);
         finish(state, task, `Nobody here talks like a foundry. ${person.name} logged a question mark.`);
       }
+      applyAegisChoice(state, "lie", person.id);
     } else {
       state.kaneHeat = Math.min(40, (state.kaneHeat ?? 0) + 4);
       finish(state, task, `You met ${person.name}'s 2753 armed. That is a conversation for the yard.`);
+      applyAegisChoice(state, "fight", person.id);
       state.shift.activeId = task.id;
       task.status = "active";
       return "fight";
     }
+    syncStorySpine(state);
     return null;
   }
 

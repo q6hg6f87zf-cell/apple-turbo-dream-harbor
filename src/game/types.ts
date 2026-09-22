@@ -816,6 +816,9 @@ export interface TravisBay {
   jobs: number;
 }
 
+/** Re-export shape from narrative-state (type-only circular import is fine). */
+export type NarrativeState = import("./narrative-state").NarrativeState
+
 export interface GameState {
   version: number;
   started: boolean;
@@ -878,4 +881,6 @@ export interface GameState {
   arcade: ArcadeState;
   tyrone: TyroneMind;
   travis: TravisBay;
+  /** Story spine, flags, journal — optional on old saves; restored with defaults. */
+  narrative?: NarrativeState;
 }

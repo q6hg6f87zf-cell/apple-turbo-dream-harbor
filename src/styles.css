@@ -903,8 +903,50 @@
 .ms-shell-hub-pad {
   padding-bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px));
 }
+.ms-shell-world-pad {
+  padding-top: calc(4.5rem + env(safe-area-inset-top, 0px));
+  padding-bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px));
+}
 .ms-shell-task-pad {
   padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+}
+[data-chrome="world"] .ms-content-scrim::before {
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--color-ink) 18%, transparent) 0%,
+    color-mix(in oklab, var(--color-ink) 48%, transparent) 2.5rem,
+    color-mix(in oklab, var(--color-ink) 70%, transparent) 100%
+  );
+}
+.ms-world-hud-plate {
+  border: 1px solid color-mix(in oklab, var(--color-line) 70%, transparent);
+  background: color-mix(in oklab, var(--color-ink) 72%, transparent);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 24px color-mix(in oklab, var(--color-ink) 45%, transparent);
+}
+.ms-world-whisper {
+  border-left: 2px solid color-mix(in oklab, var(--color-ember) 70%, transparent);
+  background: color-mix(in oklab, var(--color-ink) 55%, transparent);
+  backdrop-filter: blur(8px);
+}
+[data-region-theme="ironclad"] .ms-world-hud-plate {
+  border-color: color-mix(in oklab, #c47a2c 45%, var(--color-line));
+}
+[data-region-theme="slag"] .ms-world-hud-plate {
+  border-color: color-mix(in oklab, #8a6a4a 50%, var(--color-line));
+}
+[data-region-theme="blackspire"] .ms-world-hud-plate {
+  border-color: color-mix(in oklab, #6a7a8a 55%, var(--color-line));
+}
+[data-region-theme="brasswater"] .ms-world-hud-plate {
+  border-color: color-mix(in oklab, #b08a3a 50%, var(--color-line));
+}
+[data-region-theme="veyra"] .ms-world-hud-plate {
+  border-color: color-mix(in oklab, #4a9aaa 55%, var(--color-line));
+}
+body[data-orbit="1"] [data-dock],
+[data-chrome="world"][data-screen="map"] [data-dock].is-faded {
+  opacity: 0.35;
 }
 /* Layer 2 of the scene stack. The room stays visible through the scene breath
    above and around the content; underneath the content itself the ink comes up

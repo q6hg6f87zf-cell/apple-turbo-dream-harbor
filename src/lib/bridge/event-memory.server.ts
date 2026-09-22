@@ -40,7 +40,7 @@ export async function resolvePromisesForTrigger(discordId: string, trigger: Cont
   const fulfilled: string[] = [];
   try {
     const active = await listPromises(discordId, "active");
-    const event = { type: trigger.type, region: trigger.region ?? null, poi: trigger.poi ?? null };
+    const event = { type: trigger.type, region: trigger.region ?? null, poi: trigger.poi ?? null, tags: trigger.tags ?? [] };
     for (const row of active) {
       if (!promiseSatisfiedByEvent(row, event)) continue;
       const updated = await setPromiseStatus(discordId, row.id, "fulfilled", "system");

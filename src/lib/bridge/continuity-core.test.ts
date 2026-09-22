@@ -183,6 +183,19 @@ test("deferred promise recall is not consumed, then a real objective fulfills on
   assert.equal(promiseBrokenByEvent(keep, { type: "mission.failed", region: "blackspire" }), true);
 });
 
+test("story_flag_changed fulfills promises tagged with that flag", () => {
+  const row = promiseRow({
+    subject: "come back when the Rail Cut is scouted",
+    tags: ["rail_cut_scouted", "ironclad"],
+  });
+  assert.equal(promiseSatisfiedByEvent(row, { type: "story_flag_changed", tags: ["vesper_named"] }), false);
+  assert.equal(promiseSatisfiedByEvent(row, { type: "story_flag_changed", tags: ["rail_cut_scouted"] }), true);
+  assert.equal(
+    promiseSatisfiedByEvent(row, { type: "story_flag_changed", tags: ["flag:rail_cut_scouted"] }),
+    true,
+  );
+});
+
 test("relationship deltas stay small and repeat farming is a no-op at the rule layer", () => {
   const delta = bondDeltaForEvent("boss.defeated");
   assert.ok(Object.values(delta).every((n) => Math.abs(n) <= 1));
