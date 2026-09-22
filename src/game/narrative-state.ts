@@ -38,6 +38,14 @@ export const NARRATIVE_FLAG_IDS = [
   "orion_spoken",
   "vera_manifest_shown",
   "drake_turned_away",
+  // Act I–II scenarios
+  "travis_jig_filled",
+  "travis_refused",
+  "halo_reported",
+  "halo_ambushed",
+  "invoice_copied",
+  "invoice_burned",
+  "invoice_sold",
   // Act III — Project Vesper
   "vesper_named",
   "halo_yard_scouted",

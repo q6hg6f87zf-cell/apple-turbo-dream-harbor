@@ -34,7 +34,7 @@ export const NAV: { id: Screen; label: string; short: string; icon: typeof Landm
   { id: "map", label: "World", short: "World", icon: Globe2, hint: "sortie" },
   { id: "arcade", label: "Thirty-Eight", short: "38", icon: Spade },
   { id: "inventory", label: "Inventory", short: "Pack", icon: PackageOpen },
-  { id: "more", label: "More", short: "More", icon: MoreHorizontal },
+  { id: "more", label: "Systems", short: "More", icon: MoreHorizontal },
 ];
 
 export const VAULT_SCREENS: Screen[] = ["hq"];

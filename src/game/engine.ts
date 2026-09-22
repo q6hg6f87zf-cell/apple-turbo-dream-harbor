@@ -73,6 +73,9 @@ import { rollLoot } from "./loot";
 import { emptyNarrative } from "./narrative-state";
 import { bootstrapNarrative, syncStorySpine } from "./story-spine";
 import { setFlag } from "./narrative-state";
+import { applyRadioWorldNote } from "./radio-world";
+import { considerEndingAtDawn } from "./endings";
+import { availableScenarios } from "./scenario";
 
 export function uid(prefix = "id"): string {
   return `${prefix}-${Math.random().toString(36).slice(2, 9)}-${Date.now().toString(36)}`;
@@ -1479,7 +1482,14 @@ export function restOvernight(state: GameState): GameState {
   const dispatch = dawnDispatch(state);
   pushLog(state, "session", "Tyrone", `Day ${state.day}. ${dispatch}`);
   if (state.tutorial === "rest") state.tutorial = "done";
-  state.toast = `Dawn of day ${state.day}.`;
+  applyRadioWorldNote(state);
+  const ending = considerEndingAtDawn(state);
+  const openSit = availableScenarios(state)[0];
+  state.toast = ending
+    ? `Epilogue · ${ending.title}`
+    : openSit
+      ? `Dawn of day ${state.day}. Situation open: ${openSit.title}.`
+      : `Dawn of day ${state.day}.`;
   queueTalk(state, "dawn");
   setFlag(state, "first_dawn_survived", true);
   syncStorySpine(state);
