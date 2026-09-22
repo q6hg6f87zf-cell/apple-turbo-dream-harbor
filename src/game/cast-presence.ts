@@ -21,9 +21,10 @@ export function queueCastPresence(state: GameState, castId: CastId, force = fals
 export function pickCastScript(state: GameState, castId: CastId): string | null {
   switch (castId) {
     case "travis":
-      if (hasFlag(state, "travis_jig_filled")) return "travis_filled";
+      if ((state.travis?.fitted.length ?? 0) >= 3 || hasFlag(state, "travis_jig_filled")) return "travis_filled";
       if (hasFlag(state, "travis_refused")) return "travis_cold";
       if (availableScenarios(state).some((s) => s.id === "travis_bay")) return "travis_open";
+      if ((state.travis?.fitted.length ?? 0) >= 1) return "travis_fit";
       return "travis";
     case "lyra":
       if (hasFlag(state, "lyra_fought")) return "lyra_scar";

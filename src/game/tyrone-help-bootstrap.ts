@@ -1,4 +1,4 @@
-import { MANUAL, SCREEN_SCRIPT, TALK } from "./talk";
+import { MANUAL, MANUAL_PROMPTS, SCREEN_SCRIPT, TALK } from "./talk";
 
 let booted = false;
 
@@ -9,15 +9,15 @@ export function bootstrapTyroneHelp() {
   TALK.inventory = [
     {
       who: "Tyrone Bot",
-      text: "Inventory is supposed to be fast, partner. Tap the thing, pick the resident, read the before-and-after numbers, then use the big button. If you need a spreadsheet to equip a coat, I failed you.",
+      text: "Inventory is supposed to be a story, partner — not a spreadsheet. Tap the thing, hear why it matters, pick the resident, then use the big button. Travis parts and cracked steel get their own lanes.",
     },
     {
       who: "Tyrone Bot",
-      text: "Weapons, armor and trinkets equip. Consumables get used once. Enchantments attach to gear and disappear into it. Materials stay in Vault 13 for construction. Special items stay tagged until a door, boss or story asks for them.",
+      text: "Weapons, armor and trinkets equip. Attachments seat on firearms here. Consumables get used once. Enchantments attach to gear. Materials stay for construction. Special items stay tagged. Travis bay parts walk to the Mechanical Shop — he seats them in me.",
     },
     {
       who: "Tyrone Bot",
-      text: "Power is loadout strength. Level is the resident. First-time item mastery gives a little XP, but sorties are where real training happens. I will show you if an item is about to push somebody over a level before you commit.",
+      text: "Vault Machine Shop welds and strips. Travis favor-welds once his jig trusts you. Do not confuse the two shops. Explain quotes the lore. I will show you if an item is about to push somebody over a level before you commit.",
     },
     {
       who: "Tyrone Bot",
@@ -27,13 +27,14 @@ export function bootstrapTyroneHelp() {
 
   MANUAL.inventory = {
     title: "Quick loadout",
-    blurb: "Tyrone keeps Inventory to three moves: choose an item, preview the resident, act. The sheet explains what changes before anything is consumed or equipped.",
+    blurb: "Tyrone keeps Inventory to story-first moves: choose an item, hear why it matters, preview the resident, act. Travis parts and cracked steel show up as story lanes — not spreadsheet rows.",
     tips: [
       "Level is permanent resident progression. Power is the current loadout score.",
       "Issue & Equip moves Vault gear to the selected resident and equips it in one tap.",
-      "Consumables disappear when used. Enchantments attach permanently to one gear item.",
-      "Materials feed Vault 13 upgrades. Special items are keys, relics and story/system pieces.",
-      "Use Explain, Best fit, or How to use on an item for Tyrone's context-specific answer.",
+      "Travis bay parts: Take to Travis. He seats T-0880 fittings on TyroneBot — he does not replace the Vault Machine Shop.",
+      "Attachments: Seat on firearm here. Strip at Vault Machine Shop when the forge is lit.",
+      "Damaged weapons/armor: Repair at Vault Machine Shop, or Travis favor weld once his jig trusts you.",
+      "Explain quotes the lore. Best fit and How to use are the short clipboard.",
     ],
   };
 
@@ -49,8 +50,10 @@ export function bootstrapTyroneHelp() {
   if (TALK.deploy?.[3]) {
     TALK.deploy[3].text = "Bosses are Moon Squad raids. Scout for intel, build rider contribution XP, keep the party healthy, and bring different classes. If the Raid Matrix says no, I mean no. Improve the team before you feed me paperwork.";
   }
-  if (MANUAL.welcome) {
-    MANUAL.welcome.blurb =
-      "Kane's tape is filed. This is the shelter. Stamp your one resident in the Machine Shop, then read the dawn board. Tap Ask anytime — I live for this.";
-  }
+  MANUAL_PROMPTS.inventory = [
+    "What do I do with Travis parts?",
+    "How do I repair a weapon?",
+    "How do I seat an attachment?",
+    "Who is Travis?",
+  ];
 }

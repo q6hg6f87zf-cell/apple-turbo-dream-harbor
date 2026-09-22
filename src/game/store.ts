@@ -104,6 +104,10 @@ import { buyMarketLot, ensureMarket, MARKET_POI_ID, rollMarket, TOWER_POI_ID } f
 import type { FieldDeploy } from "./field-ops";
 import { workPoi, markFieldJob } from "./field-ops";
 import { deliverTravisPart } from "./travis";
+import { showTravisItem, travisFavorRepair } from "./item-story";
+import { attachPart, stripPart } from "./weapon-ops";
+import { setFlag, ensureNarrative, addJournal } from "./narrative-state";
+import type { AttachmentSlot } from "./types";
 import { meetCast } from "./cast";
 import {
   canRestClean,
@@ -177,6 +181,10 @@ interface Store {
   buyLot: (lotId: string) => string | null;
   workSite: (poiId?: string) => string | null;
   deliverTravis: (itemId?: string) => string | null;
+  travisFavorRepair: (itemId: string) => string | null;
+  showTravisItem: (itemId: string) => string | null;
+  attachFirearmPart: (source: { kind: "vault" } | { kind: "operative"; opId: string }, partId: string, targetOpId: string, targetItemId: string) => string | null;
+  stripFirearmPart: (opId: string, weaponId: string, slot: import("./types").AttachmentSlot) => string | null;
   openMarket: () => void;
   buyNpc: (name: string, price: number) => string | null;
   deploy: (loc: LocationId, kind: MissionKind, partyIds: string[], field?: FieldDeploy) => string | null;
@@ -969,11 +977,83 @@ export const useGame = create<Store>((set, get) => ({
         st.toast = result;
         return;
       }
+      ensureNarrative(st);
+      setFlag(st, "travis_met", true);
+      setFlag(st, "travis_bay_used", true);
+      // Do not auto-set travis_jig_filled — that flag is the authored bay situation.
+      addJournal(st, {
+        act: st.narrative?.act ?? "act_i",
+        day: st.day,
+        title: `Travis seated ${result.mod.part}`,
+        body: `${result.mod.fit} Paid ${result.pay} caps. ${result.mod.tagline}`,
+        tags: ["travis", result.mod.id, "inventory"],
+      });
       pushLog(st, "hq", "Travis", result.line);
       st.toast = result.line;
+      queueTalk(st, "travis_fit", true);
       line = null;
     });
     return line;
+  },
+  travisFavorRepair: (itemId) => {
+    let err: string | null = null;
+    mutate(set, (st) => {
+      const result = travisFavorRepair(st, itemId);
+      if (typeof result === "string") {
+        err = result;
+        st.toast = result;
+        return;
+      }
+      pushLog(st, "hq", "Travis", result.line);
+      st.toast = result.line;
+      queueTalk(st, "travis_weld", true);
+      err = null;
+    });
+    return err;
+  },
+  showTravisItem: (itemId) => {
+    let err: string | null = null;
+    mutate(set, (st) => {
+      const beat = showTravisItem(st, itemId);
+      if (typeof beat === "string") {
+        err = beat;
+        st.toast = beat;
+        return;
+      }
+      st.toast = `${beat.who}: ${beat.lines[0]}`;
+      err = null;
+    });
+    return err;
+  },
+  attachFirearmPart: (source, partId, targetOpId, targetItemId) => {
+    let err: string | null = null;
+    mutate(set, (st) => {
+      const msg = attachPart(st, source, partId, targetOpId, targetItemId);
+      if (!msg || !/seated/i.test(msg)) {
+        err = msg ?? "Could not seat that part.";
+        st.toast = err;
+        return;
+      }
+      st.toast = msg;
+      pushLog(st, "hq", "Machine Shop", msg);
+      err = null;
+    });
+    return err;
+  },
+  stripFirearmPart: (opId, weaponId, slot: AttachmentSlot) => {
+    let err: string | null = null;
+    mutate(set, (st) => {
+      const msg = stripPart(st, opId, weaponId, slot);
+      if (!msg || !/stripped from/i.test(msg)) {
+        err = msg ?? "Could not strip that part.";
+        st.toast = err;
+        return;
+      }
+      st.toast = msg;
+      pushLog(st, "hq", "Machine Shop", msg);
+      err = null;
+    });
+    return err;
   },
   buyNpc: (name, price) => {
     const s = get().s;

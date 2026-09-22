@@ -339,12 +339,15 @@ export function answerTyroneQuestion(state: GameState, raw: string): string {
     return bits.join(" ");
   }
 
-  if (/travis|jig|bay|machine shop.*tyrone|seat (the )?bay/.test(low)) {
+  if (/travis|jig|bay|mechanical shop|favor weld|seat (the )?bay/.test(low)) {
+    const n = state.travis?.fitted.length ?? 0;
+    if (n >= 1)
+      return `Travis has ${n} fitting${n === 1 ? "" : "s"} in me. Favor welds are open for cracked steel. Long rebuilds and strip jobs stay at our Vault Machine Shop — do not confuse the two.`;
     if (hasFlag(state, "travis_jig_filled")) return "Travis lit the bay. I list less to port. Keep him paid.";
     if (hasFlag(state, "travis_refused")) return "We walked out. The jig stays dark. That is on us.";
     const open = availableScenarios(state).find((s) => s.id === "travis_bay");
-    if (open) return "Travis still has an empty jig. Ironclad Mechanical Shop. He is not asking for charity.";
-    return "Travis keeps the last T-0880 bay Kane did not melt. Parts talk louder than promises.";
+    if (open) return "Travis still has an empty jig. Ironclad Mechanical Shop. Campaign parts — tube, wheel, servo, plate, coil, knee. He pays caps and seats them in me.";
+    return "Travis keeps the last T-0880 bay Kane did not melt. Inventory marks his parts. Take them to the Mechanical Shop. He is not your whole armory.";
   }
 
   if (/halo|2753|drill square|orion.?s? wing/.test(low)) {
