@@ -191,6 +191,7 @@ let switching = false;
 let lastTick = 0;
 let mode: RadioMode = "tape";
 let introChapter: IntroChapter = "found-you";
+let introHold: "kane" | "reply" | "porch" | null = null;
 let pendingTapeId: string | null = null;
 let lastSpotId: string | null = null;
 let spotLabel = "ICR 88 · Market Square";
@@ -221,6 +222,7 @@ let snapshot: RadioSnapshot = {
   subline: RADIO_TAPES[0].place,
   score: null,
   introChapter: "found-you",
+  introHold: null,
 };
 
 function applyLoop(on: boolean) {
@@ -250,6 +252,7 @@ function readSnapshot(): RadioSnapshot {
       subline: meta.subline,
       score: null,
       introChapter,
+      introHold,
     };
   }
   if (mode === "score") {
@@ -270,6 +273,7 @@ function readSnapshot(): RadioSnapshot {
       subline: scoreReason === "boss" ? "Boss fight" : "Title",
       score: scoreReason,
       introChapter,
+      introHold,
     };
   }
   if (mode === "spot") {
@@ -290,6 +294,7 @@ function readSnapshot(): RadioSnapshot {
       subline: spotLabel,
       score: null,
       introChapter,
+      introHold,
     };
   }
   return {
@@ -309,6 +314,7 @@ function readSnapshot(): RadioSnapshot {
     subline: tape?.place ?? "Vault 13 porch",
     score: null,
     introChapter,
+    introHold,
   };
 }
 
@@ -329,7 +335,8 @@ function snapshotsEqual(a: RadioSnapshot, b: RadioSnapshot) {
     a.headline === b.headline &&
     a.subline === b.subline &&
     a.score === b.score &&
-    a.introChapter === b.introChapter
+    a.introChapter === b.introChapter &&
+    a.introHold === b.introHold
   );
 }
 
@@ -388,6 +395,7 @@ export interface RadioSnapshot {
   subline: string;
   score: "title" | "boss" | null;
   introChapter: IntroChapter;
+  introHold: "kane" | "reply" | "porch" | null;
 }
 
 export function getRadioSnapshot(): RadioSnapshot {
@@ -569,7 +577,9 @@ async function playSpot(spot: RadioSpot) {
 async function onLiveEnded() {
   if (mode === "intro") {
     if (introChapter === "found-you") {
-      armKanePicture();
+      introHold = "kane";
+      playing = false;
+      emit();
       return;
     }
     if (introChapter === "kane") {
@@ -577,13 +587,12 @@ async function onLiveEnded() {
         await startKaneVoice();
         return;
       }
-      introChapter = "reply";
-      kaneVoiceStarted = false;
-      kaneClickPlayed = false;
-      await swapTo(INTRO_CHAPTER.reply.src, INTRO_CHAPTER.reply.duration, true, 0.45);
+      introHold = "reply";
+      playing = false;
+      emit();
       return;
     }
-    introChapter = "done";
+    introHold = "porch";
     playing = false;
     emit();
     return;
@@ -662,6 +671,7 @@ export async function playFoundYou() {
   kaneClickPlayed = false;
   kaneVoiceStarting = false;
   kaneLeadGen += 1;
+  introHold = null;
   pendingTapeId = null;
   currentId = null;
   await swapTo(INTRO_SRC, INTRO_DURATION, true);
@@ -673,6 +683,7 @@ export function armKanePicture() {
   kaneVoiceStarted = false;
   kaneClickPlayed = false;
   kaneVoiceStarting = false;
+  introHold = null;
   introChapter = "kane";
   mode = "intro";
   currentTime = 0;
@@ -724,9 +735,31 @@ export async function startKaneVoice() {
   }
 }
 
+export async function continueIntro() {
+  const hold = introHold;
+  if (!hold || mode !== "intro") return;
+  introHold = null;
+  if (hold === "kane") {
+    armKanePicture();
+    return;
+  }
+  if (hold === "reply") {
+    introChapter = "reply";
+    kaneVoiceStarted = false;
+    kaneClickPlayed = false;
+    kaneLeadGen += 1;
+    await swapTo(INTRO_CHAPTER.reply.src, INTRO_CHAPTER.reply.duration, true, 0.45);
+    return;
+  }
+  introChapter = "done";
+  playing = false;
+  emit();
+}
+
 export async function skipIntroTo(chapter: IntroChapter) {
   if (mode !== "intro") return;
-  if (introChapter === chapter) return;
+  if (introChapter === chapter && !introHold) return;
+  introHold = null;
   if (chapter === "kane") {
     armKanePicture();
     return;

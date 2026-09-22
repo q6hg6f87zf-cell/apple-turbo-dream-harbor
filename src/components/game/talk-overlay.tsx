@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { sfx } from "@/game/audio";
 import { kaneLineAt, replyLineAt, wakeLineAt } from "@/game/opening-reel";
-import { getRadioSnapshot, startKaneVoice, resumeRadio, subscribeRadio } from "@/game/radio";
+import { continueIntro, getRadioSnapshot, resumeRadio, startKaneVoice, subscribeRadio } from "@/game/radio";
 import { TALK, MANUAL, MANUAL_PROMPTS, isPregameTalk, isTalkLocked, renderTalk, scriptForScreen } from "@/game/talk";
 import { speakerArt } from "@/game/cast";
 import { useGame } from "@/game/store";
@@ -18,6 +18,7 @@ export function TalkOverlay() {
   const syncWakeLine = useGame((g) => g.syncWakeLine);
   const line = talk ? TALK[talk.script]?.[talk.i] : null;
   const [shown, setShown] = useState("");
+  const [hold, setHold] = useState<"kane" | "reply" | "porch" | null>(null);
   const shownRef = useRef("");
   const skipType = useRef(false);
   const full = line ? renderTalk(line.text, state) : "";
@@ -31,6 +32,11 @@ export function TalkOverlay() {
     if (liveTape) {
       const snap = getRadioSnapshot();
       if (snap.mode === "intro" && snap.playing) return;
+      if (snap.mode === "intro" && snap.introHold) {
+        sfx.click();
+        void continueIntro();
+        return;
+      }
       if (snap.mode === "intro" && snap.introChapter === "kane") {
         void startKaneVoice();
         return;
@@ -78,6 +84,12 @@ export function TalkOverlay() {
     push();
     return subscribeRadio(push);
   }, [liveTape, syncWakeLine, skip]);
+
+  useEffect(() => {
+    const push = () => setHold(getRadioSnapshot().introHold);
+    push();
+    return subscribeRadio(push);
+  }, []);
 
   useEffect(() => {
     if (!full) {
@@ -211,7 +223,9 @@ export function TalkOverlay() {
                   )}
             </div>
             <p className="mt-2 font-display text-[10px] uppercase tracking-[0.18em] text-muted">
-              {liveTape
+              {hold
+                ? "Scene's over"
+                : liveTape
                 ? last
                   ? "The reel finishes on its own · tap if it stalls"
                   : "Listening · tap if the reel stalls"
@@ -233,6 +247,19 @@ export function TalkOverlay() {
             </p>
           </div>
         </button>
+        {hold ? (
+          <Button
+            variant="ember"
+            className="mx-auto mt-2 w-full max-w-2xl"
+            data-intro-continue="1"
+            onClick={() => {
+              sfx.click();
+              void continueIntro();
+            }}
+          >
+            Continue
+          </Button>
+        ) : null}
         {!locked || liveTape ? (
           <div className="mx-auto mt-2 flex w-full max-w-2xl justify-end">
             <Button size="sm" variant="quiet" onClick={() => skip()}>

@@ -898,17 +898,18 @@
 [data-screen="inventory"] .ms-scene-breath {
   height: clamp(2.5rem, 7vh, 3.75rem);
 }
-/* The dock measures ~61px before the home indicator; clearing only 3.5rem put
-   the last control of a hub underneath it. */
-.ms-shell-hub-pad {
-  padding-bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px));
+/* Dock is pinned to the visual bottom on the phone. Scroll needs room
+   for the bar plus the home indicator, or the last crate sits under it. */
+.ms-shell-hub-pad,
+.ms-shell-task-pad {
+  padding-bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));
 }
 .ms-shell-world-pad {
   padding-top: calc(4.5rem + env(safe-area-inset-top, 0px));
-  padding-bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));
 }
-.ms-shell-task-pad {
-  padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+[data-chrome="task"] .ms-scene-breath {
+  height: 0.5rem;
 }
 [data-chrome="world"] .ms-content-scrim::before {
   background: linear-gradient(

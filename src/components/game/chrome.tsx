@@ -421,7 +421,7 @@ export function Dock() {
   return (
     <nav
       data-dock="1"
-      className="fixed inset-x-0 bottom-0 z-20 flex border-t border-line/50 bg-ink/70 px-1 pt-1 backdrop-blur-md md:hidden"
+      className="fixed inset-x-0 bottom-0 z-30 flex border-t border-line/50 bg-ink/95 px-1 pt-1 backdrop-blur-md md:hidden"
       style={{ paddingBottom: "max(8px, env(safe-area-inset-bottom))" }}
     >
       <NavButtons compact />

@@ -30,14 +30,14 @@ export function ItemInspectShell({
   // buttons inherited the list's tap suppression.
   const sheet = (
     <div
-      className="fixed inset-0 z-[70] overflow-hidden bg-ink md:bg-ink/85 md:p-6"
+      className="fixed inset-x-0 top-0 z-[70] flex overflow-hidden bg-ink bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] md:inset-0 md:bottom-0 md:bg-ink/85 md:p-6"
       onClick={onClose}
       data-item-inspect="1"
       role="presentation"
     >
       <div
         ref={focus}
-        className="relative mx-auto flex h-dvh min-h-0 w-full min-w-0 max-w-full flex-col overflow-hidden bg-surface md:h-auto md:max-h-[min(92dvh,52rem)] md:max-w-lg md:rounded-[var(--radius-xl)] md:shadow-2xl"
+        className="relative mx-auto flex h-full min-h-0 w-full min-w-0 max-w-full flex-col overflow-hidden bg-surface md:h-auto md:max-h-[min(92dvh,52rem)] md:max-w-lg md:rounded-[var(--radius-xl)] md:shadow-2xl"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
