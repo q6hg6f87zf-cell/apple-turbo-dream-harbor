@@ -71,7 +71,7 @@ describe("campaign cast", () => {
     assert.equal(TALK.kane[0]?.castId, "kane");
     assert.ok(TALK.kane.every((line) => line.castId === "kane"));
     assert.match(TALK.kane.map((l) => l.text).join(" "), /T-0880|deliver tasks|super suits/i);
-    assert.ok(!TALK.kane.some((line) => /Lyra|Vera-3|Drake-6|Orion-7/.test(line.text)));
+    assert.match(TALK.kane.map((l) => l.text).join(" "), /Orion-7|Vera-3|Lyra-4|Drake-6/);
     assert.ok(TALK.wing.some((line) => /Vera-3/.test(line.text)));
     assert.equal(CAST.vera.callsign, "VERA-3");
   });
@@ -142,7 +142,7 @@ describe("campaign cast", () => {
       ["tyrone", "kane", "lyra", "vera", "drake", "orion"],
     );
     assert.equal(CAST.tyrone.name, "TyroneBot");
-    assert.match(TALK.kane.map((l) => l.text).join(" "), /hangs in my warehouse|TyroneBot/);
+    assert.match(TALK.kane.map((l) => l.text).join(" "), /never meant to hear|TyroneBot|stay retired/);
     assert.ok(knownCast(s).some((p) => p.id === "travis"));
     assert.ok(knownCast(s).some((p) => p.id === "holt"));
     assert.ok(knownCast(s).some((p) => p.id === "vex"));

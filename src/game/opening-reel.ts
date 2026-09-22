@@ -23,8 +23,11 @@ export type IntroChapter = "found-you" | "kane" | "reply" | "done";
 
 export const KANE_TAPE = {
   src: "/audio/kane-recording.mp3",
-  duration: 202.8,
+  duration: 204.72,
 } as const;
+
+/** Recorder-button click + tape hiss before Kane's first word. */
+export const KANE_ARM = 1.88;
 
 export const TYRONE_REPLY_TAPE = {
   src: "/audio/tyrone-historically-significant.mp3",
@@ -52,39 +55,50 @@ export const WAKE_CUES = [
   { at: 87.3, i: 7 },
 ] as const satisfies readonly Cue[];
 
-/** Kane recording (~3:22). Captions follow the tape. Existing wake stills stay in the mix. */
+/** Kane recording (~3:23). Captions follow the tape word-for-word. Office stills only. */
 export const KANE_CUES = [
   { at: 0, i: 0 },
-  { at: 6.2, i: 1 },
-  { at: 18.2, i: 2 },
-  { at: 38.0, i: 3 },
-  { at: 48.0, i: 4 },
-  { at: 59.0, i: 5 },
-  { at: 69.0, i: 6 },
-  { at: 87.0, i: 7 },
-  { at: 95.0, i: 8 },
-  { at: 115.0, i: 9 },
-  { at: 135.0, i: 10 },
-  { at: 154.0, i: 11 },
-  { at: 172.0, i: 12 },
-  { at: 192.0, i: 13 },
+  { at: KANE_ARM + 2.7, i: 1 },
+  { at: KANE_ARM + 6.74, i: 2 },
+  { at: KANE_ARM + 12.64, i: 3 },
+  { at: KANE_ARM + 18.02, i: 4 },
+  { at: KANE_ARM + 21.2, i: 5 },
+  { at: KANE_ARM + 27.3, i: 6 },
+  { at: KANE_ARM + 31.37, i: 7 },
+  { at: KANE_ARM + 38.16, i: 8 },
+  { at: KANE_ARM + 41.87, i: 9 },
+  { at: KANE_ARM + 45.28, i: 10 },
+  { at: KANE_ARM + 50.46, i: 11 },
+  { at: KANE_ARM + 59.08, i: 12 },
+  { at: KANE_ARM + 69.72, i: 13 },
+  { at: KANE_ARM + 76.6, i: 14 },
+  { at: KANE_ARM + 87.76, i: 15 },
+  { at: KANE_ARM + 95.5, i: 16 },
+  { at: KANE_ARM + 110.12, i: 17 },
+  { at: KANE_ARM + 120.35, i: 18 },
+  { at: KANE_ARM + 132.09, i: 19 },
+  { at: KANE_ARM + 148.47, i: 20 },
+  { at: KANE_ARM + 157.45, i: 21 },
+  { at: KANE_ARM + 172.72, i: 22 },
+  { at: KANE_ARM + 183.03, i: 23 },
+  { at: KANE_ARM + 191.06, i: 24 },
+  { at: KANE_ARM + 196.28, i: 25 },
+  { at: KANE_ARM + 201.2, i: 26 },
 ] as const satisfies readonly Cue[];
 
 export const KANE_STILLS: readonly StillCue[] = [
   { at: 0, src: "/art/opening/kane-01.jpg" },
-  { at: 12, src: "/art/npcs/kane.jpg" },
-  { at: 22, src: "/art/opening/kane-02.jpg" },
-  { at: 36, src: "/art/npcs/t0880-line.jpg" },
-  { at: 50, src: "/art/opening/kane-03.jpg" },
-  { at: 64, src: "/art/opening/kane-04.jpg" },
-  { at: 80, src: "/art/opening/kane-05.jpg" },
-  { at: 96, src: "/art/opening/wake-vault13.jpg" },
-  { at: 114, src: "/art/opening/kane-06.jpg" },
-  { at: 136, src: "/art/npcs/aegis-suit.jpg" },
-  { at: 150, src: "/art/npcs/aegis-line.jpg" },
-  { at: 168, src: "/art/opening/kane-07.jpg" },
-  { at: 186, src: "/art/opening/kane-06.jpg" },
-  { at: 196, src: "/art/opening/kane-08.jpg" },
+  { at: KANE_ARM + 10, src: "/art/opening/kane-02.jpg" },
+  { at: KANE_ARM + 26, src: "/art/opening/kane-03.jpg" },
+  { at: KANE_ARM + 44, src: "/art/opening/kane-04.jpg" },
+  { at: KANE_ARM + 58, src: "/art/opening/kane-07.jpg" },
+  { at: KANE_ARM + 74, src: "/art/opening/kane-06.jpg" },
+  { at: KANE_ARM + 94, src: "/art/opening/kane-05.jpg" },
+  { at: KANE_ARM + 118, src: "/art/opening/kane-08.jpg" },
+  { at: KANE_ARM + 146, src: "/art/opening/kane-03.jpg" },
+  { at: KANE_ARM + 168, src: "/art/opening/kane-05.jpg" },
+  { at: KANE_ARM + 186, src: "/art/opening/kane-09.jpg" },
+  { at: KANE_ARM + 198, src: "/art/opening/kane-01.jpg" },
 ];
 
 export const REPLY_CUES = [

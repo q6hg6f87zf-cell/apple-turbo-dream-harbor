@@ -1471,7 +1471,7 @@ body[data-orbit="1"] [data-dock],
   z-index: 40;
   background: var(--color-ink);
   opacity: 1;
-  transition: opacity 1.35s var(--ease-smooth-out);
+  transition: opacity 1.6s var(--ease-smooth-out);
   pointer-events: none;
 }
 
@@ -1697,8 +1697,20 @@ body[data-orbit="1"] [data-dock],
     linear-gradient(to bottom, color-mix(in oklab, var(--color-ink) 42%, transparent), transparent 22%);
   pointer-events: none;
 }
+.ms-kane-veil {
+  background:
+    linear-gradient(
+      to top,
+      var(--color-ink) 0%,
+      color-mix(in oklab, var(--color-ink) 58%, transparent) 18%,
+      color-mix(in oklab, var(--color-ink) 8%, transparent) 42%,
+      transparent 58%
+    ),
+    linear-gradient(to bottom, color-mix(in oklab, var(--color-ink) 10%, transparent), transparent 16%);
+  pointer-events: none;
+}
 .ms-opening-crossfade {
-  animation: ms-opening-fade 0.78s var(--ease-smooth-out) both;
+  animation: ms-opening-fade 0.92s var(--ease-smooth-out) both;
 }
 @keyframes ms-opening-fade {
   from {

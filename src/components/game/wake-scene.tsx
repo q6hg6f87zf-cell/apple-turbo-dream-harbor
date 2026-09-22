@@ -111,10 +111,12 @@ export function OpeningStills({
   stills,
   time,
   className,
+  veil = "wake",
 }: {
   stills: readonly StillCue[];
   time: number;
   className?: string;
+  veil?: "wake" | "kane";
 }) {
   const src = stillSrcAt(stills, time);
   const [shown, setShown] = useState(src);
@@ -132,7 +134,7 @@ export function OpeningStills({
     const t = window.setTimeout(() => {
       setShown(src);
       setNext(null);
-    }, 780);
+    }, 920);
     return () => window.clearTimeout(t);
   }, [src, shown]);
 
@@ -142,11 +144,15 @@ export function OpeningStills({
       data-wake-clip="stills"
       aria-hidden
     >
-      <img src={shown} alt="" className="absolute inset-0 size-full object-cover object-top" />
+      <img src={shown} alt="" className="absolute inset-0 size-full object-cover object-[center_18%]" />
       {next ? (
-        <img src={next} alt="" className="ms-opening-crossfade absolute inset-0 size-full object-cover object-top" />
+        <img
+          src={next}
+          alt=""
+          className="ms-opening-crossfade absolute inset-0 size-full object-cover object-[center_18%]"
+        />
       ) : null}
-      <div className="ms-wake-veil absolute inset-0" />
+      <div className={veil === "kane" ? "ms-kane-veil absolute inset-0" : "ms-wake-veil absolute inset-0"} />
     </div>
   );
 }

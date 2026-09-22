@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "assert/strict";
 import {
   GALLERY,
+  KANE_ARM,
   KANE_CUES,
   KANE_STILLS,
   KANE_TAPE,
@@ -54,17 +55,21 @@ describe("opening reel cues", () => {
 describe("Kane recording and Tyrone reply", () => {
   it("covers the 3:22 Kane tape with a cue per spoken line", async () => {
     const { TALK } = await import("./talk");
+    const script = TALK.kane.map((l) => l.text).join(" ");
     assert.equal(TALK.kane.length, KANE_CUES.length);
     assert.equal(KANE_CUES[KANE_CUES.length - 1]?.i, TALK.kane.length - 1);
     assert.equal(kaneLineAt(0), 0);
-    assert.equal(kaneLineAt(6.2), 1);
+    assert.equal(kaneLineAt(KANE_CUES[1]!.at), 1);
     assert.equal(kaneLineAt(KANE_TAPE.duration), TALK.kane.length - 1);
-    assert.ok(KANE_TAPE.duration >= 200);
+    assert.ok(KANE_TAPE.duration >= 203);
+    assert.ok(KANE_ARM >= 1.4);
     assert.ok(KANE_STILLS.length >= 8);
-    assert.ok(KANE_STILLS.some((s) => s.src.includes("kane.jpg")));
-    assert.ok(KANE_STILLS.some((s) => s.src.includes("wake-vault13")));
-    assert.ok(KANE_STILLS.some((s) => s.src.includes("t0880-line")));
-    assert.ok(KANE_STILLS.some((s) => s.src.includes("aegis-suit")));
+    assert.ok(KANE_STILLS.every((s) => s.src.startsWith("/art/opening/kane-")));
+    assert.match(script, /You are listening to a recording you were never meant to hear/);
+    assert.match(script, /They walked packages/);
+    assert.match(script, /Orion-7/);
+    assert.match(script, /you were supposed to stay retired/);
+    assert.ok(!KANE_STILLS.some((s) => /t0880-line|aegis-suit|wake-vault13/.test(s.src)));
   });
 
   it("covers Tyrone's reply after Kane", async () => {
@@ -82,7 +87,7 @@ describe("Kane recording and Tyrone reply", () => {
     assert.equal(stillSrcAt(KANE_STILLS, 0), KANE_STILLS[0]?.src);
     const later = stillSrcAt(KANE_STILLS, 200);
     assert.equal(later, KANE_STILLS[KANE_STILLS.length - 1]?.src);
-    assert.equal(cueIndexAt(KANE_CUES, 18.2), 2);
+    assert.equal(cueIndexAt(KANE_CUES, KANE_CUES[2]!.at), 2);
   });
 });
 

@@ -183,15 +183,24 @@ export function TalkOverlay() {
               {shown.length < full.length ? <span className="term-cursor ml-0.5" /> : null}
             </p>
             <div className="mt-3 flex gap-1">
-              {Array.from({ length: total }).map((_, i) => (
-                <span
-                  key={i}
-                  className={cn(
-                    "h-1 flex-1 rounded-full",
-                    i < talk.i ? "bg-ember/70" : i === talk.i ? "bg-ember" : "bg-line",
+              {total <= 18
+                ? Array.from({ length: total }).map((_, i) => (
+                    <span
+                      key={i}
+                      className={cn(
+                        "h-1 flex-1 rounded-full",
+                        i < talk.i ? "bg-ember/70" : i === talk.i ? "bg-ember" : "bg-line",
+                      )}
+                    />
+                  ))
+                : (
+                    <span className="h-1 w-full rounded-full bg-line">
+                      <span
+                        className="block h-1 rounded-full bg-ember"
+                        style={{ width: `${Math.round(((talk.i + 1) / total) * 100)}%` }}
+                      />
+                    </span>
                   )}
-                />
-              ))}
             </div>
             <p className="mt-2 font-display text-[10px] uppercase tracking-[0.18em] text-muted">
               {liveTape

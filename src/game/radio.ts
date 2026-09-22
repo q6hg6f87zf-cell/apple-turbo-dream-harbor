@@ -474,7 +474,7 @@ async function readyDeck(el: HTMLAudioElement) {
   });
 }
 
-async function startDeck(deck: Deck, src: string, volume: number, offset = 0) {
+async function startDeck(deck: Deck, src: string, volume: number, offset = 0, fadeIn = 0.9) {
   const abs = new URL(src, window.location.origin).href;
   if (deck.el.src !== abs) {
     deck.el.src = src;
@@ -485,7 +485,7 @@ async function startDeck(deck: Deck, src: string, volume: number, offset = 0) {
   } catch {
     /* ignore */
   }
-  fadeTo(deck.fade, volume, offset > 0 ? 0.08 : 0.9);
+  fadeTo(deck.fade, volume, offset > 0 ? 0.08 : fadeIn);
   deck.el.loop = mode === "score";
   try {
     await deck.el.play();
@@ -494,7 +494,7 @@ async function startDeck(deck: Deck, src: string, volume: number, offset = 0) {
   }
 }
 
-async function swapTo(src: string, nextDuration: number, force = false) {
+async function swapTo(src: string, nextDuration: number, force = false, fadeIn = 0.9) {
   const graph = ensureGraph();
   if (!graph || isMuted()) return;
   if (switching && !force) return;
@@ -512,7 +512,7 @@ async function swapTo(src: string, nextDuration: number, force = false) {
   wait = from;
   fadeTo(from.fade, 0.0001, 1.05);
   laterPause(from, 1100);
-  await startDeck(to, src, 1);
+  await startDeck(to, src, 1, 0, fadeIn);
   if (my !== swapGen) return;
   duckAmbient(true);
   playing = !to.el.paused;
@@ -555,12 +555,12 @@ async function onLiveEnded() {
   if (mode === "intro") {
     if (introChapter === "found-you") {
       introChapter = "kane";
-      await swapTo(INTRO_CHAPTER.kane.src, INTRO_CHAPTER.kane.duration, true);
+      await swapTo(INTRO_CHAPTER.kane.src, INTRO_CHAPTER.kane.duration, true, 0.12);
       return;
     }
     if (introChapter === "kane") {
       introChapter = "reply";
-      await swapTo(INTRO_CHAPTER.reply.src, INTRO_CHAPTER.reply.duration, true);
+      await swapTo(INTRO_CHAPTER.reply.src, INTRO_CHAPTER.reply.duration, true, 0.45);
       return;
     }
     introChapter = "done";
@@ -639,11 +639,11 @@ export async function skipIntroTo(chapter: IntroChapter) {
   if (introChapter === chapter) return;
   introChapter = chapter;
   if (chapter === "kane") {
-    await swapTo(INTRO_CHAPTER.kane.src, INTRO_CHAPTER.kane.duration, true);
+    await swapTo(INTRO_CHAPTER.kane.src, INTRO_CHAPTER.kane.duration, true, 0.12);
     return;
   }
   if (chapter === "reply") {
-    await swapTo(INTRO_CHAPTER.reply.src, INTRO_CHAPTER.reply.duration, true);
+    await swapTo(INTRO_CHAPTER.reply.src, INTRO_CHAPTER.reply.duration, true, 0.45);
     return;
   }
   playing = false;

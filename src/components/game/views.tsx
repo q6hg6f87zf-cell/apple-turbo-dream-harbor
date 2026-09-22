@@ -72,9 +72,8 @@ import { FIT_TONE, MarketLotCard, lotFit, lotSpecs } from "./market-lot";
 import { RegionSheet } from "./region-sheet";
 import { WakeScene, OpeningStills } from "./wake-scene";
 import { DayBoard } from "./day-board";
-import { KANE_STILLS, TYRONE_REPLY_REEL, wakeLineAt } from "@/game/opening-reel";
+import { KANE_STILLS, KANE_TAPE, TYRONE_REPLY_REEL, TYRONE_REPLY_TAPE, wakeLineAt } from "@/game/opening-reel";
 import { getRadioSnapshot } from "@/game/radio";
-import { useOpeningBeat } from "@/game/opening";
 import { Dice20 } from "./dice";
 import { ForgeBody } from "./forge-body";
 import { MoonCard } from "./card";
@@ -122,7 +121,6 @@ export { MainMenu as TitleScreen } from "./menu";
 export function Briefing() {
   const go = useGame((g) => g.finishBriefing);
   const talk = useGame((g) => g.s.talk);
-  const beat = useOpeningBeat();
   const syncWakeLine = useGame((g) => g.syncWakeLine);
   const finishWakeReel = useGame((g) => g.finishWakeReel);
   const [curtain, setCurtain] = useState(true);
@@ -131,13 +129,19 @@ export function Briefing() {
   const wakeLive = !talk || script === "wake";
   const kaneLive = script === "kane";
   const replyLive = script === "tyrone-reply";
+  const fadeToBlack =
+    (wakeLive && tapeTime >= 91.4) ||
+    (kaneLive && tapeTime >= KANE_TAPE.duration - 1.8) ||
+    (replyLive && tapeTime >= TYRONE_REPLY_TAPE.duration - 1.15);
+  const cover = curtain || fadeToBlack;
 
   useEffect(() => {
+    setCurtain(true);
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const hold = beat === "wake" && !reduced ? 420 : reduced ? 80 : 280;
+    const hold = reduced ? 80 : script === "kane" ? 1550 : script === "tyrone-reply" ? 1200 : 420;
     const t = window.setTimeout(() => setCurtain(false), hold);
     return () => window.clearTimeout(t);
-  }, [beat]);
+  }, [script]);
 
   useEffect(() => {
     const push = () => setTapeTime(getRadioSnapshot().currentTime);
@@ -158,7 +162,7 @@ export function Briefing() {
           onEnded={() => finishWakeReel()}
         />
       ) : kaneLive ? (
-        <OpeningStills stills={KANE_STILLS} time={tapeTime} />
+        <OpeningStills stills={KANE_STILLS} time={tapeTime} veil="kane" />
       ) : replyLive ? (
         <WakeScene clip={TYRONE_REPLY_REEL} sound={false} />
       ) : (
@@ -172,8 +176,8 @@ export function Briefing() {
         </div>
       )}
       <div
-        className={cn("ms-opening-curtain", !curtain && "is-up")}
-        data-opening={curtain ? "black" : "wake"}
+        className={cn("ms-opening-curtain", !cover && "is-up")}
+        data-opening={cover ? "black" : "wake"}
         aria-hidden
       />
       <div className="relative z-[2] mx-auto mb-36 w-full max-w-xl">
