@@ -2185,3 +2185,31 @@ body[data-region-map="1"] .ms-help,
   object-fit: contain;
   filter: brightness(1.6) contrast(1.12) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.65));
 }
+
+/* Globe → region war-table dive (painting only — globe/galaxy untouched). */
+@keyframes ms-region-dive {
+  0% {
+    opacity: 1;
+    transform: scale(1.55);
+    filter: blur(0);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1.12);
+    filter: blur(0.4px);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1);
+    filter: blur(2px);
+  }
+}
+.ms-region-dive {
+  animation: ms-region-dive 1.05s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ms-region-dive {
+    animation: none;
+    opacity: 0;
+  }
+}

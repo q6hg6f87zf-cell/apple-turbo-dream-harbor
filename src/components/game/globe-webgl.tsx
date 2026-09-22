@@ -631,9 +631,15 @@ function openRegionMap(regionId: RegionId) {
   const store = useGame.getState();
   const location = REGION_TO_LOCATION[regionId];
   if (!store.s.locations[location]?.unlocked) return;
+  // Dive cue for the war-table handoff — globe/galaxy shaders stay untouched.
+  try {
+    sessionStorage.setItem("hollow:region-dive", regionId);
+  } catch {
+    /* private mode */
+  }
   store.selectLoc(location);
   store.openRegionMap();
-  window.dispatchEvent(new CustomEvent("hollow:open-region-map", { detail: { regionId } }));
+  window.dispatchEvent(new CustomEvent("hollow:open-region-map", { detail: { regionId, dive: true } }));
 }
 
 export function HollowGlobeWebGL({

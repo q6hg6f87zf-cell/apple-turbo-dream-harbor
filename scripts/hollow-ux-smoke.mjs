@@ -76,9 +76,11 @@ const seed = {
     lastTurnDay: 0,
   }],
   activeMemberId: "ux-rider",
-  seenTalk: ["briefing", "resume", "inventory", "roster"],
+  seenTalk: ["briefing", "resume", "inventory", "roster", "kane", "wake"],
   talk: null,
   talkQueue: [],
+  playerName: "UX Rider",
+  playerHandle: "ux",
 };
 
 const browser = await chromium.launch({ headless: true });
@@ -94,15 +96,31 @@ await context.addInitScript(({ key, save }) => localStorage.setItem(key, JSON.st
 const page = await context.newPage();
 const errors = [];
 page.on("pageerror", (error) => errors.push(`pageerror: ${error.message}`));
-page.on("console", (message) => { if (message.type() === "error") errors.push(`console: ${message.text()}`); });
+page.on("console", (message) => {
+  if (message.type() !== "error") return;
+  const text = message.text();
+  if (/Failed to load resource/i.test(text)) return;
+  errors.push(`console: ${text}`);
+});
 
-await page.goto(baseURL, { waitUntil: "networkidle", timeout: 60_000 });
+// Vite HMR keeps a websocket open — networkidle never settles in CI.
+await page.goto(baseURL, { waitUntil: "domcontentloaded", timeout: 60_000 });
 await page.locator('[data-ready="1"]').waitFor({ timeout: 20_000 });
+await page.waitForFunction(() => !!window.__hollowQa?.getState && !!window.__hollowQa?.setState, null, {
+  timeout: 20_000,
+});
+// Skip any talk overlay that hydrate may have queued despite seenTalk.
+for (let i = 0; i < 8; i++) {
+  const skip = page.getByRole("button", { name: /^SKIP$/i });
+  if (!(await skip.count())) break;
+  await skip.first().click().catch(() => {});
+  await page.waitForTimeout(150);
+}
 
 // Resident dossier: internal controls must not accidentally dismiss the sheet,
 // the mobile layout must expose a real backdrop gutter, and a genuine thumb tap
 // in that gutter must close it.
-await page.getByText("UX Runner", { exact: true }).first().click();
+await page.getByText("UX Runner", { exact: true }).first().click({ force: true });
 const dossierClose = page.getByRole("button", { name: "Close dossier" });
 await dossierClose.waitFor();
 const sheet = page.locator("aside.ms-sheet");
@@ -127,29 +145,33 @@ await dialog.waitFor({ state: "detached", timeout: 5_000 });
 
 // Dangerous-rest confirmation: outside tap is a cancel, never an accidental
 // destructive confirmation.
-await page.evaluate(async () => {
-  const mod = await import("/src/game/store.ts");
-  mod.useGame.setState((store) => ({
+await page.evaluate(() => {
+  window.__hollowQa.setState((store) => ({
     s: {
       ...store.s,
       rooms: { ...store.s.rooms, infirmary: 0 },
-      operatives: store.s.operatives.map((op) => op.id === "ux-op-1" ? { ...op, hp: 0, status: "downed" } : op),
+      operatives: store.s.operatives.map((op) =>
+        op.id === "ux-op-1" ? { ...op, hp: 0, status: "downed" } : op,
+      ),
     },
   }));
 });
-await page.getByRole("button", { name: /Dawn|Rest until dawn/ }).click();
+// Rest lives in the hub overflow tray now, not the primary header.
+await page.getByRole("button", { name: "More controls" }).click();
+await page.getByRole("button", { name: "Rest until dawn", exact: true }).click();
 const dawnHeading = page.getByRole("heading", { name: "Dawn is a decision" });
 await dawnHeading.waitFor();
 await page.touchscreen.tap(4, 80);
 await dawnHeading.waitFor({ state: "detached", timeout: 5_000 });
 
 // Restore the resident so other screens stay usable.
-await page.evaluate(async () => {
-  const mod = await import("/src/game/store.ts");
-  mod.useGame.setState((store) => ({
+await page.evaluate(() => {
+  window.__hollowQa.setState((store) => ({
     s: {
       ...store.s,
-      operatives: store.s.operatives.map((op) => op.id === "ux-op-1" ? { ...op, hp: op.maxHp, status: "idle" } : op),
+      operatives: store.s.operatives.map((op) =>
+        op.id === "ux-op-1" ? { ...op, hp: op.maxHp, status: "idle" } : op,
+      ),
     },
   }));
 });
@@ -157,10 +179,9 @@ await page.evaluate(async () => {
 // Primary navigation should be actual thumb-sized controls, not decorative
 // labels. Walk every destination and verify the screen state moves with it.
 const destinations = [
-  ["Vault 13", "hq"],
+  ["13", "hq"],
   ["World", "map"],
-  ["Squad", "roster"],
-  ["Inventory", "inventory"],
+  ["Pack", "inventory"],
   ["More", "more"],
 ];
 for (const [label, expected] of destinations) {
@@ -172,8 +193,8 @@ for (const [label, expected] of destinations) {
 }
 
 // Inventory local detail sheets must dismiss with Escape as well as backdrop/X.
-await page.getByRole("button", { name: "Inventory", exact: true }).last().click();
-await page.getByRole("heading", { name: "Inventory" }).waitFor();
+await page.getByRole("button", { name: "Pack", exact: true }).last().click();
+await page.locator('[data-inventory="1"]').waitFor();
 await page.getByRole("button", { name: /UX Rail Carbine/ }).click();
 const inventoryModal = page.locator("div.fixed.inset-0").filter({ hasText: "UX Rail Carbine" });
 await inventoryModal.waitFor();

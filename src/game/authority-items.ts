@@ -1,4 +1,4 @@
-import { ARMOR, BB_GUN, BB_TIN, LEDGER_POOLS, RACES, WEAPONS } from "./data";
+import { ARMOR, BB_GUN, BB_TIN, LEDGER_POOLS, RACES, WEAPONS, resolveRaceName } from "./data";
 import { HOLLOW_CATALOG } from "./hollow-catalog";
 import { TREASURE_CATALOG } from "./treasure-catalog";
 import type { ClassName, Item, ItemKind, Rarity, RegionId, WeaponSpec } from "./types";
@@ -377,7 +377,7 @@ export function legacyItemTemplate(raw: Pick<Item, "name" | "kind"> & Partial<It
 }
 
 export function starterAuthorityTemplates(_cls: ClassName, raceName: string) {
-  const race = RACES[raceName];
+  const race = RACES[resolveRaceName(raceName)];
   if (!race) return [];
   const rows: AuthorityItemTemplate[] = [];
   const gun = authorityTemplate("weapon", BB_GUN.name);

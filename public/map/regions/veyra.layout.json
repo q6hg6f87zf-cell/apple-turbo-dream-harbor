@@ -1,0 +1,38 @@
+{
+  "id": "veyra",
+  "map": "/map/regions/veyra.jpg?v=town4k1",
+  "camera": {
+    "yaw": 12,
+    "pitch": 55,
+    "fov": 28
+  },
+  "bounds": {
+    "w": 1,
+    "h": 1
+  },
+  "rim": {
+    "ember": 0.35,
+    "teal": 0.25
+  },
+  "layers": [
+    {
+      "id": "ground",
+      "z": 0
+    },
+    {
+      "id": "districts",
+      "z": 0.09
+    },
+    {
+      "id": "roofs",
+      "z": 0.2
+    },
+    {
+      "id": "smoke",
+      "z": 0.18,
+      "scroll": true
+    }
+  ],
+  "anchors": [],
+  "height": "/map/regions/veyra.height.png?v=h1"
+}

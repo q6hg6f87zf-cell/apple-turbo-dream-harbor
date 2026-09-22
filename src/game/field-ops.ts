@@ -92,6 +92,33 @@ export function knownPois(state: GameState, loc: LocationId): RegionPointOfInter
   });
 }
 
+/** War-table marks: known pins plus fog silhouettes for unmarked (unlocked) sites. */
+export function mapPoisForTable(
+  state: GameState,
+  loc: LocationId,
+): Array<RegionPointOfInterest & { known: boolean; silhouette: boolean }> {
+  const known = new Set(knownPois(state, loc).map((p) => p.id));
+  const progress = state.locations[loc];
+  return poisForLocation(loc)
+    .map((p) => {
+      if (p.kind === "boss") {
+        const unlocked = !!progress?.bossUnlocked;
+        return {
+          ...p,
+          known: unlocked && known.has(p.id),
+          silhouette: !unlocked,
+        };
+      }
+      const isKnown = known.has(p.id);
+      return {
+        ...p,
+        known: isKnown,
+        silhouette: !isKnown && p.unlocked,
+      };
+    })
+    .filter((p) => p.known || p.silhouette);
+}
+
 export function poiById(loc: LocationId, poiId: string | null | undefined) {
   if (!poiId) return undefined;
   return poisForLocation(loc).find((p) => p.id === poiId);

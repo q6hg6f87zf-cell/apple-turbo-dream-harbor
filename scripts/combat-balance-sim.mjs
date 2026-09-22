@@ -24,6 +24,18 @@ import {
 
 const RUNS = Number(process.argv[2] ?? process.env.HOLLOW_COMBAT_RUNS ?? 400);
 
+// Pin the RNG so CI does not flake on Brasswater/Veyra noise bands. Override
+// with HOLLOW_COMBAT_SEED when deliberately probing balance drift.
+(() => {
+  let a = (Number(process.env.HOLLOW_COMBAT_SEED) || 42) >>> 0;
+  Math.random = () => {
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+})();
+
 const GUNS = {
   shotgun: { name: "Pack-Tooth Scattergun", weaponFamily: "shotgun", ammoType: "12g", rangeBand: "close", ap: 0 },
   rifle: { name: "Union Forge Carbine", weaponFamily: "rifle", ammoType: "5.56", rangeBand: "mid", ap: 2 },

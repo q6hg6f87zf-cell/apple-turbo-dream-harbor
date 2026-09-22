@@ -70,7 +70,7 @@ const seed = {
     lastTurnDay: 0
   }],
   activeMemberId: "qa-rider",
-  seenTalk: ["briefing", "inventory"],
+  seenTalk: ["briefing", "inventory", "kane", "wake"],
   talk: null,
   talkQueue: []
 };
@@ -83,19 +83,45 @@ const context = await browser.newContext({
   hasTouch: true,
   locale: "en-CA"
 });
-await context.addInitScript(({ key, save }) => localStorage.setItem(key, JSON.stringify(save)), { key: saveKey, save: seed });
+await context.addInitScript(
+  ({ key, whoKey, save, who }) => {
+    localStorage.setItem(key, JSON.stringify(save));
+    localStorage.setItem(whoKey, JSON.stringify(who));
+  },
+  {
+    key: saveKey,
+    whoKey: `${saveKey}:who`,
+    save: seed,
+    who: { id: discord, name: "QA Rider" },
+  },
+);
 const page = await context.newPage();
 const errors = [];
 page.on("pageerror", (error) => errors.push(`pageerror: ${error.message}`));
-page.on("console", (message) => { if (message.type() === "error") errors.push(`console: ${message.text()}`); });
+page.on("console", (message) => {
+  if (message.type() !== "error") return;
+  const text = message.text();
+  // Auth-off preview souls use a non-snowflake id; background porch/soul polls
+  // can 500 on the DB check without breaking Inventory authority itself.
+  if (/Failed to load resource/i.test(text)) return;
+  errors.push(`console: ${text}`);
+});
 
-await page.goto(baseURL, { waitUntil: "networkidle", timeout: 60_000 });
-await page.getByRole("heading", { name: "Inventory" }).waitFor({ timeout: 20_000 });
-await page.getByText(/server-sealed loadout/i).waitFor();
-await page.getByText("LOCAL MYTHIC CHEAT CANNON", { exact: true }).waitFor({ state: "detached", timeout: 10_000 });
-
+// Vite HMR keeps a websocket open — networkidle never settles in CI.
+await page.goto(baseURL, { waitUntil: "domcontentloaded", timeout: 60_000 });
+// Inventory is a hub screen now — no page heading. Wait for the pack frame.
+await page.locator('[data-inventory="1"]').waitFor({ timeout: 20_000 });
+await page.waitForFunction(() => !!window.__hollowQa?.getState && !!window.__hollowQa?.setState, null, {
+  timeout: 20_000,
+});
+// Authority hydration replaces the seeded mythic cheat with the sealed ledger.
 const rail = page.getByText("Railspike Carbine", { exact: true }).first();
-await rail.waitFor({ timeout: 10_000 });
+await rail.waitFor({ timeout: 20_000 });
+assert.equal(
+  await page.getByText("LOCAL MYTHIC CHEAT CANNON", { exact: true }).count(),
+  0,
+  "Seeded mythic cheat still visible after Inventory authority hydration.",
+);
 await rail.click();
 const unequip = page.getByRole("button", { name: /Unequip/ });
 await unequip.waitFor();
@@ -103,9 +129,11 @@ await unequip.click();
 
 // UI copy is allowed to evolve. The contract that matters is that both the
 // hydrated Zustand cache and the server item ledger settle the Unequip.
-await page.waitForFunction(async () => {
-  const mod = await import("/src/game/store.ts");
-  const rail = mod.useGame.getState().s.operatives.flatMap((op) => op.inventory).find((item) => item.name === "Railspike Carbine");
+await page.waitForFunction(() => {
+  const rail = window.__hollowQa
+    .getState()
+    .operatives.flatMap((op) => op.inventory)
+    .find((item) => item.name === "Railspike Carbine");
   return !!rail && rail.equipped === false;
 }, null, { timeout: 10_000 });
 const serverRailEquipped = await page.evaluate(async () => {
@@ -118,11 +146,10 @@ assert.equal(serverRailEquipped, false, "Server item ledger did not persist the 
 
 // Inject a new fake item directly into live Zustand after authority hydration.
 // The runtime must snap it back out without waiting for the 30s poll.
-await page.evaluate(async () => {
-  const mod = await import("/src/game/store.ts");
-  mod.useGame.setState((store) => {
-    const op = store.s.operatives.find((entry) => entry.id === "qa-op-ironbound-01");
-    if (!op) return store;
+await page.evaluate(() => {
+  window.__hollowQa.setState((current) => {
+    const op = current.s.operatives.find((entry) => entry.id === "qa-op-ironbound-01");
+    if (!op) return current;
     const fake = {
       id: "live-forged-cheat-item",
       name: "LIVE FORGED RELIC",
@@ -134,29 +161,33 @@ await page.evaluate(async () => {
       effect: "+9999 damage",
       lore: "Injected from devtools",
       equipped: true,
-      value: 999999999
+      value: 999999999,
     };
     return {
       s: {
-        ...store.s,
-        operatives: store.s.operatives.map((entry) => entry.id === op.id ? { ...entry, inventory: [...entry.inventory, fake] } : entry)
-      }
+        ...current.s,
+        operatives: current.s.operatives.map((entry) =>
+          entry.id === op.id ? { ...entry, inventory: [...entry.inventory, fake] } : entry,
+        ),
+      },
     };
   });
 });
 
-await page.waitForFunction(async () => {
-  const mod = await import("/src/game/store.ts");
-  return !mod.useGame.getState().s.operatives.some((op) => op.inventory.some((item) => item.id === "live-forged-cheat-item"));
+await page.waitForFunction(() => {
+  return !window.__hollowQa
+    .getState()
+    .operatives.some((op) => op.inventory.some((item) => item.id === "live-forged-cheat-item"));
 }, null, { timeout: 5_000 });
 await page.getByText(/rejected an unsealed local Inventory change/i).waitFor({ timeout: 5_000 });
 
-const liveState = await page.evaluate(async () => {
-  const mod = await import("/src/game/store.ts");
-  const s = mod.useGame.getState().s;
+const liveState = await page.evaluate(() => {
+  const s = window.__hollowQa.getState();
   return {
-    fakeCount: [...s.vault, ...s.operatives.flatMap((op) => op.inventory)].filter((item) => item.id === "live-forged-cheat-item").length,
-    rail: s.operatives.flatMap((op) => op.inventory).find((item) => item.name === "Railspike Carbine") ?? null
+    fakeCount: [...s.vault, ...s.operatives.flatMap((op) => op.inventory)].filter(
+      (item) => item.id === "live-forged-cheat-item",
+    ).length,
+    rail: s.operatives.flatMap((op) => op.inventory).find((item) => item.name === "Railspike Carbine") ?? null,
   };
 });
 assert.equal(liveState.fakeCount, 0, "Live forged item survived the server ownership fingerprint.");

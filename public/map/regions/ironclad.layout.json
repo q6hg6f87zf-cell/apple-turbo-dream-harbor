@@ -1,0 +1,111 @@
+{
+  "id": "ironclad",
+  "map": "/map/regions/ironclad.jpg?v=town4k1",
+  "camera": {
+    "yaw": 14,
+    "pitch": 54,
+    "fov": 30
+  },
+  "bounds": {
+    "w": 1,
+    "h": 1
+  },
+  "rim": {
+    "ember": 0.55,
+    "teal": 0.0
+  },
+  "layers": [
+    {
+      "id": "ground",
+      "z": 0
+    },
+    {
+      "id": "districts",
+      "z": 0.07
+    },
+    {
+      "id": "roofs",
+      "z": 0.15
+    },
+    {
+      "id": "smoke",
+      "z": 0.22,
+      "scroll": true
+    }
+  ],
+  "anchors": [
+    {
+      "poiId": "ironclad-vault13",
+      "x": 0.2,
+      "y": 0.72,
+      "z": 0.08
+    },
+    {
+      "poiId": "ironclad-highway",
+      "x": 0.08,
+      "y": 0.58,
+      "z": 0.04
+    },
+    {
+      "poiId": "ironclad-gate",
+      "x": 0.48,
+      "y": 0.55,
+      "z": 0.1
+    },
+    {
+      "poiId": "ironclad-market",
+      "x": 0.42,
+      "y": 0.64,
+      "z": 0.09
+    },
+    {
+      "poiId": "ironclad-shop",
+      "x": 0.54,
+      "y": 0.58,
+      "z": 0.09
+    },
+    {
+      "poiId": "ironclad-tower",
+      "x": 0.58,
+      "y": 0.22,
+      "z": 0.18
+    },
+    {
+      "poiId": "ironclad-halo",
+      "x": 0.36,
+      "y": 0.4,
+      "z": 0.08
+    },
+    {
+      "poiId": "ironclad-rail",
+      "x": 0.64,
+      "y": 0.7,
+      "z": 0.06
+    },
+    {
+      "poiId": "ironclad-works",
+      "x": 0.66,
+      "y": 0.39,
+      "z": 0.12
+    },
+    {
+      "poiId": "ironclad-berm",
+      "x": 0.8,
+      "y": 0.48,
+      "z": 0.05
+    },
+    {
+      "poiId": "ironclad-exchange",
+      "x": 0.52,
+      "y": 0.46,
+      "z": 0.08
+    },
+    {
+      "poiId": "ironclad-gravenor",
+      "x": 0.29,
+      "y": 0.27,
+      "z": 0.1
+    }
+  ],
+  "height": "/map/regions/ironclad.height.png?v=h1"
+}

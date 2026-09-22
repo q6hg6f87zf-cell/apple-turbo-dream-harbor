@@ -88,7 +88,7 @@ import { MARKET_KEEPER } from "@/game/market";
 import { className, displayRace } from "@/game/presentation";
 import { FATE_COPY, FATE_KEYS, STAT_ORDER, fateLanding } from "@/game/stats-copy";
 import { punchClick, shockwaveAt } from "@/game/juice";
-import { OrbitTheater, RegionMapOverlay } from "./orbit-theater";
+import { OrbitTheater } from "./orbit-theater";
 
 function err(msg: string | null) {
   if (!msg) {
@@ -1333,7 +1333,8 @@ export function MapView() {
       ) : null}
       {mapOpen ? (
         <MapErrorBoundary onReset={closeRegionMap}>
-          <RegionMapOverlay />
+          {/* RegionMapOverlay mounts at App shell so orbit/SITE/dive all share one seat. */}
+          <span className="sr-only" data-region-map-host="map-view" />
         </MapErrorBoundary>
       ) : null}
     </div>
