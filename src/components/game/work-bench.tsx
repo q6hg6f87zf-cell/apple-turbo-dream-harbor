@@ -7,6 +7,7 @@ import { nextQuarterCost, nextRoomCost, repairCost } from "@/game/engine";
 import { itemArt } from "@/game/item-art";
 import { useGame, type WorkJob } from "@/game/store";
 import { fittedModules, pendingModules, travisBayBlurb, TRAVIS_MODULES } from "@/game/travis";
+import { allRepairCandidates, travisCanFavorWeld, travisReadItem } from "@/game/item-story";
 import type { QuarterId, RoomId } from "@/game/types";
 import { X } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -249,11 +250,15 @@ function TravisBay() {
   const s = useGame((g) => g.s);
   const close = useGame((g) => g.closeWork);
   const deliver = useGame((g) => g.deliverTravis);
+  const favor = useGame((g) => g.travisFavorRepair);
   const pending = pendingModules(s);
   const fitted = fittedModules(s);
+  const cracked = allRepairCandidates(s);
+  const canWeld = travisCanFavorWeld(s);
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [read, setRead] = useState<string[] | null>(null);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -272,6 +277,23 @@ function TravisBay() {
     sfx.forge();
     window.setTimeout(() => {
       const msg = deliver(itemId);
+      if (msg) {
+        setError(msg);
+        sfx.hurt();
+      } else {
+        sfx.unlock();
+        setNote(useGame.getState().s.toast);
+      }
+      setBusy(null);
+    }, 900);
+  };
+
+  const weld = (itemId: string) => {
+    setError(null);
+    setBusy(`weld:${itemId}`);
+    sfx.forge();
+    window.setTimeout(() => {
+      const msg = favor(itemId);
       if (msg) {
         setError(msg);
         sfx.hurt();
@@ -312,10 +334,13 @@ function TravisBay() {
           <h2 className="font-display text-2xl text-paper">{CAST.travis.name}</h2>
           <p className="mt-1 text-sm text-muted">{CAST.travis.callsign} · {travisBayBlurb(s)}</p>
           <p className="mt-3 text-sm italic leading-relaxed text-moon">“{CAST.travis.voice[s.travis.jobs ? 0 : 1]}”</p>
+          <p className="mt-2 text-xs leading-relaxed text-muted">
+            T-0880 fittings are the job. Favor welds are a courtesy once the jig trusts you. Optics, strip, and long rebuilds stay at Vault 13&apos;s Machine Shop.
+          </p>
 
           {pending.length ? (
             <div className="mt-5 space-y-2">
-              <SectionLabel>On the bench</SectionLabel>
+              <SectionLabel>On the jig · TyroneBot</SectionLabel>
               {pending.map(({ item, mod }) => (
                 <div key={item.id} className="flex gap-3 rounded-[var(--radius-sm)] bg-ink/55 p-3">
                   <img
@@ -342,9 +367,73 @@ function TravisBay() {
             </div>
           ) : (
             <p className="mt-5 text-sm leading-relaxed text-muted">
-              Nothing on the bench. Run a campaign — rail, Works, Berm, tower, Halo. Tube, wheel, servo, plate, coil, knee. I pay in caps. I put them in him.
+              Nothing on the jig. Run a campaign — rail, Works, Berm, tower, Halo. Tube, wheel, servo, plate, coil, knee. I pay in caps. I put them in him.
             </p>
           )}
+
+          {cracked.length ? (
+            <div className="mt-5 space-y-2">
+              <SectionLabel>Show him steel</SectionLabel>
+              <p className="text-xs text-muted">
+                {canWeld
+                  ? "Jig trusts you. One favor weld per tap — toward pristine, not a full rebuild."
+                  : "Seat a T-0880 part first. Then I favor-weld cracked weapons and plate."}
+              </p>
+              {cracked.slice(0, 6).map(({ item }) => {
+                const cost = repairCost(s, item);
+                const favorCost = Math.max(35, Math.round(cost * 0.9));
+                return (
+                  <div key={item.id} className="flex gap-3 rounded-[var(--radius-sm)] bg-ink/40 p-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-display text-paper">{item.name}</p>
+                      <p className="text-sm text-muted">
+                        {item.condition} · {item.kind}
+                      </p>
+                    </div>
+                    <div className="flex flex-col gap-1 self-center">
+                      <Button
+                        size="sm"
+                        variant="quiet"
+                        disabled={!!busy}
+                        onClick={() => {
+                          sfx.click();
+                          setRead(travisReadItem(s, item).lines);
+                        }}
+                      >
+                        Read
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ember"
+                        disabled={!!busy || !canWeld}
+                        onClick={() => weld(item.id)}
+                      >
+                        {busy === `weld:${item.id}` ? "Welding…" : (
+                          <>
+                            Weld · <Coin n={favorCost} />
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
+
+          {read ? (
+            <div className="mt-4 rounded-[var(--radius-sm)] border border-line bg-ink/55 p-3">
+              <p className="font-display text-[9px] uppercase tracking-[0.18em] text-ember">Travis</p>
+              {read.map((line) => (
+                <p key={line} className="mt-1 text-sm leading-relaxed text-paper">
+                  {line}
+                </p>
+              ))}
+              <button type="button" className="mt-2 text-xs text-muted" onClick={() => setRead(null)}>
+                Close
+              </button>
+            </div>
+          ) : null}
 
           <div className="mt-5">
             <SectionLabel>Seated in TyroneBot</SectionLabel>

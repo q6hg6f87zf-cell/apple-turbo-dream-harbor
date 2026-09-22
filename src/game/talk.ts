@@ -502,6 +502,13 @@ export const TALK: Record<string, TalkLine[]> = {
       still: CAST.travis.still,
       text: "Bay's lit. He lists less to port. Keep the parts coming and I keep the serial quiet.",
     },
+    {
+      who: "Travis",
+      castId: "travis",
+      portrait: CAST.travis.portrait,
+      still: CAST.travis.still,
+      text: "You earned a favor. Lay cracked steel on the bench and I weld a step. Optics and strip jobs stay at Vault 13 — do not confuse my jig with their Machine Shop.",
+    },
   ],
   travis_cold: [
     {
@@ -510,6 +517,28 @@ export const TALK: Record<string, TalkLine[]> = {
       portrait: CAST.travis.portrait,
       still: CAST.travis.still,
       text: "You walked out empty. The jig stays dark. I still tune the guitar. Do not ask me to pretend that is the same as seating him.",
+    },
+  ],
+  travis_fit: [
+    {
+      who: "Travis",
+      castId: "travis",
+      portrait: CAST.travis.portrait,
+      still: CAST.travis.still,
+      text: "Seated. He lists less. Caps are on your ledger. Bring the next part when the campaign coughs one up — tube, wheel, servo, plate, coil, knee.",
+    },
+    {
+      who: WHO,
+      text: "I feel that one, partner. Travis keeps the serial quiet. I keep walking. If your rifle is cracking, ask him for a favor weld once the jig trusts you — the long rebuilds still belong to our Machine Shop.",
+    },
+  ],
+  travis_weld: [
+    {
+      who: "Travis",
+      castId: "travis",
+      portrait: CAST.travis.portrait,
+      still: CAST.travis.still,
+      text: "Favor weld. One step toward pristine. I am not Kane's armory and I am not your whole Machine Shop. I am the last bay that still answers to a name.",
     },
   ],
   lyra_berm: [
@@ -746,13 +775,14 @@ export const MANUAL: Record<string, FieldCard> = {
   },
   vault: {
     title: "Salvage Depot",
-    blurb: "Vault 13's shared storage for caps, field supplies, weapons and whatever survived the trip home.",
+    blurb: "Vault 13's shared storage — and the story of what came home. Travis bay parts, cracked steel, and socketed firearms all leave receipts.",
     tips: [
       "Caps always drop on a win. You cannot Use them.",
+      "Open Inventory for Explain / Travis lanes / Seat on firearm.",
+      "Travis parts belong at the Ironclad Mechanical Shop, not on a resident.",
+      "Attachments seat here. Strip at the Machine Shop when the forge is lit.",
       "Stimpak stands the dying up. Mentats fatten the next loot roll.",
       "Bobby pins and probe kits belong to the SYNAPSE terminal.",
-      "Issue stored gear to an idle resident.",
-      "Rifles, attachments and ammo boxes live here now. Seat parts. Do not drink the 9mm.",
     ],
   },
   ledger: {
