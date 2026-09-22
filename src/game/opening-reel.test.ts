@@ -4,6 +4,7 @@ import {
   GALLERY,
   KANE_ARM,
   KANE_CUES,
+  KANE_REEL,
   KANE_STILLS,
   KANE_TAPE,
   REPLY_CUES,
@@ -69,7 +70,9 @@ describe("Kane recording and Tyrone reply", () => {
     assert.match(script, /They walked packages/);
     assert.match(script, /Orion-7/);
     assert.match(script, /you were supposed to stay retired/);
-    assert.ok(!KANE_STILLS.some((s) => /t0880-line|aegis-suit|wake-vault13/.test(s.src)));
+    assert.ok(KANE_REEL.src.endsWith("/art/opening/kane-intro.mp4"));
+    assert.equal(KANE_REEL.poster, "/art/opening/kane-01.jpg");
+    assert.ok(KANE_REEL.loop);
   });
 
   it("covers Tyrone's reply after Kane", async () => {

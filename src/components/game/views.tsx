@@ -70,9 +70,9 @@ import { ItemInspectShell } from "./item-inspect";
 import { ItemThumb } from "./item-thumb";
 import { FIT_TONE, MarketLotCard, lotFit, lotSpecs } from "./market-lot";
 import { RegionSheet } from "./region-sheet";
-import { WakeScene, OpeningStills } from "./wake-scene";
+import { KaneIntro, WakeScene } from "./wake-scene";
 import { DayBoard } from "./day-board";
-import { KANE_STILLS, KANE_TAPE, TYRONE_REPLY_REEL, TYRONE_REPLY_TAPE, wakeLineAt } from "@/game/opening-reel";
+import { KANE_TAPE, TYRONE_REPLY_REEL, TYRONE_REPLY_TAPE, wakeLineAt } from "@/game/opening-reel";
 import { getRadioSnapshot } from "@/game/radio";
 import { Dice20 } from "./dice";
 import { ForgeBody } from "./forge-body";
@@ -162,7 +162,7 @@ export function Briefing() {
           onEnded={() => finishWakeReel()}
         />
       ) : kaneLive ? (
-        <OpeningStills stills={KANE_STILLS} time={tapeTime} veil="kane" />
+        <KaneIntro time={tapeTime} />
       ) : replyLive ? (
         <WakeScene clip={TYRONE_REPLY_REEL} sound={false} />
       ) : (

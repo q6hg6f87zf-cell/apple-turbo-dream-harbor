@@ -1,4 +1,4 @@
-import { stillSrcAt, WAKE_REEL, type StillCue } from "@/game/opening-reel";
+import { KANE_REEL, KANE_STILLS, stillSrcAt, WAKE_REEL, type StillCue } from "@/game/opening-reel";
 import { cn } from "@/lib/cn";
 import { useEffect, useRef, useState } from "react";
 
@@ -7,15 +7,19 @@ export function WakeScene({
   sound = false,
   loop = false,
   clip = WAKE_REEL,
+  veil = "wake",
   onTime,
   onEnded,
+  onFail,
 }: {
   className?: string;
   sound?: boolean;
   loop?: boolean;
   clip?: { src: string; poster: string; duration?: number };
+  veil?: "wake" | "kane";
   onTime?: (seconds: number) => void;
   onEnded?: () => void;
+  onFail?: () => void;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [reduced, setReduced] = useState(false);
@@ -89,7 +93,10 @@ export function WakeScene({
             "absolute inset-0 size-full object-cover object-center transition-opacity duration-500 md:object-contain",
             ready ? "opacity-100" : "opacity-0",
           )}
-          onError={() => setFailed(true)}
+          onError={() => {
+            setFailed(true);
+            onFail?.();
+          }}
           onPlaying={() => setReady(true)}
           onCanPlay={() => {
             setReady(true);
@@ -102,8 +109,23 @@ export function WakeScene({
           onEnded={() => onEnded?.()}
         />
       ) : null}
-      <div className="ms-wake-veil absolute inset-0" />
+      <div className={veil === "kane" ? "ms-kane-veil absolute inset-0" : "ms-wake-veil absolute inset-0"} />
     </div>
+  );
+}
+
+/** Kane chapter picture: intro mp4 if present, office stills if it 404s. */
+export function KaneIntro({ time }: { time: number }) {
+  const [reel, setReel] = useState(true);
+  if (!reel) return <OpeningStills stills={KANE_STILLS} time={time} veil="kane" />;
+  return (
+    <WakeScene
+      clip={KANE_REEL}
+      sound={false}
+      loop={KANE_REEL.loop}
+      veil="kane"
+      onFail={() => setReel(false)}
+    />
   );
 }
 
