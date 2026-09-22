@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { sfx } from "@/game/audio";
 import { kaneLineAt, replyLineAt, wakeLineAt } from "@/game/opening-reel";
-import { getRadioSnapshot, subscribeRadio } from "@/game/radio";
+import { getRadioSnapshot, startKaneVoice, resumeRadio, subscribeRadio } from "@/game/radio";
 import { TALK, MANUAL, MANUAL_PROMPTS, isPregameTalk, isTalkLocked, renderTalk, scriptForScreen } from "@/game/talk";
 import { speakerArt } from "@/game/cast";
 import { useGame } from "@/game/store";
@@ -31,6 +31,14 @@ export function TalkOverlay() {
     if (liveTape) {
       const snap = getRadioSnapshot();
       if (snap.mode === "intro" && snap.playing) return;
+      if (snap.mode === "intro" && snap.introChapter === "kane") {
+        void startKaneVoice();
+        return;
+      }
+      if (snap.mode === "intro") {
+        void resumeRadio();
+        return;
+      }
       sfx.click();
       advance();
       return;

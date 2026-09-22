@@ -12,7 +12,7 @@ import {
   sfxMix,
   toggleMute,
 } from "./audio";
-import { SCORE, KANE_AUDIO_AT, KANE_TAPE, TYRONE_REPLY_TAPE, type IntroChapter } from "./opening-reel";
+import { SCORE, KANE_AUDIO_AT, KANE_LEAD, KANE_TAPE, TYRONE_REPLY_TAPE, type IntroChapter } from "./opening-reel";
 import type { RegionId, Screen } from "./types";
 
 export type RadioBed =
@@ -199,6 +199,7 @@ let swapGen = 0;
 let kaneVoiceStarted = false;
 let kaneClickPlayed = false;
 let kaneLeadGen = 0;
+let kaneVoiceStarting = false;
 const heardPlaces = new Set<string>();
 const REGION_BEDS: RadioBed[] = ["ironclad", "slagtown", "blackspire", "brasswater", "veyra"];
 
@@ -484,18 +485,27 @@ async function startDeck(deck: Deck, src: string, volume: number, offset = 0, fa
   if (deck.el.src !== abs) {
     deck.el.src = src;
   }
-  await readyDeck(deck.el);
-  try {
-    if (Number.isFinite(offset)) deck.el.currentTime = offset;
-  } catch {
-    /* ignore */
-  }
   fadeTo(deck.fade, volume, offset > 0 ? 0.08 : fadeIn);
   deck.el.loop = mode === "score";
-  try {
+  const kick = async () => {
+    try {
+      if (Number.isFinite(offset) && offset > 0 && deck.el.readyState >= 1) {
+        deck.el.currentTime = offset;
+      }
+    } catch {
+      /* ignore */
+    }
     await deck.el.play();
+  };
+  try {
+    await kick();
   } catch {
-    playing = false;
+    await readyDeck(deck.el);
+    try {
+      await kick();
+    } catch {
+      playing = false;
+    }
   }
 }
 
@@ -563,6 +573,10 @@ async function onLiveEnded() {
       return;
     }
     if (introChapter === "kane") {
+      if (!kaneVoiceStarted) {
+        await startKaneVoice();
+        return;
+      }
       introChapter = "reply";
       kaneVoiceStarted = false;
       kaneClickPlayed = false;
@@ -629,6 +643,15 @@ export function armIntro() {
   pendingTapeId = null;
 }
 
+function primeSrc(src: string) {
+  const graph = ensureGraph();
+  if (!graph?.wait) return;
+  const abs = new URL(src, window.location.origin).href;
+  if (graph.wait.el.src === abs) return;
+  graph.wait.el.preload = "auto";
+  graph.wait.el.src = src;
+}
+
 export async function playFoundYou() {
   applyLoop(false);
   scoreReason = null;
@@ -637,16 +660,19 @@ export async function playFoundYou() {
   introChapter = "found-you";
   kaneVoiceStarted = false;
   kaneClickPlayed = false;
+  kaneVoiceStarting = false;
   kaneLeadGen += 1;
   pendingTapeId = null;
   currentId = null;
   await swapTo(INTRO_SRC, INTRO_DURATION, true);
+  primeSrc(KANE_LEAD.src);
 }
 
 export function armKanePicture() {
   const my = ++kaneLeadGen;
   kaneVoiceStarted = false;
   kaneClickPlayed = false;
+  kaneVoiceStarting = false;
   introChapter = "kane";
   mode = "intro";
   currentTime = 0;
@@ -654,11 +680,12 @@ export function armKanePicture() {
   playing = false;
   pendingTapeId = null;
   currentId = null;
-  if (live) {
-    fadeTo(live.fade, 0.0001, 0.45);
-    laterPause(live, 550);
-  }
   emit();
+  // Play the hiss in this call stack so iPhone does not kill the session.
+  void swapTo(KANE_LEAD.src, KANE_LEAD.duration, true, 0.08).then(() => {
+    if (my !== kaneLeadGen) return;
+    primeSrc(KANE_TAPE.src);
+  });
   if (typeof window !== "undefined") {
     window.setTimeout(() => {
       if (my !== kaneLeadGen || introChapter !== "kane") return;
@@ -667,7 +694,7 @@ export function armKanePicture() {
     window.setTimeout(() => {
       if (my !== kaneLeadGen || introChapter !== "kane") return;
       void startKaneVoice();
-    }, KANE_AUDIO_AT * 1000 + 400);
+    }, KANE_AUDIO_AT * 1000);
   }
 }
 
@@ -681,13 +708,20 @@ export function cueKaneVoiceFromPicture(t: number) {
 }
 
 export async function startKaneVoice() {
-  if (introChapter !== "kane" || kaneVoiceStarted) return;
-  kaneVoiceStarted = true;
+  if (introChapter !== "kane" || kaneVoiceStarted || kaneVoiceStarting) return;
+  kaneVoiceStarting = true;
+  ac();
   if (!kaneClickPlayed) {
     kaneClickPlayed = true;
     sfx.recorder();
   }
-  await swapTo(INTRO_CHAPTER.kane.src, INTRO_CHAPTER.kane.duration, true, 0.18);
+  try {
+    await swapTo(INTRO_CHAPTER.kane.src, INTRO_CHAPTER.kane.duration, true, 0.18);
+    if (introChapter !== "kane") return;
+    kaneVoiceStarted = !!(live && !live.el.paused);
+  } finally {
+    kaneVoiceStarting = false;
+  }
 }
 
 export async function skipIntroTo(chapter: IntroChapter) {

@@ -32,6 +32,12 @@ export const KANE_ARM = 1.88;
 /** Picture plays first. Kane's recording starts this many seconds into the reel. */
 export const KANE_AUDIO_AT = 4;
 
+/** Keeps the iPhone play-chain alive for those 4 seconds. Tape hiss, not silence. */
+export const KANE_LEAD = {
+  src: "/audio/kane-lead.mp3",
+  duration: KANE_AUDIO_AT,
+} as const;
+
 /**
  * Kane intro picture — the office reel. Mute is intentional: captions follow
  * kane-recording.mp3, which arms at KANE_AUDIO_AT.

@@ -5,6 +5,7 @@ import {
   KANE_ARM,
   KANE_AUDIO_AT,
   KANE_CUES,
+  KANE_LEAD,
   KANE_REEL,
   KANE_SHOTS,
   KANE_STILLS,
@@ -69,6 +70,8 @@ describe("Kane recording and Tyrone reply", () => {
     assert.ok(KANE_TAPE.duration >= 203);
     assert.ok(KANE_ARM >= 1.4);
     assert.equal(KANE_AUDIO_AT, 4);
+    assert.equal(KANE_LEAD.duration, KANE_AUDIO_AT);
+    assert.equal(KANE_LEAD.src, "/audio/kane-lead.mp3");
     assert.ok(KANE_STILLS.length >= 1);
     assert.ok(KANE_STILLS.every((s) => s.src.startsWith("/art/opening/")));
     assert.match(script, /You are listening to a recording you were never meant to hear/);
@@ -87,6 +90,8 @@ describe("Kane recording and Tyrone reply", () => {
     assert.equal(KANE_REEL.src, "/art/opening/kane-intro.mp4");
     assert.ok(KANE_REEL.duration >= 210);
     assert.equal(KANE_REEL.loop, false);
+    assert.equal(KANE_LEAD.duration, 4);
+
   });
 
   it("holds one office reel so the tape can speak", () => {
