@@ -1,11 +1,14 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { defaultState } from "./engine.ts";
-import { emptyNarrative, hasFlag, setFlag } from "./narrative-state.ts";
+import { bumpFaction, emptyNarrative, hasFlag, setFlag } from "./narrative-state.ts";
 import { availableScenarios, resolveScenarioApproach } from "./scenario.ts";
 import { applyEnding, endingEligible, pickEndingId } from "./endings.ts";
 import { radioBulletinFor } from "./radio-world.ts";
 import { advanceTalk } from "./talk.ts";
+import { discoverNextPoi, discoverPoi, poisForLocation } from "./field-ops.ts";
+import { worldHudModel } from "./shell.ts";
+import { answerTyroneQuestion } from "./tyrone-voice.ts";
 
 describe("authored scenarios pass 2", () => {
   it("opens Travis bay when the file is cut", () => {
@@ -97,5 +100,65 @@ describe("resume lands World", () => {
     let guard = 0;
     while (s.talk?.script === "resume" && guard++ < 40) advanceTalk(s);
     assert.equal(s.screen, "map");
+  });
+});
+
+describe("oblivion depth hardenings", () => {
+  it("surfaces open situations on the World HUD model", () => {
+    const s = defaultState();
+    s.started = true;
+    s.day = 3;
+    s.narrative = emptyNarrative();
+    s.narrative.act = "act_i";
+    setFlag(s, "file_cut", true);
+    s.operatives = [{ id: "op1", name: "Ash", status: "idle" } as never];
+    const hud = worldHudModel(s);
+    assert.ok(hud.situation);
+    assert.equal(hud.situation!.id, "travis_bay");
+  });
+
+  it("lets Tyrone answer story questions about Vesper and situations", () => {
+    const s = defaultState();
+    s.started = true;
+    s.day = 4;
+    s.narrative = emptyNarrative();
+    s.narrative.act = "act_i";
+    setFlag(s, "vesper_named", true);
+    setFlag(s, "file_cut", true);
+    s.operatives = [{ id: "op1", name: "Ash", status: "idle" } as never];
+    assert.match(answerTyroneQuestion(s, "What is Project Vesper?"), /Vesper|invoice|Kane/i);
+    assert.match(answerTyroneQuestion(s, "What's open?"), /Travis|situation|bay|jig/i);
+    assert.match(answerTyroneQuestion(s, "How is our standing?"), /Ironclad|Kane|AEGIS/i);
+  });
+
+  it("writes a journal mark when a POI is newly discovered", () => {
+    const s = defaultState();
+    s.started = true;
+    s.narrative = emptyNarrative();
+    s.locations.ironclad.discoveredPois = [];
+    const hidden = poisForLocation("ironclad").find((p) => !p.discovered && p.kind !== "boss");
+    assert.ok(hidden, "expected at least one undiscovered Ironclad POI in canon");
+    discoverPoi(s, "ironclad", hidden!.id);
+    assert.ok(s.narrative!.journal.some((j) => j.tags.includes("discovery")));
+    assert.ok(s.narrative!.discoveries.some((d) => d.includes(hidden!.id)));
+    // Second call is idempotent — no duplicate journal noise.
+    const before = s.narrative!.journal.length;
+    discoverPoi(s, "ironclad", hidden!.id);
+    assert.equal(s.narrative!.journal.length, before);
+    // discoverNextPoi path also journals when it finds something new.
+    const found = discoverNextPoi(s, "ironclad");
+    if (found) {
+      assert.ok(s.narrative!.journal.some((j) => j.title.includes(found.name)));
+    }
+  });
+
+  it("whispers faction standing into the journal on threshold crosses", () => {
+    const s = defaultState();
+    s.narrative = emptyNarrative();
+    s.narrative.factions.kane = 0;
+    bumpFaction(s, "kane", 7);
+    assert.ok(s.narrative!.journal.some((j) => j.id === "fac-kane-6"));
+    bumpFaction(s, "kane", -20);
+    assert.ok(s.narrative!.journal.some((j) => j.id === "fac-kane--6"));
   });
 });

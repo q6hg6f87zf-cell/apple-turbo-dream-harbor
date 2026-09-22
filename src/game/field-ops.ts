@@ -1,6 +1,7 @@
-import { canonicalRegionId, regionById } from "./data";
+import { canonicalRegionId, locById, regionById } from "./data";
 import { rumorFor } from "./market";
 import { meetCast } from "./cast";
+import { addJournal, ensureNarrative, recordDiscovery } from "./narrative-state";
 import type {
   GameState,
   LocationId,
@@ -124,6 +125,26 @@ export function poiById(loc: LocationId, poiId: string | null | undefined) {
   return poisForLocation(loc).find((p) => p.id === poiId);
 }
 
+/** Oblivion-style discovery: map pin + journal mark + short diegetic note. */
+function notePoiDiscovery(state: GameState, loc: LocationId, poi: RegionPointOfInterest) {
+  ensureNarrative(state);
+  const label = `${loc}:${poi.id}`;
+  if (state.narrative?.discoveries.includes(label)) return;
+  recordDiscovery(state, label);
+  const place = locById(loc).short;
+  addJournal(state, {
+    id: `disc-${poi.id}`,
+    act: state.narrative?.act ?? "act_i",
+    title: `Marked · ${poi.name}`,
+    body: `${place}. ${poi.description} The pin is yours now — the road still decides what waits there.`,
+    tags: ["discovery", "poi", loc, poi.kind],
+  });
+  if (state.tyrone && !state.tyrone.utterance) {
+    state.tyrone.utterance = `Pinned ${poi.name}. ${place} just got a little less foggy.`;
+  }
+  if (!state.toast) state.toast = `Discovered ${poi.name}.`;
+}
+
 export function discoverPoi(
   state: GameState,
   loc: LocationId,
@@ -136,6 +157,7 @@ export function discoverPoi(
   const current = progress.discoveredPois ?? [];
   if (!poi.discovered && !current.includes(poi.id)) {
     progress.discoveredPois = [...current, poi.id];
+    notePoiDiscovery(state, loc, poi);
   }
   return poi;
 }
@@ -179,6 +201,7 @@ export function discoverNextPoi(state: GameState, loc: LocationId): RegionPointO
   const current = state.locations[loc].discoveredPois ?? [];
   if (!current.includes(next.id)) {
     state.locations[loc].discoveredPois = [...current, next.id];
+    notePoiDiscovery(state, loc, next);
   }
   return next;
 }

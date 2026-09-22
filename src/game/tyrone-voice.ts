@@ -26,6 +26,9 @@ import {
 import type { GameState, LocationId, RoomId, TyroneAssist } from "./types";
 import { promiseCallbackLine } from "@/lib/bridge/continuity-core";
 import { activeStoryBeat } from "./story-spine";
+import { availableScenarios } from "./scenario";
+import { ensureNarrative, hasFlag, type FactionStanding } from "./narrative-state";
+import { radioBulletinFor } from "./radio-world";
 
 const WHO = "Tyrone Bot";
 
@@ -184,12 +187,14 @@ export function answerTyroneQuestion(state: GameState, raw: string): string {
   if (/what happened to|where is |how's |how is /.test(low)) {
     const living = state.operatives;
     const hit = living.find((o) => low.includes(o.name.toLowerCase().split(" ")[0]!));
-    if (!hit) return "I don't remember forging that name.";
-    if (hit.status === "dead") return `${hit.name} is a closed file. I remember.`;
-    if (hit.status === "downed")
-      return `${hit.name} is downed. ${state.rooms.infirmary >= 1 ? "Med Bay can stand them up." : "Med Bay is dark. Dawn will not be kind."}`;
-    const where = hit.location === "hq" || hit.status === "idle" ? "Idle at Vault 13." : `Out on ${locById(hit.location).short}.`;
-    return `${hit.name}, ${hit.cls}. ${hit.hp}/${hit.maxHp} on the meter. ${where}`;
+    if (hit) {
+      if (hit.status === "dead") return `${hit.name} is a closed file. I remember.`;
+      if (hit.status === "downed")
+        return `${hit.name} is downed. ${state.rooms.infirmary >= 1 ? "Med Bay can stand them up." : "Med Bay is dark. Dawn will not be kind."}`;
+      const where = hit.location === "hq" || hit.status === "idle" ? "Idle at Vault 13." : `Out on ${locById(hit.location).short}.`;
+      return `${hit.name}, ${hit.cls}. ${hit.hp}/${hit.maxHp} on the meter. ${where}`;
+    }
+    // Fall through — "how is our standing" is story, not roster.
   }
 
   if (/scout or raid|should i scout|should we raid|intel/.test(low)) {
@@ -246,12 +251,103 @@ export function answerTyroneQuestion(state: GameState, raw: string): string {
     return "Name's Tyrone. S.Y.N.A.P.S.E unit T-0880. I live in Vault 13. You hold the squad.";
   }
 
+  // Story / world Q&A — Oblivion-style: companion answers the plot, not only the UI.
+  if (/vesper|project vesper|invoice|weigh.?chit|hull serial/.test(low)) {
+    ensureNarrative(state);
+    if (hasFlag(state, "invoice_sold"))
+      return "You sold the Vesper page. Kane has the ink. I have the receipt of who took the coin.";
+    if (hasFlag(state, "invoice_copied"))
+      return "We have serials SYNAPSE should not. Kane still has the original. That is a race, not a win.";
+    if (hasFlag(state, "invoice_burned"))
+      return "Ash on the gatehouse table. Kane will invent a new page. You bought a night.";
+    if (hasFlag(state, "vesper_named"))
+      return "Project Vesper is Kane's jump-stack invoice with our town's steel on it. The board and the gatehouse both know the word now.";
+    return "I have heard the word Vesper on ICR. Not enough to brief. Watch the Gate.";
+  }
+
+  if (/caravan|culvert|missing (cart|steel|weigh)/.test(low)) {
+    if (hasFlag(state, "caravan_staged"))
+      return "That vanishing was theater. Empty crates. A frequency slip with Lyra's color on it.";
+    if (hasFlag(state, "caravan_survived"))
+      return "Some steel came home. Some questions got louder. The Gate still argues about who lied.";
+    if (hasFlag(state, "caravan_abandoned"))
+      return "You left the carts. Kane wrote the story without us. I did not forget.";
+    if (hasFlag(state, "caravan_investigated"))
+      return "We looked. Tracks that lie. Witnesses who will not say Lyra. The culvert still waits if the board says so.";
+    const open = availableScenarios(state).find((s) => s.id.startsWith("caravan"));
+    if (open) return `${open.title} is open. ${open.setup.split(".")[0]}.`;
+    return "No open caravan file on my desk. Yet.";
+  }
+
+  if (/kane|aegis|orion|lyra|vera|heat/.test(low) && /who|what|why|standing|think|about|status|story/.test(low)) {
+    const heat = state.kaneHeat ?? 0;
+    const fac = ensureNarrative(state).factions;
+    const bits: string[] = [];
+    if (heat >= 10) bits.push(`Heat ${heat}. AEGIS is listening.`);
+    else if (heat >= 5) bits.push(`Heat ${heat}. Kane is watching.`);
+    else bits.push("Trail is still cold.");
+    if (fac.kane >= 6) bits.push("Kane's buyers tip their hats. That is not free.");
+    if (fac.kane <= -6) bits.push("Kane's ledger has your name colder.");
+    if (fac.aegis <= -8) bits.push("AEGIS treats the plate as a problem.");
+    if (hasFlag(state, "lyra_ridge_handled")) bits.push("Lyra's ridge is already in the file.");
+    return bits.join(" ");
+  }
+
+  if (/travis|jig|bay|machine shop.*tyrone|seat (the )?bay/.test(low)) {
+    if (hasFlag(state, "travis_jig_filled")) return "Travis lit the bay. I list less to port. Keep him paid.";
+    if (hasFlag(state, "travis_refused")) return "We walked out. The jig stays dark. That is on us.";
+    const open = availableScenarios(state).find((s) => s.id === "travis_bay");
+    if (open) return "Travis still has an empty jig. Ironclad Mechanical Shop. He is not asking for charity.";
+    return "Travis keeps the last T-0880 bay Kane did not melt. Parts talk louder than promises.";
+  }
+
+  if (/halo|2753|drill square|orion.?s? wing/.test(low)) {
+    if (hasFlag(state, "halo_reported")) return "Halo Yard is on the map. Warm cell. Boot prints the size of a 2753.";
+    if (hasFlag(state, "halo_ambushed")) return "Halo went hot. The wing knows the plate now.";
+    const open = availableScenarios(state).find((s) => s.id === "halo_yard");
+    if (open) return "Scorched outlines east of the Berm. Someone is drilling where Orion trained the replacement wing.";
+    return "Halo Yard is old drill ground. If heat climbs, it stops being nostalgia.";
+  }
+
+  if (/what.?s (the |my )?story|story beat|objective|what am i (doing|supposed)|main quest|next (beat|chapter)/.test(low)) {
+    const beat = activeStoryBeat(state);
+    if (beat) return `${beat.title}. ${beat.objective}`;
+    return "No hard spine on the desk. The board and the map still decide the day.";
+  }
+
+  if (/situation|open (case|job|scenario)|what.?s open|anything brewing/.test(low)) {
+    const open = availableScenarios(state)[0];
+    if (open) return `${open.title} at ${open.locationLabel}. ${open.setup.split(".")[0]}. Choices matter.`;
+    return "No authored situation is open. Walk the Hollow until the board or the road writes one.";
+  }
+
+  if (/faction|standing|reputation|who likes|who hates/.test(low)) {
+    const fac = ensureNarrative(state).factions;
+    const rank = (k: keyof FactionStanding) => {
+      const v = fac[k];
+      if (v >= 12) return "warm";
+      if (v >= 6) return "known";
+      if (v <= -12) return "hostile";
+      if (v <= -6) return "cold";
+      return "quiet";
+    };
+    return `Ironclad ${rank("ironclad")}, Kane ${rank("kane")}, AEGIS ${rank("aegis")}, Vault 13 ${rank("vault13")}. Numbers live in the journal.`;
+  }
+
+  if (/radio|icr|bulletin|what.?s on (the )?air/.test(low)) {
+    const line = radioBulletinFor(state);
+    if (line) return `ICR says: ${line}`;
+    return "ICR is quiet. Or I am not listening hard enough.";
+  }
+
   if (/help|lost|what do i do|stuck/.test(low)) {
     const downed = state.operatives.filter((o) => o.status === "downed");
     if (downed.length && state.rooms.infirmary < 1)
       return `${downed[0]!.name} is downed and the Med Bay is dark. That is the job, partner.`;
     if (state.operatives.filter((o) => o.status !== "dead").length === 0)
       return "Roster is empty. Machine Shop. Name them like you mean it.";
+    const openSit = availableScenarios(state)[0];
+    if (openSit) return `${openSit.title} is open. Face it from the board, the World strip, or ask me about the situation.`;
     if ((state.shift?.board.filter((t) => t.status === "open") ?? []).length)
       return "The board still has jobs. A day with one dice roll is a simulation.";
     return "Forge. Deploy. Salvage. Recover. I put the next smart move on the strip up top.";
@@ -259,7 +355,7 @@ export function answerTyroneQuestion(state: GameState, raw: string): string {
 
   const mem = retrieveMemories(state, { limit: 1 })[0];
   if (mem && /we|last time|before/.test(low)) return `Yeah. ${mem.description}`;
-  return "I've got nothing in my records on that. Ask me about the roll, the Matrix, a name on the roster, or this place.";
+  return "I've got nothing in my records on that. Ask me about the story, a situation, Kane, the roll, the Matrix, a name on the roster, or this place.";
 }
 
 export function isUnknownTyroneReply(text: string) {
@@ -309,6 +405,17 @@ export function considerTyroneHint(state: GameState, before: TyroneSnap) {
         reason: `Dawn story beat ${beat.id}`,
       });
       if (said) cooling(state, "story-dawn", 48);
+      return;
+    }
+    const sit = availableScenarios(state)[0];
+    if (sit && !onCooldown(state, "situation-dawn")) {
+      const said = speakTyrone(state, {
+        text: `${sit.title} is pinned. ${sit.locationLabel}. The board knows.`,
+        concept: `sit-${sit.id}`,
+        priority: 2,
+        reason: `Dawn open situation ${sit.id}`,
+      });
+      if (said) cooling(state, "situation-dawn", 60);
       return;
     }
   }
