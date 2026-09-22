@@ -63,7 +63,7 @@ export function RadioDirector() {
   const mission = useGame((g) => !!g.s.mission);
   const combat = useGame((g) => g.s.combat);
   const inCombat = !!combat;
-  const boss = !!(combat?.bossId || combat?.enemies.some((e) => e.isBoss || e.tags.includes("boss")));
+  const boss = !!(combat?.bossId || combat?.enemies?.some((e) => e.isBoss || e.tags?.includes("boss")));
   const watch = useGame((g) => g.s.shift?.watch);
   useEffect(() => {
     const cue = scoreCueForGame({ screen, boss });

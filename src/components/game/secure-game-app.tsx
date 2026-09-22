@@ -1,3 +1,4 @@
+import { ShellErrorBoundary } from "@/lib/error-component";
 import { useGame } from "@/game/store";
 import { dismissSynapseSplash } from "@/game/opening";
 import { useDiscordAccess } from "@/lib/auth/discord-access";
@@ -65,9 +66,13 @@ export function SecureGameApp() {
       {screen === "rules" ? (
         <DiscordRulesView />
       ) : !hydrated || pending || screen === "title" || !allowed ? (
-        <AuthenticatedMainMenu />
+        <ShellErrorBoundary label="The porch flickered">
+          <AuthenticatedMainMenu />
+        </ShellErrorBoundary>
       ) : (
-        <GameApp />
+        <ShellErrorBoundary label="The war table flickered">
+          <GameApp />
+        </ShellErrorBoundary>
       )}
       <EliteTerminalOverlay />
     </>

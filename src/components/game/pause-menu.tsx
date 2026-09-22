@@ -1,4 +1,5 @@
-import { sfx } from "@/game/audio";
+import { sfx, isMuted, toggleMute, unlockAudio } from "@/game/audio";
+import { openRadioDeck } from "@/game/radio";
 import {
   availableApproaches,
   availableScenarios,
@@ -8,11 +9,14 @@ import { GAME_MENU } from "@/game/shell";
 import { actTitle, activeStoryBeat } from "@/game/story-spine";
 import { useGame } from "@/game/store";
 import type { StoryActId } from "@/game/narrative-state";
+import type { TyroneAssist } from "@/game/types";
 import { cn } from "@/lib/cn";
-import { X } from "lucide-react";
+import { AudioLines, CircleHelp, Volume2, VolumeX, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
-type Pane = "menu" | "journal" | "scenario";
+type Pane = "menu" | "journal" | "scenario" | "settings";
+
+const ASSIST: TyroneAssist[] = ["off", "minimal", "normal", "helpful", "high"];
 
 /**
  * Diegetic field menu — Character / Inventory / Journal / Map / Ledger /
@@ -27,6 +31,8 @@ export function PauseMenu({ open, onClose, initial = "menu" }: { open: boolean; 
     if (open) setPane(initial);
   }, [open, initial]);
 
+  if (!open) return null;
+
   const scenarios = availableScenarios(s);
   const beat = activeStoryBeat(s);
   const journal = s.narrative?.journal ?? [];
@@ -36,8 +42,6 @@ export function PauseMenu({ open, onClose, initial = "menu" }: { open: boolean; 
     scenarios[0];
   const openScenario = pinned;
 
-  if (!open) return null;
-
   return (
     <div className="fixed inset-0 z-[140] flex items-end justify-center md:items-center" data-pause-menu="1" role="dialog" aria-label="Field menu">
       <button type="button" className="absolute inset-0 bg-ink/70 backdrop-blur-sm" aria-label="Close menu" onClick={onClose} />
@@ -45,14 +49,22 @@ export function PauseMenu({ open, onClose, initial = "menu" }: { open: boolean; 
         <header className="flex items-center justify-between gap-2 border-b border-line/60 px-4 py-3">
           <div className="min-w-0">
             <p className="font-display text-[10px] uppercase tracking-[0.16em] text-ember">
-              {pane === "journal" ? "Field journal" : pane === "scenario" ? "Situation" : "Field menu"}
+              {pane === "journal"
+                ? "Field journal"
+                : pane === "scenario"
+                  ? "Situation"
+                  : pane === "settings"
+                    ? "Field settings"
+                    : "Field menu"}
             </p>
             <h2 className="truncate font-display text-lg text-paper">
               {pane === "menu"
                 ? actTitle((s.narrative?.act ?? "prologue") as StoryActId)
                 : pane === "journal"
                   ? "What you know"
-                  : (openScenario?.title ?? "Situation")}
+                  : pane === "settings"
+                    ? "Assist, radio, rest"
+                    : (openScenario?.title ?? "Situation")}
             </h2>
           </div>
           <button
@@ -91,7 +103,7 @@ export function PauseMenu({ open, onClose, initial = "menu" }: { open: boolean; 
                       return;
                     }
                     if (row.id === "settings") {
-                      onClose();
+                      setPane("settings");
                       return;
                     }
                     setScreen(row.id as never);
@@ -151,6 +163,8 @@ export function PauseMenu({ open, onClose, initial = "menu" }: { open: boolean; 
               resolve={resolveScenario}
             />
           ) : null}
+
+          {pane === "settings" ? <SettingsPane onBack={() => setPane("menu")} onClose={onClose} /> : null}
         </div>
       </div>
     </div>
@@ -232,6 +246,71 @@ function ScenarioPane({
           </button>
         ))}
       </div>
+    </div>
+  );
+}
+
+function SettingsPane({ onBack, onClose }: { onBack: () => void; onClose: () => void }) {
+  const [mute, setMute] = useState(isMuted);
+  const assist = useGame((g) => g.s.tyrone?.settings?.assist ?? "normal");
+  const setAssist = useGame((g) => g.setTyroneAssist);
+  const rest = useGame((g) => g.rest);
+  const combat = useGame((g) => !!g.s.combat || !!g.s.mission);
+
+  return (
+    <div className="space-y-1">
+      <button type="button" className="text-label uppercase tracking-[0.12em] text-ember" onClick={onBack}>
+        ← Menu
+      </button>
+      <button
+        type="button"
+        className="flex min-h-12 w-full items-center gap-3 rounded-[var(--radius-sm)] px-3 text-left hover:bg-raised"
+        onClick={() => {
+          const next = toggleMute();
+          setMute(next);
+          if (!next) sfx.click();
+        }}
+      >
+        {mute ? <VolumeX className="size-4 text-muted" /> : <Volume2 className="size-4 text-ember" />}
+        <span className="font-display text-body text-paper">{mute ? "Unmute" : "Mute"}</span>
+      </button>
+      <button
+        type="button"
+        className="flex min-h-12 w-full items-center gap-3 rounded-[var(--radius-sm)] px-3 text-left hover:bg-raised"
+        onClick={() => {
+          unlockAudio();
+          sfx.click();
+          openRadioDeck();
+          onClose();
+        }}
+      >
+        <AudioLines className="size-4 text-ember" />
+        <span className="font-display text-body text-paper">Tyrone's radio</span>
+      </button>
+      <button
+        type="button"
+        className="flex min-h-12 w-full items-center gap-3 rounded-[var(--radius-sm)] px-3 text-left hover:bg-raised"
+        onClick={() => {
+          sfx.click();
+          const i = ASSIST.indexOf(assist as TyroneAssist);
+          setAssist(ASSIST[(i + 1) % ASSIST.length]!);
+        }}
+      >
+        <CircleHelp className="size-4 text-ember" />
+        <span className="font-display text-body text-paper">Assist · {assist}</span>
+      </button>
+      <button
+        type="button"
+        disabled={combat}
+        className="flex min-h-12 w-full items-center gap-3 rounded-[var(--radius-sm)] px-3 text-left hover:bg-raised disabled:opacity-40"
+        onClick={() => {
+          sfx.click();
+          rest();
+          onClose();
+        }}
+      >
+        <span className="font-display text-body text-paper">Rest until dawn</span>
+      </button>
     </div>
   );
 }

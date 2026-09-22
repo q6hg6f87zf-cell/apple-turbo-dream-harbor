@@ -254,8 +254,8 @@ export function FieldManual() {
   const state = useGame((g) => g.s);
   const combat = !!state.combat || (!!state.mission && !state.mission.waiting);
   const [question, setQuestion] = useState("");
-  const assist = state.tyrone?.settings.assist ?? "normal";
-  const numbers = state.tyrone?.settings.showNumbers !== false;
+  const assist = state.tyrone?.settings?.assist ?? "normal";
+  const numbers = state.tyrone?.settings?.showNumbers !== false;
 
   useEffect(() => {
     if (!open) return;

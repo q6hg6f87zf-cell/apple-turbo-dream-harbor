@@ -54,8 +54,9 @@ export function MoonCard({ member, className }: { member: SquadMember; className
   const flipFrom = useRef(0);
   const flipTo = useRef(0);
   const lastTap = useRef(0);
-  const [label, setLabel] = useState("Drag · pinch · spin");
+  const [label, setLabel] = useState("Moon Squad plate");
   const [spinning, setSpinning] = useState(false);
+  const [live, setLive] = useState(false);
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const pinch0 = useRef(0);
   const scale0 = useRef(1);
@@ -88,7 +89,23 @@ export function MoonCard({ member, className }: { member: SquadMember; className
   };
 
   useEffect(() => {
+    const coarse = window.matchMedia("(pointer: coarse)").matches;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const tiny = window.innerWidth < 420 || window.innerHeight < 700;
+    const saveData = Boolean(
+      (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData,
+    );
+    const next = !coarse && !reduce && !tiny && !saveData;
+    setLive(next);
+    if (!next) setLabel("Moon Squad plate");
+  }, []);
+
+  useEffect(() => {
     reduced.current = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (!live) {
+      paint();
+      return;
+    }
     let last = performance.now();
     const tick = (now: number) => {
       const dt = Math.min(0.05, (now - last) / 1000);
@@ -118,11 +135,11 @@ export function MoonCard({ member, className }: { member: SquadMember; className
     raf.current = requestAnimationFrame(tick);
     paint();
     return () => cancelAnimationFrame(raf.current);
-  }, []);
+  }, [live]);
 
   useEffect(() => {
     const root = stage.current;
-    if (!root) return;
+    if (!root || !live) return;
 
     const dist = () => {
       const pts = [...pointers.current.values()];
@@ -231,7 +248,7 @@ export function MoonCard({ member, className }: { member: SquadMember; className
       root.removeEventListener("wheel", onWheel);
       root.removeEventListener("keydown", onKey);
     };
-  }, []);
+  }, [live]);
 
   const toggleSpin = () => {
     spinOn.current = !spinOn.current;
@@ -265,7 +282,7 @@ export function MoonCard({ member, className }: { member: SquadMember; className
     paint();
   };
 
-  const pan = member.personalCaps.toLocaleString();
+  const pan = Number(member?.personalCaps ?? 0).toLocaleString();
   const num = cardNumber(member.id);
   const vacant = isVacant(member);
   const holder = vacant ? "Unclaimed" : member.name;
@@ -278,7 +295,7 @@ export function MoonCard({ member, className }: { member: SquadMember; className
       <div
         ref={stage}
         tabIndex={0}
-        className="ms-card-stage relative mx-auto flex h-[14.5rem] w-full max-w-md cursor-grab select-none items-center justify-center touch-none outline-none active:cursor-grabbing md:h-[16.5rem]"
+        className="ms-card-stage relative mx-auto flex h-[10.5rem] w-full max-w-md cursor-grab select-none items-center justify-center touch-none outline-none active:cursor-grabbing md:h-[16.5rem]"
         aria-label="Moon Squad bank card. Drag to rotate, pinch or wheel to zoom, double-tap to flip, space to spin."
         onContextMenu={(e) => e.preventDefault()}
       >
@@ -358,6 +375,7 @@ export function MoonCard({ member, className }: { member: SquadMember; className
           </div>
         </div>
       </div>
+      {live ? (
       <div className="flex items-center justify-center gap-1">
         <button
           type="button"
@@ -391,6 +409,9 @@ export function MoonCard({ member, className }: { member: SquadMember; className
           <RotateCcw className="size-4" />
         </button>
       </div>
+      ) : (
+        <p className="text-center font-display text-[10px] uppercase tracking-[0.18em] text-muted">{label}</p>
+      )}
     </div>
   );
 }

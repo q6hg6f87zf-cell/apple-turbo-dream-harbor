@@ -51,7 +51,7 @@ export function GameApp() {
   const focused = !!mission || !!combat;
   const kind = focused ? "focused" : chromeKind(screen);
   const [pauseOpen, setPauseOpen] = useState(false);
-  const [pausePane, setPausePane] = useState<"menu" | "journal" | "scenario">("menu");
+  const [pausePane, setPausePane] = useState<"menu" | "journal" | "scenario" | "settings">("menu");
 
   useLayoutEffect(() => {
     if (!hydrated) hydrate();

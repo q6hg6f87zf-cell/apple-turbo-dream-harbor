@@ -166,20 +166,36 @@ export function worldHudModel(state: GameState): {
   situation: { id: string; title: string; place: string; poiId?: string } | null;
   bulletin: string | null;
 } {
-  ensureNarrative(state);
-  const region = locationToRegion(state.selectedLoc ?? "ironclad");
-  const open = availableScenarios(state)[0];
-  return {
-    day: state.day,
-    objective: storyObjective(state),
+  const fallback = {
+    day: state.day ?? 1,
+    objective: "The Hollow is still seating.",
     act: state.narrative?.act ?? "prologue",
-    regionTheme: regionThemeId(region),
+    regionTheme: "vault13",
     heat: state.kaneHeat ?? 0,
     tyroneLine: state.tyrone?.utterance ?? null,
     watchesLeft: state.shift?.watchesLeft ?? 0,
-    situation: open
-      ? { id: open.id, title: open.title, place: open.locationLabel, poiId: open.poiId }
-      : null,
-    bulletin: radioBulletinFor(state),
+    situation: null as { id: string; title: string; place: string; poiId?: string } | null,
+    bulletin: null as string | null,
   };
+  try {
+    ensureNarrative(state);
+    const region = locationToRegion(state.selectedLoc ?? "ironclad");
+    const open = availableScenarios(state)[0];
+    return {
+      day: state.day,
+      objective: storyObjective(state),
+      act: state.narrative?.act ?? "prologue",
+      regionTheme: regionThemeId(region),
+      heat: state.kaneHeat ?? 0,
+      tyroneLine: state.tyrone?.utterance ?? null,
+      watchesLeft: state.shift?.watchesLeft ?? 0,
+      situation: open
+        ? { id: open.id, title: open.title, place: open.locationLabel, poiId: open.poiId }
+        : null,
+      bulletin: radioBulletinFor(state),
+    };
+  } catch (err) {
+    console.warn("Hollow world HUD", err);
+    return fallback;
+  }
 }

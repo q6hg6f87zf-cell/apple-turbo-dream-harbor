@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { defaultState } from "./engine";
-import { chromeKind, guidanceMode, guidanceSignal, navSignalKey, navSignals } from "./shell";
+import { cloneState, defaultState } from "./engine";
+import { chromeKind, guidanceMode, guidanceSignal, navSignalKey, navSignals, worldHudModel } from "./shell";
 
 describe("guidanceMode", () => {
   it("tutorial is guided even if idle flavor would apply", () => {
@@ -147,5 +147,45 @@ describe("navSignals", () => {
   it("is comparable by value so the dock can subscribe to it", () => {
     const s = ready();
     assert.equal(navSignalKey(s), navSignalKey(s));
+  });
+});
+
+describe("worldHudModel", () => {
+  it("seats a HUD on a sparse file without throwing", () => {
+    const s = defaultState();
+    s.narrative = undefined as never;
+    const hud = worldHudModel(s);
+    assert.equal(typeof hud.objective, "string");
+    assert.ok(hud.objective.length > 0);
+    assert.equal(hud.day, s.day);
+  });
+
+  it("survives a started map file", () => {
+    const s = defaultState();
+    s.started = true;
+    s.screen = "map";
+    s.selectedLoc = "ironclad";
+    s.day = 2;
+    const hud = worldHudModel(s);
+    assert.equal(hud.day, 2);
+    assert.equal(typeof hud.act, "string");
+  });
+});
+
+describe("cloneState", () => {
+  it("clones a live file", () => {
+    const s = defaultState();
+    s.playerName = "Rider";
+    const next = cloneState(s);
+    next.playerName = "Ash";
+    assert.equal(s.playerName, "Rider");
+    assert.equal(next.playerName, "Ash");
+  });
+
+  it("does not throw on a function-tainted snapshot", () => {
+    const s = defaultState() as ReturnType<typeof defaultState> & { boom?: () => void };
+    s.boom = () => 1;
+    const next = cloneState(s);
+    assert.equal(next.day, s.day);
   });
 });

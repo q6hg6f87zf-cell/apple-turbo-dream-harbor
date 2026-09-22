@@ -160,7 +160,7 @@ export function AuthenticatedMainMenu() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  });
+  }, [talking, pending, allowed, named, started, signingIn]);
 
   const loginLabel = !allowed
     ? signingIn
@@ -175,10 +175,10 @@ export function AuthenticatedMainMenu() {
       <TitleBackdrop />
       <div className="title-veil pointer-events-none absolute inset-0 z-[1]" />
       <OpeningBoot gateReady={hydrated && !pending}>
-      <div className="relative z-[2] flex min-h-0 flex-1 flex-col justify-end px-4 pb-8 pt-16 md:px-10 md:pb-10">
+      <div className="relative z-[2] flex min-h-0 flex-1 flex-col justify-end px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-16 md:px-10 md:pb-10">
         <div className="mx-auto flex w-full max-w-lg flex-col gap-3 md:max-w-xl">
           {started && allowed ? <RadioChip /> : null}
-          <div className="ms-title-dock rounded-[var(--radius-xl)] bg-ink/62 p-4 shadow-[var(--shadow-border)] backdrop-blur-md md:p-5">
+          <div className="ms-title-dock rounded-[var(--radius-xl)] bg-ink/62 p-3 shadow-[var(--shadow-border)] backdrop-blur-md md:p-5">
             <p className="font-display text-[11px] uppercase tracking-[0.42em] text-ember">S.Y.N.A.P.S.E T-0880</p>
             <p className="mt-1 text-xs text-moon">
               {!allowed

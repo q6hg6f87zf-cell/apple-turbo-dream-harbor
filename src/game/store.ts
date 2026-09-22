@@ -84,7 +84,7 @@ import { playFoundYou, armIntro, startPorchRadio } from "./radio";
 import { enterWake } from "./opening";
 import { advanceTalk as stepTalk, queueTalk, skipTalk as skipTalkFn, SCREEN_SCRIPT, scriptForScreen, TALK } from "./talk";
 import { considerTyroneHint, speakTyrone, answerTyroneQuestion } from "./tyrone-voice";
-import { ingestTyrone, snapshotTyrone } from "./tyrone-mind";
+import { ingestTyrone, snapshotTyrone, emptyTyrone } from "./tyrone-mind";
 import {
   canTakeArcTurn,
   bindDiscordIdentity,
@@ -243,8 +243,12 @@ function mutate(set: (fn: (x: Store) => Partial<Store>) => void, fn: (s: GameSta
     const next = cloneState(st.s);
     const snap = snapshotTyrone(next);
     fn(next);
-    ingestTyrone(next, snap);
-    considerTyroneHint(next, snap);
+    try {
+      ingestTyrone(next, snap);
+      considerTyroneHint(next, snap);
+    } catch (err) {
+      console.warn("Tyrone ingest", err);
+    }
     return { s: next };
   });
 }
@@ -394,7 +398,12 @@ export const useGame = create<Store>((set, get) => ({
     if (!isSnowflake(snow)) return;
     const cleanName = (name ?? "").trim().replace(/^@/, "").slice(0, 24);
     const cleanHandle = (handle ?? "").trim().replace(/^@/, "").slice(0, 32);
-    const prev = get().s.discordId;
+    const cur = get().s;
+    const handleLocked = Boolean(cur.playerHandle) && !isPlaceholderName(cur.playerHandle);
+    if (cur.discordId === snow && hasPlayerProfile(cur) && (!cleanHandle || handleLocked || cur.playerHandle === cleanHandle)) {
+      return;
+    }
+    const prev = cur.discordId;
     if (prev && prev !== snow) adoptSaveIdentity(prev, snow);
     setActiveIdentity({ id: snow, name: isPlaceholderName(cleanName) ? cleanHandle || snow : cleanName });
     mutate(set, (st) => {
@@ -405,6 +414,9 @@ export const useGame = create<Store>((set, get) => ({
     get().persist();
   },
   stampProfile: (name, handle) => {
+    const cur = get().s;
+    const handleLocked = Boolean(cur.playerHandle) && !isPlaceholderName(cur.playerHandle);
+    if (hasPlayerProfile(cur) && handleLocked) return null;
     let msg: string | null = null;
     mutate(set, (st) => {
       msg = stampPlayerProfile(st, name, handle);
@@ -534,10 +546,12 @@ export const useGame = create<Store>((set, get) => ({
   },
   setTyroneAssist: (level) =>
     mutate(set, (s) => {
+      if (!s.tyrone) s.tyrone = emptyTyrone();
       s.tyrone.settings.assist = level;
     }),
   toggleTyroneNumbers: () =>
     mutate(set, (s) => {
+      if (!s.tyrone) s.tyrone = emptyTyrone();
       s.tyrone.settings.showNumbers = !s.tyrone.settings.showNumbers;
     }),
   openGuide: () => set({ guideOpen: true }),

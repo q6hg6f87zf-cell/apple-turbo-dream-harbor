@@ -91,7 +91,7 @@ export function HubHeader() {
             </span>
             <span className="shrink-0 text-label tabular-nums text-muted">D{s.day}</span>
             <span className="shrink-0 font-display text-value tabular-nums text-ember">
-              Plate · {me.personalCaps.toLocaleString()}
+              Plate · {Number(me.personalCaps ?? 0).toLocaleString()}
             </span>
           </span>
         </button>
@@ -147,7 +147,7 @@ function OverflowMenu({
   onClose: () => void;
 }) {
   const [mute, setMute] = useState(isMuted);
-  const assist = useGame((g) => g.s.tyrone?.settings.assist ?? "normal");
+  const assist = useGame((g) => g.s.tyrone?.settings?.assist ?? "normal");
   const setAssist = useGame((g) => g.setTyroneAssist);
   const setScreen = useGame((g) => g.setScreen);
   const forged = useGame((g) => characterForged(g.s));
@@ -280,7 +280,7 @@ export function TaskHeader() {
       </button>
       <h1 className="min-w-0 flex-1 truncate text-center font-display text-body text-paper">{meta.title}</h1>
       {meta.plate ? (
-        <span className="shrink-0 font-display text-value tabular-nums text-ember">Plate · {me.personalCaps.toLocaleString()}</span>
+        <span className="shrink-0 font-display text-value tabular-nums text-ember">Plate · {Number(me.personalCaps ?? 0).toLocaleString()}</span>
       ) : (
         <span className="w-11 shrink-0" aria-hidden />
       )}

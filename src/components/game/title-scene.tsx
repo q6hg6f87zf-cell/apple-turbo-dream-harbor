@@ -44,7 +44,11 @@ export function TitleBackdrop({
   useEffect(() => {
     if (!live || reduced) return;
     const coarse = window.matchMedia("(pointer: coarse)").matches;
-    const t = window.setTimeout(() => setArmed(true), coarse ? 900 : 280);
+    const saveData = Boolean(
+      (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData,
+    );
+    if (coarse || saveData) return;
+    const t = window.setTimeout(() => setArmed(true), 280);
     return () => window.clearTimeout(t);
   }, [live, reduced]);
 

@@ -1574,7 +1574,17 @@ export function nextQuarterCost(state: GameState, q: keyof GameState["quarters"]
 }
 
 export function cloneState(s: GameState): GameState {
-  return structuredClone(s);
+  try {
+    return structuredClone(s);
+  } catch (err) {
+    console.warn("Hollow file clone fell back to JSON.", err);
+    try {
+      return JSON.parse(JSON.stringify(s)) as GameState;
+    } catch (jsonErr) {
+      console.error("Hollow file clone failed.", jsonErr);
+      return defaultState();
+    }
+  }
 }
 
 export function hireResidentCost(state: GameState): number {

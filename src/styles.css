@@ -1658,6 +1658,24 @@ body[data-orbit="1"] [data-dock],
   -webkit-backdrop-filter: blur(18px) saturate(1.2);
 }
 
+@media (pointer: coarse) {
+  .ms-title-dock {
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+  }
+  .ms-card {
+    will-change: auto;
+    transform-style: flat;
+  }
+  .ms-world-hud-plate,
+  .ms-world-whisper {
+    backdrop-filter: blur(4px);
+  }
+  .ms-scene-breath {
+    height: clamp(2.25rem, 7vh, 3.25rem);
+  }
+}
+
 .ms-wake-card {
   animation: ms-wake-in 0.45s var(--ease-smooth-out) both;
 }
