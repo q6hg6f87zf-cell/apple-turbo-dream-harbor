@@ -335,8 +335,11 @@ await page.getByText(/Construction stock, not pocket clutter|Material stays in V
 // data underneath the page. force is intentional because the item sheet is
 // still open and changing screens should dismiss that component naturally.
 await page.getByRole("button", { name: "World", exact: true }).click({ force: true });
-await page.getByText(/Orbital Command/).waitFor({ timeout: 20_000 });
-assert.ok((await page.locator("canvas").count()) >= 1, "World renderer did not mount a canvas.");
+await page.getByRole("heading", { name: "World", exact: true }).waitFor({ timeout: 20_000 });
+await page.getByText(/Pick a region to brief the sortie/i).waitFor({ timeout: 10_000 });
+await page.getByRole("button", { name: /Orbit the world/i }).click();
+await page.waitForTimeout(800);
+assert.ok((await page.locator("canvas").count()) >= 1, "Orbit theater did not mount a canvas.");
 
 const worldOverflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 assert.ok(worldOverflow <= 2, `World screen overflows horizontally by ${worldOverflow}px.`);
