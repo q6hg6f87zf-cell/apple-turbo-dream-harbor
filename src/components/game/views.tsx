@@ -70,9 +70,9 @@ import { ItemInspectShell } from "./item-inspect";
 import { ItemThumb } from "./item-thumb";
 import { FIT_TONE, MarketLotCard, lotFit, lotSpecs } from "./market-lot";
 import { RegionSheet } from "./region-sheet";
-import { WakeScene } from "./wake-scene";
+import { WakeScene, OpeningStills } from "./wake-scene";
 import { DayBoard } from "./day-board";
-import { wakeLineAt } from "@/game/opening-reel";
+import { KANE_STILLS, TYRONE_REPLY_REEL, wakeLineAt } from "@/game/opening-reel";
 import { getRadioSnapshot } from "@/game/radio";
 import { useOpeningBeat } from "@/game/opening";
 import { Dice20 } from "./dice";
@@ -126,7 +126,11 @@ export function Briefing() {
   const syncWakeLine = useGame((g) => g.syncWakeLine);
   const finishWakeReel = useGame((g) => g.finishWakeReel);
   const [curtain, setCurtain] = useState(true);
-  const wakeLive = !talk || talk.script === "wake";
+  const [tapeTime, setTapeTime] = useState(0);
+  const script = talk?.script;
+  const wakeLive = !talk || script === "wake";
+  const kaneLive = script === "kane";
+  const replyLive = script === "tyrone-reply";
 
   useEffect(() => {
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -134,6 +138,13 @@ export function Briefing() {
     const t = window.setTimeout(() => setCurtain(false), hold);
     return () => window.clearTimeout(t);
   }, [beat]);
+
+  useEffect(() => {
+    const push = () => setTapeTime(getRadioSnapshot().currentTime);
+    push();
+    const id = window.setInterval(push, 180);
+    return () => window.clearInterval(id);
+  }, [script]);
 
   return (
     <div className="relative flex h-dvh flex-col justify-end overflow-hidden bg-ink px-5 py-8" data-briefing="1">
@@ -146,10 +157,14 @@ export function Briefing() {
           }}
           onEnded={() => finishWakeReel()}
         />
+      ) : kaneLive ? (
+        <OpeningStills stills={KANE_STILLS} time={tapeTime} />
+      ) : replyLive ? (
+        <WakeScene clip={TYRONE_REPLY_REEL} sound={false} />
       ) : (
         <div className="ms-wake-film pointer-events-none absolute inset-0 z-0 overflow-hidden bg-ink" aria-hidden>
           <img
-            src={talk?.script === "kane" ? CAST.kane.still : "/art/npcs/t0880-line.jpg"}
+            src={script === "kane" ? CAST.kane.still : "/art/npcs/t0880-line.jpg"}
             alt=""
             className="absolute inset-0 size-full object-cover object-top"
           />

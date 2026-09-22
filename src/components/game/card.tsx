@@ -97,7 +97,11 @@ export function MoonCard({ member, className }: { member: SquadMember; className
     );
     const next = !coarse && !reduce && !tiny && !saveData;
     setLive(next);
-    if (!next) setLabel("Moon Squad plate");
+    if (!next) {
+      rot.current = { x: -4, y: 8 };
+      setLabel("Moon Squad plate");
+      paint();
+    }
   }, []);
 
   useEffect(() => {
@@ -295,7 +299,7 @@ export function MoonCard({ member, className }: { member: SquadMember; className
       <div
         ref={stage}
         tabIndex={0}
-        className="ms-card-stage relative mx-auto flex h-[10.5rem] w-full max-w-md cursor-grab select-none items-center justify-center touch-none outline-none active:cursor-grabbing md:h-[16.5rem]"
+        className="ms-card-stage relative mx-auto flex h-[13.5rem] w-full max-w-md cursor-grab select-none items-center justify-center overflow-hidden touch-none outline-none active:cursor-grabbing md:h-[16.5rem]"
         aria-label="Moon Squad bank card. Drag to rotate, pinch or wheel to zoom, double-tap to flip, space to spin."
         onContextMenu={(e) => e.preventDefault()}
       >

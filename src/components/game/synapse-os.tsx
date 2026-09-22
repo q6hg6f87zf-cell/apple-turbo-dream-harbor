@@ -272,13 +272,13 @@ function PlatePane() {
   const vacant = isVacant(me);
   const tapped = s.clocks?.cardTap ?? 0;
   return (
-    <div className="space-y-4 p-4">
-      <div>
+    <div className="space-y-4 overflow-x-hidden p-4">
+      <div className="relative z-[2]">
         <p className="font-mono text-label uppercase tracking-[0.2em] text-ember">Black card</p>
         <h2 className="mt-0.5 font-display text-2xl text-paper">{vacant ? "Unclaimed plate" : me.name}</h2>
         <p className="text-secondary text-moon">{plateHandle(plate)} · personal ledger, not the vault drawer</p>
       </div>
-      <MoonCard member={me} />
+      <MoonCard member={me} className="relative z-[1]" />
       <div className="grid grid-cols-2 gap-2">
         <div className="rounded-[var(--radius-sm)] bg-ink/55 p-3">
           <p className="font-mono text-label uppercase tracking-[0.16em] text-ember">Plate</p>
@@ -582,23 +582,36 @@ function PeoplePane() {
         ) : null}
       </div>
       {known.map((person) => {
+        const banner = person.banner ?? person.still;
         return (
           <article key={person.id} data-cast={person.id} className="overflow-hidden rounded-[var(--radius-sm)] bg-ink/55">
-            <img src={person.still} alt="" className="h-40 w-full object-cover object-top" />
-            <div className="flex gap-3">
-              <img src={person.portrait} alt="" className="h-28 w-20 shrink-0 object-cover object-top" />
-              <div className="min-w-0 flex-1 py-3 pr-3">
-                <p className="font-mono text-label uppercase tracking-[0.16em] text-ember">{person.title}</p>
-                <h3 className="mt-0.5 font-display text-lg text-paper">{person.name}</h3>
-                <p className="text-label text-muted">
-                  {person.callsign}
-                  {person.visor ? ` · ${person.visor} visor` : ""}
-                  {" · on file"}
-                </p>
-                <p className="mt-2 text-secondary italic leading-relaxed text-moon">{person.tagline}</p>
+            <div className="relative">
+              <img
+                src={banner}
+                alt=""
+                className="h-52 w-full object-cover object-[center_22%] sm:h-64"
+              />
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink via-ink/85 to-transparent px-3 pb-3 pt-16">
+                <div className="flex items-end gap-3">
+                  <img
+                    src={person.portrait}
+                    alt=""
+                    className="h-20 w-14 shrink-0 rounded-[var(--radius-xs)] object-cover object-top shadow-[var(--shadow-border)]"
+                  />
+                  <div className="min-w-0 flex-1 pb-0.5">
+                    <p className="font-mono text-label uppercase tracking-[0.16em] text-ember">{person.title}</p>
+                    <h3 className="mt-0.5 font-display text-lg text-paper">{person.name}</h3>
+                    <p className="text-label text-muted">
+                      {person.callsign}
+                      {person.visor ? ` · ${person.visor} visor` : ""}
+                      {" · on file"}
+                    </p>
+                    <p className="mt-1 text-secondary italic leading-relaxed text-moon">{person.tagline}</p>
+                  </div>
+                </div>
               </div>
             </div>
-            <p className="px-3 pb-3 text-secondary leading-relaxed text-muted">{person.dossier}</p>
+            <p className="px-3 pb-3 pt-3 text-secondary leading-relaxed text-muted">{person.dossier}</p>
             {person.voice[0] ? (
               <p className="px-3 pb-3 text-secondary italic leading-relaxed text-ember">“{person.voice[0]}”</p>
             ) : null}

@@ -478,7 +478,7 @@
 
 .ms-card-stage {
   perspective: 1100px;
-  overflow: visible;
+  overflow: hidden;
   user-select: none;
   -webkit-user-select: none;
 }
@@ -1697,6 +1697,23 @@ body[data-orbit="1"] [data-dock],
     linear-gradient(to bottom, color-mix(in oklab, var(--color-ink) 42%, transparent), transparent 22%);
   pointer-events: none;
 }
+.ms-opening-crossfade {
+  animation: ms-opening-fade 0.78s var(--ease-smooth-out) both;
+}
+@keyframes ms-opening-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ms-opening-crossfade {
+    animation: none;
+    opacity: 1;
+  }
+}
 
 @keyframes ms-title-drift {
   from {
@@ -1934,6 +1951,7 @@ body[data-region-map="1"] .ms-help,
 /* S.Y.N.A.P.S.E OS — rider plate. Ember phosphor, bronze bezel. */
 .ms-os {
   padding-top: 0.25rem;
+  overflow-x: hidden;
 }
 .ms-os-bezel {
   position: relative;

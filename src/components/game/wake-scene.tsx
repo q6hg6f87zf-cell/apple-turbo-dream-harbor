@@ -1,4 +1,4 @@
-import { WAKE_REEL } from "@/game/opening-reel";
+import { stillSrcAt, WAKE_REEL, type StillCue } from "@/game/opening-reel";
 import { cn } from "@/lib/cn";
 import { useEffect, useRef, useState } from "react";
 
@@ -6,12 +6,14 @@ export function WakeScene({
   className,
   sound = false,
   loop = false,
+  clip = WAKE_REEL,
   onTime,
   onEnded,
 }: {
   className?: string;
   sound?: boolean;
   loop?: boolean;
+  clip?: { src: string; poster: string; duration?: number };
   onTime?: (seconds: number) => void;
   onEnded?: () => void;
 }) {
@@ -55,7 +57,7 @@ export function WakeScene({
       document.removeEventListener("pointerdown", kick);
       document.removeEventListener("touchstart", kick);
     };
-  }, [reduced, sound, loop, armed]);
+  }, [reduced, sound, loop, armed, clip.src]);
 
   const still = failed || reduced;
 
@@ -66,7 +68,7 @@ export function WakeScene({
       aria-hidden
     >
       <img
-        src={WAKE_REEL.poster}
+        src={clip.poster}
         alt=""
         decoding="async"
         fetchPriority="high"
@@ -74,9 +76,10 @@ export function WakeScene({
       />
       {!still && armed ? (
         <video
+          key={clip.src}
           ref={videoRef}
-          src={WAKE_REEL.src}
-          poster={WAKE_REEL.poster}
+          src={clip.src}
+          poster={clip.poster}
           autoPlay
           muted={!sound}
           loop={loop}
@@ -98,6 +101,50 @@ export function WakeScene({
           }}
           onEnded={() => onEnded?.()}
         />
+      ) : null}
+      <div className="ms-wake-veil absolute inset-0" />
+    </div>
+  );
+}
+
+export function OpeningStills({
+  stills,
+  time,
+  className,
+}: {
+  stills: readonly StillCue[];
+  time: number;
+  className?: string;
+}) {
+  const src = stillSrcAt(stills, time);
+  const [shown, setShown] = useState(src);
+  const [next, setNext] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (src === shown) return;
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduced) {
+      setShown(src);
+      setNext(null);
+      return;
+    }
+    setNext(src);
+    const t = window.setTimeout(() => {
+      setShown(src);
+      setNext(null);
+    }, 780);
+    return () => window.clearTimeout(t);
+  }, [src, shown]);
+
+  return (
+    <div
+      className={cn("ms-wake-film pointer-events-none absolute inset-0 z-0 overflow-hidden bg-ink", className)}
+      data-wake-clip="stills"
+      aria-hidden
+    >
+      <img src={shown} alt="" className="absolute inset-0 size-full object-cover object-top" />
+      {next ? (
+        <img src={next} alt="" className="ms-opening-crossfade absolute inset-0 size-full object-cover object-top" />
       ) : null}
       <div className="ms-wake-veil absolute inset-0" />
     </div>

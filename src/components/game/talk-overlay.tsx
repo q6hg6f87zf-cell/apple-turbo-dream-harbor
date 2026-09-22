@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { sfx } from "@/game/audio";
-import { wakeLineAt } from "@/game/opening-reel";
+import { kaneLineAt, replyLineAt, wakeLineAt } from "@/game/opening-reel";
 import { getRadioSnapshot, subscribeRadio } from "@/game/radio";
 import { TALK, MANUAL, MANUAL_PROMPTS, isPregameTalk, isTalkLocked, renderTalk, scriptForScreen } from "@/game/talk";
 import { speakerArt } from "@/game/cast";
@@ -23,12 +23,12 @@ export function TalkOverlay() {
   const full = line ? renderTalk(line.text, state) : "";
   const locked = isTalkLocked(state);
   const pregame = isPregameTalk(state);
-  const liveWake = talk?.script === "wake";
+  const liveTape = talk?.script === "wake" || talk?.script === "kane" || talk?.script === "tyrone-reply";
   const total = talk ? (TALK[talk.script]?.length ?? 1) : 1;
   shownRef.current = shown;
 
   const revealOrAdvance = () => {
-    if (liveWake) {
+    if (liveTape) {
       const snap = getRadioSnapshot();
       if (snap.mode === "intro" && snap.playing) return;
       sfx.click();
@@ -46,15 +46,30 @@ export function TalkOverlay() {
   };
 
   useEffect(() => {
-    if (!liveWake) return;
+    if (!liveTape) return;
     const push = () => {
       const snap = getRadioSnapshot();
       if (snap.mode !== "intro") return;
-      syncWakeLine(wakeLineAt(snap.currentTime));
+      const script = useGame.getState().s.talk?.script;
+      if (snap.introChapter === "kane" && script === "wake") {
+        skip();
+        return;
+      }
+      if (snap.introChapter === "reply" && script === "kane") {
+        skip();
+        return;
+      }
+      if (snap.introChapter === "done" && script === "tyrone-reply") {
+        skip();
+        return;
+      }
+      if (script === "wake") syncWakeLine(wakeLineAt(snap.currentTime));
+      else if (script === "kane") syncWakeLine(kaneLineAt(snap.currentTime));
+      else if (script === "tyrone-reply") syncWakeLine(replyLineAt(snap.currentTime));
     };
     push();
     return subscribeRadio(push);
-  }, [liveWake, syncWakeLine]);
+  }, [liveTape, syncWakeLine, skip]);
 
   useEffect(() => {
     if (!full) {
@@ -62,7 +77,7 @@ export function TalkOverlay() {
       return;
     }
     skipType.current = false;
-    if (liveWake) {
+    if (liveTape) {
       setShown(full);
       shownRef.current = full;
       return;
@@ -88,7 +103,7 @@ export function TalkOverlay() {
       if (i >= full.length) window.clearInterval(id);
     }, 16);
     return () => window.clearInterval(id);
-  }, [full, talk?.script, talk?.i, liveWake]);
+  }, [full, talk?.script, talk?.i, liveTape]);
 
   useEffect(() => {
     if (!talk) return;
@@ -98,12 +113,12 @@ export function TalkOverlay() {
       if (t?.closest("input, textarea, select")) return;
       if (e.key === "Escape") {
         e.preventDefault();
-        if (liveWake) {
+        if (liveTape) {
           skip();
           return;
         }
         if (shown.length < full.length) setShown(full);
-        else if (!locked || talk?.script === "kane" || talk?.script === "wing") skip();
+        else if (!locked || talk?.script === "kane" || talk?.script === "tyrone-reply" || talk?.script === "wing") skip();
         return;
       }
       if (e.key === " " || e.key === "Enter") {
@@ -113,7 +128,7 @@ export function TalkOverlay() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [talk, shown, full, advance, skip, locked, liveWake]);
+  }, [talk, shown, full, advance, skip, locked, liveTape]);
 
   if (!talk || !line) return null;
   const last = talk.i >= total - 1;
@@ -123,7 +138,7 @@ export function TalkOverlay() {
     art.portrait ||
     (talk.script === "wake" ? "/art/tyrone-wake.jpg" : "/art/tyrone.jpg");
   const still = line.still || art.still;
-  const cinematic = talk.script === "kane" || talk.script === "wing";
+  const cinematic = talk.script === "wing";
 
   return (
     <>
@@ -148,7 +163,7 @@ export function TalkOverlay() {
             talk.script === "wake" && "ms-wake-card",
           )}
           onClick={revealOrAdvance}
-          data-wake-auto={liveWake ? "1" : undefined}
+          data-wake-auto={liveTape ? "1" : undefined}
         >
           <img
             src={portrait}
@@ -179,7 +194,7 @@ export function TalkOverlay() {
               ))}
             </div>
             <p className="mt-2 font-display text-[10px] uppercase tracking-[0.18em] text-muted">
-              {liveWake
+              {liveTape
                 ? last
                   ? "The reel finishes on its own · tap if it stalls"
                   : "Listening · tap if the reel stalls"
@@ -187,7 +202,9 @@ export function TalkOverlay() {
                   ? talk.script === "welcome"
                     ? "Tap to open Vault 13 · File holds her"
                     : talk.script === "kane"
-                      ? "Tap to keep her face · File is waiting"
+                      ? "Listening · Kane on the tape"
+                      : talk.script === "tyrone-reply"
+                        ? "Listening · he is still in the room"
                       : talk.script === "wing"
                         ? "Tap to file the visors"
                         : "Tap to enter the ranch"
@@ -199,7 +216,7 @@ export function TalkOverlay() {
             </p>
           </div>
         </button>
-        {!locked || liveWake ? (
+        {!locked || liveTape ? (
           <div className="mx-auto mt-2 flex w-full max-w-2xl justify-end">
             <Button size="sm" variant="quiet" onClick={() => skip()}>
               Skip

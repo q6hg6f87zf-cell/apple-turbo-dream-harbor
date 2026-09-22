@@ -1,6 +1,23 @@
 import { describe, it } from "node:test";
 import assert from "assert/strict";
-import { GALLERY, SCORE, wakeLineAt, WAKE_CUES, WAKE_REEL } from "./opening-reel";
+import {
+  GALLERY,
+  KANE_CUES,
+  KANE_STILLS,
+  KANE_TAPE,
+  REPLY_CUES,
+  REPLY_STILLS,
+  SCORE,
+  TYRONE_REPLY_REEL,
+  TYRONE_REPLY_TAPE,
+  cueIndexAt,
+  kaneLineAt,
+  replyLineAt,
+  stillSrcAt,
+  wakeLineAt,
+  WAKE_CUES,
+  WAKE_REEL,
+} from "./opening-reel";
 import { RADIO_TAPES, scoreCueForGame } from "./radio";
 
 describe("opening reel cues", () => {
@@ -34,6 +51,41 @@ describe("opening reel cues", () => {
   });
 });
 
+describe("Kane recording and Tyrone reply", () => {
+  it("covers the 3:22 Kane tape with a cue per spoken line", async () => {
+    const { TALK } = await import("./talk");
+    assert.equal(TALK.kane.length, KANE_CUES.length);
+    assert.equal(KANE_CUES[KANE_CUES.length - 1]?.i, TALK.kane.length - 1);
+    assert.equal(kaneLineAt(0), 0);
+    assert.equal(kaneLineAt(6.2), 1);
+    assert.equal(kaneLineAt(KANE_TAPE.duration), TALK.kane.length - 1);
+    assert.ok(KANE_TAPE.duration >= 200);
+    assert.ok(KANE_STILLS.length >= 8);
+    assert.ok(KANE_STILLS.some((s) => s.src.includes("kane.jpg")));
+    assert.ok(KANE_STILLS.some((s) => s.src.includes("wake-vault13")));
+    assert.ok(KANE_STILLS.some((s) => s.src.includes("t0880-line")));
+    assert.ok(KANE_STILLS.some((s) => s.src.includes("aegis-suit")));
+  });
+
+  it("covers Tyrone's reply after Kane", async () => {
+    const { TALK } = await import("./talk");
+    assert.equal(TALK["tyrone-reply"].length, REPLY_CUES.length);
+    assert.equal(replyLineAt(0), 0);
+    assert.equal(replyLineAt(7), 2);
+    assert.ok(TYRONE_REPLY_TAPE.duration >= 11);
+    assert.ok(TYRONE_REPLY_REEL.src.endsWith(".mp4"));
+    assert.equal(REPLY_STILLS.length, 5);
+    assert.match(TALK["tyrone-reply"].map((l) => l.text).join(" "), /historically significant/i);
+  });
+
+  it("crossfades stills on the clock, not the caption index", () => {
+    assert.equal(stillSrcAt(KANE_STILLS, 0), KANE_STILLS[0]?.src);
+    const later = stillSrcAt(KANE_STILLS, 200);
+    assert.equal(later, KANE_STILLS[KANE_STILLS.length - 1]?.src);
+    assert.equal(cueIndexAt(KANE_CUES, 18.2), 2);
+  });
+});
+
 describe("score stays off the radio deck", () => {
   it("is not a catalogued tape", () => {
     assert.equal(
@@ -45,6 +97,8 @@ describe("score stays off the radio deck", () => {
   it("keeps a gallery that can replay the opening", () => {
     assert.ok(GALLERY.some((item) => item.kind === "reel" && item.id === "found-you"));
     assert.ok(GALLERY.some((item) => item.id === "kane"));
+    assert.ok(GALLERY.some((item) => item.id === "kane-recording"));
+    assert.ok(GALLERY.some((item) => item.id === "historically-significant"));
     assert.ok(GALLERY.some((item) => item.id === "aegis-line"));
   });
 

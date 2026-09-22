@@ -80,7 +80,7 @@ import {
   type HandshakeDelta,
 } from "./discord";
 import { sfx } from "./audio";
-import { playFoundYou, armIntro, startPorchRadio } from "./radio";
+import { playFoundYou, armIntro, startPorchRadio, skipIntroTo, getRadioSnapshot } from "./radio";
 import { enterWake } from "./opening";
 import { advanceTalk as stepTalk, queueTalk, skipTalk as skipTalkFn, SCREEN_SCRIPT, scriptForScreen, TALK } from "./talk";
 import { considerTyroneHint, speakTyrone, answerTyroneQuestion } from "./tyrone-voice";
@@ -494,11 +494,27 @@ export const useGame = create<Store>((set, get) => ({
     const s = get().s;
     if (!s.started) return;
     const needsWake = s.tutorial === "briefing" && s.operatives.length === 0 && !s.seenTalk.includes("wake");
+    const needsKane = s.tutorial === "briefing" && s.operatives.length === 0 && s.seenTalk.includes("wake") && !s.seenTalk.includes("kane");
+    const needsReply =
+      s.tutorial === "briefing" &&
+      s.operatives.length === 0 &&
+      s.seenTalk.includes("kane") &&
+      !s.seenTalk.includes("tyrone-reply");
     mutate(set, (st) => {
       if (st.tutorial === "briefing" && st.operatives.length === 0) {
         if (!st.seenTalk.includes("wake")) {
           st.screen = "briefing";
           queueTalk(st, "wake", true);
+          return;
+        }
+        if (!st.seenTalk.includes("kane")) {
+          st.screen = "briefing";
+          queueTalk(st, "kane", true);
+          return;
+        }
+        if (!st.seenTalk.includes("tyrone-reply")) {
+          st.screen = "briefing";
+          queueTalk(st, "tyrone-reply", true);
           return;
         }
         if (!st.seenTalk.includes("welcome") && !st.seenTalk.includes("briefing")) {
@@ -517,6 +533,14 @@ export const useGame = create<Store>((set, get) => ({
       armIntro();
       enterWake();
       void playFoundYou();
+    } else if (needsKane) {
+      armIntro();
+      enterWake();
+      void skipIntroTo("kane");
+    } else if (needsReply) {
+      armIntro();
+      enterWake();
+      void skipIntroTo("reply");
     }
   },
   askTyrone: (script) => {
@@ -1316,34 +1340,41 @@ export const useGame = create<Store>((set, get) => ({
     return msg;
   },
   advanceTalk: () => {
-    let leftWake = false;
+    let leftIntro = false;
     mutate(set, (st) => {
       const was = st.talk?.script;
       const result = stepTalk(st);
-      if (was === "wake" && result === "done") leftWake = true;
+      if (was === "tyrone-reply" && result === "done") leftIntro = true;
       if (st.screen === "hq") ensureShift(st);
     });
-    if (leftWake) void startPorchRadio();
+    if (leftIntro) void startPorchRadio();
   },
   skipTalk: () => {
-    let leftWake = false;
+    let leftIntro = false;
+    let skipTo: "kane" | "reply" | null = null;
     mutate(set, (st) => {
       const was = st.talk?.script;
       skipTalkFn(st);
-      if (was === "wake" && st.talk?.script !== "wake") leftWake = true;
+      if (was === "wake" && st.talk?.script === "kane") skipTo = "kane";
+      if (was === "kane" && st.talk?.script === "tyrone-reply") skipTo = "reply";
+      if (was === "tyrone-reply" && st.talk?.script !== "tyrone-reply") leftIntro = true;
       if (st.screen === "hq") ensureShift(st);
     });
-    if (leftWake) void startPorchRadio();
+    if (skipTo) void skipIntroTo(skipTo);
+    if (leftIntro) void startPorchRadio();
   },
   syncWakeLine: (i) =>
     mutate(set, (st) => {
-      if (st.talk?.script !== "wake") return;
-      const max = Math.max(0, (TALK.wake?.length ?? 1) - 1);
+      const script = st.talk?.script;
+      if (script !== "wake" && script !== "kane" && script !== "tyrone-reply") return;
+      const max = Math.max(0, (TALK[script]?.length ?? 1) - 1);
       const next = Math.max(0, Math.min(max, Math.floor(i)));
-      if (st.talk.i === next) return;
-      st.talk.i = next;
+      if (st.talk!.i === next) return;
+      st.talk!.i = next;
     }),
   finishWakeReel: () => {
+    const radio = getRadioSnapshot();
+    if (radio.mode === "intro" && radio.introChapter !== "found-you") return;
     get().skipTalk();
   },
   registerRider: (name, handle, discordId) => {

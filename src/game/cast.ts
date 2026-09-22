@@ -26,6 +26,7 @@ export interface CastPerson {
   visor?: string;
   portrait: string;
   still: string;
+  banner?: string;
   thumb: string;
   alwaysKnown?: boolean;
   heatUnlock?: number;
@@ -44,6 +45,7 @@ export const CAST: Record<CastId, CastPerson> = {
     faction: "kane",
     portrait: "/art/npcs/portraits/kane.jpg",
     still: "/art/npcs/kane.jpg",
+    banner: "/art/npcs/banners/kane.jpg",
     thumb: "/art/npcs/thumbs/kane-bust.jpg",
     alwaysKnown: true,
     tagline: "She signed the T-0880 shutdown. Then she built the people who replaced us.",
@@ -148,6 +150,7 @@ export const CAST: Record<CastId, CastPerson> = {
     faction: "vault",
     portrait: "/art/tyrone.jpg",
     still: "/art/tyrone-wake.jpg",
+    banner: "/art/npcs/banners/tyrone.jpg",
     thumb: "/art/tyrone.jpg",
     alwaysKnown: true,
     tagline: "The T-0880 that named himself, walked off Kane's scrap list, and left a porch light on.",
@@ -168,6 +171,7 @@ export const CAST: Record<CastId, CastPerson> = {
     faction: "ironclad",
     portrait: "/art/npcs/portraits/travis.jpg",
     still: "/art/npcs/travis.jpg",
+    banner: "/art/npcs/banners/travis.jpg",
     thumb: "/art/npcs/thumbs/travis.jpg",
     alwaysKnown: true,
     tagline: "Grey beard, a guitar on the wall, and the last jig Kane did not melt.",
@@ -188,6 +192,7 @@ export const CAST: Record<CastId, CastPerson> = {
     faction: "ironclad",
     portrait: "/art/npcs/portraits/holt.jpg",
     still: "/art/npcs/holt.jpg",
+    banner: "/art/npcs/banners/holt.jpg",
     thumb: "/art/npcs/thumbs/holt.jpg",
     alwaysKnown: true,
     tagline: "Dawn stock, black card, does not ask a name twice.",
@@ -208,6 +213,7 @@ export const CAST: Record<CastId, CastPerson> = {
     faction: "ironclad",
     portrait: "/art/npcs/portraits/vex.jpg",
     still: "/art/npcs/vex.jpg",
+    banner: "/art/npcs/banners/vex.jpg",
     thumb: "/art/npcs/thumbs/vex.jpg",
     alwaysKnown: true,
     tagline: "Salt, a sermon, and a stall that blesses what the Gate will not.",

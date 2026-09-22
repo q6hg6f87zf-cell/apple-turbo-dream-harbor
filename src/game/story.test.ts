@@ -76,12 +76,15 @@ describe("campaign cast", () => {
     assert.equal(CAST.vera.callsign, "VERA-3");
   });
 
-  it("lands Kane on HQ so PEOPLE is reachable before the Machine Shop", () => {
+  it("lands Kane on the opening tape, then the porch after Tyrone replies", () => {
     const s = defaultState();
     s.talk = { script: "wake", i: 0 };
     skipTalk(s);
-    assert.equal(s.screen, "hq");
+    assert.equal(s.screen, "briefing");
     assert.equal(s.talk?.script, "kane");
+    skipTalk(s);
+    assert.equal(s.screen, "briefing");
+    assert.equal(s.talk?.script, "tyrone-reply");
     skipTalk(s);
     assert.equal(s.screen, "hq");
     assert.equal(s.talk?.script, "welcome");
@@ -146,6 +149,9 @@ describe("campaign cast", () => {
     assert.ok(knownCast(s).some((p) => p.id === "rourke"));
     assert.ok(knownCast(s).some((p) => p.id === "gravenor"));
     assert.equal(CAST.travis.name, "Travis");
+    assert.ok(CAST.holt.banner);
+    assert.ok(CAST.vex.banner);
+    assert.ok(CAST.kane.banner);
     assert.match(CAST.travis.dossier, /Mechanical Shop|T-0880/);
     assert.match(CAST.holt.dossier, /Moon Squad Market/);
     assert.match(CAST.rourke.dossier, /Relay Tower Three/);

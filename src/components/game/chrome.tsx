@@ -308,6 +308,7 @@ export function GuidanceRow() {
   const row = guidanceSignal(s);
   if (!row) return null;
   if (s.mission || s.combat) return null;
+  if (FILE_SCREENS.includes(s.screen) && row.mode !== "urgent") return null;
   const here = s.screen === row.screen || (row.cta === "Rest" && s.screen === "hq");
   return (
     <button

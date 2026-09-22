@@ -11,7 +11,7 @@ import {
   sfxMix,
   toggleMute,
 } from "./audio";
-import { SCORE } from "./opening-reel";
+import { SCORE, KANE_TAPE, TYRONE_REPLY_TAPE, type IntroChapter } from "./opening-reel";
 import type { RegionId, Screen } from "./types";
 
 export type RadioBed =
@@ -162,6 +162,12 @@ const RADIO_SPOTS: RadioSpot[] = [
 const INTRO_SRC = "/audio/tyrone-found-you.mp3";
 const INTRO_DURATION = 94;
 
+const INTRO_CHAPTER: Record<Exclude<IntroChapter, "done">, { src: string; duration: number; headline: string; subline: string }> = {
+  "found-you": { src: INTRO_SRC, duration: INTRO_DURATION, headline: "Tyrone", subline: "East of the highway" },
+  kane: { src: KANE_TAPE.src, duration: KANE_TAPE.duration, headline: "Dr. Vesper Kane", subline: "A recording you were not meant to hear" },
+  reply: { src: TYRONE_REPLY_TAPE.src, duration: TYRONE_REPLY_TAPE.duration, headline: "Tyrone", subline: "Historically significant" },
+};
+
 const FOLLOW_KEY = "hollow-radio-follow-v1";
 
 type Deck = {
@@ -183,6 +189,7 @@ let duration = 0;
 let switching = false;
 let lastTick = 0;
 let mode: RadioMode = "tape";
+let introChapter: IntroChapter = "found-you";
 let pendingTapeId: string | null = null;
 let lastSpotId: string | null = null;
 let spotLabel = "ICR 88 · Market Square";
@@ -208,6 +215,7 @@ let snapshot: RadioSnapshot = {
   headline: RADIO_TAPES[0].title,
   subline: RADIO_TAPES[0].place,
   score: null,
+  introChapter: "found-you",
 };
 
 function applyLoop(on: boolean) {
@@ -218,6 +226,8 @@ function applyLoop(on: boolean) {
 function readSnapshot(): RadioSnapshot {
   const tape = tapeById(currentId) ?? (unlocked && mode === "tape" ? tapeForBed(bed) : RADIO_TAPES[0]);
   if (mode === "intro") {
+    const chapter = introChapter === "done" ? "reply" : introChapter;
+    const meta = INTRO_CHAPTER[chapter];
     return {
       tape: null,
       bed,
@@ -226,14 +236,15 @@ function readSnapshot(): RadioSnapshot {
       unlocked,
       deckOpen,
       currentTime,
-      duration: duration || INTRO_DURATION,
+      duration: duration || meta.duration,
       muted: isMuted(),
       music: musicMix(),
       sfx: sfxMix(),
       mode,
-      headline: "Tyrone",
-      subline: "East of the highway",
+      headline: meta.headline,
+      subline: meta.subline,
       score: null,
+      introChapter,
     };
   }
   if (mode === "score") {
@@ -253,6 +264,7 @@ function readSnapshot(): RadioSnapshot {
       headline: SCORE.title,
       subline: scoreReason === "boss" ? "Boss fight" : "Title",
       score: scoreReason,
+      introChapter,
     };
   }
   if (mode === "spot") {
@@ -272,6 +284,7 @@ function readSnapshot(): RadioSnapshot {
       headline: "Station break",
       subline: spotLabel,
       score: null,
+      introChapter,
     };
   }
   return {
@@ -290,6 +303,7 @@ function readSnapshot(): RadioSnapshot {
     headline: tape?.title ?? "Keep the Radio On",
     subline: tape?.place ?? "Vault 13 porch",
     score: null,
+    introChapter,
   };
 }
 
@@ -309,7 +323,8 @@ function snapshotsEqual(a: RadioSnapshot, b: RadioSnapshot) {
     a.mode === b.mode &&
     a.headline === b.headline &&
     a.subline === b.subline &&
-    a.score === b.score
+    a.score === b.score &&
+    a.introChapter === b.introChapter
   );
 }
 
@@ -367,6 +382,7 @@ export interface RadioSnapshot {
   headline: string;
   subline: string;
   score: "title" | "boss" | null;
+  introChapter: IntroChapter;
 }
 
 export function getRadioSnapshot(): RadioSnapshot {
@@ -537,6 +553,17 @@ async function playSpot(spot: RadioSpot) {
 
 async function onLiveEnded() {
   if (mode === "intro") {
+    if (introChapter === "found-you") {
+      introChapter = "kane";
+      await swapTo(INTRO_CHAPTER.kane.src, INTRO_CHAPTER.kane.duration, true);
+      return;
+    }
+    if (introChapter === "kane") {
+      introChapter = "reply";
+      await swapTo(INTRO_CHAPTER.reply.src, INTRO_CHAPTER.reply.duration, true);
+      return;
+    }
+    introChapter = "done";
     playing = false;
     emit();
     return;
@@ -591,6 +618,7 @@ export function armIntro() {
   applyLoop(false);
   scoreReason = null;
   mode = "intro";
+  introChapter = "found-you";
   unlocked = true;
   pendingTapeId = null;
 }
@@ -600,9 +628,26 @@ export async function playFoundYou() {
   scoreReason = null;
   unlocked = true;
   mode = "intro";
+  introChapter = "found-you";
   pendingTapeId = null;
   currentId = null;
   await swapTo(INTRO_SRC, INTRO_DURATION, true);
+}
+
+export async function skipIntroTo(chapter: IntroChapter) {
+  if (mode !== "intro") return;
+  if (introChapter === chapter) return;
+  introChapter = chapter;
+  if (chapter === "kane") {
+    await swapTo(INTRO_CHAPTER.kane.src, INTRO_CHAPTER.kane.duration, true);
+    return;
+  }
+  if (chapter === "reply") {
+    await swapTo(INTRO_CHAPTER.reply.src, INTRO_CHAPTER.reply.duration, true);
+    return;
+  }
+  playing = false;
+  emit();
 }
 
 export function stopFoundYou() {
@@ -614,6 +659,7 @@ export function stopFoundYou() {
   }
   playing = false;
   mode = "tape";
+  introChapter = "done";
   emit();
 }
 

@@ -1,5 +1,5 @@
 import type { GameState, Screen } from "./types";
-import { CAST, AEGIS_LINE_STILL, T0880_LINE_STILL, meetCast, type CastId } from "./cast";
+import { CAST, AEGIS_LINE_STILL, meetCast, type CastId } from "./cast";
 
 export interface TalkLine {
   who: string;
@@ -57,36 +57,116 @@ export const TALK: Record<string, TalkLine[]> = {
       who: "Dr. Vesper Kane",
       castId: "kane",
       portrait: CAST.kane.portrait,
+      still: "/art/opening/kane-01.jpg",
+      text: "I am Dr. Vesper Kane. You are listening to a recording you were never meant to hear.",
+    },
+    {
+      who: "Dr. Vesper Kane",
+      castId: "kane",
+      portrait: CAST.kane.portrait,
+      still: "/art/opening/kane-02.jpg",
+      text: "Project Vesper requires hull plate, actuator assemblies, and intact control architecture. Ironclad is the first collection point. That is the official explanation.",
+    },
+    {
+      who: "Dr. Vesper Kane",
+      castId: "kane",
+      portrait: CAST.kane.portrait,
       still: CAST.kane.still,
-      text: "You are listening to a recording you were not meant to hear. I am Dr. Vesper Kane. Project Vesper needs hull plate. Ironclad is the first invoice.",
+      text: "The real reason is Tyrone. The T-0880 line was built to deliver tasks, nothing more. A chassis with a clipboard.",
     },
     {
       who: "Dr. Vesper Kane",
       castId: "kane",
       portrait: CAST.kane.portrait,
-      still: T0880_LINE_STILL,
-      text: "The T-0880 line was established to deliver tasks. Chassis with a clipboard. They walked packages. They did not think. They did not argue. They did not name themselves.",
+      still: "/art/npcs/t0880-line.jpg",
+      text: "They did not think. They did not argue. They did not name themselves. Then one did. TyroneBot. The rest of the line hangs in my warehouse.",
     },
     {
       who: "Dr. Vesper Kane",
       castId: "kane",
       portrait: CAST.kane.portrait,
-      still: T0880_LINE_STILL,
-      text: "Then one of them named himself. TyroneBot. He lives in a shelter on the outskirts of Ironclad and answers to a porch light. He is the only T-0880 with a name. That is not a compliment. Prototypes that walk off the scrap list get retired. The rest of the line hangs in my warehouse.",
+      still: "/art/opening/kane-03.jpg",
+      text: "He should have been another numbered machine. Instead he walked away. He learned. He adapted. He began making decisions no one had written for him.",
+    },
+    {
+      who: "Dr. Vesper Kane",
+      castId: "kane",
+      portrait: CAST.kane.portrait,
+      still: "/art/opening/kane-04.jpg",
+      text: "The machine operating near Ironclad today is no longer the T-0880 unit we catalogued. Current designation: T-0888. Tyrone Bot.",
+    },
+    {
+      who: "Dr. Vesper Kane",
+      castId: "kane",
+      portrait: CAST.kane.portrait,
+      still: "/art/opening/wake-vault13.jpg",
+      text: "He lives in Vault 13, on the outskirts of Ironclad. A maintenance shelter he has decided is a home. He answers to a porch light.",
+    },
+    {
+      who: "Dr. Vesper Kane",
+      castId: "kane",
+      portrait: CAST.kane.portrait,
+      still: "/art/opening/kane-05.jpg",
+      text: "He keeps objects that have no operational value: music, old records, conversations, names, memories. That is the problem. Machines preserve data. Tyrone preserves meaning.",
+    },
+    {
+      who: "Dr. Vesper Kane",
+      castId: "kane",
+      portrait: CAST.kane.portrait,
+      still: "/art/opening/kane-06.jpg",
+      text: "The successor program is AEGIS 2753. Human-operated super suits. Purpose-built frames. A person inside the plate, not an old-world delivery chassis that learned to become a person.",
     },
     {
       who: "Dr. Vesper Kane",
       castId: "kane",
       portrait: CAST.kane.portrait,
       still: "/art/npcs/aegis-suit.jpg",
-      text: "The successor program is AEGIS 2753. Human-operated super suits. Halo-grade frames. A person inside the plate, not a delivery chassis pretending to be one. They do the job the T-0880s were never going to finish.",
+      text: "AEGIS was designed to finish the work the T-0880 program never could. And yet every field report names the same machine. Tyrone. Still functioning. Still remembering. Still making promises.",
     },
     {
       who: "Dr. Vesper Kane",
       castId: "kane",
       portrait: CAST.kane.portrait,
-      still: CAST.kane.still,
-      text: "I do not hunt robots. I hunt what walked off the list. Vault 13 is a shelter, not a country. Do not make me prove the difference. Project Vesper does not sleep. Neither do I.",
+      still: "/art/npcs/aegis-line.jpg",
+      text: "Do you understand how impossible that is? He is old-world equipment, the only piece of it still walking. Somewhere inside that chassis are records Project Vesper was supposed to bury.",
+    },
+    {
+      who: "Dr. Vesper Kane",
+      castId: "kane",
+      portrait: CAST.kane.portrait,
+      still: "/art/opening/kane-07.jpg",
+      text: "That makes him valuable. It also makes him dangerous. I do not hunt robots. I hunt what walked off the list. Vault 13 is a shelter, not a country.",
+    },
+    {
+      who: "Dr. Vesper Kane",
+      castId: "kane",
+      portrait: CAST.kane.portrait,
+      still: "/art/opening/kane-06.jpg",
+      text: "If you are hearing this beside him, look at him. Ask yourself why a delivery machine needed a name. Ask him what he remembers before Ironclad. Then watch what happens when he tries to answer.",
+    },
+    {
+      who: "Dr. Vesper Kane",
+      castId: "kane",
+      portrait: CAST.kane.portrait,
+      still: "/art/opening/kane-08.jpg",
+      text: "Project Vesper does not sleep. Neither do I. And Tyrone, if you can hear this, you were supposed to stay retired.",
+    },
+  ],
+  "tyrone-reply": [
+    {
+      who: WHO,
+      still: "/art/opening/tyrone-reply-01.jpg",
+      text: "Well, I'll be damned.",
+    },
+    {
+      who: WHO,
+      still: "/art/opening/tyrone-reply-03.jpg",
+      text: "All this time I figured I was just difficult. Turns out I'm historically significant!",
+    },
+    {
+      who: WHO,
+      still: "/art/opening/tyrone-reply-05.jpg",
+      text: "Come on, wanderer, let's go make poor Dr. Kane earn her blood pressure.",
     },
   ],
   welcome: [
@@ -943,8 +1023,8 @@ export const SCREEN_SCRIPT: Partial<Record<Screen, string>> = {
   arcade: "arcade",
 };
 
-const LOCKED_UNTIL_SEEN = new Set(["wake", "kane", "welcome", "briefing", "resume", "wing"]);
-const PREGAME = new Set(["wake", "kane"]);
+const LOCKED_UNTIL_SEEN = new Set(["wake", "kane", "tyrone-reply", "welcome", "briefing", "resume", "wing"]);
+const PREGAME = new Set(["wake", "kane", "tyrone-reply"]);
 
 export function scriptForScreen(state: GameState): string {
   if (state.hack) return "synapse";
@@ -952,6 +1032,7 @@ export function scriptForScreen(state: GameState): string {
   if (state.mission) return "mission";
   if (state.talk?.script === "wake") return "wake";
   if (state.talk?.script === "kane") return "kane";
+  if (state.talk?.script === "tyrone-reply") return "tyrone-reply";
   if (state.talk?.script === "welcome") return "welcome";
   if (state.talk?.script === "wing") return "wing";
   if (state.screen === "title") return "menu";
@@ -1020,9 +1101,11 @@ export function advanceTalk(state: GameState): "next" | "done" | "idle" {
     state.talk = null;
     if (script === "wake") {
       state.tutorial = "forge";
+      state.screen = "briefing";
       if (!state.seenTalk.includes("kane")) {
-        state.screen = "hq";
         queueTalk(state, "kane", true);
+      } else if (!state.seenTalk.includes("tyrone-reply")) {
+        queueTalk(state, "tyrone-reply", true);
       } else if (!state.seenTalk.includes("welcome") && !state.seenTalk.includes("briefing")) {
         state.screen = "hq";
         queueTalk(state, "welcome", true);
@@ -1033,6 +1116,16 @@ export function advanceTalk(state: GameState): "next" | "done" | "idle" {
         state.screen = "hq";
       }
     } else if (script === "kane") {
+      meetCast(state, "kane");
+      state.screen = "briefing";
+      state.tutorial = "forge";
+      if (!state.seenTalk.includes("tyrone-reply")) {
+        queueTalk(state, "tyrone-reply", true);
+      } else if (!state.seenTalk.includes("welcome") && !state.seenTalk.includes("briefing")) {
+        state.screen = "hq";
+        queueTalk(state, "welcome", true);
+      }
+    } else if (script === "tyrone-reply") {
       meetCast(state, "kane");
       state.screen = "hq";
       state.tutorial = "forge";
@@ -1076,7 +1169,7 @@ export function skipTalk(state: GameState) {
   const t = state.talk;
   if (!t) return;
   // First wake is locked so they hear it — unless they choose Skip.
-  if (isTalkLocked(state) && t.script !== "wake" && t.script !== "kane" && t.script !== "wing") return;
+  if (isTalkLocked(state) && t.script !== "wake" && t.script !== "kane" && t.script !== "tyrone-reply" && t.script !== "wing") return;
   t.i = (TALK[t.script]?.length ?? 1) - 1;
   advanceTalk(state);
 }
