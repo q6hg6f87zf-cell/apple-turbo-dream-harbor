@@ -8,11 +8,13 @@ import {
   upgradeBlockReason,
   quarterUpgradeQuote,
 } from "@/game/campaign-balance";
-import { canonicalRegionId, regionById } from "@/game/data";
+import { canonicalRegionId, locById, regionById } from "@/game/data";
+import { KIND_LABEL } from "@/game/event-theater";
+import { poiById } from "@/game/field-ops";
 import { HOLLOW_CATALOG, type CatalogItem } from "@/game/hollow-catalog";
 import { isVacant } from "@/game/squad";
 import { useGame } from "@/game/store";
-import type { GameState, Item, LocationId, LogEntry, MissionKind, Rarity, RegionId } from "@/game/types";
+import type { GameState, Item, LocationId, LogEntry, MissionKind, MissionState, Rarity, RegionId } from "@/game/types";
 import { useEffect } from "react";
 
 const PAYOUT_TICKS = 43; // 43 × the legacy 1.4s heartbeat ≈ one economy payout/minute.
@@ -49,6 +51,24 @@ function mutateState(fn: (state: GameState) => boolean | void) {
     if (changed === false) return store;
     return { s };
   });
+}
+
+function homecomingLine(mission: MissionState, caps: number, intel: number, extra: string[]) {
+  const place = (mission.poiId && poiById(mission.locationId, mission.poiId)?.name) || locById(mission.locationId).short;
+  const parts = [`${place} ${KIND_LABEL[mission.kind].toLowerCase()} done`];
+  if (caps > 0) parts.push(`+${caps} caps`);
+  if (mission.ore > 0) parts.push(`+${mission.ore} ore`);
+  if (intel > 0) parts.push(`intel +${intel}`);
+  const haul: string[] = [];
+  for (const name of [...mission.loot.map((item) => item.name), ...extra]) {
+    if (!haul.includes(name)) haul.push(name);
+  }
+  if (haul.length) {
+    const shown = haul.slice(0, 2);
+    const rest = haul.length - shown.length;
+    parts.push(`back with ${shown.join(", ")}${rest > 0 ? ` +${rest} more` : ""}`);
+  }
+  return parts.join(" · ");
 }
 
 function pushLog(state: GameState, who: string, what: string) {
@@ -258,7 +278,9 @@ export function CampaignBalanceRuntime() {
               "S.Y.N.A.P.S.E Matrix",
               `Grade ${matrix.grade} · ${matrix.score}/1000 · execution ${matrix.execution} · survival ${matrix.survival} · teamwork ${matrix.teamwork} · preparation ${matrix.preparation} · reward ×${matrix.multiplier.toFixed(2)}${recovered.length ? ` · MATRIX TREASURE: ${recovered.join(", ")}` : ""}.`,
             );
-            state.toast = `${matrix.grade} · ${matrix.score}/1000${recovered.length ? ` · ${recovered.length} treasure` : ""}`;
+            const intel =
+              (next.locations[mission.locationId]?.intel ?? 0) - (prev.locations[mission.locationId]?.intel ?? 0);
+            state.toast = homecomingLine(mission, desiredCaps, intel, recovered);
           });
         }
       }

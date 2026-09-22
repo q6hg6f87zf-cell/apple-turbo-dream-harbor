@@ -56,8 +56,8 @@ import {
 } from "./data";
 import { REGION_LOCATION, campaignOpenRegions } from "./arsenal";
 import { applyArmor, fieldArmor, rangeHitMod, resolveWeapon } from "./weapon-ops";
-import { APPROACHES, locationToRegion, tacticsFor, type FieldDeploy } from "./field-ops";
-import { eventBriefing, beatPrompt, contactFlavor, debriefLines, radioFor, rollLines } from "./event-theater";
+import { APPROACHES, locationToRegion, poiById, tacticsFor, type FieldDeploy } from "./field-ops";
+import { eventBriefing, beatPrompt, contactFlavor, debriefLines, KIND_LABEL, radioFor, rollLines } from "./event-theater";
 import { emptyMarket } from "./market";
 import { emptyShift } from "./shift";
 import { emptyTyrone } from "./tyrone-mind";
@@ -887,7 +887,20 @@ export function completeMission(state: GameState): GameState {
   if (firstWatch && !(state.seenTalk ?? []).includes("wing")) {
     queueTalk(state, "wing");
   }
-  state.toast = `Sortie complete. +${m.coins} caps${cut ? ` · +${cut} on the card` : ""}${m.ore ? ` · +${m.ore} ore` : ""}.`;
+  const place = (m.poiId && poiById(m.locationId, m.poiId)?.name) || L.short;
+  const intel = m.kind === "scout" ? 2 : 1;
+  const haul = m.loot.map((item) => item.name).filter((name, i, all) => all.indexOf(name) === i);
+  const parts = [`${place} ${KIND_LABEL[m.kind].toLowerCase()} done`];
+  if (m.coins > 0) parts.push(`+${m.coins} caps`);
+  if (cut > 0) parts.push(`+${cut} on the card`);
+  if (m.ore > 0) parts.push(`+${m.ore} ore`);
+  parts.push(`intel +${intel}`);
+  if (haul.length) {
+    const shown = haul.slice(0, 2);
+    const rest = haul.length - shown.length;
+    parts.push(`back with ${shown.join(", ")}${rest > 0 ? ` +${rest} more` : ""}`);
+  }
+  state.toast = parts.join(" · ");
   setFlag(state, "first_sortie_done", true);
   if (m.poiId === "ironclad-rail" || (m.locationId === "ironclad" && firstWatch)) {
     setFlag(state, m.kind === "forage" ? "rail_cut_foraged" : "rail_cut_scouted", true);

@@ -438,45 +438,52 @@ export function CombatOverlay() {
   const hullPct = enemy ? Math.max(0, Math.min(100, (enemy.hp / Math.max(1, enemy.maxHp)) * 100)) : 0;
 
   return (
-    <div className="fixed inset-0 z-40 flex flex-col" data-combat="1">
+    <div
+      className="fixed inset-x-0 top-0 z-40 flex h-dvh max-h-dvh w-full flex-col overflow-hidden supports-[height:100svh]:h-svh supports-[height:100svh]:max-h-svh"
+      data-combat="1"
+    >
       <EncounterBackdrop
         locationId={combat.locationId}
         tone="danger"
         art={enemy?.tags?.includes("aegis") ? AEGIS_FIELD_STILL : undefined}
       />
 
-      <div className={cn("relative z-[1] flex min-h-0 flex-1 flex-col", flash && "ms-hit")}>
-        <div className="shrink-0 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
-          <div className="flex items-baseline justify-between gap-3">
-            <span className="font-display text-label uppercase tracking-[0.22em] text-danger">
-              Contact · round {combat.turn}
-            </span>
-            {combat.enemies.length > 1 ? (
-              <span className="text-label tabular-nums text-muted">
-                {standing}/{combat.enemies.length} standing
-              </span>
+      <div className={cn("relative z-[1] flex min-h-0 flex-1 flex-col overflow-hidden", flash && "ms-hit")}>
+        <div className="max-h-[34svh] shrink-0 overflow-y-auto px-4 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))]">
+          <div className="flex items-start gap-3">
+            {enemy?.portrait ? (
+              <img
+                src={enemy.portrait}
+                alt=""
+                className="size-16 shrink-0 rounded-[var(--radius-sm)] object-cover object-top shadow-[var(--shadow-border)]"
+              />
             ) : null}
-          </div>
-
-          <h2 className="mt-1 font-display text-3xl leading-tight text-paper">{enemy?.name}</h2>
-          {v ? (
-            <p className="text-label text-muted">
-              {v.title} · {v.arc}
-            </p>
-          ) : enemy?.castId ? (
-            <p className="text-label text-muted">{CAST[enemy.castId as keyof typeof CAST]?.title}</p>
-          ) : null}
-          {phase ? (
-            <p className="mt-1 font-display text-label uppercase tracking-[0.16em] text-ember">{phase.name}</p>
-          ) : enemy?.flavor ? (
-            <p className="mt-1 text-secondary text-moon">{enemy.flavor}</p>
-          ) : null}
-
-          {enemy?.portrait ? (
-            <div className="relative mt-3 h-40 overflow-hidden rounded-[var(--radius-md)] shadow-[var(--shadow-border)]">
-              <img src={enemy.portrait} alt="" className="size-full object-cover object-top" />
+            <div className="min-w-0 flex-1">
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="font-display text-label uppercase tracking-[0.22em] text-danger">
+                  Contact · round {combat.turn}
+                </span>
+                {combat.enemies.length > 1 ? (
+                  <span className="text-label tabular-nums text-muted">
+                    {standing}/{combat.enemies.length} standing
+                  </span>
+                ) : null}
+              </div>
+              <h2 className="mt-1 font-display text-2xl leading-tight text-paper">{enemy?.name}</h2>
+              {v ? (
+                <p className="truncate text-label text-muted">
+                  {v.title} · {v.arc}
+                </p>
+              ) : enemy?.castId ? (
+                <p className="truncate text-label text-muted">{CAST[enemy.castId as keyof typeof CAST]?.title}</p>
+              ) : null}
+              {phase ? (
+                <p className="mt-1 font-display text-label uppercase tracking-[0.16em] text-ember">{phase.name}</p>
+              ) : enemy?.flavor ? (
+                <p className="mt-1 line-clamp-2 text-secondary text-moon">{enemy.flavor}</p>
+              ) : null}
             </div>
-          ) : null}
+          </div>
 
           <div className="relative mt-3">
             <div className="ms-hull-track">
