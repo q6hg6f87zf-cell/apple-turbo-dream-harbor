@@ -118,15 +118,18 @@ export function MissionOverlay() {
   const face = castById(mission.npcId);
 
   return (
-    <div className="fixed inset-0 z-40 flex flex-col" data-mission="1">
+    <div
+      className="fixed inset-x-0 top-0 z-40 flex h-dvh max-h-dvh w-full flex-col overflow-hidden supports-[height:100svh]:h-svh supports-[height:100svh]:max-h-svh"
+      data-mission="1"
+    >
       <EncounterBackdrop
         locationId={mission.locationId}
         tone={mission.kind === "boss" || mission.kind === "raid" ? "danger" : "neutral"}
         art={face?.still}
       />
 
-      <div className="relative z-[1] flex min-h-0 flex-1 flex-col">
-        <div className="shrink-0 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+      <div className="relative z-[1] flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="max-h-[34svh] shrink-0 overflow-y-auto px-4 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))]">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="font-display text-label uppercase tracking-[0.22em] text-ember">
@@ -134,7 +137,6 @@ export function MissionOverlay() {
                 {mission.beats.length}
               </div>
               <h2 className="mt-1 font-display text-2xl leading-tight">{beat?.title ?? "Debrief"}</h2>
-              <p className="mt-1 text-secondary text-moon">{beat?.prompt ?? mission.briefing}</p>
             </div>
             <div className="flex shrink-0 items-start gap-2">
               {face ? (
@@ -149,10 +151,7 @@ export function MissionOverlay() {
               </div>
             </div>
           </div>
-          {mission.stakes ? <p className="mt-2 text-label text-muted">{mission.stakes}</p> : null}
           <EventChips chips={chips} />
-          <p className="mt-2 text-label text-muted">Kane · {kaneHeatLine(heat)}</p>
-
           <div className="mt-3 flex gap-1.5">
             {mission.beats.map((b, i) => (
               <span
@@ -188,31 +187,32 @@ export function MissionOverlay() {
             </div>
           </div>
         ) : (
-          <>
-            <EventLog lines={mission.narrative} />
+          <div className="ms-scroll min-h-0 flex-1 overflow-y-auto px-4 pb-2">
+            {beat?.prompt ? <p className="text-body leading-relaxed text-moon">{beat.prompt}</p> : null}
+            {mission.stakes ? <p className="mt-2 text-label text-muted">{mission.stakes}</p> : null}
+            <p className="mt-2 text-label text-muted">Kane · {kaneHeatLine(heat)}</p>
+            <EventLog lines={mission.narrative} pin={false} />
             {mission.lastRoll ? (
-              <div className="shrink-0 px-4 pb-2">
-                <div className="flex items-center justify-center gap-3">
-                  <DiceFace value={mission.lastRoll.value} band={mission.lastRoll.band} spinning={spin} size={72} />
-                  <p className="text-secondary text-moon">
-                    {mission.lastRoll.text}. {BAND_COPY[mission.lastRoll.band]}
-                  </p>
-                </div>
+              <div className="flex items-center justify-center gap-3 py-2">
+                <DiceFace value={mission.lastRoll.value} band={mission.lastRoll.band} spinning={spin} size={72} />
+                <p className="text-secondary text-moon">
+                  {mission.lastRoll.text}. {BAND_COPY[mission.lastRoll.band]}
+                </p>
               </div>
             ) : spin ? (
-              <div className="flex shrink-0 justify-center px-4 pb-2">
+              <div className="flex justify-center py-2">
                 <DiceFace spinning size={72} />
               </div>
             ) : null}
             {mission.loot.length ? (
-              <div className="shrink-0 border-t border-line/50 px-4 py-2">
+              <div className="border-t border-line/50 py-2">
                 <SectionLabel>Recovered</SectionLabel>
                 {mission.loot.map((it) => (
                   <ItemLine key={it.id} item={it} />
                 ))}
               </div>
             ) : null}
-          </>
+          </div>
         )}
 
         <div className="shrink-0 px-3 py-2">
@@ -246,6 +246,7 @@ export function MissionOverlay() {
                 variant="ember"
                 sound="none"
                 autoFocus
+                data-mission-next="1"
                 onClick={() => {
                   sfx.click();
                   cont();
