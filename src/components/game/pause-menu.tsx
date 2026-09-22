@@ -120,6 +120,7 @@ export function PauseMenu({ open, onClose, initial = "menu" }: { open: boolean; 
               <button type="button" className="text-label uppercase tracking-[0.12em] text-ember" onClick={() => setPane("menu")}>
                 ← Menu
               </button>
+              <FactionStrip />
               {journal.length === 0 ? (
                 <p className="text-secondary text-muted">Nothing written yet. Walk the Hollow.</p>
               ) : (
@@ -127,6 +128,8 @@ export function PauseMenu({ open, onClose, initial = "menu" }: { open: boolean; 
                   <article key={entry.id} className="border-b border-line/40 pb-3">
                     <p className="font-mono text-[10px] text-muted">
                       D{entry.day} · {entry.act}
+                      {entry.tags.includes("faction") ? " · standing" : ""}
+                      {entry.tags.includes("discovery") ? " · discovery" : ""}
                     </p>
                     <h3 className="font-display text-body text-paper">{entry.title}</h3>
                     <p className="mt-1 text-secondary text-muted">{entry.body}</p>
@@ -146,6 +149,35 @@ export function PauseMenu({ open, onClose, initial = "menu" }: { open: boolean; 
           ) : null}
         </div>
       </div>
+    </div>
+  );
+}
+
+function FactionStrip() {
+  const fac = useGame((g) => g.s.narrative?.factions);
+  if (!fac) return null;
+  const rows: { key: keyof typeof fac; label: string }[] = [
+    { key: "ironclad", label: "Gate" },
+    { key: "kane", label: "Kane" },
+    { key: "aegis", label: "AEGIS" },
+    { key: "vault13", label: "Vault" },
+  ];
+  const tone = (v: number) => {
+    if (v >= 8) return "text-ok";
+    if (v <= -8) return "text-danger";
+    if (v <= -3) return "text-ember";
+    return "text-muted";
+  };
+  return (
+    <div data-faction-strip="1" className="mb-2 grid grid-cols-4 gap-2 border border-line/50 bg-ink/40 px-2 py-2">
+      {rows.map((r) => (
+        <div key={r.key} className="min-w-0 text-center">
+          <p className="font-mono text-[9px] uppercase tracking-[0.12em] text-muted">{r.label}</p>
+          <p className={cn("font-display text-body tabular-nums", tone(fac[r.key]))}>
+            {fac[r.key] > 0 ? `+${fac[r.key]}` : fac[r.key]}
+          </p>
+        </div>
+      ))}
     </div>
   );
 }

@@ -7,7 +7,7 @@ import { cn } from "@/lib/cn";
 import { BookOpen, CircleHelp } from "lucide-react";
 
 /**
- * Minimal world HUD — objective + day + Tyrone whisper.
+ * Minimal world HUD — objective + day + situation chip + Tyrone whisper.
  * Sits above the environment; fades when mission/combat owns the screen.
  */
 export function WorldHUD({ onJournal, onPause }: { onJournal?: () => void; onPause?: () => void }) {
@@ -33,6 +33,21 @@ export function WorldHUD({ onJournal, onPause }: { onJournal?: () => void; onPau
             <span>{hud.watchesLeft}w</span>
             {hud.heat > 0 ? <span className="text-ember">Heat {hud.heat}</span> : null}
           </p>
+          {hud.situation ? (
+            <button
+              type="button"
+              data-world-situation="1"
+              className="mt-2 flex w-full flex-col items-start border-t border-ember/30 pt-2 text-left"
+              onClick={() => {
+                sfx.click();
+                window.dispatchEvent(new CustomEvent("hollow:open-situation"));
+              }}
+            >
+              <span className="font-display text-[10px] uppercase tracking-[0.14em] text-ember">Situation</span>
+              <span className="truncate font-display text-body text-paper">{hud.situation.title}</span>
+              <span className="truncate font-mono text-[10px] text-muted">{hud.situation.place}</span>
+            </button>
+          ) : null}
         </div>
         <div className="flex shrink-0 gap-1">
           <button

@@ -198,8 +198,49 @@ export function bumpFaction(
   delta: number,
 ): number {
   const n = ensureNarrative(state);
-  n.factions[key] = Math.max(-40, Math.min(40, (n.factions[key] ?? 0) + delta));
-  return n.factions[key];
+  const before = n.factions[key] ?? 0;
+  n.factions[key] = Math.max(-40, Math.min(40, before + delta));
+  const after = n.factions[key];
+  whisperFactionShift(state, key, before, after);
+  return after;
+}
+
+const FACTION_LABEL: Record<keyof FactionStanding, string> = {
+  kane: "Kane Industries",
+  aegis: "AEGIS",
+  ironclad: "Ironclad Gate",
+  pack: "The Pack",
+  union: "Union hands",
+  vault13: "Vault 13",
+};
+
+/** Threshold whispers — Oblivion-style reputation note when standing crosses a band. */
+function whisperFactionShift(
+  state: GameState,
+  key: keyof FactionStanding,
+  before: number,
+  after: number,
+) {
+  if (before === after) return;
+  const bands = [
+    { at: 12, title: "Warm welcome", body: (name: string) => `${name} makes room when you walk in. That is not free.` },
+    { at: 6, title: "Known face", body: (name: string) => `${name} is starting to recognize the plate. Useful — and watched.` },
+    { at: -6, title: "Cold ledger", body: (name: string) => `${name} has your name on the wrong page. Caps will not fix that overnight.` },
+    { at: -12, title: "Open hostility", body: (name: string) => `${name} treats you as a problem. Expect closed doors and louder guns.` },
+  ];
+  for (const band of bands) {
+    const crossedUp = before < band.at && after >= band.at;
+    const crossedDown = before > band.at && after <= band.at && band.at < 0;
+    if (!crossedUp && !crossedDown) continue;
+    const name = FACTION_LABEL[key];
+    addJournal(state, {
+      id: `fac-${key}-${band.at}`,
+      act: state.narrative?.act ?? "act_i",
+      title: `${name} · ${band.title}`,
+      body: band.body(name),
+      tags: ["faction", key, "whisper"],
+    });
+  }
 }
 
 export function addJournal(

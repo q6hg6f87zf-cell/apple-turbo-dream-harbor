@@ -4,6 +4,7 @@ import { storyObjective } from "./story-spine";
 import { ensureNarrative } from "./narrative-state";
 import { locationToRegion } from "./field-ops";
 import { regionThemeId } from "./narrative-state";
+import { availableScenarios } from "./scenario";
 
 export const HUB_SCREENS = ["hq", "file", "roster", "squad", "map", "arcade", "inventory", "more"] as const;
 export const TASK_SCREENS = ["market", "forge", "ledger", "vault", "codex"] as const;
@@ -161,9 +162,11 @@ export function worldHudModel(state: GameState): {
   heat: number;
   tyroneLine: string | null;
   watchesLeft: number;
+  situation: { id: string; title: string; place: string } | null;
 } {
   ensureNarrative(state);
   const region = locationToRegion(state.selectedLoc ?? "ironclad");
+  const open = availableScenarios(state)[0];
   return {
     day: state.day,
     objective: storyObjective(state),
@@ -172,5 +175,8 @@ export function worldHudModel(state: GameState): {
     heat: state.kaneHeat ?? 0,
     tyroneLine: state.tyrone?.utterance ?? null,
     watchesLeft: state.shift?.watchesLeft ?? 0,
+    situation: open
+      ? { id: open.id, title: open.title, place: open.locationLabel }
+      : null,
   };
 }

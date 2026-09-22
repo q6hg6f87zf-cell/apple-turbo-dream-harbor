@@ -5,6 +5,7 @@ import { sfx } from "@/game/audio";
 import { locById } from "@/game/data";
 import { locationToRegion } from "@/game/field-ops";
 import { punchClick } from "@/game/juice";
+import { availableScenarios } from "@/game/scenario";
 import { WATCH_LABEL, WATCH_ORDER } from "@/game/shift";
 import { useGame } from "@/game/store";
 import type { DayTask, WatchId } from "@/game/types";
@@ -42,6 +43,40 @@ function WatchRibbon({ current, left }: { current: WatchId; left: number }) {
         );
       })}
     </ol>
+  );
+}
+
+function SituationTicket({
+  title,
+  place,
+  setup,
+}: {
+  title: string;
+  place: string;
+  setup: string;
+}) {
+  return (
+    <button
+      type="button"
+      data-board-situation="1"
+      onClick={() => {
+        sfx.click();
+        window.dispatchEvent(new CustomEvent("hollow:open-situation"));
+      }}
+      className="ms-board-lead ms-board-ticket-hot"
+    >
+      <img src={BOARD_SEAL} alt="" className="ms-board-lead-art object-contain p-6 opacity-80" />
+      <span className="ms-board-lead-shade" />
+      <span className="ms-board-lead-copy">
+        <span className="font-mono text-label uppercase tracking-[0.2em] text-ember">Situation · open</span>
+        <span className="mt-1 block font-display text-xl text-paper">{title}</span>
+        <span className="mt-2 block text-secondary leading-relaxed text-moon">{setup}</span>
+        <span className="mt-2 block font-mono text-label uppercase tracking-[0.14em] text-muted">{place}</span>
+        <span className="mt-3 inline-flex min-h-11 items-center font-display text-label uppercase tracking-[0.18em] text-ember">
+          Face it
+        </span>
+      </span>
+    </button>
   );
 }
 
@@ -155,6 +190,7 @@ export function DayBoard() {
   const closed = board.filter((task) => task.status === "done" || task.status === "failed");
   const dark = unansweredWatches(board, left);
   const take = (id: string) => err(openTask(id));
+  const situation = availableScenarios(s)[0] ?? null;
 
   return (
     <section className="ms-day-board mt-4 overflow-hidden rounded-[var(--radius-md)]" data-day-board="1">
@@ -168,7 +204,8 @@ export function DayBoard() {
             </p>
             <p className="mt-1 text-secondary text-moon">
               {live.length} live of {board.length} posted
-              {dark > 0 ? ` · ${boardWatchLabel(dark)} will go unanswered` : " · the day can cover the wall"}
+              {situation ? " · a situation is pinned above the jobs" : ""}
+              {dark > 0 ? ` · ${boardWatchLabel(dark)} will go unanswered` : situation ? "" : " · the day can cover the wall"}
             </p>
           </div>
           {left <= 0 ? (
@@ -180,6 +217,19 @@ export function DayBoard() {
         <div className="mt-3">
           <WatchRibbon current={watch} left={left} />
         </div>
+
+        {situation ? (
+          <div className="mt-4">
+            <p className="mb-2 font-display text-label uppercase tracking-[0.18em] text-danger">
+              The road wrote this — not the clerk
+            </p>
+            <SituationTicket
+              title={situation.title}
+              place={situation.locationLabel}
+              setup={situation.setup.split(".").slice(0, 2).join(".").trim() + "."}
+            />
+          </div>
+        ) : null}
 
         {lead ? (
           <div className="mt-4">

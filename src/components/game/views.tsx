@@ -252,10 +252,11 @@ function CompoundWing() {
         <div className="flex items-center gap-4">
           <div className="ms-moon !size-14 shrink-0" />
           <div className="min-w-0 flex-1">
-            <SectionLabel>SYNAPSE Compound</SectionLabel>
-            <h2 className="font-display text-2xl">The compound</h2>
+            <SectionLabel>Vault 13</SectionLabel>
+            <h2 className="font-display text-2xl">Home compound</h2>
             <p className="mt-1 text-sm text-muted">
-              Earns {income} caps while you wait · roster {living.length}/{rosterCap(s)}. Kane's Ironclad invoice is open.
+              The porch still takes coin while the board waits — about {income} caps a tick. Roster {living.length}/
+              {rosterCap(s)}. Kane's Ironclad invoice is open on the steel wall.
             </p>
           </div>
           <Button
