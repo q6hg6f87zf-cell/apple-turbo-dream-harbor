@@ -5,6 +5,7 @@ import {
   KANE_ARM,
   KANE_CUES,
   KANE_REEL,
+  KANE_SHOTS,
   KANE_STILLS,
   KANE_TAPE,
   REPLY_CUES,
@@ -13,7 +14,9 @@ import {
   TYRONE_REPLY_REEL,
   TYRONE_REPLY_TAPE,
   cueIndexAt,
+  kaneEdgeFade,
   kaneLineAt,
+  kaneShotAt,
   replyLineAt,
   stillSrcAt,
   wakeLineAt,
@@ -65,14 +68,31 @@ describe("Kane recording and Tyrone reply", () => {
     assert.ok(KANE_TAPE.duration >= 203);
     assert.ok(KANE_ARM >= 1.4);
     assert.ok(KANE_STILLS.length >= 8);
-    assert.ok(KANE_STILLS.every((s) => s.src.startsWith("/art/opening/kane-")));
+    assert.ok(KANE_STILLS.every((s) => s.src.startsWith("/art/opening/")));
     assert.match(script, /You are listening to a recording you were never meant to hear/);
     assert.match(script, /They walked packages/);
     assert.match(script, /Orion-7/);
     assert.match(script, /you were supposed to stay retired/);
-    assert.ok(KANE_REEL.src.endsWith("/art/opening/kane-intro.mp4"));
-    assert.equal(KANE_REEL.poster, "/art/opening/kane-01.jpg");
-    assert.ok(KANE_REEL.loop);
+    assert.ok(KANE_REEL.src.includes("/art/opening/kane-clips/"));
+    assert.equal(KANE_REEL.loop, false);
+  });
+
+  it("cuts Tyrone footage onto the lines that name him", () => {
+    assert.ok(KANE_SHOTS[0]!.at === 0);
+    assert.ok(KANE_SHOTS.every((shot, i) => i === 0 || shot.at > KANE_SHOTS[i - 1]!.at));
+    assert.equal(kaneShotAt(KANE_CUES[4]!.at).subject, "tyrone");
+    assert.ok(kaneShotAt(KANE_CUES[4]!.at).src.includes("tyrone-line"));
+    assert.equal(kaneShotAt(KANE_CUES[10]!.at).subject, "tyrone");
+    assert.equal(kaneShotAt(KANE_CUES[13]!.at).subject, "tyrone");
+    assert.ok(kaneShotAt(KANE_CUES[13]!.at).src.includes("tyrone-vault"));
+    assert.equal(kaneShotAt(KANE_CUES[16]!.at).subject, "aegis");
+    assert.equal(kaneShotAt(KANE_CUES[19]!.at).subject, "tyrone");
+    assert.equal(kaneShotAt(KANE_CUES[23]!.at).subject, "tyrone");
+    assert.equal(kaneShotAt(KANE_CUES[24]!.at).subject, "tyrone");
+    assert.ok(kaneShotAt(0).src.includes("kane-desk-01"));
+    const mid = (KANE_SHOTS[2]!.at + KANE_SHOTS[3]!.at) / 2;
+    assert.ok(kaneEdgeFade(mid) < 0.15);
+    assert.ok(kaneEdgeFade(KANE_CUES[4]!.at) > 0.9);
   });
 
   it("covers Tyrone's reply after Kane", async () => {

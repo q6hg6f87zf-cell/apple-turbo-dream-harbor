@@ -1,4 +1,4 @@
-import { KANE_REEL, KANE_STILLS, stillSrcAt, WAKE_REEL, type StillCue } from "@/game/opening-reel";
+import { kaneEdgeFade, kaneShotAt, stillSrcAt, WAKE_REEL, type KaneShot, type StillCue } from "@/game/opening-reel";
 import { cn } from "@/lib/cn";
 import { useEffect, useRef, useState } from "react";
 
@@ -114,17 +114,112 @@ export function WakeScene({
   );
 }
 
-/** Kane chapter picture: intro mp4 if present, office stills if it 404s. */
+/** Kane chapter picture: timed office + Tyrone clips, stills if a clip 404s. */
 export function KaneIntro({ time }: { time: number }) {
-  const [reel, setReel] = useState(true);
-  if (!reel) return <OpeningStills stills={KANE_STILLS} time={time} veil="kane" />;
+  const [reduced, setReduced] = useState(false);
+  const [failed, setFailed] = useState<Record<string, true>>({});
+  const shot = kaneShotAt(time);
+  const clipFailed = shot.kind === "clip" && Boolean(failed[shot.src]);
+  const showStill = reduced || shot.kind === "still" || clipFailed;
+  const stillSrc = shot.kind === "still" ? shot.src : shot.poster;
+  const fade = reduced ? 0 : kaneEdgeFade(time);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setReduced(mq.matches);
+    const onChange = () => setReduced(mq.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+
   return (
-    <WakeScene
-      clip={KANE_REEL}
-      sound={false}
-      loop={KANE_REEL.loop}
-      veil="kane"
-      onFail={() => setReel(false)}
+    <div
+      className="ms-wake-film pointer-events-none absolute inset-0 z-0 overflow-hidden bg-ink"
+      data-wake-clip="kane"
+      data-kane-subject={shot.subject}
+      aria-hidden
+    >
+      <img
+        src={stillSrc}
+        alt=""
+        decoding="async"
+        className="absolute inset-0 size-full object-cover object-center"
+      />
+      {!showStill ? (
+        <KaneShotVideo
+          key={`${shot.at}:${shot.src}`}
+          shot={shot}
+          onFail={() => setFailed((map) => ({ ...map, [shot.src]: true }))}
+        />
+      ) : null}
+      <div className="ms-kane-veil absolute inset-0" />
+      <div className="ms-kane-shot-black absolute inset-0" style={{ opacity: fade }} />
+    </div>
+  );
+}
+
+function KaneShotVideo({
+  shot,
+  onFail,
+}: {
+  shot: KaneShot;
+  onFail: () => void;
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [ready, setReady] = useState(false);
+  const [armed, setArmed] = useState(false);
+
+  useEffect(() => {
+    const coarse = window.matchMedia("(pointer: coarse)").matches;
+    const t = window.setTimeout(() => setArmed(true), coarse ? 180 : 40);
+    return () => window.clearTimeout(t);
+  }, []);
+
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el || !armed) return;
+    el.muted = true;
+    el.defaultMuted = true;
+    el.loop = false;
+    el.playsInline = true;
+    el.setAttribute("playsinline", "true");
+    el.setAttribute("webkit-playsinline", "true");
+    const kick = () => {
+      void el.play().catch(() => {});
+    };
+    kick();
+    document.addEventListener("pointerdown", kick);
+    document.addEventListener("touchstart", kick, { passive: true });
+    return () => {
+      document.removeEventListener("pointerdown", kick);
+      document.removeEventListener("touchstart", kick);
+    };
+  }, [armed, shot.src]);
+
+  if (!armed) return null;
+
+  return (
+    <video
+      ref={videoRef}
+      src={shot.src}
+      poster={shot.poster}
+      autoPlay
+      muted
+      playsInline
+      preload="auto"
+      className={cn(
+        "absolute inset-0 size-full object-cover object-center transition-opacity duration-500 md:object-contain",
+        ready ? "opacity-100" : "opacity-0",
+      )}
+      onError={onFail}
+      onPlaying={() => setReady(true)}
+      onCanPlay={() => {
+        setReady(true);
+        void videoRef.current?.play().catch(() => {});
+      }}
+      onEnded={() => {
+        videoRef.current?.pause();
+      }}
     />
   );
 }

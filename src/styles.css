@@ -1709,6 +1709,11 @@ body[data-orbit="1"] [data-dock],
     linear-gradient(to bottom, color-mix(in oklab, var(--color-ink) 4%, transparent), transparent 10%);
   pointer-events: none;
 }
+.ms-kane-shot-black {
+  background: var(--color-ink);
+  pointer-events: none;
+  z-index: 2;
+}
 .ms-opening-crossfade {
   animation: ms-opening-fade 0.92s var(--ease-smooth-out) both;
 }
