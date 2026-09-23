@@ -31,7 +31,14 @@ describe("itemArt catalogue stills", () => {
     assert.equal(itemArt({ kind: "special", name: "Union Foreman's Seal" }), "/art/items/union-seal.jpg");
     assert.equal(itemArt({ kind: "consumable", name: "Civic Reboot Dose" }), "/art/items/reboot-dose.jpg");
     assert.equal(itemArt({ kind: "material", name: "Prismatic Conduit" }), "/art/items/prism-conduit.jpg");
-    assert.equal(itemArt({ kind: "weapon", name: "Vault 13 BB Gun" }), "/art/items/bb-gun.jpg");
+    assert.equal(itemArt({ kind: "weapon", name: "Halo Lance", weaponFamily: "energy" }), "/art/items/halo-lance.jpg");
+    assert.equal(itemArt({ kind: "weapon", name: "Seven's Cestus", weaponFamily: "melee" }), "/art/items/sevens-cestus.jpg");
+    assert.equal(itemArt({ kind: "weapon", name: "Bulkhead Twelve", weaponFamily: "shotgun" }), "/art/items/bulkhead-twelve.jpg");
+    assert.equal(itemArt({ kind: "weapon", name: "Second Knock", weaponFamily: "melee" }), "/art/items/second-knock.jpg");
+    assert.equal(itemArt({ kind: "weapon", name: "Ridge Glass", weaponFamily: "sniper" }), "/art/items/ridge-glass.jpg");
+    assert.equal(itemArt({ kind: "weapon", name: "Mast Knife", weaponFamily: "melee" }), "/art/items/mast-knife.jpg");
+    assert.equal(itemArt({ kind: "weapon", name: "Manifest", weaponFamily: "rifle" }), "/art/items/manifest-rifle.jpg");
+    assert.equal(itemArt({ kind: "weapon", name: "Warrant Spike", weaponFamily: "melee" }), "/art/items/warrant-spike.jpg");
     assert.equal(itemArt({ kind: "consumable", name: "Steel BB Tin", ammoType: "bb" }), "/art/items/bb-tin.jpg");
   });
 });

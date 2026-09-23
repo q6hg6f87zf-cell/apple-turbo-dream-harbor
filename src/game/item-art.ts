@@ -103,6 +103,14 @@ const ART = {
   union: "/art/items/union-seal.jpg",
   dose: "/art/items/reboot-dose.jpg",
   conduit: "/art/items/prism-conduit.jpg",
+  haloLance: "/art/items/halo-lance.jpg",
+  cestus: "/art/items/sevens-cestus.jpg",
+  bulkhead: "/art/items/bulkhead-twelve.jpg",
+  secondKnock: "/art/items/second-knock.jpg",
+  ridgeGlass: "/art/items/ridge-glass.jpg",
+  mastKnife: "/art/items/mast-knife.jpg",
+  manifest: "/art/items/manifest-rifle.jpg",
+  warrant: "/art/items/warrant-spike.jpg",
 };
 
 function ammoStill(ammoType: AmmoType | undefined, name: string): string {
@@ -189,6 +197,14 @@ export function itemArt(input: {
   if (/foreman'?s seal|union foreman/.test(n)) return ART.union;
   if (/civic reboot/.test(n)) return ART.dose;
   if (/prismatic conduit/.test(n)) return ART.conduit;
+  if (n === "halo lance") return ART.haloLance;
+  if (n === "seven's cestus" || n === "sevens cestus") return ART.cestus;
+  if (n === "bulkhead twelve") return ART.bulkhead;
+  if (n === "second knock") return ART.secondKnock;
+  if (n === "ridge glass") return ART.ridgeGlass;
+  if (n === "mast knife") return ART.mastKnife;
+  if (n === "manifest") return ART.manifest;
+  if (n === "warrant spike") return ART.warrant;
   if (/key|token|seal$|white token/.test(n) && /key|token|seal|warden/.test(n)) return ART.key;
   if (/grease/.test(n)) return ART.grease;
   if (/thermite/.test(n)) return ART.thermite;

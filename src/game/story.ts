@@ -627,7 +627,7 @@ function aegisCopy(person: CastPerson, heat: number, day: number) {
       choices: [
         { id: "hide", label: "Hide Tyrone", blurb: "Perimeter Control or a dark bunk. He wants the robot, not you." },
         { id: "lie", label: "We are a salvage outfit", blurb: "Talk. Needs a face at the door." },
-        { id: "fight", label: "Meet him armed", blurb: "Loud. He remembers serials." },
+        { id: "fight", label: "Meet him armed", blurb: "Loud. He is a hand-to-hand specialist. The lance is the other hand." },
       ],
     };
   }
@@ -639,7 +639,7 @@ function aegisCopy(person: CastPerson, heat: number, day: number) {
       choices: [
         { id: "hide", label: "Kill the lights", blurb: "Dark bunk. He wants T-0880, not a foundry." },
         { id: "lie", label: "Talk him off the hinge", blurb: "Needs a Bard or a Merchant. Otherwise he hears a lie." },
-        { id: "fight", label: "Meet him armed", blurb: "Red visor. This becomes a yard conversation." },
+        { id: "fight", label: "Meet him armed", blurb: "Red visor. The twelve-gauge is already up." },
       ],
     };
   }
@@ -651,7 +651,7 @@ function aegisCopy(person: CastPerson, heat: number, day: number) {
       choices: [
         { id: "hide", label: "Misplace the books", blurb: "Perimeter cameras. A dark ledger. She hates a missing number." },
         { id: "lie", label: "Show a clean page", blurb: "Talk. A Merchant makes this true." },
-        { id: "fight", label: "Show her the door", blurb: "Ugly. She comes back with Drake." },
+        { id: "fight", label: "Show her the door", blurb: "Ugly. She has a rifle, and she comes back with Drake." },
       ],
     };
   }
@@ -662,7 +662,7 @@ function aegisCopy(person: CastPerson, heat: number, day: number) {
     choices: [
       { id: "hide", label: "Go dark", blurb: "Kill the porch lamps. Let her paint an empty ridge." },
       { id: "lie", label: "Wave like a foundry", blurb: "Look busy. Look boring. She is listening for Tyrone." },
-      { id: "fight", label: "Walk the ridge armed", blurb: "She will call Drake. Do not start that unless you mean it." },
+      { id: "fight", label: "Walk the ridge armed", blurb: "She already has the long gun. She will still call Drake." },
     ],
   };
 }

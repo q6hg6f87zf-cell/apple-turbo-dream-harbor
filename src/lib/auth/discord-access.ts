@@ -10,6 +10,7 @@ export type DiscordAccess = {
   stamped?: boolean;
   returning?: boolean;
   devBypass: boolean;
+  guest?: boolean;
   provider: string | null;
   stage?: "discord" | "tyrone" | "stamp" | "ready";
   discordId?: string;
@@ -41,6 +42,7 @@ export async function fetchDiscordAccess(): Promise<DiscordAccess> {
     stamped: !!body.stamped,
     returning: !!body.returning,
     devBypass: !!body.devBypass,
+    guest: !!body.guest,
     provider: body.provider ?? null,
     stage: body.stage,
     discordId: body.discordId,
@@ -84,6 +86,7 @@ export function useDiscordAccess() {
             stamped: false,
             returning: false,
             devBypass: false,
+            guest: false,
             provider: null,
             stage: "discord",
             error: "Discord access check failed. Try again.",
@@ -104,6 +107,10 @@ export function useDiscordAccess() {
 
 export async function signInWithDiscord() {
   window.location.assign("/api/discord/start");
+}
+
+export function signInAsGuest() {
+  window.location.assign("/api/guest/start");
 }
 
 export async function signOutDiscord() {

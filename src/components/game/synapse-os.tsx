@@ -11,7 +11,7 @@ import { WATCH_LABEL } from "@/game/shift";
 import { currentArcLoc, isVacant, plateHandle, plateMember, seatedMember } from "@/game/squad";
 import { bandForRoll, STAT_COPY, STAT_ORDER } from "@/game/stats-copy";
 import { useGame } from "@/game/store";
-import { knownCast } from "@/game/cast";
+import { knownCast, type CastPerson, type IssuePiece } from "@/game/cast";
 import { kaneFileBlurb } from "@/game/story";
 import { fittedModules, travisBayBlurb } from "@/game/travis";
 import { currentPorch } from "@/game/porch";
@@ -563,6 +563,91 @@ function DataPane() {
   );
 }
 
+const VISOR_EDGE: Record<string, string> = {
+  violet: "shadow-[inset_0_0_0_1px_rgba(167,139,250,0.85)]",
+  crimson: "shadow-[inset_0_0_0_1px_rgba(214,78,58,0.9)]",
+  white: "shadow-[inset_0_0_0_1px_rgba(255,255,255,0.55)]",
+  amber: "shadow-[inset_0_0_0_1px_rgba(212,160,74,0.9)]",
+};
+
+function IssueKit({ person }: { person: CastPerson }) {
+  const kit = person.issue;
+  const [open, setOpen] = useState<string | null>(null);
+  if (!kit) return null;
+  const shown = kit.find((piece) => piece.name === open) ?? null;
+  const edge = VISOR_EDGE[person.visor ?? ""] ?? "shadow-[inset_0_0_0_1px_rgba(212,160,74,0.45)]";
+  return (
+    <div className="px-3 pb-1 pt-3" data-issue={person.id}>
+      <p className="font-mono text-label uppercase tracking-[0.16em] text-ember">Issue · not for sale</p>
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        {kit.map((piece) => (
+          <IssuePlate
+            key={piece.name}
+            piece={piece}
+            edge={edge}
+            on={shown?.name === piece.name}
+            onOpen={() => {
+              sfx.click();
+              setOpen((cur) => (cur === piece.name ? null : piece.name));
+            }}
+          />
+        ))}
+      </div>
+      {shown ? (
+        <div className="mt-2 overflow-hidden rounded-[var(--radius-xs)] bg-ink/80" data-issue-open={shown.name}>
+          <img src={shown.art} alt="" className="aspect-square w-full object-cover" />
+          <div className="px-3 py-2.5">
+            <p className="font-mono text-label uppercase tracking-[0.14em] text-ember">
+              {shown.plate} · {shown.chamber}
+            </p>
+            <p className="mt-0.5 font-display text-body text-paper">{shown.name}</p>
+            <p className="mt-1 font-mono text-label uppercase tracking-[0.08em] text-moon">
+              {shown.damage} · {shown.traits}
+            </p>
+            <p className="mt-1 text-secondary leading-relaxed text-muted">{shown.lore}</p>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function IssuePlate({
+  piece,
+  edge,
+  on,
+  onOpen,
+}: {
+  piece: IssuePiece;
+  edge: string;
+  on: boolean;
+  onOpen: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-expanded={on}
+      data-issue-piece={piece.name}
+      className={cn(
+        "overflow-hidden rounded-[var(--radius-xs)] bg-ink/70 text-left",
+        edge,
+        on && "ring-1 ring-ember",
+      )}
+    >
+      <img src={piece.art} alt="" className="aspect-[5/4] w-full object-cover object-center" />
+      <span className="block px-2 pb-2 pt-1.5">
+        <span className="block font-mono text-label uppercase tracking-[0.14em] text-ember">{piece.chamber}</span>
+        <span className="mt-0.5 block font-display text-sm leading-tight text-paper">{piece.name}</span>
+        <span className="mt-0.5 block font-mono text-label uppercase tracking-[0.06em] text-moon">
+          {piece.damage} · {piece.traits}
+        </span>
+        <span className="mt-0.5 block text-label leading-snug text-muted">{piece.line}</span>
+      </span>
+    </button>
+  );
+}
+
 function PeoplePane() {
   const s = useGame((g) => g.s);
   const known = knownCast(s);
@@ -611,6 +696,7 @@ function PeoplePane() {
                 </div>
               </div>
             </div>
+            <IssueKit person={person} />
             <p className="px-3 pb-3 pt-3 text-secondary leading-relaxed text-muted">{person.dossier}</p>
             {person.voice[0] ? (
               <p className="px-3 pb-3 text-secondary italic leading-relaxed text-ember">“{person.voice[0]}”</p>

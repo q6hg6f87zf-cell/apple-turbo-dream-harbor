@@ -1921,7 +1921,7 @@ export function CodexView() {
             <div className="p-4">
               <div className="font-display text-[10px] uppercase tracking-[0.2em] text-ember">AEGIS 2753 · first wing</div>
               <p className="mt-2 text-sm text-muted">
-                Human pilots in successor-suits. Kane built them to replace the T-0880 line. Orion, Vera, Drake, Lyra.
+                Human pilots in successor-suits. Kane built them to replace the T-0880 line. Each one carries a gun nobody else is issued, and a melee of their own. Orion, the lance. Vera, the rifle. Drake, the twelve-gauge. Lyra, the long gun.
               </p>
             </div>
           </Panel>
@@ -1936,7 +1936,24 @@ export function CodexView() {
                   <p className="mt-2 text-sm italic text-moon">{person.tagline}</p>
                 </div>
               </div>
-              <p className="px-4 pb-4 text-sm text-muted">{person.dossier}</p>
+              <p className="px-4 pb-3 text-sm text-muted">{person.dossier}</p>
+              {person.issue ? (
+                <div className="grid grid-cols-2 gap-2 px-4 pb-4" data-issue={person.id}>
+                  {person.issue.map((piece) => (
+                    <div key={piece.name} className="overflow-hidden rounded-[var(--radius-xs)] bg-ink/50">
+                      <img src={piece.art} alt="" className="aspect-[5/4] w-full object-cover" />
+                      <div className="px-2 py-1.5">
+                        <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ember">{piece.chamber}</p>
+                        <p className="font-display text-sm text-paper">{piece.name}</p>
+                        <p className="font-mono text-[10px] uppercase tracking-[0.06em] text-moon">
+                          {piece.damage} · {piece.traits}
+                        </p>
+                        <p className="text-xs leading-snug text-muted">{piece.line}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </Panel>
           ))}
         </>

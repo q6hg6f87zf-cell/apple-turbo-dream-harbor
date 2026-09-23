@@ -11,6 +11,8 @@ export type RiderSession = {
   handle: string;
   name: string;
   stamped: boolean;
+  /** Test porch. Not a Discord snowflake owner, even if `did` is numeric. */
+  guest?: boolean;
   iat: number;
 };
 
@@ -158,7 +160,7 @@ export function readCookie(request: Request, name: string) {
 export function serializeCookie(
   name: string,
   value: string,
-  { maxAge, httpOnly = true }: { maxAge: number; httpOnly?: boolean },
+  { maxAge, httpOnly = true, secure = true }: { maxAge: number; httpOnly?: boolean; secure?: boolean },
 ) {
   const parts = [
     `${name}=${encodeURIComponent(value)}`,
@@ -167,7 +169,7 @@ export function serializeCookie(
     `Max-Age=${Math.max(0, Math.floor(maxAge))}`,
   ];
   if (httpOnly) parts.push("HttpOnly");
-  parts.push("Secure");
+  if (secure) parts.push("Secure");
   return parts.join("; ");
 }
 
@@ -189,11 +191,15 @@ export function readRiderSession(request: Request): RiderSession | null {
     handle,
     name: name || handle,
     stamped: !!raw.stamped,
+    guest: !!raw.guest,
     iat: raw.iat,
   };
 }
 
-export function riderCookie(session: Omit<RiderSession, "v" | "iat"> & { iat?: number }) {
+export function riderCookie(
+  session: Omit<RiderSession, "v" | "iat"> & { iat?: number },
+  opts?: { secure?: boolean },
+) {
   const secret = sessionSecret();
   if (!secret) return "";
   const payload: RiderSession = {
@@ -202,9 +208,39 @@ export function riderCookie(session: Omit<RiderSession, "v" | "iat"> & { iat?: n
     handle: session.handle.replace(/^@/, "").trim().slice(0, 32),
     name: session.name.trim().slice(0, 24) || session.handle,
     stamped: !!session.stamped,
+    guest: !!session.guest,
     iat: session.iat ?? Math.floor(Date.now() / 1000),
   };
-  return serializeCookie(RIDER_COOKIE, sealed(payload, secret), { maxAge: RIDER_MAX_AGE });
+  return serializeCookie(RIDER_COOKIE, sealed(payload, secret), {
+    maxAge: RIDER_MAX_AGE,
+    secure: opts?.secure !== false,
+  });
+}
+
+/** Numeric id outside the live Discord range, so a guest file cannot collide with a rider. */
+export function guestSnowflake() {
+  const n = randomBytes(8).readBigUInt64BE() % 10n ** 17n;
+  return `9${n.toString().padStart(17, "0")}`;
+}
+
+export function requestIsSecure(request: Request) {
+  const forwarded = (request.headers.get("x-forwarded-proto") ?? "").split(",")[0].trim().toLowerCase();
+  if (forwarded) return forwarded === "https";
+  return new URL(request.url).protocol === "https:";
+}
+
+export function issueGuestCookie(request: Request) {
+  const did = guestSnowflake();
+  return riderCookie(
+    {
+      did,
+      handle: `guest${did.slice(-4)}`,
+      name: "Guest",
+      stamped: true,
+      guest: true,
+    },
+    { secure: requestIsSecure(request) },
+  );
 }
 
 function sha256B64url(value: string) {

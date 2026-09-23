@@ -6,6 +6,8 @@ import {
   discordRedirectUri,
   homeRedirect,
   isLiveRealmHost,
+  guestSnowflake,
+  issueGuestCookie,
   riderCookie,
   readRiderSession,
   RIDER_COOKIE,
@@ -88,4 +90,23 @@ test("signed rider cookies round-trip and reject tampers", () => {
     headers: { cookie: `${RIDER_COOKIE}=${body}.aaaaaaaa` },
   });
   assert.equal(readRiderSession(bad), null);
+});
+
+test("guest cookies are signed, marked guest, and sit outside Discord ids", () => {
+  process.env.DISCORD_CLIENT_SECRET = "unit-test-secret";
+  const request = new Request("http://127.0.0.1:8080/api/guest/start");
+  const cookie = issueGuestCookie(request);
+  assert.match(cookie, new RegExp(`^${RIDER_COOKIE}=`));
+  assert.doesNotMatch(cookie, /Secure/);
+  const token = decodeURIComponent(cookie.slice(RIDER_COOKIE.length + 1).split(";")[0] ?? "");
+  const session = readRiderSession(
+    new Request("http://127.0.0.1:8080/api/hollow/access", {
+      headers: { cookie: `${RIDER_COOKIE}=${encodeURIComponent(token)}` },
+    }),
+  );
+  assert.equal(session?.guest, true);
+  assert.equal(session?.name, "Guest");
+  assert.match(session?.did ?? "", /^9\d{17}$/);
+  assert.match(session?.handle ?? "", /^guest\d{4}$/);
+  assert.match(guestSnowflake(), /^9\d{17}$/);
 });

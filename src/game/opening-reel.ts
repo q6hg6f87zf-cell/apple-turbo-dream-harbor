@@ -328,7 +328,7 @@ export const GALLERY: GalleryItem[] = [
     kind: "still",
     title: "AEGIS 2753",
     eyebrow: "First wing",
-    blurb: "Orion. Vera. Drake. Lyra. Human pilots in successor-suits.",
+    blurb: "Orion, the lance. Vera, the rifle. Drake, the twelve-gauge. Lyra, the long gun.",
     src: "/art/npcs/aegis-line.jpg",
   },
   {

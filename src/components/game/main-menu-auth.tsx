@@ -4,9 +4,9 @@ import { isPlaceholderName } from "@/game/discord";
 import { seatedMember } from "@/game/squad";
 import { sfx, unlockAudio } from "@/game/audio";
 import { useGame } from "@/game/store";
-import { signInWithDiscord, signOutDiscord, stampDiscordPlate, useDiscordAccess } from "@/lib/auth/discord-access";
+import { signInAsGuest, signInWithDiscord, signOutDiscord, stampDiscordPlate, useDiscordAccess } from "@/lib/auth/discord-access";
 import { LogOut, RefreshCw, ShieldCheck } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { CapMark, SectionLabel } from "./primitives";
 import { HelpChrome, TalkOverlay } from "./talk-overlay";
 import { OpeningBoot, TitleBackdrop, SynapseLoadBar } from "./title-scene";
@@ -39,6 +39,7 @@ export function AuthenticatedMainMenu() {
   const openTerminal = useGame((g) => g.openTerminal);
   const adoptVerifiedDiscord = useGame((g) => g.adoptVerifiedDiscord);
   const stamp = useGame((g) => g.stampProfile);
+  const reviseGuest = useGame((g) => g.reviseGuestPlate);
   const started = useGame((g) => g.s.started);
   const day = useGame((g) => g.s.day);
   const coins = useGame((g) => g.s.coins);
@@ -56,6 +57,9 @@ export function AuthenticatedMainMenu() {
   const { access, pending, refresh } = useDiscordAccess();
   const [authError, setAuthError] = useState<string | null>(null);
   const [signingIn, setSigningIn] = useState(false);
+  const [draftName, setDraftName] = useState("");
+  const [draftHandle, setDraftHandle] = useState("");
+  const guestSeeded = useRef(false);
 
   const allowed = !!access?.allowed;
   const discordHandle = (() => {
@@ -72,11 +76,15 @@ export function AuthenticatedMainMenu() {
 
   useEffect(() => {
     if (!allowed || !access?.discordId) return;
+    if (access.guest) {
+      adoptVerifiedDiscord(access.discordId, "", "");
+      return;
+    }
     adoptVerifiedDiscord(access.discordId, access.name ?? "", access.handle ?? "");
-  }, [access?.discordId, access?.handle, access?.name, allowed, adoptVerifiedDiscord]);
+  }, [access?.discordId, access?.handle, access?.name, access?.guest, allowed, adoptVerifiedDiscord]);
 
   useEffect(() => {
-    if (!allowed) return;
+    if (!allowed || access?.guest) return;
     const name = (access?.name ?? "").trim();
     const handle = (access?.handle ?? "").replace(/^@/, "");
     if (!isPlaceholderName(name)) {
@@ -97,10 +105,10 @@ export function AuthenticatedMainMenu() {
   }, [allowed, access?.soul]);
 
   useEffect(() => {
-    if (!allowed || !named || access?.devBypass || !access?.discordId) return;
+    if (!allowed || !named || access?.devBypass || access?.guest || !access?.discordId) return;
     if (isPlaceholderName(playerName) || isPlaceholderName(playerHandle)) return;
     void stampDiscordPlate(playerName ?? "", playerHandle ?? "");
-  }, [allowed, named, access?.devBypass, access?.discordId, playerName, playerHandle]);
+  }, [allowed, named, access?.devBypass, access?.guest, access?.discordId, playerName, playerHandle]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -112,14 +120,42 @@ export function AuthenticatedMainMenu() {
           ? "Discord sign-in was cancelled."
           : reason === "not-configured"
             ? "Discord login is not seated on this host yet."
-            : "Discord sign-in failed. Try again.",
+            : reason === "guest-unavailable"
+          ? "Guest login is not seated on this host yet."
+          : "Discord sign-in failed. Try again.",
       );
     }
   }, []);
 
+  useEffect(() => {
+    if (!access?.guest || !hydrated || guestSeeded.current) return;
+    guestSeeded.current = true;
+    const name = !isPlaceholderName(playerName) && playerName && playerName !== "Guest" ? playerName : "";
+    const handle = (playerHandle ?? "").replace(/^@/, "");
+    setDraftName(name);
+    setDraftHandle(/^guest\d{4}$/.test(handle) ? "" : handle);
+  }, [access?.guest, hydrated, playerName, playerHandle]);
+
+  useEffect(() => {
+    if (!allowed || !access?.guest) return;
+    const name = draftName.trim();
+    const handle = draftHandle.trim().replace(/^@/, "");
+    if (name.length < 2 || handle.length < 2) return;
+    reviseGuest(name, handle);
+  }, [allowed, access?.guest, draftName, draftHandle, reviseGuest]);
+
   const enterFile = () => {
     if (!allowed) return;
-    if (!named) {
+    if (access?.guest) {
+      const name = draftName.trim();
+      const handle = draftHandle.trim().replace(/^@/, "");
+      if (name.length < 2 || handle.length < 2) {
+        setAuthError("Name and @ go on the card first.");
+        return;
+      }
+      setAuthError(null);
+      reviseGuest(name, handle);
+    } else if (!named) {
       const name = (access?.name ?? "").trim() || (access?.devBypass ? "Rider" : "");
       const handle = (access?.handle ?? "").replace(/^@/, "") || (access?.devBypass ? "sandbox" : "");
       if (!isPlaceholderName(name)) stamp(name, handle);
@@ -129,6 +165,15 @@ export function AuthenticatedMainMenu() {
     sfx.click();
     if (started) resume();
     else assume();
+  };
+
+  const connectGuest = () => {
+    if (signingIn) return;
+    setSigningIn(true);
+    setAuthError(null);
+    unlockAudio();
+    sfx.click();
+    signInAsGuest();
   };
 
   const connectDiscord = async () => {
@@ -160,7 +205,7 @@ export function AuthenticatedMainMenu() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [talking, pending, allowed, named, started, signingIn]);
+  }, [talking, pending, allowed, named, started, signingIn, access?.guest, draftName, draftHandle]);
 
   const loginLabel = !allowed
     ? signingIn
@@ -175,7 +220,7 @@ export function AuthenticatedMainMenu() {
       <TitleBackdrop />
       <div className="title-veil pointer-events-none absolute inset-0 z-[1]" />
       <OpeningBoot gateReady={hydrated && !pending}>
-      <div className="relative z-[2] flex min-h-0 flex-1 flex-col justify-end px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-16 md:px-10 md:pb-10">
+      <div className="relative z-[2] flex min-h-0 flex-1 flex-col justify-end overflow-y-auto px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-16 md:px-10 md:pb-10">
         <div className="mx-auto flex w-full max-w-lg flex-col gap-3 md:max-w-xl">
           {started && allowed ? <RadioChip /> : null}
           <div className="ms-title-dock rounded-[var(--radius-xl)] bg-ink/62 p-3 shadow-[var(--shadow-border)] backdrop-blur-md md:p-5">
@@ -183,9 +228,11 @@ export function AuthenticatedMainMenu() {
             <p className="mt-1 text-xs text-moon">
               {!allowed
                 ? "The porch stays up. Discord cuts the black card. Name and handle lock to that file."
-                : started
-                  ? "Tyrone keeps the porch light on."
-                  : "Your black card is cut from Discord. Wake up and we roll the body. Two rerolls. Then it locks."}
+                : access?.guest
+                  ? "Guest file. Name and @ sit on the black card. Log out when you want Discord."
+                  : started
+                    ? "Tyrone keeps the porch light on."
+                    : "Your black card is cut from Discord. Wake up and we roll the body. Two rerolls. Then it locks."}
             </p>
             {!allowed ? (
               <div>
@@ -209,6 +256,9 @@ export function AuthenticatedMainMenu() {
                     <Button variant="ember" size="lg" className="mt-4 w-full" onClick={refresh}>
                       <RefreshCw className="size-4" /> I verified with Tyrone
                     </Button>
+                    <Button variant="ghost" className="mt-2 w-full" onClick={connectGuest} disabled={signingIn}>
+                      Continue as guest
+                    </Button>
                   </>
                 ) : (
                   <>
@@ -218,10 +268,73 @@ export function AuthenticatedMainMenu() {
                     <Button variant="ember" size="lg" className="mt-4 w-full" onClick={onLogin} disabled={signingIn || pending}>
                       <DiscordMark className="size-4" /> {loginLabel}
                     </Button>
+                    <Button variant="ghost" className="mt-2 w-full" onClick={connectGuest} disabled={signingIn || pending}>
+                      Continue as guest
+                    </Button>
+                    <p className="mt-2 text-xs leading-relaxed text-muted">Test file. You name the card.</p>
                   </>
                 )}
                 {(authError || access?.error) ? <p className="mt-3 text-xs leading-relaxed text-danger">{authError ?? access?.error}</p> : null}
               </div>
+            ) : access?.guest ? (
+              <>
+                <div className="mt-4">
+                  <SectionLabel>Black card</SectionLabel>
+                  <p className="mt-2 text-sm leading-relaxed text-moon">
+                    Type the name and @. The card takes them. Discord riders stay locked.
+                  </p>
+                  <label className="mt-3 block">
+                    <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted">Name</span>
+                    <input
+                      value={draftName}
+                      maxLength={24}
+                      autoComplete="nickname"
+                      placeholder="Name on the card"
+                      onChange={(event) => setDraftName(event.target.value)}
+                      className="mt-1 min-h-12 w-full rounded-[var(--radius-sm)] bg-ink px-3 text-sm text-paper shadow-[var(--shadow-border)] outline-none placeholder:text-muted"
+                    />
+                  </label>
+                  <label className="mt-2 block">
+                    <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted">Handle</span>
+                    <input
+                      value={draftHandle}
+                      maxLength={24}
+                      autoComplete="username"
+                      placeholder="handle"
+                      onChange={(event) => setDraftHandle(event.target.value.replace(/^@/, "").replace(/\s+/g, ""))}
+                      className="mt-1 min-h-12 w-full rounded-[var(--radius-sm)] bg-ink px-3 text-sm text-paper shadow-[var(--shadow-border)] outline-none placeholder:text-muted"
+                    />
+                  </label>
+                  <div className="mt-4">
+                    <MoonCard member={me} />
+                  </div>
+                </div>
+                <div className="mt-5 flex flex-col gap-2">
+                  <Button
+                    variant="ember"
+                    size="lg"
+                    className="w-full"
+                    onPointerDown={() => {
+                      unlockAudio();
+                    }}
+                    onClick={onLogin}
+                    disabled={talking}
+                  >
+                    {loginLabel}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="w-full"
+                    onClick={() => {
+                      unlockAudio();
+                      sfx.click();
+                      void signOutDiscord();
+                    }}
+                  >
+                    <LogOut className="size-4" /> Log out
+                  </Button>
+                </div>
+              </>
             ) : (
               <>
                 {started ? (
@@ -246,7 +359,7 @@ export function AuthenticatedMainMenu() {
                   <div className="mt-4">
                     <SectionLabel>Black card · locked</SectionLabel>
                     <p className="mt-2 text-sm leading-relaxed text-moon">
-                      {chosenName || "Rider"}. Scraped from Discord. The name and @ do not edit. Two rerolls when we cut the body. Then the Machine Shop closes.
+                      {chosenName || "Rider"}. {access?.guest ? "A guest file for testing. The name is not a Discord card." : "Scraped from Discord. The name and @ do not edit."} Two rerolls when we cut the body. Then the Machine Shop closes.
                     </p>
                     {discordHandle ? (
                       <p className="mt-3 font-display text-[10px] uppercase tracking-[0.18em] text-ember">@{discordHandle}</p>
@@ -268,7 +381,7 @@ export function AuthenticatedMainMenu() {
                     onClick={onLogin}
                     disabled={talking}
                   >
-                    {allowed ? <DiscordMark className="size-4" /> : null}
+                    {access?.discord ? <DiscordMark className="size-4" /> : null}
                     {loginLabel}
                   </Button>
                   <Button

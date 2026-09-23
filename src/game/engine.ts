@@ -1649,6 +1649,23 @@ export function stampPlayerProfile(state: GameState, name: string, handle?: stri
   return stampSeatedPlate(state);
 }
 
+/** Guest porch only. Discord stamps stay locked. */
+export function reviseGuestPlate(state: GameState, name: string, handle?: string | null): string | null {
+  const clean = name.trim().replace(/^@/, "").slice(0, 24);
+  const hid = (handle ?? "").trim().replace(/^@/, "").replace(/\s+/g, "").slice(0, 24);
+  if (clean.length < 2 || isPlaceholderName(clean)) return "Stamp a name first, partner.";
+  if (hid.length < 2 || isPlaceholderName(hid)) return "Stamp a handle.";
+  state.playerName = clean;
+  state.playerHandle = hid;
+  state.discordName = hid;
+  const seated = state.squad?.find((member) => member.id === state.activeMemberId) ?? state.squad?.[0];
+  if (seated) {
+    seated.name = clean;
+    seated.discordHandle = `@${hid}`;
+  }
+  return stampSeatedPlate(state);
+}
+
 export function syncWorldUnlocks(state: GameState) {
   const open = campaignOpenRegions(state.day, state.locations);
   for (const region of open) {

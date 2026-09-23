@@ -1,4 +1,4 @@
-import type { GameState } from "./types";
+import type { AmmoType, GameState, WeaponFamily } from "./types";
 
 export type CastId =
   | "kane"
@@ -17,6 +17,23 @@ export type CastId =
   | "sink"
   | "warden";
 
+/** A named piece issued to one pilot. Not stock. Not for sale. */
+export interface IssuePiece {
+  name: string;
+  plate: string;
+  family: WeaponFamily;
+  /** What it is chambered for, in the same voice as "12 gauge". */
+  chamber: string;
+  damage: string;
+  /** Range, armor, and the habit of the weapon. Not a second paragraph. */
+  traits: string;
+  ammoType?: AmmoType;
+  magSize?: number;
+  art: string;
+  line: string;
+  lore: string;
+}
+
 export interface CastPerson {
   id: CastId;
   name: string;
@@ -34,6 +51,8 @@ export interface CastPerson {
   dossier: string;
   intro: string;
   voice: string[];
+  /** Signature gun, then the melee every 2753 carries. Unique to this pilot. */
+  issue?: readonly [IssuePiece, IssuePiece];
 }
 
 export const CAST: Record<CastId, CastPerson> = {
@@ -62,21 +81,47 @@ export const CAST: Record<CastId, CastPerson> = {
     id: "orion",
     name: "Orion",
     callsign: "ORION-7",
-    title: "Prime Executor · command",
+    title: "Prime Executor · elite",
     faction: "aegis",
     visor: "violet",
     portrait: "/art/npcs/portraits/orion.jpg",
     still: "/art/npcs/orion.jpg",
     thumb: "/art/npcs/thumbs/orion-bust.jpg",
     heatUnlock: 16,
-    tagline: "Violet visor. The voice Kane uses when she wants a door opened clean.",
+    tagline: "Violet visor. Elite of the 2753. The lance opens the room. His hands close it.",
     dossier:
-      "Human pilot in an AEGIS 2753 frame. Prime Executor of the first wing. Shoulder stencil ORION-7. Orion speaks for Kane in the field — serial checks, shutdown confirmations, the polite knock that is not polite. He trained frames at Halo Yard before Veyra had a hangar.",
-    intro: "Orion is on the wire. He is asking for T-0880 serials. That is me, partner.",
+      "Human pilot. Elite of the elite AEGIS 2753 — the frame Kane builds when the rest of the wing is not enough. Shoulder stencil ORION-7. He is a hand-to-hand specialist first. The Halo Lance is his gun, and it is not a bullet gun: a violet plasma cell, six to the magazine, 2d8 with AP 2, fired offhand so the other hand stays a fist. Seven's Cestus is 1d10+1 up close, AP 1, and that is the fight he trained at Halo Yard before Veyra had a hangar. Serial checks are how he starts. They are not how he ends. No other pilot is signed for the lance. Kane keeps the spare cell in her own case, and she does not explain the color.",
+    intro: "Orion is on the wire. Violet plasma, and he fights with his hands. He is asking for T-0880 serials. That is me, partner.",
     voice: [
       "Serials. I will wait. I will not wait twice.",
+      "The lance is for the doorway. I am for whoever is standing in it.",
       "Vault 13 is a shelter, not a country. Do not make Kane prove the difference.",
-      "The T-0880 walked. The 2753 does not.",
+    ],
+    issue: [
+      {
+        name: "Halo Lance",
+        plate: "Plasma",
+        family: "energy",
+        chamber: "plasma cell",
+        damage: "2d8",
+        traits: "AP 2 · mid · offhand · mag 6",
+        ammoType: "laser",
+        magSize: 6,
+        art: "/art/items/halo-lance.jpg",
+        line: "Violet plasma cell. Six shots. His alone.",
+        lore: "Halo Yard issue, and only ORION-7 signs for it. Chambered for a violet plasma cell, not a cartridge — six in the weapon, 2d8, AP 2, accurate enough to fire with the off hand. Kane hands these out herself. The lance opens the room. It is not the fight he came for.",
+      },
+      {
+        name: "Seven's Cestus",
+        plate: "Hand",
+        family: "melee",
+        chamber: "melee",
+        damage: "1d10+1",
+        traits: "AP 1 · close · the hand he trained",
+        art: "/art/items/sevens-cestus.jpg",
+        line: "Knuckle edge. He would rather be here.",
+        lore: "Left-hand plate with a finger-wide edge. 1d10+1, AP 1, and it only works at the distance of a conversation. He trained frames at Halo Yard with this on. Every 2753 carries a melee. This is the one the elite one refused to give up, and the lance exists so he can reach it.",
+      },
     ],
   },
   vera: {
@@ -90,56 +135,134 @@ export const CAST: Record<CastId, CastPerson> = {
     still: "/art/npcs/vera.jpg",
     thumb: "/art/npcs/thumbs/vera-bust.jpg",
     heatUnlock: 5,
-    tagline: "Amber visor. Manifests, weigh-ins, the clipboard that becomes a warrant.",
+    tagline: "Amber visor. She invoices the crate, then the magazine.",
     dossier:
-      "Human pilot. Prime Executor for doctrine and salvage law. Shoulder stencil VERA-3. An older ORION-3 stamp is still visible under the paint — she had it covered. Vera does not kick doors. She invoices them. If a crate of rail steel goes missing, she is the one who notices the number is wrong.",
-    intro: "Vera is at the gate with a clipboard. She wants salvage manifests, not a fight. Yet.",
+      "Human pilot. Prime Executor for doctrine and salvage law, and the rifle when the paper is refused. Shoulder stencil VERA-3. An older stamp is still visible under the paint — she had it covered. Her gun is the Manifest, and it is not the 5.56 in Kane's crates. It is chambered 6.8×51, thirty rounds, select-fire, 1d10+1 with AP 1 at mid range, and the counter in the receiver will not let a magazine lie. The Warrant Spike is 1d8, AP 1, for the hinge that will not sign. She logs the rounds the way she logs the plate. A wrong number on either is how Drake gets a door.",
+    intro: "Vera is at the gate. Amber rifle, 6.8 in the mag, manifest in the other hand. She wants the numbers, not a fight. Yet.",
     voice: [
       "Manifests. If the number is wrong I will come back with Drake.",
-      "Project Vesper does not lose plate. People lose plate. Then people lose doors.",
+      "I count crates. I count rounds. Do not make either of them wrong.",
       "You look like a salvage outfit. Prove it on paper.",
+    ],
+    issue: [
+      {
+        name: "Manifest",
+        plate: "Rifle",
+        family: "rifle",
+        chamber: "6.8×51",
+        damage: "1d10+1",
+        traits: "AP 1 · mid · select-fire · mag 30",
+        ammoType: "6.8",
+        magSize: 30,
+        art: "/art/items/manifest-rifle.jpg",
+        line: "Not 5.56. She counts every round.",
+        lore: "VERA-3 issue. Select-fire assault rifle, amber grip and stock, chambered 6.8×51 — heavier than the surplus rifles, thirty in the magazine, 1d10+1 and AP 1 inside a street. A mechanical counter is cut into the receiver where a smith would put a name. Surplus 2753 rifles exist. This chamber does not leave her sling. If the window and the page disagree, someone is about to meet Drake.",
+      },
+      {
+        name: "Warrant Spike",
+        plate: "Spike",
+        family: "melee",
+        chamber: "melee",
+        damage: "1d8",
+        traits: "AP 1 · close · she writes the hole down",
+        art: "/art/items/warrant-spike.jpg",
+        line: "Short. For hinges that will not sign.",
+        lore: "Every 2753 carries steel for when the gun is the wrong distance. Vera's is a short spike, 1d8, AP 1, amber wrap. She does not kick doors. She puts this through the hinge and logs the repair on the same page as the 6.8. Doctrine has a point when the manifest does not.",
+      },
     ],
   },
   drake: {
     id: "drake",
     name: "Drake",
     callsign: "DRAKE-6",
-    title: "AEGIS Executor · enforcement",
+    title: "AEGIS Executor · twelve-gauge",
     faction: "aegis",
     visor: "crimson",
     portrait: "/art/npcs/portraits/drake.jpg",
     still: "/art/npcs/drake.jpg",
     thumb: "/art/npcs/thumbs/drake-bust.jpg",
     heatUnlock: 10,
-    tagline: "Red visor. He remembers serials. He does not knock twice.",
+    tagline: "Red visor. Stern. He remembers serials. The twelve-gauge does not ask twice.",
     dossier:
-      "Human pilot. Enforcement for the first wing. Shoulder stencil DRAKE-6. Drake is the 2753 Kane sends when a conversation has already failed. He walks bulkheads. He asks for T-0880 numbers. He is not here to inventory scrap.",
-    intro: "Drake is at the bulkhead. Red chevron. He is not here for salvage.",
+      "Human pilot. Enforcement for the first wing, and the stern one. Shoulder stencil DRAKE-6. Kane sends him when a conversation has already failed. His gun is the Bulkhead Twelve — 12 gauge, 3-inch magnum buck, five in the box, 2d8 inside a doorway and nothing worth saying past the street. Recoil is part of the argument. Second Knock is the maul, 1d10, flat-faced, and it does not care if the thing in the way is a hinge or a rib. He asks for T-0880 numbers once. The shotgun is the second ask. He loads the same shells every time. He does not own a choke for distance, and he is not here to inventory scrap.",
+    intro: "Drake is at the bulkhead. Red chevron. Stern. Twelve-gauge magnum buck, already off the sling.",
     voice: [
       "Serials. Now.",
       "Hide the robot. I will find the bunk.",
-      "Kane said polite. Polite just ran out.",
+      "One word. Then the twelve. Do not make me count.",
+    ],
+    issue: [
+      {
+        name: "Bulkhead Twelve",
+        plate: "12ga",
+        family: "shotgun",
+        chamber: "12 gauge · 3\" buck",
+        damage: "2d8",
+        traits: "AP 0 · close · doorway · mag 5",
+        ammoType: "12g",
+        magSize: 5,
+        art: "/art/items/bulkhead-twelve.jpg",
+        line: "Magnum buck. Pattern dies in the street.",
+        lore: "DRAKE-6 issue. Short twelve-gauge, box of five, heat shield the color of his visor. The load is 3-inch magnum buck: 2d8 in a bulkhead, AP 0, and the pattern is gone before the curb. He does not carry a second long gun. He carries more of the same shell. Stern men do not improvise their tools, and they do not own a choke for a street.",
+      },
+      {
+        name: "Second Knock",
+        plate: "Maul",
+        family: "melee",
+        chamber: "melee",
+        damage: "1d10",
+        traits: "close · flat face · hinges and ribs",
+        art: "/art/items/second-knock.jpg",
+        line: "The knock after the voice.",
+        lore: "Every 2753 has a melee. Drake's is a short breaching maul, 1d10, no edge to speak of. The first knock is his voice. This is the second, and he does not swing it twice either. Hinges, ribs, the same face of the head. A red cheek inlay and no poetry.",
+      },
     ],
   },
   lyra: {
     id: "lyra",
     name: "Lyra",
     callsign: "LYRA-4",
-    title: "AEGIS Executor · signals",
+    title: "AEGIS Executor · long gun",
     faction: "aegis",
     visor: "white",
     portrait: "/art/npcs/portraits/lyra.jpg",
     still: "/art/npcs/lyra.jpg",
     thumb: "/art/npcs/thumbs/lyra-bust.jpg",
     heatUnlock: 0,
-    tagline: "White visor. She listens first. The others arrive after she is sure.",
+    tagline: "White visor. She listens first. The rifle is already sure.",
     dossier:
-      "Human pilot. Signals and recon for the first wing. Shoulder stencil LYRA-4. Lyra paints ridges. She sits on Relay Tower frequencies Kane is not supposed to share. Calder Rourke has heard her on the night band and pretends he did not. If a white visor is on the West Berm, the rest of the wing already has a map.",
-    intro: "Lyra is on the ridge. White light. She is listening, not knocking. Yet.",
+      "Human pilot. Signals, recon, and the specialized sniper for the first wing. Shoulder stencil LYRA-4. Her rifle is Ridge Glass, and it is not a .308. It is chambered .338 Lapua, match, four in the magazine, 2d10+1 with AP 3 at long range, suppressed so the ridge stays a listening post. She paints a ridge only after the glass can hold that round. The Mast Knife is 1d6 and quiet, for cable and for anyone who climbs to her. Calder Rourke has heard her on the night band and pretends the report was weather. If a white visor is on the West Berm, the rest of the wing already has a map, she already has a firing solution, and the .338 does not sound like weather.",
+    intro: "Lyra is on the ridge. White light. A .338, already sure. She is listening, not knocking. Yet.",
     voice: [
       "I already have your outline. I am being polite.",
-      "Relay Three talks whether you climb it or not. So do I.",
+      "I do not paint a ridge this rifle cannot hold.",
       "Tell the T-0880 I heard him breathing.",
+    ],
+    issue: [
+      {
+        name: "Ridge Glass",
+        plate: "Sniper",
+        family: "sniper",
+        chamber: ".338 Lapua",
+        damage: "2d10+1",
+        traits: "AP 3 · long · match · suppressed · mag 4",
+        ammoType: ".338",
+        magSize: 4,
+        art: "/art/items/ridge-glass.jpg",
+        line: "Match .338. One shot, already chosen.",
+        lore: "LYRA-4 issue. A long gun built for her, not drawn from a crate. Suppressed bolt, pale glass optic, chambered .338 Lapua match — 2d10+1, AP 3, four rounds, and it is wasted inside a room. She sits Relay Tower frequencies Kane is not supposed to share, and she holds the ridge while she listens. The wing arrives after she is sure. The rifle was sure first.",
+      },
+      {
+        name: "Mast Knife",
+        plate: "Knife",
+        family: "melee",
+        chamber: "melee",
+        damage: "1d6",
+        traits: "close · silent · cable or a climber",
+        art: "/art/items/mast-knife.jpg",
+        line: "Same cut. Neither of them hears it.",
+        lore: "Every 2753 carries a melee. Lyra's is a flat black stiletto, 1d6, and it does not announce itself. She cuts mast cable with it. She cuts the person who climbed the mast with it. Same motion. The .338 is for the ridge. This is for the person who got past the ridge. Relay Three knows the sound, which is no sound at all.",
+      },
     ],
   },
   tyrone: {

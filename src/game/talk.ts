@@ -685,12 +685,12 @@ export const TALK: Record<string, TalkLine[]> = {
       who: WHO,
       portrait: CAST.lyra.portrait,
       still: CAST.lyra.still,
-      text: "White light on the West Berm. That is Lyra. LYRA-4. She listens first. The rest of the wing arrives after she is sure.",
+      text: "White light on the West Berm. That is Lyra. LYRA-4. Long gun. She listens first. The rest of the wing arrives after she is sure.",
     },
     {
       who: WHO,
       still: AEGIS_LINE_STILL,
-      text: "Amber is Vera-3 — she invoices. Red is Drake-6 — he knocks. Violet is Orion-7 — he finishes. File tab, PEOPLE, if you forget a face. You will meet them in that order if you make enough noise.",
+      text: "Amber is Vera-3 — she invoices, Manifest on the sling. Red is Drake-6 — stern, a twelve-gauge. Violet is Orion-7 — elite. Plasma lance, then his hands. File tab, PEOPLE, if you want the guns.",
     },
   ],
   companion: [
@@ -1138,9 +1138,9 @@ export const MANUAL: Record<string, FieldCard> = {
     title: "AEGIS 2753",
     blurb: "Kane did not waste the first tape on names. Tyrone names the visors after the first watch home.",
     tips: [
-      "Lyra listens first. White visor. West Berm.",
-      "Vera-3 invoices. Drake-6 knocks. Orion-7 finishes.",
-      "PEOPLE on the File tab holds the faces.",
+      "Lyra listens first. White visor. Ridge Glass on the berm.",
+      "Vera invoices with the Manifest. Drake knocks with a twelve-gauge. Orion finishes with a lance and his hands.",
+      "PEOPLE on the File tab holds the faces and the guns they will not lend.",
     ],
   },
   companion: {

@@ -24,6 +24,7 @@ import { Route as ApiDiscordCallbackRouteImport } from './routes/api/discord/cal
 import { Route as ApiDiscordLogoutRouteImport } from './routes/api/discord/logout'
 import { Route as ApiDiscordPlateRouteImport } from './routes/api/discord/plate'
 import { Route as ApiDiscordStartRouteImport } from './routes/api/discord/start'
+import { Route as ApiGuestStartRouteImport } from './routes/api/guest/start'
 import { Route as ApiHollowAccessRouteImport } from './routes/api/hollow/access'
 import { Route as ApiHollowAcquisitionRouteImport } from './routes/api/hollow/acquisition'
 import { Route as ApiHollowChronicleRouteImport } from './routes/api/hollow/chronicle'
@@ -111,6 +112,11 @@ const ApiDiscordStartRoute = ApiDiscordStartRouteImport.update({
   path: '/api/discord/start',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiGuestStartRoute = ApiGuestStartRouteImport.update({
+  id: '/api/guest/start',
+  path: '/api/guest/start',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiHollowAccessRoute = ApiHollowAccessRouteImport.update({
   id: '/api/hollow/access',
   path: '/api/hollow/access',
@@ -183,6 +189,7 @@ export interface FileRoutesByFullPath {
   '/api/discord/logout': typeof ApiDiscordLogoutRoute
   '/api/discord/plate': typeof ApiDiscordPlateRoute
   '/api/discord/start': typeof ApiDiscordStartRoute
+  '/api/guest/start': typeof ApiGuestStartRoute
   '/api/hollow/access': typeof ApiHollowAccessRoute
   '/api/hollow/acquisition': typeof ApiHollowAcquisitionRoute
   '/api/hollow/chronicle': typeof ApiHollowChronicleRoute
@@ -211,6 +218,7 @@ export interface FileRoutesByTo {
   '/api/discord/logout': typeof ApiDiscordLogoutRoute
   '/api/discord/plate': typeof ApiDiscordPlateRoute
   '/api/discord/start': typeof ApiDiscordStartRoute
+  '/api/guest/start': typeof ApiGuestStartRoute
   '/api/hollow/access': typeof ApiHollowAccessRoute
   '/api/hollow/acquisition': typeof ApiHollowAcquisitionRoute
   '/api/hollow/chronicle': typeof ApiHollowChronicleRoute
@@ -240,6 +248,7 @@ export interface FileRoutesById {
   '/api/discord/logout': typeof ApiDiscordLogoutRoute
   '/api/discord/plate': typeof ApiDiscordPlateRoute
   '/api/discord/start': typeof ApiDiscordStartRoute
+  '/api/guest/start': typeof ApiGuestStartRoute
   '/api/hollow/access': typeof ApiHollowAccessRoute
   '/api/hollow/acquisition': typeof ApiHollowAcquisitionRoute
   '/api/hollow/chronicle': typeof ApiHollowChronicleRoute
@@ -270,6 +279,7 @@ export interface FileRouteTypes {
     | '/api/discord/logout'
     | '/api/discord/plate'
     | '/api/discord/start'
+    | '/api/guest/start'
     | '/api/hollow/access'
     | '/api/hollow/acquisition'
     | '/api/hollow/chronicle'
@@ -298,6 +308,7 @@ export interface FileRouteTypes {
     | '/api/discord/logout'
     | '/api/discord/plate'
     | '/api/discord/start'
+    | '/api/guest/start'
     | '/api/hollow/access'
     | '/api/hollow/acquisition'
     | '/api/hollow/chronicle'
@@ -326,6 +337,7 @@ export interface FileRouteTypes {
     | '/api/discord/logout'
     | '/api/discord/plate'
     | '/api/discord/start'
+    | '/api/guest/start'
     | '/api/hollow/access'
     | '/api/hollow/acquisition'
     | '/api/hollow/chronicle'
@@ -355,6 +367,7 @@ export interface RootRouteChildren {
   ApiDiscordLogoutRoute: typeof ApiDiscordLogoutRoute
   ApiDiscordPlateRoute: typeof ApiDiscordPlateRoute
   ApiDiscordStartRoute: typeof ApiDiscordStartRoute
+  ApiGuestStartRoute: typeof ApiGuestStartRoute
   ApiHollowAccessRoute: typeof ApiHollowAccessRoute
   ApiHollowAcquisitionRoute: typeof ApiHollowAcquisitionRoute
   ApiHollowChronicleRoute: typeof ApiHollowChronicleRoute
@@ -475,6 +488,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiDiscordStartRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/guest/start': {
+      id: '/api/guest/start'
+      path: '/api/guest/start'
+      fullPath: '/api/guest/start'
+      preLoaderRoute: typeof ApiGuestStartRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/hollow/access': {
       id: '/api/hollow/access'
       path: '/api/hollow/access'
@@ -571,6 +591,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiDiscordLogoutRoute: ApiDiscordLogoutRoute,
   ApiDiscordPlateRoute: ApiDiscordPlateRoute,
   ApiDiscordStartRoute: ApiDiscordStartRoute,
+  ApiGuestStartRoute: ApiGuestStartRoute,
   ApiHollowAccessRoute: ApiHollowAccessRoute,
   ApiHollowAcquisitionRoute: ApiHollowAcquisitionRoute,
   ApiHollowChronicleRoute: ApiHollowChronicleRoute,

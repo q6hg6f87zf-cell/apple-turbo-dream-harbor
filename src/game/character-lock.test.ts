@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { characterForged, defaultState, FORGE_REROLLS, seatSoul, stampPlayerProfile } from "./engine.ts";
+import { characterForged, defaultState, FORGE_REROLLS, reviseGuestPlate, seatSoul, stampPlayerProfile } from "./engine.ts";
 import type { Operative } from "./types.ts";
 
 test("character is unforged until the first operative exists", () => {
@@ -22,6 +22,16 @@ test("discord plate name and handle lock after the first stamp", () => {
   assert.equal(stampPlayerProfile(s, "Other Name", "otherhandle"), null);
   assert.equal(s.playerName, "Brent McDonald");
   assert.equal(s.playerHandle, "brontosaurus");
+});
+
+test("guest plate name and handle can be rewritten", () => {
+  const s = defaultState();
+  assert.equal(stampPlayerProfile(s, "Guest", "guest1044"), null);
+  assert.equal(reviseGuestPlate(s, "Brent", "brontosaurus"), null);
+  assert.equal(s.playerName, "Brent");
+  assert.equal(s.playerHandle, "brontosaurus");
+  assert.equal(s.squad[0]?.name, "Brent");
+  assert.equal(s.squad[0]?.discordHandle, "@brontosaurus");
 });
 
 test("OAuth ok tokens do not lock the black card", () => {

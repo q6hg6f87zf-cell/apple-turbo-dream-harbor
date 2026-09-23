@@ -204,7 +204,7 @@ export function GameApp() {
 
   return (
     <div
-      className="relative flex h-dvh overflow-hidden overflow-x-hidden bg-ink text-paper"
+      className="relative flex h-dvh min-h-dvh w-full overflow-hidden overflow-x-hidden bg-ink text-paper"
       data-ready="1"
       data-screen={screen}
       data-chrome={kind}
@@ -260,10 +260,8 @@ export function GameApp() {
             {screen === "arcade" && <ArcadeView />}
           </div>
         </main>
+        {kind === "hub" || kind === "world" || kind === "task" ? <Dock /> : null}
       </div>
-      {kind === "hub" || kind === "world" ? (
-        <Dock />
-      ) : null}
       <RadioDirector />
       <MissionOverlay />
       <CombatOverlay />

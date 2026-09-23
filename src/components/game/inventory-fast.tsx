@@ -318,6 +318,37 @@ export function InventoryFast() {
         item: catalogueItem(x),
       });
     }
+    for (const person of [CAST.orion, CAST.lyra, CAST.drake, CAST.vera]) {
+      for (const piece of person.issue ?? []) {
+        const item: Item = {
+          id: `issue:${piece.name}`,
+          name: piece.name,
+          kind: "weapon",
+          rarity: person.id === "orion" ? "Mythic" : "Legendary",
+          condition: "Pristine",
+          effect: `${piece.damage} · ${piece.chamber} · ${piece.traits}`,
+          lore: piece.lore,
+          value: 0,
+          equipped: false,
+          weaponFamily: piece.family,
+          ammoType: piece.ammoType,
+          magSize: piece.magSize,
+          mag: piece.magSize,
+        };
+        rows.push({
+          key: `issue:${piece.name}`,
+          source: "catalogue",
+          name: piece.name,
+          kind: "weapon",
+          rarity: item.rarity,
+          value: 0,
+          effect: `${piece.damage} · ${piece.chamber} · ${piece.traits}`,
+          lore: piece.lore,
+          owner: `${person.callsign} · not for sale`,
+          item,
+        });
+      }
+    }
     const seen = new Set<string>();
     return rows.filter((row) => {
       const id = `${row.kind}:${row.name.toLowerCase()}`;

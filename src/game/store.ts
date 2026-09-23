@@ -51,6 +51,7 @@ import {
   spawnAegisYard,
   spawnScenarioCombat,
   stampPlayerProfile,
+  reviseGuestPlate,
   finishCombat,
 } from "./engine";
 import { hackDud, hackGuess, openHack, seedPackIfNeeded, usePackItem } from "./inventory";
@@ -146,6 +147,7 @@ interface Store {
   persist: () => void;
   reset: () => void;
   stampProfile: (name: string, handle?: string) => string | null;
+  reviseGuestPlate: (name: string, handle?: string) => string | null;
   linkDiscord: (id: string, name?: string) => void;
   adoptVerifiedDiscord: (id: string, name?: string, handle?: string) => void;
   setScreen: (screen: Screen) => void;
@@ -436,6 +438,14 @@ export const useGame = create<Store>((set, get) => ({
       st.toast = hid
         ? `${plate.name} sits the black card · @${hid}`
         : `${plate.name} sits the black card.`;
+    });
+    if (!msg) get().persist();
+    return msg;
+  },
+  reviseGuestPlate: (name, handle) => {
+    let msg: string | null = null;
+    mutate(set, (st) => {
+      msg = reviseGuestPlate(st, name, handle);
     });
     if (!msg) get().persist();
     return msg;
@@ -1383,7 +1393,7 @@ export const useGame = create<Store>((set, get) => ({
     }),
   finishWakeReel: () => {
     const radio = getRadioSnapshot();
-    if (radio.mode === "intro" && radio.introChapter !== "found-you") return;
+    if (radio.mode === "intro") return;
     get().skipTalk();
   },
   registerRider: (name, handle, discordId) => {
