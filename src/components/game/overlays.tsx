@@ -166,52 +166,60 @@ export function MissionOverlay() {
         </div>
 
         {choosing ? (
-          <div className="ms-scroll min-h-0 flex-1 overflow-y-auto px-4 pb-4">
-            <p className="text-body leading-relaxed text-moon">{beat?.prompt}</p>
-            <div className="mt-4 space-y-2">
-              <p className="font-display text-label uppercase tracking-[0.16em] text-ember">Call it</p>
-              {beat?.tactics?.map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => {
-                    sfx.click();
-                    pickTactic(t.id);
-                  }}
-                  className="flex min-h-14 w-full flex-col items-start justify-center rounded-[var(--radius-md)] bg-ink/75 px-3 py-2 text-left shadow-[var(--shadow-border)] backdrop-blur-sm"
-                >
-                  <span className="font-display text-body text-paper">{t.label}</span>
-                  <span className="mt-0.5 text-secondary text-muted">{t.blurb}</span>
-                </button>
-              ))}
+          <div className="relative min-h-0 flex-1">
+            <div className="ms-scroll absolute inset-x-0 bottom-0 max-h-[72%] overflow-y-auto px-3 pb-3">
+              <div className="rounded-[var(--radius-md)] bg-ink/78 px-3 py-3 shadow-[var(--shadow-border)] backdrop-blur-sm">
+                <p className="text-body leading-relaxed text-moon">{beat?.prompt}</p>
+                <div className="mt-4 space-y-2">
+                  <p className="font-display text-label uppercase tracking-[0.16em] text-ember">Call it</p>
+                  {beat?.tactics?.map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => {
+                        sfx.click();
+                        pickTactic(t.id);
+                      }}
+                      className="flex min-h-14 w-full flex-col items-start justify-center rounded-[var(--radius-md)] bg-ink/75 px-3 py-2 text-left shadow-[var(--shadow-border)] backdrop-blur-sm"
+                    >
+                      <span className="font-display text-body text-paper">{t.label}</span>
+                      <span className="mt-0.5 text-secondary text-muted">{t.blurb}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         ) : (
-          <div className="ms-scroll min-h-0 flex-1 overflow-y-auto px-4 pb-2">
-            {beat?.prompt ? <p className="text-body leading-relaxed text-moon">{beat.prompt}</p> : null}
-            {mission.stakes ? <p className="mt-2 text-label text-muted">{mission.stakes}</p> : null}
-            <p className="mt-2 text-label text-muted">Kane · {kaneHeatLine(heat)}</p>
-            <EventLog lines={mission.narrative} pin={false} />
-            {mission.lastRoll ? (
-              <div className="flex items-center justify-center gap-3 py-2">
-                <DiceFace value={mission.lastRoll.value} band={mission.lastRoll.band} spinning={spin} size={72} />
-                <p className="text-secondary text-moon">
-                  {mission.lastRoll.text}. {BAND_COPY[mission.lastRoll.band]}
-                </p>
+          <div className="relative min-h-0 flex-1">
+            <div className="ms-scroll absolute inset-x-0 bottom-0 max-h-[62%] overflow-y-auto px-3 pb-2">
+              <div className="rounded-[var(--radius-md)] bg-ink/78 px-3 py-2 shadow-[var(--shadow-border)] backdrop-blur-sm">
+                {beat?.prompt ? <p className="text-body leading-relaxed text-moon">{beat.prompt}</p> : null}
+                {mission.stakes ? <p className="mt-2 text-label text-muted">{mission.stakes}</p> : null}
+                <p className="mt-2 text-label text-muted">Kane · {kaneHeatLine(heat)}</p>
+                <EventLog lines={mission.narrative} pin={false} />
+                {mission.lastRoll ? (
+                  <div className="flex items-center justify-center gap-3 py-2">
+                    <DiceFace value={mission.lastRoll.value} band={mission.lastRoll.band} spinning={spin} size={72} />
+                    <p className="text-secondary text-moon">
+                      {mission.lastRoll.text}. {BAND_COPY[mission.lastRoll.band]}
+                    </p>
+                  </div>
+                ) : spin ? (
+                  <div className="flex justify-center py-2">
+                    <DiceFace spinning size={72} />
+                  </div>
+                ) : null}
+                {mission.loot.length ? (
+                  <div className="border-t border-line/50 py-2">
+                    <SectionLabel>Recovered</SectionLabel>
+                    {mission.loot.map((it) => (
+                      <ItemLine key={it.id} item={it} />
+                    ))}
+                  </div>
+                ) : null}
               </div>
-            ) : spin ? (
-              <div className="flex justify-center py-2">
-                <DiceFace spinning size={72} />
-              </div>
-            ) : null}
-            {mission.loot.length ? (
-              <div className="border-t border-line/50 py-2">
-                <SectionLabel>Recovered</SectionLabel>
-                {mission.loot.map((it) => (
-                  <ItemLine key={it.id} item={it} />
-                ))}
-              </div>
-            ) : null}
+            </div>
           </div>
         )}
 
@@ -285,9 +293,9 @@ export function CombatOverlay() {
   const s = useGame((g) => g.s);
   const act = useGame((g) => g.combatAct);
   const extract = useGame((g) => g.extractCombat);
-  const [flash, setFlash] = useState(false);
   const [help, setHelp] = useState<keyof typeof ACT_HELP>("strike");
   const [float, setFloat] = useState({ n: 0, tick: 0 });
+  const [faceFlash, setFaceFlash] = useState(false);
   const [hurtId, setHurtId] = useState<string | null>(null);
   const [lock, setLock] = useState(false);
   const lockRef = useRef(false);
@@ -295,11 +303,11 @@ export function CombatOverlay() {
   const prevParty = useRef<Record<string, number>>({});
 
   useEffect(() => {
-    if (!combat) return;
-    setFlash(true);
-    const t = window.setTimeout(() => setFlash(false), 280);
+    if (float.n <= 0) return;
+    setFaceFlash(true);
+    const t = window.setTimeout(() => setFaceFlash(false), 280);
     return () => window.clearTimeout(t);
-  }, [combat?.log.length, combat]);
+  }, [float.tick, float.n]);
 
   const enemy = combat?.enemies.find((e) => e.hp > 0) ?? combat?.enemies[0];
   useEffect(() => {
@@ -448,71 +456,73 @@ export function CombatOverlay() {
         art={enemy?.tags?.includes("aegis") ? AEGIS_FIELD_STILL : undefined}
       />
 
-      <div className={cn("relative z-[1] flex min-h-0 flex-1 flex-col overflow-hidden", flash && "ms-hit")}>
-        <div className="max-h-[34svh] shrink-0 overflow-y-auto px-4 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))]">
-          <div className="flex items-start gap-3">
+      <div className="relative z-[1] flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="shrink-0 px-4 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))]">
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="font-display text-label uppercase tracking-[0.22em] text-danger">
+              Contact · round {combat.turn}
+            </span>
+            {combat.enemies.length > 1 ? (
+              <span className="text-label tabular-nums text-muted">
+                {standing}/{combat.enemies.length} standing
+              </span>
+            ) : null}
+          </div>
+          <h2 className="mt-1 font-display text-2xl leading-tight text-paper">{enemy?.name}</h2>
+          {v ? (
+            <p className="truncate text-label text-muted">
+              {v.title} · {v.arc}
+            </p>
+          ) : enemy?.castId ? (
+            <p className="truncate text-label text-muted">{CAST[enemy.castId as keyof typeof CAST]?.title}</p>
+          ) : phase ? (
+            <p className="mt-1 font-display text-label uppercase tracking-[0.16em] text-ember">{phase.name}</p>
+          ) : enemy?.flavor ? (
+            <p className="mt-1 line-clamp-1 text-secondary text-moon">{enemy.flavor}</p>
+          ) : null}
+        </div>
+
+        <div className="relative min-h-0 flex-1">
+          <div
+            data-enemy-face="1"
+            className="absolute inset-0 overflow-hidden"
+          >
             {enemy?.portrait ? (
               <img
                 src={enemy.portrait}
                 alt=""
-                className="size-16 shrink-0 rounded-[var(--radius-sm)] object-cover object-top shadow-[var(--shadow-border)]"
+                className={cn("size-full object-cover object-top", faceFlash && "ms-hit")}
               />
             ) : null}
-            <div className="min-w-0 flex-1">
-              <div className="flex items-baseline justify-between gap-3">
-                <span className="font-display text-label uppercase tracking-[0.22em] text-danger">
-                  Contact · round {combat.turn}
-                </span>
-                {combat.enemies.length > 1 ? (
-                  <span className="text-label tabular-nums text-muted">
-                    {standing}/{combat.enemies.length} standing
-                  </span>
-                ) : null}
+            {faceFlash ? <div className="ms-hit-wash pointer-events-none absolute inset-0" /> : null}
+            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink via-ink/80 to-transparent px-3 pb-2 pt-12">
+              <div className="ms-hull-track">
+                <div className="ms-hull-fill" style={{ width: `${hullPct}%` }} />
               </div>
-              <h2 className="mt-1 font-display text-2xl leading-tight text-paper">{enemy?.name}</h2>
-              {v ? (
-                <p className="truncate text-label text-muted">
-                  {v.title} · {v.arc}
+              <div className="mt-1 flex items-center justify-between text-label tabular-nums text-muted">
+                <span>
+                  Hull {enemy?.hp ?? 0}/{enemy?.maxHp ?? 0}
+                </span>
+                <span>
+                  DC {enemy?.dc}
+                  {enemy?.armorClass ? ` · ${enemy.armorClass}` : ""}
+                  {enemy?.preferredRange ? ` · ${enemy.preferredRange}` : ""}
+                </span>
+              </div>
+              {combat.incomingSoft ? (
+                <p className="mt-1 font-display text-label uppercase tracking-[0.16em] text-ember">
+                  Bracing · next hit lands softer
                 </p>
-              ) : enemy?.castId ? (
-                <p className="truncate text-label text-muted">{CAST[enemy.castId as keyof typeof CAST]?.title}</p>
               ) : null}
-              {phase ? (
-                <p className="mt-1 font-display text-label uppercase tracking-[0.16em] text-ember">{phase.name}</p>
-              ) : enemy?.flavor ? (
-                <p className="mt-1 line-clamp-2 text-secondary text-moon">{enemy.flavor}</p>
+              {combat.log.length ? (
+                <p className="mt-1 line-clamp-2 text-secondary text-paper">{combat.log[combat.log.length - 1]}</p>
               ) : null}
-            </div>
-          </div>
-
-          <div className="relative mt-3">
-            <div className="ms-hull-track">
-              <div className="ms-hull-fill" style={{ width: `${hullPct}%` }} />
-            </div>
-            <div className="mt-1 flex items-center justify-between text-label tabular-nums text-muted">
-              <span>
-                Hull {enemy?.hp ?? 0}/{enemy?.maxHp ?? 0}
-              </span>
-              <span>
-                DC {enemy?.dc}
-                {enemy?.armorClass ? ` · ${enemy.armorClass}` : ""}
-                {enemy?.preferredRange ? ` · ${enemy.preferredRange}` : ""}
-              </span>
             </div>
             {float.n ? <FloatNum n={float.n} kind={float.n > 0 ? "dmg" : "heal"} tick={float.tick} /> : null}
           </div>
-
-          {combat.incomingSoft ? (
-            <p className="mt-1 font-display text-label uppercase tracking-[0.16em] text-ember">
-              Bracing · next hit lands softer
-            </p>
-          ) : null}
         </div>
 
-        {/* The room fills the gap; the fight's words sit down against the party. */}
-        <EventLog lines={combat.log} />
-
-        <div className="shrink-0 px-3 py-3">
+        <div className="shrink-0 px-3 py-2">
           <div className="grid grid-cols-3 gap-2">
             {party.map((op) => (
               <div
@@ -543,7 +553,7 @@ export function CombatOverlay() {
         <CommandBar>
           {actor && actor.hp > 0 ? (
             <>
-              <p className="mb-2 min-h-8 text-secondary text-moon">{ACT_HELP[help]}</p>
+              <p className="mb-2 truncate text-secondary text-moon">{ACT_HELP[help]}</p>
               <div className="grid grid-cols-3 gap-2">
                 {actions.map((a) => {
                   const Icon = a.icon;
@@ -558,7 +568,7 @@ export function CombatOverlay() {
                         go(a.id);
                       }}
                       className={cn(
-                        "flex min-h-16 flex-col items-center justify-center gap-1 rounded-[var(--radius-sm)] px-2 py-2 text-center disabled:opacity-40",
+                        "flex min-h-12 flex-col items-center justify-center gap-1 rounded-[var(--radius-sm)] px-2 py-1.5 text-center disabled:opacity-40",
                         a.variant === "ember" && "bg-ember text-ink",
                         a.variant === "ghost" && "bg-ink/60 text-paper shadow-[var(--shadow-border)]",
                         a.variant === "quiet" && "bg-raised/80 text-muted",
