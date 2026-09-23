@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { MoonCrest } from "./primitives";
+import { RadioChip } from "./radio-deck";
 
 export const NAV: { id: Screen; label: string; short: string; icon: typeof Landmark; hint?: string }[] = [
   { id: "hq", label: "Vault 13", short: "13", icon: Landmark },
@@ -397,7 +398,7 @@ export function Rail() {
   return (
     <aside
       data-rail="1"
-      className="relative z-[1] hidden w-[6.25rem] flex-col items-stretch border-r border-line/50 bg-ink/55 py-4 backdrop-blur-md md:flex"
+      className="relative z-[1] hidden w-44 shrink-0 flex-col items-stretch border-r border-line/50 bg-ink/55 py-4 backdrop-blur-md md:flex lg:w-56"
     >
       <button
         type="button"
@@ -426,5 +427,92 @@ export function Dock() {
     >
       <NavButtons compact />
     </nav>
+  );
+}
+
+const DESK_LINKS: { id: Screen; label: string }[] = [
+  { id: "forge", label: "Machine shop" },
+  { id: "market", label: "Market" },
+  { id: "ledger", label: "Ledger" },
+  { id: "vault", label: "Salvage" },
+  { id: "codex", label: "Archive" },
+];
+
+export function DeskRail() {
+  const s = useGame((g) => g.s);
+  const setScreen = useGame((g) => g.setScreen);
+  const me = plateMember(s);
+  const vacant = isVacant(me);
+  const living = s.operatives.filter((op) => op.status !== "dead").length;
+  const row = guidanceSignal(s);
+
+  return (
+    <aside
+      data-desk="1"
+      className="relative z-[1] hidden w-80 shrink-0 flex-col gap-3 overflow-y-auto border-l border-line/50 bg-ink/55 p-4 backdrop-blur-md lg:flex"
+    >
+      <button
+        type="button"
+        className="ms-hud-plate px-3 py-3 text-left"
+        onClick={() => {
+          sfx.click();
+          setScreen("file");
+        }}
+      >
+        <p className="font-display text-[10px] uppercase tracking-[0.22em] text-ember">Plate</p>
+        <p className="mt-1 truncate font-display text-lg text-paper">{vacant ? "Unclaimed" : me.name}</p>
+        <p className="truncate font-mono text-[11px] text-moon">{vacant ? "No rider seated" : me.discordHandle || "Moon Squad"}</p>
+      </button>
+      <div className="grid grid-cols-3 gap-2">
+        <DeskStat label="Day" value={String(s.day)} />
+        <DeskStat label="Plate" value={Number(me.personalCaps ?? 0).toLocaleString()} />
+        <DeskStat label="File" value={`${living}`} />
+      </div>
+      {row && !s.mission && !s.combat ? (
+        <button
+          type="button"
+          className="rounded-[var(--radius-sm)] border border-line/70 bg-raised/80 px-3 py-2 text-left"
+          onClick={() => {
+            sfx.click();
+            setScreen(row.screen);
+          }}
+        >
+          <p className="font-display text-[10px] uppercase tracking-[0.18em] text-muted">Next</p>
+          <p className="mt-1 text-sm text-paper">{row.text}</p>
+          <p className="mt-1 font-display text-[10px] uppercase tracking-[0.14em] text-ember">{row.cta}</p>
+        </button>
+      ) : null}
+      <RadioChip />
+      <div>
+        <p className="px-1 font-display text-[10px] uppercase tracking-[0.18em] text-muted">Systems</p>
+        <div className="mt-2 flex flex-col gap-1">
+          {DESK_LINKS.map((link) => (
+            <button
+              key={link.id}
+              type="button"
+              onClick={() => {
+                sfx.click();
+                setScreen(link.id);
+              }}
+              className={cn(
+                "min-h-10 rounded-[var(--radius-sm)] px-3 text-left font-display text-[11px] uppercase tracking-[0.14em]",
+                s.screen === link.id ? "bg-ember/10 text-ember" : "text-moon hover:bg-raised hover:text-paper",
+              )}
+            >
+              {link.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+function DeskStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[var(--radius-sm)] bg-ink/55 px-2 py-2 text-center shadow-[var(--shadow-border)]">
+      <div className="truncate font-display text-sm tabular-nums text-paper">{value}</div>
+      <div className="mt-0.5 font-display text-[9px] uppercase tracking-[0.14em] text-muted">{label}</div>
+    </div>
   );
 }

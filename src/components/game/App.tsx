@@ -31,7 +31,7 @@ import { GalleryView } from "./gallery-view";
 import { ArcadeView } from "./arcade-view";
 import { FileView } from "./synapse-os";
 import { RadioDeckSheet, RadioDirector } from "./radio-deck";
-import { Dock, GuidanceRow, HubHeader, Rail, SceneBreath, TaskHeader } from "./chrome";
+import { Dock, DeskRail, GuidanceRow, HubHeader, Rail, SceneBreath, TaskHeader } from "./chrome";
 import { WorkBench } from "./work-bench";
 import { RegionMapOverlay } from "./orbit-theater";
 import { WorldHUD } from "./world-hud";
@@ -242,7 +242,7 @@ export function GameApp() {
           <div
             key={screen}
             className={cn(
-              "ms-rise ms-content-scrim mx-auto w-full max-w-4xl",
+              "ms-rise ms-content-scrim mx-auto w-full max-w-4xl lg:mx-0 lg:max-w-none",
               screen === "inventory" && "flex min-h-0 flex-1 flex-col overflow-hidden",
               kind === "world" && "ms-world-scrim",
             )}
@@ -262,6 +262,7 @@ export function GameApp() {
         </main>
         {kind === "hub" || kind === "world" || kind === "task" ? <Dock /> : null}
       </div>
+      {kind === "hub" || kind === "task" ? <DeskRail /> : null}
       <RadioDirector />
       <MissionOverlay />
       <CombatOverlay />

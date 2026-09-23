@@ -227,8 +227,8 @@ export function AuthenticatedMainMenu() {
       <TitleBackdrop />
       <div className="title-veil pointer-events-none absolute inset-0 z-[1]" />
       <OpeningBoot gateReady={hydrated && !pending}>
-      <div className="relative z-[2] flex min-h-0 flex-1 flex-col justify-end overflow-y-auto px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-16 [transform:translateZ(0)] md:px-10 md:pb-10">
-        <div className="mx-auto flex w-full max-w-lg flex-col gap-3 md:max-w-xl">
+      <div className="relative z-[2] flex min-h-0 flex-1 flex-col justify-end overflow-y-auto px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-16 [transform:translateZ(0)] md:px-10 md:pb-10 lg:flex-row lg:items-center lg:justify-end lg:px-16 lg:py-10">
+        <div className="mx-auto flex w-full max-w-lg flex-col gap-3 md:max-w-xl lg:mx-0 lg:w-[30rem] lg:max-w-none">
           {started && allowed ? <RadioChip /> : null}
           <div className="ms-title-dock rounded-[var(--radius-xl)] bg-ink/62 p-3 shadow-[var(--shadow-border)] backdrop-blur-md md:p-5">
             <p className="font-display text-[11px] uppercase tracking-[0.42em] text-ember">S.Y.N.A.P.S.E T-0880</p>

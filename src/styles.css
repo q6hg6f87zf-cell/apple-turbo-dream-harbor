@@ -954,6 +954,18 @@
   padding-top: calc(4.5rem + env(safe-area-inset-top, 0px));
   padding-bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));
 }
+@media (min-width: 768px) {
+  .ms-shell-hub-pad,
+  .ms-shell-task-pad,
+  .ms-shell-world-pad {
+    padding-bottom: 1.5rem;
+  }
+}
+@media (min-width: 1024px) {
+  .ms-scene-breath {
+    height: 1.25rem;
+  }
+}
 [data-chrome="task"] .ms-scene-breath {
   height: 0.5rem;
 }
