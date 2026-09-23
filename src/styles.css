@@ -809,6 +809,52 @@
   color: var(--color-paper);
   text-shadow: 0 1px 0 color-mix(in oklab, black 55%, transparent);
 }
+.ms-plate-type,
+.ms-plate-steel,
+.ms-plate-ember {
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  -webkit-background-clip: text;
+  filter: drop-shadow(0 1px 0 rgb(0 0 0 / 0.72));
+}
+.ms-plate-type {
+  background-image:
+    repeating-linear-gradient(
+      92deg,
+      rgb(255 248 230 / 0.55) 0 1px,
+      transparent 1px 2px
+    ),
+    repeating-linear-gradient(
+      0deg,
+      rgb(40 24 8 / 0.45) 0 1px,
+      transparent 1px 3px
+    ),
+    linear-gradient(185deg, #fff8e8 0%, #f0d7a0 18%, #b8893e 42%, #f6e3b4 58%, #6d5324 78%, #e7c98a 100%);
+}
+.ms-plate-steel {
+  background-image:
+    repeating-linear-gradient(
+      90deg,
+      rgb(255 255 255 / 0.28) 0 1px,
+      transparent 1px 2px
+    ),
+    repeating-linear-gradient(
+      180deg,
+      rgb(0 0 0 / 0.35) 0 1px,
+      transparent 1px 2px
+    ),
+    linear-gradient(180deg, #f4f7fb 0%, #c5ced8 34%, #7d8794 52%, #e8eef4 74%, #5c6570 100%);
+}
+.ms-plate-ember {
+  background-image:
+    repeating-linear-gradient(
+      96deg,
+      rgb(255 220 170 / 0.45) 0 1px,
+      transparent 1px 3px
+    ),
+    linear-gradient(180deg, #ffe7c4 0%, #f0a04a 36%, #b85a18 58%, #ffd7a4 80%, #8a3e10 100%);
+}
 @keyframes ms-foil {
   from {
     background-position: 0% 0;
@@ -1663,10 +1709,6 @@ body[data-orbit="1"] [data-dock],
   .ms-title-dock {
     backdrop-filter: blur(6px);
     -webkit-backdrop-filter: blur(6px);
-  }
-  .ms-card {
-    will-change: auto;
-    transform-style: flat;
   }
   .ms-world-hud-plate,
   .ms-world-whisper {

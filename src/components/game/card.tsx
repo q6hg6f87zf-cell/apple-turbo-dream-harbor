@@ -89,16 +89,11 @@ export function MoonCard({ member, className }: { member: SquadMember; className
   };
 
   useEffect(() => {
-    const coarse = window.matchMedia("(pointer: coarse)").matches;
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const tiny = window.innerWidth < 420 || window.innerHeight < 700;
-    const saveData = Boolean(
-      (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData,
-    );
-    const next = !coarse && !reduce && !tiny && !saveData;
+    const next = !reduce;
     setLive(next);
     if (!next) {
-      rot.current = { x: -4, y: 8 };
+      rot.current = { x: -8, y: 18 };
       setLabel("Moon Squad plate");
       paint();
     }
@@ -123,14 +118,19 @@ export function MoonCard({ member, className }: { member: SquadMember; className
       } else if (spinOn.current && !dragging.current && !reduced.current) {
         rot.current.y = (rot.current.y + SPIN_DEG * dt) % 360;
       } else if (!dragging.current && !reduced.current) {
-        rot.current.x += vel.current.x * dt;
-        rot.current.y += vel.current.y * dt;
-        const damp = Math.exp(-3.4 * dt);
-        vel.current.x *= damp;
-        vel.current.y *= damp;
-        if (Math.hypot(vel.current.x, vel.current.y) < 4) vel.current = { x: 0, y: 0 };
-        const bob = Math.sin((now - t0.current) / 1400) * 1.6;
-        rot.current.x = Math.max(-52, Math.min(52, rot.current.x * 0.994 + (-14 + bob) * 0.006));
+        const moving = Math.hypot(vel.current.x, vel.current.y) >= 4;
+        if (moving) {
+          rot.current.x += vel.current.x * dt;
+          rot.current.y += vel.current.y * dt;
+          const damp = Math.exp(-3.4 * dt);
+          vel.current.x *= damp;
+          vel.current.y *= damp;
+        } else {
+          vel.current = { x: 0, y: 0 };
+          rot.current.y = (rot.current.y + 26 * dt) % 360;
+          const bob = Math.sin((now - t0.current) / 1700) * 8;
+          rot.current.x = -12 + bob;
+        }
       }
       rot.current.x = Math.max(-52, Math.min(52, rot.current.x));
       paint();
@@ -314,25 +314,25 @@ export function MoonCard({ member, className }: { member: SquadMember; className
               <div className="relative z-[1] flex h-full flex-col justify-between p-4 text-paper md:p-5">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="font-display text-[11px] uppercase tracking-[0.34em] text-moon">Moon Squad 🌙</p>
-                    <p className="mt-1 font-mono text-[10px] tracking-[0.18em] text-muted">SYNAPSE · T-0880</p>
+                    <p className="ms-plate-type font-display text-[11px] uppercase tracking-[0.34em]">Moon Squad</p>
+                    <p className="ms-plate-steel mt-1 font-mono text-[10px] tracking-[0.18em]">SYNAPSE · T-0880</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="ms-card-nfc" aria-hidden />
                     <span className="ms-card-chip" aria-hidden />
                   </div>
                 </div>
-                <p className="font-mono text-[13px] tracking-[0.28em] text-paper/90 md:text-sm">{num}</p>
+                <p className="ms-plate-steel font-mono text-[13px] tracking-[0.28em] md:text-sm">{num}</p>
                 <div className="flex items-end justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="font-display text-[10px] uppercase tracking-[0.2em] text-muted">Cardholder</p>
-                    <p className="truncate font-display text-lg leading-tight">{holder}</p>
-                    <p className="truncate font-mono text-[11px] text-moon">{handle}</p>
+                    <p className="ms-plate-steel font-display text-[10px] uppercase tracking-[0.2em]">Cardholder</p>
+                    <p className="ms-plate-type truncate font-display text-lg leading-tight">{holder}</p>
+                    <p className="ms-plate-steel truncate font-mono text-[11px]">{handle}</p>
                   </div>
                   <div className="text-right">
                     <MoonCrest className="ml-auto size-7 text-moon" />
-                    <p className="mt-1 font-display text-[10px] uppercase tracking-[0.2em] text-muted">Balance</p>
-                    <p className="font-display text-xl tabular-nums text-ember">{pan}</p>
+                    <p className="ms-plate-steel mt-1 font-display text-[10px] uppercase tracking-[0.2em]">Balance</p>
+                    <p className="ms-plate-ember font-display text-xl tabular-nums">{pan}</p>
                   </div>
                 </div>
               </div>
@@ -358,8 +358,8 @@ export function MoonCard({ member, className }: { member: SquadMember; className
               </div>
               <div className="ms-card-back-body">
                 <div className="min-w-0 flex-1">
-                  <p className="font-display text-[11px] uppercase tracking-[0.28em] text-moon">Moon Squad 🌙</p>
-                  <p className="mt-1 truncate font-mono text-[11px] text-muted">{handle}</p>
+                  <p className="ms-plate-type font-display text-[11px] uppercase tracking-[0.28em]">Moon Squad</p>
+                  <p className="ms-plate-steel mt-1 truncate font-mono text-[11px]">{handle}</p>
                   <p className="ms-card-legal">
                     This plate is property of SYNAPSE T-0880 and remains Moon Squad issue. Personal ledger only —
                     compound vault is a separate account. If found, return to the porch. Not transferable. Void if
@@ -371,8 +371,8 @@ export function MoonCard({ member, className }: { member: SquadMember; className
                   <span className="ms-card-holo" aria-hidden>
                     <MoonCrest className="ms-card-holo-mark" />
                   </span>
-                  <p className="ms-card-last4">{last4}</p>
-                  <p className="font-display text-[8px] uppercase tracking-[0.2em] text-muted">Desk 24h</p>
+                  <p className="ms-card-last4 ms-plate-steel">{last4}</p>
+                  <p className="ms-plate-steel font-display text-[8px] uppercase tracking-[0.2em]">Desk 24h</p>
                 </div>
               </div>
             </div>
