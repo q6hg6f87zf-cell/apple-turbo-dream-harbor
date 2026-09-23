@@ -39,6 +39,17 @@ export function TitleBackdrop({
     if (!live) return;
     armScore("title");
     void playScore("title");
+    const kick = () => {
+      unlockAudio();
+      const snap = getRadioSnapshot();
+      if ((snap.mode === "score" || snap.mode === "intro") && !snap.playing) void resumeRadio();
+    };
+    document.addEventListener("pointerdown", kick);
+    document.addEventListener("touchstart", kick, { passive: true });
+    return () => {
+      document.removeEventListener("pointerdown", kick);
+      document.removeEventListener("touchstart", kick);
+    };
   }, [live]);
 
   useEffect(() => {

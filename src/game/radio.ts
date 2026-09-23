@@ -407,12 +407,17 @@ function makeDeck(c: AudioContext, bus: GainNode): Deck {
   // Beds are 5-10MB. Assigning a src should cost a header, not the whole tape;
   // play() pulls the audio when the player actually hears it.
   el.preload = "metadata";
-  el.crossOrigin = "anonymous";
   el.loop = false;
   el.setAttribute("playsinline", "");
   el.setAttribute("webkit-playsinline", "");
   el.setAttribute("aria-hidden", "true");
-  el.style.display = "none";
+  el.style.position = "fixed";
+  el.style.width = "1px";
+  el.style.height = "1px";
+  el.style.opacity = "0";
+  el.style.pointerEvents = "none";
+  el.style.left = "0";
+  el.style.bottom = "0";
   document.body.appendChild(el);
   const srcNode = c.createMediaElementSource(el);
   const fade = c.createGain();
@@ -459,9 +464,16 @@ function ensureGraph() {
 function fadeTo(node: GainNode, value: number, seconds: number) {
   const c = ac();
   if (!c) return;
-  node.gain.cancelScheduledValues(c.currentTime);
-  node.gain.setValueAtTime(Math.max(0.0001, node.gain.value), c.currentTime);
-  node.gain.exponentialRampToValueAtTime(Math.max(0.0001, value), c.currentTime + seconds);
+  const now = c.currentTime;
+  const target = Math.max(0.0001, value);
+  const from = Number.isFinite(node.gain.value) ? Math.max(0.0001, node.gain.value) : 0.0001;
+  node.gain.cancelScheduledValues(now);
+  node.gain.setValueAtTime(from, now);
+  if (seconds <= 0.05) {
+    node.gain.setValueAtTime(target, now);
+    return;
+  }
+  node.gain.setTargetAtTime(target, now, Math.min(0.2, seconds / 3));
 }
 
 /** Fade a deck out, then pause it — unless a later swap reused it as live. */
@@ -662,6 +674,15 @@ function primeSrc(src: string) {
 }
 
 export async function playFoundYou() {
+  if (
+    mode === "intro" &&
+    introChapter === "found-you" &&
+    live &&
+    !live.el.paused &&
+    playing
+  ) {
+    return;
+  }
   applyLoop(false);
   scoreReason = null;
   unlocked = true;
@@ -674,7 +695,7 @@ export async function playFoundYou() {
   introHold = null;
   pendingTapeId = null;
   currentId = null;
-  await swapTo(INTRO_SRC, INTRO_DURATION, true);
+  await swapTo(INTRO_SRC, INTRO_DURATION, true, 0.12);
   primeSrc(KANE_LEAD.src);
 }
 

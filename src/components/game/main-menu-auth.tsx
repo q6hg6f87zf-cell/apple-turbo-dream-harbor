@@ -4,6 +4,7 @@ import { isPlaceholderName } from "@/game/discord";
 import { seatedMember } from "@/game/squad";
 import { sfx, unlockAudio } from "@/game/audio";
 import { useGame } from "@/game/store";
+import { playFoundYou } from "@/game/radio";
 import { beginGuestPlay } from "@/game/guest-play";
 import { signInAsGuest, signInWithDiscord, signOutDiscord, stampDiscordPlate, useDiscordAccess } from "@/lib/auth/discord-access";
 import { LogOut, RefreshCw, ShieldCheck } from "lucide-react";
@@ -322,6 +323,10 @@ export function AuthenticatedMainMenu() {
                     className="w-full"
                     onPointerDown={() => {
                       unlockAudio();
+                      const name = draftName.trim();
+                      const handle = draftHandle.trim().replace(/^@/, "");
+                      if (name.length < 2 || handle.length < 2) return;
+                      void playFoundYou();
                     }}
                     onClick={onLogin}
                     disabled={talking}
