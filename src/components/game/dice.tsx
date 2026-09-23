@@ -120,12 +120,15 @@ export function Dice20({
   band,
   spinning,
   size = 92,
+  mark = true,
   className,
 }: {
   value?: number;
   band?: RollBand;
   spinning?: boolean;
   size?: number;
+  /** The word under the die. Off when a sentence beside it already says the result. */
+  mark?: boolean;
   className?: string;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -200,10 +203,19 @@ export function Dice20({
       ctx.clearRect(0, 0, size, size);
       const cx = size / 2;
       const cy = size / 2 + size * 0.02;
-      const scale = size * 0.42;
+      const scale = size * 0.4;
       const light = [0.32, -0.5, 0.8];
       const ln = Math.hypot(light[0], light[1], light[2]);
       const L = light.map((n) => n / ln);
+      const accent = band ? GLOW[band] : "#c98545";
+
+      if (band && !s.spin) {
+        const glow = ctx.createRadialGradient(cx, cy, size * 0.04, cx, cy, size * 0.58);
+        glow.addColorStop(0, `${accent}88`);
+        glow.addColorStop(1, `${accent}00`);
+        ctx.fillStyle = glow;
+        ctx.fillRect(0, 0, size, size);
+      }
 
       const pts = MESH.verts.map((v) => rot(v, s.ax, s.ay, s.az));
       const faces = MESH.faces.map((f, i) => {
@@ -228,15 +240,16 @@ export function Dice20({
       });
       faces.sort((p, q) => p.z - q.z);
       const topNz = Math.max(...faces.map((f) => f.nz));
+      const front = faces.reduce((best, f) => (f.nz > best.nz ? f : best), faces[0]!);
+      const compact = size < 140;
 
       ctx.save();
       ctx.beginPath();
-      ctx.ellipse(cx, size * 0.88, size * 0.3, size * 0.055, 0, 0, Math.PI * 2);
-      ctx.fillStyle = "rgba(0,0,0,0.38)";
+      ctx.ellipse(cx, size * 0.9, size * 0.28, size * 0.045, 0, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(0,0,0,0.45)";
       ctx.fill();
       ctx.restore();
 
-      const accent = band ? GLOW[band] : "#c98545";
       faces.forEach((f) => {
         if (f.nz <= 0.04) return;
         const lit = Math.max(0.14, f.nx * L[0]! + f.ny * L[1]! + f.nz * L[2]!);
@@ -261,9 +274,12 @@ export function Dice20({
         if ((band === "fumble" || band === "fail") && !spinning)
           ctx.fillStyle = `rgb(${Math.round(78 + lit * 90)},${Math.round(20 + lit * 22)},${Math.round(20 + lit * 22)})`;
         ctx.fill();
+        ctx.strokeStyle = "rgba(11,9,8,0.92)";
+        ctx.lineWidth = Math.max(1, size * 0.012);
+        ctx.stroke();
         ctx.strokeStyle = accent;
-        ctx.globalAlpha = 0.28 + lit * 0.45;
-        ctx.lineWidth = f.nz > topNz - 0.04 ? 1.6 : 1;
+        ctx.globalAlpha = f.nz > topNz - 0.05 ? 0.9 : 0.28;
+        ctx.lineWidth = f.nz > topNz - 0.05 ? Math.max(1.4, size * 0.018) : Math.max(0.6, size * 0.008);
         ctx.stroke();
         ctx.globalAlpha = 1;
 
@@ -272,11 +288,15 @@ export function Dice20({
         const area = Math.abs((pa[0] * (pb[1] - pc[1]) + pb[0] * (pc[1] - pa[1]) + pc[0] * (pa[1] - pb[1])) / 2);
         const winner = !spinning && f.n === (value ?? -1);
         const facing = f.nz > 0.18;
-        if (!facing && !winner) return;
-        const fontPx = Math.max(
-          size * 0.12,
-          Math.min(size * (winner ? 0.3 : 0.22), Math.sqrt(Math.max(8, area)) * (winner ? 0.7 : 0.5)),
-        );
+        const showNum = compact ? (spinning ? f.i === front.i && f.nz > 0.2 : winner) : facing || winner;
+        if (!showNum) return;
+        const fontPx =
+          compact && (winner || spinning)
+            ? size * 0.36
+            : Math.max(
+                size * 0.12,
+                Math.min(size * (winner ? 0.3 : 0.22), Math.sqrt(Math.max(8, area)) * (winner ? 0.7 : 0.5)),
+              );
         ctx.save();
         ctx.translate(mx, my);
         if (winner) {
@@ -310,7 +330,7 @@ export function Dice20({
       <div className="relative" style={{ width: size, height: size }} aria-hidden>
         <canvas ref={canvasRef} className="size-full" style={{ width: size, height: size }} />
       </div>
-      {band && !spinning ? (
+      {mark && band && !spinning ? (
         <div className="font-display text-[10px] uppercase tracking-[0.2em] text-muted">
           {BAND_LABEL[band]}
           {typeof value === "number" ? ` · ${value}` : ""}

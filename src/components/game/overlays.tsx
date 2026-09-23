@@ -1,12 +1,12 @@
 import { Button } from "@/components/ui/button";
 import { CLASS_GIFT, COMPANIONS, PRIMARY_STAT, locById, villainById, WORLD } from "@/game/data";
 import { className, displayLineage, displayRace } from "@/game/presentation";
-import { BAND_COPY, combatActor, computeStats, equippedWeapon, healCost } from "@/game/engine";
+import { BAND_COPY, BAND_LABEL, combatActor, computeStats, equippedWeapon, healCost } from "@/game/engine";
 import { magLine, isAmmoConsumable } from "@/game/weapon-ops";
 import { restPenalties, WATCH_LABEL } from "@/game/shift";
 import { sfx, rumble } from "@/game/audio";
 import { useGame } from "@/game/store";
-import type { Operative } from "@/game/types";
+import type { Item, Operative } from "@/game/types";
 import { STAT_COPY, STAT_ORDER } from "@/game/stats-copy";
 import { cn } from "@/lib/cn";
 import { CommandBar, EncounterBackdrop, EventChips, EventLog } from "./encounter-scene";
@@ -14,6 +14,7 @@ import { KIND_LABEL, eventChips, eventStatHint, shiftRadio, dawnLines } from "@/
 import { BOARD_KIND_LABEL, boardStake } from "@/game/board-copy";
 import { CAST, kaneHeatLine, AEGIS_FIELD_STILL, castById } from "@/game/cast";
 import { poiById } from "@/game/field-ops";
+import { itemArt, itemThumbUrl } from "@/game/item-art";
 import {
   ClassGlyph,
   Coin,
@@ -29,6 +30,37 @@ import {
 } from "./primitives";
 import { Heart, Package, Shield, Sparkles, Swords, Wind, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+
+const HAUL_EDGE = {
+  Common: "shadow-[inset_0_0_0_2px_var(--color-line)]",
+  Uncommon: "shadow-[inset_0_0_0_2px_var(--color-ok)]",
+  Rare: "shadow-[inset_0_0_0_2px_var(--color-moon)]",
+  Legendary: "shadow-[inset_0_0_0_2px_var(--color-ember)]",
+  Mythic: "shadow-[inset_0_0_0_2px_var(--color-void)]",
+  Cursed: "shadow-[inset_0_0_0_2px_var(--color-danger)]",
+} as const;
+
+const HAUL_WORD = {
+  Common: "text-muted",
+  Uncommon: "text-ok",
+  Rare: "text-moon",
+  Legendary: "text-ember",
+  Mythic: "text-void",
+  Cursed: "text-danger",
+} as const;
+
+function HaulPlate({ item }: { item: Item }) {
+  const src = itemThumbUrl(itemArt({ kind: item.kind, name: item.name, ammoType: item.ammoType, weaponFamily: item.weaponFamily }));
+  return (
+    <div className="w-[4.75rem] shrink-0" data-haul-plate="1">
+      <div className={cn("size-[4.75rem] overflow-hidden rounded-[var(--radius-sm)] bg-ink", HAUL_EDGE[item.rarity])}>
+        {src ? <img src={src} alt="" className="size-full object-cover" /> : null}
+      </div>
+      <p className="mt-1 line-clamp-2 text-xs leading-tight text-paper">{item.name}</p>
+      <p className={cn("mt-0.5 truncate text-[10px] uppercase tracking-[0.14em]", HAUL_WORD[item.rarity])}>{item.rarity}</p>
+    </div>
+  );
+}
 
 export function ToastHost() {
   const toast = useGame((g) => g.s.toast);
@@ -57,20 +89,32 @@ export function MissionOverlay() {
   const pickTactic = useGame((g) => g.pickTactic);
   const cont = useGame((g) => g.continueMission);
   const [spin, setSpin] = useState(false);
+  const [held, setHeld] = useState(false);
+  const holdTimer = useRef<number | null>(null);
   const waiting = !!mission?.waiting;
   const open = !!mission && !combat;
+
+  useEffect(() => {
+    return () => {
+      if (holdTimer.current) window.clearTimeout(holdTimer.current);
+    };
+  }, []);
 
   const onRoll = () => {
     const m = useGame.getState().s.mission;
     if (!m?.waiting || spin) return;
     const current = m.beats[m.beatIndex];
     if (current?.tactics && !current.tacticId) return;
+    setHeld(false);
     setSpin(true);
     sfx.dice();
     rumble(10);
     window.setTimeout(() => {
       rollBeat();
       setSpin(false);
+      setHeld(true);
+      if (holdTimer.current) window.clearTimeout(holdTimer.current);
+      holdTimer.current = window.setTimeout(() => setHeld(false), 860);
       const b = useGame.getState().s.mission?.lastRoll?.band;
       if (b === "crit") {
         sfx.crit();
@@ -194,30 +238,28 @@ export function MissionOverlay() {
           <div className="relative min-h-0 flex-1">
             <div className="ms-scroll absolute inset-x-0 bottom-0 max-h-[62%] overflow-y-auto px-3 pb-2">
               <div className="rounded-[var(--radius-md)] bg-ink/78 px-3 py-2 shadow-[var(--shadow-border)] backdrop-blur-sm">
-                {beat?.prompt ? <p className="text-body leading-relaxed text-moon">{beat.prompt}</p> : null}
-                {mission.stakes ? <p className="mt-2 text-label text-muted">{mission.stakes}</p> : null}
-                <p className="mt-2 text-label text-muted">Kane · {kaneHeatLine(heat)}</p>
-                <EventLog lines={mission.narrative} pin={false} />
-                {mission.lastRoll ? (
-                  <div className="flex items-center justify-center gap-3 py-2">
-                    <DiceFace value={mission.lastRoll.value} band={mission.lastRoll.band} spinning={spin} size={72} />
+                {mission.lastRoll && !spin && !held ? (
+                  <div className="flex items-center gap-3 py-1">
+                    <DiceFace value={mission.lastRoll.value} band={mission.lastRoll.band} size={72} mark={false} />
                     <p className="text-secondary text-moon">
                       {mission.lastRoll.text}. {BAND_COPY[mission.lastRoll.band]}
                     </p>
                   </div>
-                ) : spin ? (
-                  <div className="flex justify-center py-2">
-                    <DiceFace spinning size={72} />
-                  </div>
                 ) : null}
                 {mission.loot.length ? (
-                  <div className="border-t border-line/50 py-2">
+                  <div className="border-t border-line/40 py-2">
                     <SectionLabel>Recovered</SectionLabel>
-                    {mission.loot.map((it) => (
-                      <ItemLine key={it.id} item={it} />
-                    ))}
+                    <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+                      {mission.loot.map((it) => (
+                        <HaulPlate key={it.id} item={it} />
+                      ))}
+                    </div>
                   </div>
                 ) : null}
+                {beat?.prompt ? <p className="text-body leading-relaxed text-moon">{beat.prompt}</p> : null}
+                {mission.stakes ? <p className="mt-2 text-label text-muted">{mission.stakes}</p> : null}
+                <p className="mt-2 text-label text-muted">Kane · {kaneHeatLine(heat)}</p>
+                <EventLog lines={mission.narrative} pin={false} />
               </div>
             </div>
           </div>
@@ -266,6 +308,26 @@ export function MissionOverlay() {
           </CommandBar>
         )}
       </div>
+      {(spin || held) && (
+        <div
+          className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-start pt-[16svh]"
+          data-roll-stage="1"
+          data-roll-band={held ? (mission.lastRoll?.band ?? "live") : "live"}
+        >
+          <div className="ms-roll-wash absolute inset-0" />
+          <DiceFace
+            className="relative"
+            size={208}
+            spinning={spin}
+            mark={false}
+            value={held ? mission.lastRoll?.value : undefined}
+            band={held ? mission.lastRoll?.band : undefined}
+          />
+          <p className="relative mt-1 font-display text-3xl tracking-wide text-paper">
+            {held && mission.lastRoll ? `${mission.lastRoll.value} · ${BAND_LABEL[mission.lastRoll.band]}` : "Rolling"}
+          </p>
+        </div>
+      )}
     </div>
   );
 }

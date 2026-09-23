@@ -1955,6 +1955,45 @@ body[data-region-map="1"] .ms-help,
   animation: ms-hit-wash 0.28s var(--ease-smooth-out);
 }
 
+/* The roll owns the street for a moment. Color is the result, not a label. */
+.ms-roll-wash {
+  background: radial-gradient(
+    ellipse at 50% 42%,
+    color-mix(in oklab, var(--color-ember) 28%, transparent),
+    transparent 64%
+  );
+}
+[data-roll-band="fumble"] .ms-roll-wash,
+[data-roll-band="fail"] .ms-roll-wash {
+  background: radial-gradient(
+    ellipse at 50% 42%,
+    color-mix(in oklab, var(--color-danger) 62%, transparent),
+    transparent 68%
+  );
+}
+[data-roll-band="weak"] .ms-roll-wash {
+  background: radial-gradient(
+    ellipse at 50% 42%,
+    color-mix(in oklab, var(--color-moon) 48%, transparent),
+    transparent 66%
+  );
+}
+[data-roll-band="success"] .ms-roll-wash {
+  background: radial-gradient(
+    ellipse at 50% 42%,
+    color-mix(in oklab, var(--color-ok) 50%, transparent),
+    transparent 66%
+  );
+}
+[data-roll-band="strong"] .ms-roll-wash,
+[data-roll-band="crit"] .ms-roll-wash {
+  background: radial-gradient(
+    ellipse at 50% 40%,
+    color-mix(in oklab, var(--color-ember-bright) 62%, transparent),
+    transparent 70%
+  );
+}
+
 /* The enemy's own bar. Wide, red, and the first thing read on contact. */
 .ms-hull-track {
   height: 0.6rem;
