@@ -9,7 +9,7 @@ export const Route = createFileRoute("/api/discord/logout")({
     handlers: {
       POST: async ({ request }) => {
         const session = readRiderSession(request);
-        if (session?.did) {
+        if (session?.did && !session.guest) {
           try {
             const sql = await getSql();
             await sql`delete from hollow_porch where discord_id = ${session.did}`;

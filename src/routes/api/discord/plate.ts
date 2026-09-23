@@ -22,6 +22,16 @@ export const Route = createFileRoute("/api/discord/plate")({
         }
         const session = readRiderSession(request);
         if (!session) return json({ error: "Sign in with Discord first." }, 401);
+        if (session.guest) {
+          return json({
+            ok: true,
+            stamped: true,
+            guest: true,
+            discordId: session.did,
+            name: session.name,
+            handle: session.handle,
+          });
+        }
         const rider = await stampRider(session, session.name);
         return json(
           {

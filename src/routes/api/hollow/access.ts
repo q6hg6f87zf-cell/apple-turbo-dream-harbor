@@ -22,6 +22,7 @@ const DEV_ACCESS = {
   stamped: true,
   returning: false,
   devBypass: true,
+  guest: false,
   provider: "dev",
   stage: "ready" as const,
 };
@@ -29,6 +30,24 @@ const DEV_ACCESS = {
 async function riderAccess(request: Request) {
   const session = readRiderSession(request);
   if (!session) return null;
+  if (session.guest) {
+    return json({
+      allowed: true,
+      authenticated: true,
+      discord: false,
+      linked: false,
+      stamped: true,
+      returning: false,
+      devBypass: false,
+      guest: true,
+      provider: "guest",
+      discordId: session.did,
+      name: session.name || "Guest",
+      handle: session.handle,
+      soul: null,
+      stage: "ready" as const,
+    });
+  }
   const stored = await lookupRider(session.did);
   const storedName = stored?.name && !isAuthStatus(stored.name) ? stored.name : "";
   const storedHandle = stored?.handle && !isAuthStatus(stored.handle) ? stored.handle : "";
@@ -49,6 +68,7 @@ async function riderAccess(request: Request) {
     stamped,
     returning: !!stored?.stamped || session.stamped || !!soul,
     devBypass: false,
+    guest: false,
     provider: "discord",
     discordId: session.did,
     name,
@@ -74,6 +94,7 @@ export const Route = createFileRoute("/api/hollow/access")({
               stamped: false,
               returning: false,
               devBypass: false,
+              guest: false,
               provider: null,
               stage: "discord",
             });
