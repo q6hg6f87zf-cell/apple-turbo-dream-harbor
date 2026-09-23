@@ -54,12 +54,7 @@ export function TitleBackdrop({
 
   useEffect(() => {
     if (!live || reduced) return;
-    const coarse = window.matchMedia("(pointer: coarse)").matches;
-    const saveData = Boolean(
-      (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData,
-    );
-    if (coarse || saveData) return;
-    const t = window.setTimeout(() => setArmed(true), 280);
+    const t = window.setTimeout(() => setArmed(true), 120);
     return () => window.clearTimeout(t);
   }, [live, reduced]);
 
@@ -69,6 +64,8 @@ export function TitleBackdrop({
     el.muted = true;
     el.defaultMuted = true;
     el.playsInline = true;
+    el.setAttribute("playsinline", "true");
+    el.setAttribute("webkit-playsinline", "true");
     const kick = () => {
       void el.play().catch(() => {});
       const snap = getRadioSnapshot();
@@ -109,7 +106,7 @@ export function TitleBackdrop({
           muted
           loop
           playsInline
-          preload="metadata"
+          preload="auto"
           data-title-reel="1"
           className={cn(
             "absolute inset-0 size-full object-cover object-[center_28%] transition-opacity duration-500 md:object-contain",
