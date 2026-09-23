@@ -48,6 +48,9 @@ export function hollowVerifiedUser(request?: Request): HollowIdentity {
 
   if (request) {
     const session = readRiderSession(request);
+    if (session?.guest) {
+      return { response: json({ error: "guest" }, 401) };
+    }
     if (session) {
       return {
         userId: `discord:${session.did}`,

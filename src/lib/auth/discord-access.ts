@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Operative } from "@/game/types";
 import { getBearerToken } from "./client";
+import { beginGuestPlay, discardGuestPlay } from "@/game/guest-play";
 
 export type DiscordAccess = {
   allowed: boolean;
@@ -105,15 +106,18 @@ export function useDiscordAccess() {
   return { access, pending, refresh };
 }
 
-export async function signInWithDiscord() {
+export function signInWithDiscord() {
+  discardGuestPlay();
   window.location.assign("/api/discord/start");
 }
 
 export function signInAsGuest() {
+  beginGuestPlay();
   window.location.assign("/api/guest/start");
 }
 
 export async function signOutDiscord() {
+  discardGuestPlay();
   try {
     await fetch("/api/discord/logout", {
       method: "POST",

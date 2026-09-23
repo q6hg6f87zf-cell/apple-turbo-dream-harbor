@@ -98,7 +98,7 @@ export function consumeAuthQuery() {
     const discord = url.searchParams.get("discord");
     const auth = url.searchParams.get("auth");
     let dirty = false;
-    if (auth === "ok") {
+    if (auth === "ok" || auth === "guest") {
       url.searchParams.delete("auth");
       dirty = true;
     }

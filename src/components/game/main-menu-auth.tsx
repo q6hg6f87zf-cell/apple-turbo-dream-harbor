@@ -1,9 +1,10 @@
 import { Button } from "@/components/ui/button";
-import { cloneState, hasPlayerProfile, seatSoul } from "@/game/engine";
+import { cloneState, defaultState, hasPlayerProfile, seatSoul } from "@/game/engine";
 import { isPlaceholderName } from "@/game/discord";
 import { seatedMember } from "@/game/squad";
 import { sfx, unlockAudio } from "@/game/audio";
 import { useGame } from "@/game/store";
+import { beginGuestPlay } from "@/game/guest-play";
 import { signInAsGuest, signInWithDiscord, signOutDiscord, stampDiscordPlate, useDiscordAccess } from "@/lib/auth/discord-access";
 import { LogOut, RefreshCw, ShieldCheck } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -77,7 +78,12 @@ export function AuthenticatedMainMenu() {
   useEffect(() => {
     if (!allowed || !access?.discordId) return;
     if (access.guest) {
-      adoptVerifiedDiscord(access.discordId, "", "");
+      beginGuestPlay();
+      const file = useGame.getState().s;
+      const carried = file.started || !!file.discordId || file.operatives.length > 0;
+      if (carried) {
+        useGame.setState({ s: defaultState(), hydrated: true, handshake: null });
+      }
       return;
     }
     adoptVerifiedDiscord(access.discordId, access.name ?? "", access.handle ?? "");
@@ -95,7 +101,7 @@ export function AuthenticatedMainMenu() {
   }, [allowed, access?.name, access?.handle, access?.devBypass, stamp]);
 
   useEffect(() => {
-    if (!allowed || !access?.soul) return;
+    if (!allowed || !access?.soul || access.guest) return;
     const soul = access.soul;
     useGame.setState((store) => {
       const next = cloneState(store.s);
@@ -163,8 +169,8 @@ export function AuthenticatedMainMenu() {
     }
     unlockAudio();
     sfx.click();
-    if (started) resume();
-    else assume();
+    if (access?.guest || !started) assume();
+    else resume();
   };
 
   const connectGuest = () => {
@@ -229,7 +235,7 @@ export function AuthenticatedMainMenu() {
               {!allowed
                 ? "The porch stays up. Discord cuts the black card. Name and handle lock to that file."
                 : access?.guest
-                  ? "Guest file. Name and @ sit on the black card. Log out when you want Discord."
+                  ? "Guest walk. Nothing is saved. Name the card, then the opening starts."
                   : started
                     ? "Tyrone keeps the porch light on."
                     : "Your black card is cut from Discord. Wake up and we roll the body. Two rerolls. Then it locks."}
@@ -271,7 +277,7 @@ export function AuthenticatedMainMenu() {
                     <Button variant="ghost" className="mt-2 w-full" onClick={connectGuest} disabled={signingIn || pending}>
                       Continue as guest
                     </Button>
-                    <p className="mt-2 text-xs leading-relaxed text-muted">Test file. You name the card.</p>
+                    <p className="mt-2 text-xs leading-relaxed text-muted">Test walk. Saves nothing. Starts at the opening.</p>
                   </>
                 )}
                 {(authError || access?.error) ? <p className="mt-3 text-xs leading-relaxed text-danger">{authError ?? access?.error}</p> : null}
@@ -281,7 +287,7 @@ export function AuthenticatedMainMenu() {
                 <div className="mt-4">
                   <SectionLabel>Black card</SectionLabel>
                   <p className="mt-2 text-sm leading-relaxed text-moon">
-                    Type the name and @. The card takes them. Discord riders stay locked.
+                    Type the name and @. The card takes them for this walk only. Refresh starts over. Discord files stay put.
                   </p>
                   <label className="mt-3 block">
                     <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted">Name</span>

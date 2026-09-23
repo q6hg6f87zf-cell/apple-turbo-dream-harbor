@@ -68,6 +68,7 @@ import {
 } from "./terminal";
 import { settleArcade, stampHackWin } from "./arcade";
 import { clearSave, claimAnonymousIfNeeded, loadSave, setActiveIdentity, writeSave, adoptSaveIdentity } from "./save";
+import { beginGuestPlay, finishDiscard, guestPlayRequested, isGuestPlay } from "./guest-play";
 import {
   applyFloor,
   consumeAuthQuery,
@@ -286,6 +287,13 @@ export const useGame = create<Store>((set, get) => ({
     if (get().hydrated) return;
     if (typeof window === "undefined") return;
     try {
+      if (guestPlayRequested()) {
+        beginGuestPlay();
+        consumeAuthQuery();
+        set({ s: defaultState(), hydrated: true, handshake: null });
+        return;
+      }
+      finishDiscard();
       consumeAuthQuery();
       const urlSnap = snapshotFromSearch();
       const who = urlSnap ? { id: urlSnap.id, name: urlSnap.name } : readWho();
@@ -405,6 +413,7 @@ export const useGame = create<Store>((set, get) => ({
     if (snow) get().pullArcade();
   },
   adoptVerifiedDiscord: (id, name, handle) => {
+    if (isGuestPlay()) return;
     const snow = (id ?? "").trim();
     if (!isSnowflake(snow)) return;
     const cleanName = (name ?? "").trim().replace(/^@/, "").slice(0, 24);

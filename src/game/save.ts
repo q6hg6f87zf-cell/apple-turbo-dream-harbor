@@ -8,6 +8,7 @@ import { restoreHack, restoreTalk, restoreTerm } from "./terminal";
 import { restoreTyrone } from "./tyrone-mind";
 import { restoreTravis } from "./travis";
 import { ensureSquad } from "./squad";
+import { isDiscardingPlay, isGuestPlay } from "./guest-play";
 import type { GameState, LocationId, LocationProgress, Operative } from "./types";
 
 let activeId: string | null = null;
@@ -167,6 +168,7 @@ export function loadSave(): GameState {
 }
 
 export function writeSave(state: GameState) {
+  if (isGuestPlay() || isDiscardingPlay()) return;
   try {
     const slim: GameState = {
       ...state,
