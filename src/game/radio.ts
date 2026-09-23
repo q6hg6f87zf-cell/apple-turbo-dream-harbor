@@ -177,6 +177,83 @@ type Deck = {
   fade: GainNode;
 };
 
+let titleBuf: AudioBuffer | null = null;
+let titleSrc: AudioBufferSourceNode | null = null;
+let titleGain: GainNode | null = null;
+let titleLoading: Promise<AudioBuffer | null> | null = null;
+let titleStartedSuspended = false;
+
+function loadTitleBuffer(): Promise<AudioBuffer | null> {
+  if (titleBuf) return Promise.resolve(titleBuf);
+  if (titleLoading) return titleLoading;
+  const c = ac();
+  if (!c) return Promise.resolve(null);
+  titleLoading = fetch(SCORE.src)
+    .then((res) => res.arrayBuffer())
+    .then((raw) => c.decodeAudioData(raw.slice(0)))
+    .then((buf) => {
+      titleBuf = buf;
+      return buf;
+    })
+    .catch(() => null);
+  return titleLoading;
+}
+
+function stopTitleBuffer() {
+  titleStartedSuspended = false;
+  if (titleSrc) {
+    try {
+      titleSrc.stop();
+    } catch {
+      /* already stopped */
+    }
+    try {
+      titleSrc.disconnect();
+    } catch {
+      /* already disconnected */
+    }
+  }
+  titleSrc = null;
+  if (titleGain) {
+    try {
+      titleGain.disconnect();
+    } catch {
+      /* already disconnected */
+    }
+  }
+  titleGain = null;
+}
+
+async function startTitleBuffer() {
+  if (isMuted() || mode !== "score") return;
+  const c = ac();
+  const bus = getMusicBus();
+  if (!c || !bus) return;
+  if (c.state === "suspended") void c.resume();
+  if (titleSrc) return;
+  const buf = await loadTitleBuffer();
+  if (!buf || mode !== "score" || isMuted() || titleSrc) return;
+  const src = c.createBufferSource();
+  const gain = c.createGain();
+  gain.gain.value = 1;
+  src.buffer = buf;
+  src.loop = true;
+  src.connect(gain);
+  gain.connect(bus);
+  try {
+    src.start();
+  } catch {
+    return;
+  }
+  titleSrc = src;
+  titleGain = gain;
+  titleStartedSuspended = c.state !== "running";
+  playing = true;
+  duration = buf.duration;
+  currentTime = 0;
+  duckAmbient(true);
+  emit();
+}
 let live: Deck | null = null;
 let wait: Deck | null = null;
 let currentId: string | null = null;
@@ -674,6 +751,7 @@ function primeSrc(src: string) {
 }
 
 export async function playFoundYou() {
+  stopTitleBuffer();
   if (
     mode === "intro" &&
     introChapter === "found-you" &&
@@ -845,18 +923,30 @@ export function getScoreReason() {
 
 export async function playScore(reason: "title" | "boss") {
   if (mode === "intro") return;
-  if (mode === "score" && scoreReason === reason && playing) return;
+  if (mode === "score" && scoreReason === reason && titleSrc && !titleStartedSuspended) return;
   scoreReason = reason;
   mode = "score";
   pendingTapeId = null;
   currentId = null;
   unlocked = true;
   applyLoop(true);
-  await swapTo(SCORE.src, SCORE.duration, true);
+  if (live) {
+    fadeTo(live.fade, 0.0001, 0.05);
+    try {
+      live.el.pause();
+    } catch {
+      /* ignore */
+    }
+  }
+  if (titleSrc && titleStartedSuspended) stopTitleBuffer();
+  await startTitleBuffer();
+  playing = !!titleSrc || playing;
+  emit();
 }
 
 export function stopScore(opts?: { resume?: boolean }) {
-  if (mode !== "score") return;
+  if (mode !== "score" && !titleSrc) return;
+  stopTitleBuffer();
   scoreReason = null;
   applyLoop(false);
   const dying = live;
@@ -913,19 +1003,14 @@ export async function resumeRadio() {
     return;
   }
   if (mode === "score") {
-    if (live && live.el.src) {
-      applyLoop(true);
-      try {
-        await live.el.play();
-        playing = true;
-        duckAmbient(true);
-      } catch {
-        playing = false;
-      }
+    if (titleSrc && !titleStartedSuspended) {
+      playing = true;
+      duckAmbient(true);
       emit();
-    } else if (scoreReason) {
-      await playScore(scoreReason);
+      return;
     }
+    if (titleSrc && titleStartedSuspended) stopTitleBuffer();
+    await startTitleBuffer();
     return;
   }
   const tape = tapeById(currentId) ?? tapeForBed(bed);
@@ -1099,6 +1184,21 @@ export function scoreCueForGame(input: { screen: Screen; boss: boolean }): Score
 }
 
 if (typeof window !== "undefined") {
+  const kickScore = () => {
+    const c = ac();
+    if (!c) return;
+    const wake = () => {
+      if (isMuted() || mode !== "score") return;
+      if (!titleSrc || titleStartedSuspended) {
+        stopTitleBuffer();
+        void startTitleBuffer();
+      }
+    };
+    if (c.state === "suspended") void c.resume().then(wake);
+    else wake();
+  };
+  window.addEventListener("pointerdown", kickScore, true);
+  window.addEventListener("touchstart", kickScore, { capture: true, passive: true });
   addUnlockHook(() => {
     unlocked = true;
     if (live?.el && playing && live.el.paused) void resumeRadio();
