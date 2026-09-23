@@ -500,7 +500,6 @@ export const useGame = create<Store>((set, get) => ({
     }
     armIntro();
     enterWake();
-    void playFoundYou();
     set({ guideOpen: false });
     mutate(set, (s) => {
       s.started = true;
@@ -517,6 +516,11 @@ export const useGame = create<Store>((set, get) => ({
       queueTalk(s, "wake", true);
     });
     get().persist();
+    try {
+      void playFoundYou();
+    } catch {
+      /* the opening still starts if the tape cannot */
+    }
   },
   resumeSession: () => {
     const s = get().s;

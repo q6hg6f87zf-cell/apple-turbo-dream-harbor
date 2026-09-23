@@ -4,7 +4,6 @@ import { isPlaceholderName } from "@/game/discord";
 import { seatedMember } from "@/game/squad";
 import { sfx, unlockAudio } from "@/game/audio";
 import { useGame } from "@/game/store";
-import { playFoundYou } from "@/game/radio";
 import { beginGuestPlay } from "@/game/guest-play";
 import { signInAsGuest, signInWithDiscord, signOutDiscord, stampDiscordPlate, useDiscordAccess } from "@/lib/auth/discord-access";
 import { LogOut, RefreshCw, ShieldCheck } from "lucide-react";
@@ -81,7 +80,8 @@ export function AuthenticatedMainMenu() {
     if (access.guest) {
       beginGuestPlay();
       const file = useGame.getState().s;
-      const carried = file.started || !!file.discordId || file.operatives.length > 0;
+      if (file.screen !== "title" || file.started) return;
+      const carried = !!file.discordId || file.operatives.length > 0;
       if (carried) {
         useGame.setState({ s: defaultState(), hydrated: true, handshake: null });
       }
@@ -227,7 +227,7 @@ export function AuthenticatedMainMenu() {
       <TitleBackdrop />
       <div className="title-veil pointer-events-none absolute inset-0 z-[1]" />
       <OpeningBoot gateReady={hydrated && !pending}>
-      <div className="relative z-[2] flex min-h-0 flex-1 flex-col justify-end overflow-y-auto px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-16 md:px-10 md:pb-10">
+      <div className="relative z-[2] flex min-h-0 flex-1 flex-col justify-end overflow-y-auto px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-16 [transform:translateZ(0)] md:px-10 md:pb-10">
         <div className="mx-auto flex w-full max-w-lg flex-col gap-3 md:max-w-xl">
           {started && allowed ? <RadioChip /> : null}
           <div className="ms-title-dock rounded-[var(--radius-xl)] bg-ink/62 p-3 shadow-[var(--shadow-border)] backdrop-blur-md md:p-5">
@@ -323,13 +323,9 @@ export function AuthenticatedMainMenu() {
                     className="w-full"
                     onPointerDown={() => {
                       unlockAudio();
-                      const name = draftName.trim();
-                      const handle = draftHandle.trim().replace(/^@/, "");
-                      if (name.length < 2 || handle.length < 2) return;
-                      void playFoundYou();
                     }}
                     onClick={onLogin}
-                    disabled={talking}
+                    disabled={pending}
                   >
                     {loginLabel}
                   </Button>

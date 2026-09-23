@@ -83,7 +83,7 @@ export function TitleBackdrop({
   const still = failed || reduced || !live;
 
   return (
-    <div className={cn("absolute inset-0 overflow-hidden bg-ink", className)} data-title-scene="1">
+    <div className={cn("pointer-events-none absolute inset-0 overflow-hidden bg-ink", className)} data-title-scene="1">
       <img
         src={TITLE_REEL.poster}
         alt=""
@@ -109,7 +109,7 @@ export function TitleBackdrop({
           preload="auto"
           data-title-reel="1"
           className={cn(
-            "absolute inset-0 size-full object-cover object-[center_28%] transition-opacity duration-500 md:object-contain",
+            "pointer-events-none absolute inset-0 size-full object-cover object-[center_28%] transition-opacity duration-500 md:object-contain",
             ready ? "opacity-100" : "opacity-0",
           )}
           onError={() => setFailed(true)}

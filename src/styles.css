@@ -1700,7 +1700,13 @@ body[data-orbit="1"] [data-dock],
   animation: ms-rise 0.7s var(--ease-smooth-out) both;
 }
 
+[data-title-reel] {
+  pointer-events: none !important;
+}
 .ms-title-dock {
+  position: relative;
+  z-index: 3;
+  transform: translateZ(1px);
   backdrop-filter: blur(18px) saturate(1.2);
   -webkit-backdrop-filter: blur(18px) saturate(1.2);
 }
