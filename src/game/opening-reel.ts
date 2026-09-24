@@ -1,3 +1,4 @@
+export const CANON_KANE_TRANSCRIPT=true;
 import { TALK } from "./talk";
 
 export const WAKE_REEL = {
