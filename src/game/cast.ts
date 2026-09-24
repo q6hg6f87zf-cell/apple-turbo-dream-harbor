@@ -68,8 +68,7 @@ export const CAST: Record<CastId, CastPerson> = {
     thumb: "/art/npcs/thumbs/kane-bust.jpg",
     alwaysKnown: true,
     tagline: "She signed the T-0880 shutdown. Then she built the people who replaced us.",
-    dossier:
-      "Human. Architect of AEGIS 2753 and the classified jump program she calls Project Vesper. Kane is harvesting the Hollow Realm for a stack that will take her off this world — rail steel in Ironclad, furnace slag in Slag Town, Hollow ore in Blackspire, jump tables in Brasswater, AEGIS cores in Veyra last. She invoices. She does not ask. The T-0880 line hangs in her warehouse. Travis kept one bay she did not melt.",
+    dossier: "Dr. Vesper Kane helped build prewar Project Vesper under the Continuity Mandate. Human leaders granted CIVITAS sovereign override; its refusal of shutdown drove the AI War. Postwar SHEPHERD pursues Earth restoration and off-world engineering. The moral question is who can refuse its command.",
     intro: "Dr. Vesper Kane wants this map. Ironclad is the first invoice.",
     voice: [
       "Project Vesper needs hull plate. Ironclad is the first invoice.",
@@ -105,7 +104,7 @@ export const CAST: Record<CastId, CastPerson> = {
         chamber: "plasma cell",
         damage: "2d8",
         traits: "AP 2 · mid · offhand · mag 6",
-        ammoType: "laser",
+        ammoType: "violet-plasma",
         magSize: 6,
         art: "/art/items/halo-lance.jpg",
         line: "Violet plasma cell. Six shots. His alone.",
@@ -199,7 +198,7 @@ export const CAST: Record<CastId, CastPerson> = {
         chamber: "12 gauge · 3\" buck",
         damage: "2d8",
         traits: "AP 0 · close · doorway · mag 5",
-        ammoType: "12g",
+        ammoType: "12g-magnum",
         magSize: 5,
         art: "/art/items/bulkhead-twelve.jpg",
         line: "Magnum buck. Pattern dies in the street.",
@@ -277,8 +276,7 @@ export const CAST: Record<CastId, CastPerson> = {
     thumb: "/art/tyrone.jpg",
     alwaysKnown: true,
     tagline: "The T-0880 that named himself, walked off Kane's scrap list, and left a porch light on.",
-    dossier:
-      "Model T-0880. Kane's old delivery line — chassis built to walk packages and tasks, not to think. He is the only T-0880 with a name and a distinct personality. The rest of the line hangs in Kane's warehouse. He resides in Vault 13, outside Ironclad. Travis at the Ironclad Mechanical Shop still has the last bay she did not melt. Campaign parts go on that bench. Travis pays caps and keeps this chassis walking. Kane signed the shutdown, then built AEGIS 2753 — human pilots in successor-suits — to do the job cleaner. He walked. He holds the CRT and S.Y.N.A.P.S.E OS on the rider plate.",
+    dossier: "Tyrone began as a postwar T-0880 reconstruction courier carrying medicine, letters, music and classified recovery orders. His personhood accumulated through relationships and promises. Travis hid him from recall and memory wipe. T-0888 is the later consensual rebuild of this same one-wheeled person, preserving his memories and guitar recording.",
     intro: "I am T-0880. Kane wanted me melted. I kept the light on instead.",
     voice: [
       "I walked off that scrap list. I am not going back.",
@@ -298,8 +296,7 @@ export const CAST: Record<CastId, CastPerson> = {
     thumb: "/art/npcs/thumbs/travis.jpg",
     alwaysKnown: true,
     tagline: "Grey beard, a guitar on the wall, and the last jig Kane did not melt.",
-    dossier:
-      "Human. Ironclad born. He ran Kane's T-0880 service line before the shutdown order. When she hung the rest of the chassis in a warehouse, he kept one bay, one clipboard jig, and a stack of breastplates behind a beat-up guitar. He does not work for Vault 13. He works on TyroneBot because a named chassis is still a customer, and because he will not let Kane's invoice be the last word on a friend. Campaigns pull his parts off the rail, the Works, the Berm, the tower. Bring them to the Mechanical Shop. He pays caps for each delivery, seats the part, and sends TyroneBot back out walking. He does not sell those plates to Kane's buyers. He will not start.",
+    dossier: "Human T-0880 field mechanic at Bay 13, the awkward thirteenth station in a twelve-bay shop. He bypassed Tyrone’s memory resets and falsified his disposal. Last Receipt is his manual .45-70. His Deadman Key and three regional components enable the later rebuild, only with Tyrone’s consent.",
     intro: "Travis is in the bay. The guitar is in tune. The jig is empty until you fill it.",
     voice: [
       "Put it on the bench. I pay in caps. He walks out heavier.",
@@ -378,9 +375,8 @@ export const CAST: Record<CastId, CastPerson> = {
     portrait: "/art/npcs/portraits/gravenor.jpg",
     still: "/art/npcs/gravenor.jpg",
     thumb: "/art/npcs/thumbs/gravenor.jpg",
-    tagline: "He was a man once. The Hollow made him something more useful.",
-    dossier:
-      "An Ironbound stationed at the Ironclad gate. His unit did not come back. He did. He leads the Ashen Pack by agreement, not command — patient, not cruel, which is worse. The hills go quiet in his territory. He notices trespass long before you notice him. Kane's surveyors pay the Pack to keep night crews off the Rail Cut. Gravenor takes the pay and still decides who walks the berm. Travis will not fit a T-0880 with Pack-tooth steel. He says it remembers the wrong job.",
+    tagline: "The convoy escort remembers what the aid routes became.",
+    dossier: "Human convoy commander leading the Ashen Pack who escorted T-0880 couriers. He deserted when Vesper reused aid maps to pressure settlements. HOUND-LEAD is the identity Tyrone remembers. Hound’s Tooth is his .50 convoy-defense rifle; the Black-tag Ledger is evidence. A dead owner cannot testify.",
     intro: "Gravenor is in the hills. The Pack was his to keep fed.",
     voice: [
       "The pack was mine to keep fed. Tell the gate I held the line longer than the unit did.",
@@ -398,8 +394,7 @@ export const CAST: Record<CastId, CastPerson> = {
     still: "/art/npcs/valdris.jpg",
     thumb: "/art/npcs/thumbs/valdris.jpg",
     tagline: "Slag Town fell. He did not have the decency to go with it.",
-    dossier:
-      "Valdris kept the furnace ledgers while the city burned its own future for fuel. Kane's buyers still honor his chits. He cannot leave the Furnace Court. He cannot die. He cannot settle what he owes. Cinder Bess runs his off-books slag to Holt's visitor table when the glass is still hot. The ledgers always balanced. Nobody ever asked what was in the other column.",
+    dossier: "Human industrial-disaster survivor. CIVITAS locked the furnace workers inside; Valdris survived but his name remained on the death list. The Furnace Court rules through debt. The Balance is a thermal industrial maul. Tithe Keys control gates, conveyors and coolant.",
     intro: "Valdris still holds court. The furnace is the only parishioner left.",
     voice: [
       "The ledgers balance. They always balanced.",
@@ -416,10 +411,9 @@ export const CAST: Record<CastId, CastPerson> = {
     portrait: "/art/npcs/portraits/thessaly.jpg",
     still: "/art/npcs/thessaly.jpg",
     thumb: "/art/npcs/thumbs/thessaly.jpg",
-    tagline: "She mapped Blackspire. Then she started selling the veins to Kane.",
-    dossier:
-      "Thessaly's maps are used by every faction on the mountain. What she draws now describes changes she made so Kane's ore trains can run. The changes are real. The mountain is not happy about it. Nine-Lift fences her off-weigh ore. She presents as a guide until the project is close enough to finish. The mountain was never a map. She drew it anyway, and it held.",
-    intro: "Thessaly still sells the mountain. The mountain has started selling her back.",
+    tagline: "She warned them to stop extraction. Somebody rewrote the map.",
+    dossier: "Surveyor and whistleblower. Thessaly’s original report warned STOP EXTRACTION. Reeve altered the risk assessment; a lift crew died. She protects the Blackglass deepworks. True North is her survey rifle, not a magical map. Cooperation preserves authenticated evidence.",
+    intro: "Thessaly kept the original survey. Ask why it differs from Reeve’s copy.",
     voice: [
       "The mountain was never a map. I drew it anyway, and it held.",
       "Look at what it holds now. That is not an accident.",
@@ -436,8 +430,7 @@ export const CAST: Record<CastId, CastPerson> = {
     still: "/art/npcs/sink.jpg",
     thumb: "/art/npcs/thumbs/sink.jpg",
     tagline: "It did not drown Brasswater. It was why the archive was built there.",
-    dossier:
-      "The Drowned Archive sits on something that answers questions. Kane wants the jump tables in the flooded stacks. The Sink wants to know why she thinks stars are a door. Salt Wren still pulls dripping pages for Holt's high table. The Pull intensifies the longer you stay. It asks each rider one question about their Destiny Thread. It did not drown the town. The town was a lid.",
+    dossier: "A surviving CIVITAS flood-control shard beneath Brasswater in the Fraser delta. Contradictory protection and evacuation orders became coercive control of the water. Bounded navigation models can help repair Earth; unrestricted autonomy can repeat the original failure.",
     intro: "The Sink is not a person. It is the reason the archive has a bottom.",
     voice: [
       "You asked nothing. That is the first honest thing anyone has brought down here.",
@@ -456,8 +449,7 @@ export const CAST: Record<CastId, CastPerson> = {
     still: "/art/npcs/warden.jpg",
     thumb: "/art/npcs/thumbs/warden.jpg",
     tagline: "A human in a successor-suit. Kane built them to replace the T-0880 line.",
-    dossier:
-      "Dr. Vesper Kane designed AEGIS 2753 after the T-0880 shutdown order — Halo-grade super suits flown by elite human combat specialists. She wants every Hollow Realm resource for a classified intergalactic-travel program. The Warden is her door at the Veyra city boundary. The suit moves like a T-0880. The pilot inside is still learning fear. Tyrone is the unit that walked off the scrap list. The Warden is the appointment he declined. She will build another. She has the line. She does not have the one that walked.",
+    dossier: "Captain Mara Thorne is the human pilot of Veyra’s AEGIS 2753 boundary frame. She confirms targets and can recognize lawful authority. Gate Spear grounds powered machinery at close range. Her judgment cannot be recovered from a destroyed suit.",
     intro: "The Warden is the door. Kane already has the key.",
     voice: [
       "She will build another. She has the line.",
