@@ -531,7 +531,7 @@ export function resolveTask(state: GameState, taskId: string, payload: TaskPaylo
   }
 
   if (task.kind === "cabinet") {
-    return "Sit the T-0888 glass. A scored win closes this job.";
+    return "Sit the Thirty-Eight glass. A scored win closes this job.";
   }
 
   if (task.kind === "market") {
