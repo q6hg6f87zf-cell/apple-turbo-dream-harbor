@@ -1,3 +1,4 @@
+import {recordCanonBossDefeat,tyroneRebuilt,fieldLoad,trackSupplies} from './canon-combat';
 import type {
   ClassName,
   CombatState,
@@ -55,7 +56,7 @@ import {
   weaponDamageAvg,
 } from "./data";
 import { REGION_LOCATION, campaignOpenRegions } from "./arsenal";
-import { applyArmor, fieldArmor, rangeHitMod, resolveWeapon } from "./weapon-ops";
+import { applyArmor, fieldArmor, rangeHitMod, resolveWeapon, spendShot, reloadWeapon } from "./weapon-ops";
 import { APPROACHES, locationToRegion, poiById, tacticsFor, type FieldDeploy } from "./field-ops";
 import { eventBriefing, beatPrompt, contactFlavor, debriefLines, KIND_LABEL, radioFor, rollLines } from "./event-theater";
 import { emptyMarket } from "./market";
@@ -75,7 +76,7 @@ import { bootstrapNarrative, syncStorySpine } from "./story-spine";
 import { setFlag } from "./narrative-state";
 import { applyRadioWorldNote } from "./radio-world";
 import { considerEndingAtDawn } from "./endings";
-import { availableScenarios } from "./scenario";
+import { availableScenarios, completeScenarioCombat } from "./scenario";
 
 export function uid(prefix = "id"): string {
   return `${prefix}-${Math.random().toString(36).slice(2, 9)}-${Date.now().toString(36)}`;
@@ -1073,7 +1074,7 @@ function topThreat(combat: CombatState, party: Operative[]): Operative | null {
 
 export function resolvePlayerAction(
   state: GameState,
-  action: "strike" | "guard" | "gift" | "item" | "flee" | "skill",
+  action: "strike" | "guard" | "gift" | "item" | "flee" | "skill" | "aim" | "reload" | "support",
 ): GameState {
   const combat = state.combat;
   if (!combat) return state;
@@ -1096,6 +1097,18 @@ export function resolvePlayerAction(
   const weapon = equippedWeapon(actor);
   const broken = weapon?.condition === "Broken";
 
+  if(action==='aim'){combat.aimId=actor.id;combat.log=[...log,`${actor.name} aims. Next strike: +3 accuracy and +1 AP.`].slice(-12);return enemyTurn(state);}
+  if(action==='reload'){const r=weapon&&!broken?trackSupplies(state,actor,()=>reloadWeapon(actor,weapon)):null;combat.log=[...log,r?.log??'No compatible ammunition or serviceable weapon.'].slice(-12);return r?enemyTurn(state):state;}
+  if(action==='support'){
+    if(!tyroneRebuilt(state)||combat.supportUsed)return state;combat.supportUsed=true;combat.suppressNext=true;
+    const hurt=combat.partyIds.map(id=>state.operatives.find(o=>o.id===id)).filter((o):o is Operative=>!!o&&o.status!=='dead').sort((a,b)=>a.hp/a.maxHp-b.hp/b.maxHp)[0];
+    if(hurt){hurt.hp=Math.min(hurt.maxHp,hurt.hp+3);if(hurt.hp>0&&hurt.status==='downed')hurt.status='idle';}
+    combat.log=[...log,'T-0888 · Porchlight restores 3 HP. Static Grace disrupts the next hostile sensor cycle.'].slice(-12);return enemyTurn(state);
+  }
+  if(action==='strike'&&broken){combat.log=[...log,'Broken weapon: repair it before firing.'].slice(-12);return state;}
+  const shot=action==='strike'?trackSupplies(state,actor,()=>spendShot(actor,weapon)):null;
+  if(shot?.log)log.push(shot.log);if(shot?.dry){combat.log=log.slice(-12);return enemyTurn(state);}
+  const aimed=action==='strike'&&combat.aimId===actor.id;if(action==='strike')combat.aimId=undefined;
   if (action === "gift") {
     if (actor.giftUsed) {
       log.push(`${actor.name} already spent their gift today.`);
@@ -1163,7 +1176,7 @@ export function resolvePlayerAction(
   }
 
   if (action === "item") {
-    const pot = actor.inventory.find((i) => i.kind === "consumable");
+    const pot = actor.inventory.find((i) => i.kind === "consumable" && !i.ammoType && /restore|heal|HP/i.test(i.effect));
     if (!pot) {
       log.push(`${actor.name} has nothing left to drink.`);
       combat.log = log.slice(-12);
@@ -1245,7 +1258,7 @@ export function resolvePlayerAction(
   // the squad makes in the Vault, and it is paid for here.
   const profile = resolveWeapon(weapon);
   const reach = action === "strike" ? rangeHitMod(profile.rangeBand, target.preferredRange, profile.family) : 0;
-  const swing = total + reach;
+  const swing = total + reach + profile.accuracy + (shot?.accuracyBonus??0) + (aimed?3:0) - (shot?.rushed?2:0) - fieldLoad(actor).penalty;
   const hit = swing >= target.dc || b === "crit";
   if (action === "guard") {
     log.push(`${actor.name} sets a guard.`);
@@ -1255,7 +1268,8 @@ export function resolvePlayerAction(
     const avg = weapon ? weaponDamageAvg(weapon.damage ?? "1d6") : 3;
     let dmg = Math.max(1, avg - Math.floor(target.def / 2) + (b === "crit" ? 4 : b === "strong" ? 2 : 0));
     const plain = dmg;
-    dmg = applyArmor(dmg, profile, target);
+    dmg = applyArmor(dmg+(shot?.damageBonus??0), {...profile,ap:profile.ap+(shot?.apBonus??0)+(aimed?1:0)}, target);
+    if(weapon?.ammoType==="bb"&&target.isBoss)dmg=Math.min(dmg,1);
     dmg *= surge;
     if (b === "weak") dmg = Math.max(1, Math.floor(dmg * 0.6));
     target.hp = Math.max(0, target.hp - dmg);
@@ -1303,6 +1317,7 @@ function enemyTurn(state: GameState): GameState {
     state.combat = combat;
     return finishCombat(state, false);
   }
+  const suppressed=!!combat.suppressNext;combat.suppressNext=false;
   const bossPhase = combat.bossId ? villainById(combat.bossId)?.phases : undefined;
   combat.enemies
     .filter((e) => e.hp > 0)
@@ -1322,7 +1337,10 @@ function enemyTurn(state: GameState): GameState {
         log.push(`${e.name} hits nothing. Shield Block.`);
         return;
       }
-      const hit = roll + e.atk >= dc + (guard ? 2 : 0);
+      const prepared=!!e.isBoss&&combat.turn%3===0;
+      const keys=combat.bossId==='valdris'&&[state.vault,...state.operatives.map(o=>o.inventory)].some(bag=>bag.some(i=>i.name==='Tithe Keys'));
+      const hit=roll+e.atk+(prepared&&!guard&&!keys?3:0)-(suppressed?4:0)>=dc+(guard?4:0);
+      if(prepared)log.push(guard||keys?'The prepared attack loses its firing solution.':'Prepared attack: the exposed lane costs you.');
       if (hit) {
         const dmg = Math.max(1, e.atk - Math.floor(stats.DEF / 4) + (roll >= 18 ? 2 : 0));
         const i = state.operatives.findIndex((o) => o.id === target.id);
@@ -1356,6 +1374,7 @@ export function finishCombat(state: GameState, won: boolean, fled = false): Game
   const combat = state.combat;
   if (!combat) return state;
   if (won) {
+    if(combat.scenarioChoice)completeScenarioCombat(state,combat.scenarioChoice.scenarioId,combat.scenarioChoice.approachId);
     const payout = Math.round((120 + locById(combat.locationId).danger * 40) * combat.rewardMult);
     const yard = combat.enemies.some((e) => e.tags?.includes("yard")) || combat.missionKind === "scout" || combat.missionKind === "forage";
     state.coins += payout;
@@ -1385,17 +1404,7 @@ export function finishCombat(state: GameState, won: boolean, fled = false): Game
       grantPackLoot(state, { sure: true, source: "Boss" });
       const v = villainById(combat.bossId);
       if (v) {
-        const relic = makeItem({
-          name: v.lootName,
-          kind: "trinket",
-          rarity: v.id === "warden" ? "Mythic" : "Legendary",
-          condition: "Pristine",
-          slot: "trinket",
-          effect: "Arc trophy. +1 all rolls in this region.",
-          lore: v.tagline,
-          value: 5000,
-        });
-        state.vault.push(relic);
+        recordCanonBossDefeat(state,v.id);
         if (v.id === "warden") state.challengeCoin = true;
         state.moonFavor += 8;
         pushLog(state, "combat", v.name, `Fallen. ${v.lootName} recovered.`);
