@@ -1,3 +1,5 @@
+import {fetchCanon,type CanonSnapshot} from './server-canon';
+import {pullServerInventory} from './server-inventory';
 import { create } from "zustand";
 import type {
   ArcadePayout,
@@ -122,6 +124,9 @@ import {
 
 type Action =
   | "strike"
+  | "aim"
+  | "reload"
+  | "support"
   | "guard"
   | "gift"
   | "item"
@@ -221,7 +226,7 @@ interface Store {
   toggleTyroneNumbers: () => void;
   openGuide: () => void;
   closeGuide: () => void;
-  resolveScenario: (scenarioId: string, approachId: string) => string | null;
+  resolveScenario: (scenarioId: string, approachId: string) => Promise<string | null>;
   openExpansion: () => void;
   closeExpansion: () => void;
   openWork: (job: WorkJob) => void;
@@ -618,7 +623,11 @@ export const useGame = create<Store>((set, get) => ({
     if (!get().guideOpen) return;
     set({ guideOpen: false });
   },
-  resolveScenario: (scenarioId, approachId) => {
+  resolveScenario: async (scenarioId, approachId) => {
+    const identity=get().s.discordId;
+    if(scenarioId.startsWith('canon_')&&identity&&isSnowflake(identity)){
+      try{const snapshot=await fetchCanon(scenarioId,approachId);if(get().s.discordId!==identity)return 'The signed-in resident changed.';if(snapshot)applyCanonSnapshot(snapshot);await pullServerInventory();return null;}catch(error){return error instanceof Error?error.message:'Campaign could not be saved.';}
+    }
     let err: string | null = null;
     mutate(set, (st) => {
       const result = resolveScenarioApproach(st, scenarioId, approachId);
@@ -630,6 +639,7 @@ export const useGame = create<Store>((set, get) => ({
       syncStorySpine(st);
       if (result.spawnCombat) {
         spawnScenarioCombat(st, scenarioId);
+        if(st.combat)st.combat.scenarioChoice={scenarioId,approachId};
       }
       if (result.followUpId) {
         const cue = presenceLineForSituation(st, result.followUpId);
@@ -1500,7 +1510,7 @@ export const useGame = create<Store>((set, get) => ({
         if (t) t.status = "active";
         st.shift.activeId = id;
         st.screen = "arcade";
-        st.toast = "T-0888 glass is live. A scored win pays the vault and closes this job.";
+        st.toast = "Thirty-Eight glass is live. A scored win pays the vault and closes this job.";
       });
       return null;
     }
@@ -1607,4 +1617,15 @@ if (typeof window !== "undefined") {
     hackPick: (word: string) => useGame.getState().hackPick(word),
     setState: (partial: Parameters<typeof useGame.setState>[0]) => useGame.setState(partial),
   };
+}
+
+const canonRevisions=new Map<string,number>();
+export function applyCanonSnapshot(snapshot:CanonSnapshot){
+ const id=useGame.getState().s.discordId??'guest';if(snapshot.revision<(canonRevisions.get(id)??-1))return;canonRevisions.set(id,snapshot.revision);
+ useGame.setState(store=>{const s=cloneState(store.s),n=snapshot.narrative,local=s.narrative??n;
+ s.narrative={...local,beats:{...Object.fromEntries(Object.entries(local.beats).filter(([id])=>!id.startsWith('canon_')&&!id.startsWith('resolved:canon_'))),...n.beats},flags:{...local.flags,...n.flags},factions:n.factions,journal:[...n.journal,...local.journal.filter(j=>!n.journal.some(other=>other.id===j.id))].slice(0,48),endingId:n.endingId,act:n.endingId?'ending':local.act};
+ s.tyrone.relationship.trust=snapshot.trust;
+ const routes:Record<string,[LocationId,LocationId?]>={canon_hound:['ironclad','kingdom'],canon_furnace:['kingdom','caverns'],canon_survey:['caverns','library'],canon_archive:['library','veyra'],canon_boundary:['veyra']};
+ for(const [beat,[loc,next]] of Object.entries(routes))if(n.beats[beat]?.status==='done'){s.locations[loc].bossDefeated=true;if(next)s.locations[next].unlocked=true;}
+ if(snapshot.toast)s.toast=snapshot.toast;return{s};});useGame.getState().persist();
 }
