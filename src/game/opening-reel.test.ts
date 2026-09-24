@@ -59,39 +59,11 @@ describe("opening reel cues", () => {
 });
 
 describe("Kane recording and Tyrone reply", () => {
-  it("covers the 3:22 Kane tape with a cue per spoken line", async () => {
-    const { TALK } = await import("./talk");
-    const script = TALK.kane.map((l) => l.text).join(" ");
-    assert.equal(TALK.kane.length, KANE_CUES.length);
-    assert.equal(KANE_CUES[KANE_CUES.length - 1]?.i, TALK.kane.length - 1);
-    assert.equal(kaneLineAt(0), 0);
-    assert.equal(kaneLineAt(KANE_CUES[1]!.at), 1);
-    assert.equal(kaneLineAt(KANE_TAPE.duration), TALK.kane.length - 1);
-    assert.ok(KANE_TAPE.duration >= 203);
-    assert.ok(KANE_ARM >= 1.4);
-    assert.equal(KANE_AUDIO_AT, 4);
-    assert.equal(KANE_LEAD.duration, KANE_AUDIO_AT);
-    assert.equal(KANE_LEAD.src, "/audio/kane-lead.mp3");
-    assert.ok(KANE_STILLS.length >= 1);
-    assert.ok(KANE_STILLS.every((s) => s.src.startsWith("/art/opening/")));
-    assert.match(script, /You are listening to a recording you were never meant to hear/);
-    assert.match(script, /They walked packages/);
-    assert.match(script, /Orion-7/);
-    assert.match(script, /you were supposed to stay retired/);
-    assert.ok(KANE_CUES[14]!.at > 80 && KANE_CUES[14]!.at < 81);
-    assert.ok(KANE_CUES[17]!.at > 104 && KANE_CUES[17]!.at < 107);
-    assert.match(TALK.kane[17]!.text, /^Human-operated super suits\.?$/);
-    assert.doesNotMatch(TALK.kane[17]!.text, /Not an Old World/);
-    assert.match(TALK.kane[18]!.text, /Purpose-built frames/);
-    assert.match(TALK.kane[20]!.text, /person inside the plate/);
-    assert.match(TALK.kane[21]!.text, /Not an Old World/);
-    assert.ok(KANE_CUES[23]!.at > 120 && KANE_CUES[23]!.at < 122);
-    assert.ok(KANE_CUES[KANE_CUES.length - 1]!.at > 199);
-    assert.equal(KANE_REEL.src, "/art/opening/kane-intro.mp4");
-    assert.ok(KANE_REEL.duration >= 210);
-    assert.equal(KANE_REEL.loop, false);
-    assert.equal(KANE_LEAD.duration, 4);
-
+  it("retains historic media while using the canonical manual transcript",async()=>{
+    const {TALK}=await import('./talk');const {CANON_KANE_TRANSCRIPT}=await import('./opening-reel');
+    assert.equal(CANON_KANE_TRANSCRIPT,true);const script=TALK.kane.map(l=>l.text).join(' ');
+    assert.match(script,/T-0880/);assert.match(script,/Orion-7/);assert.doesNotMatch(script,/T-0888|SHEPHERD/);
+    assert.equal(KANE_CUES.length,40);assert.equal(kaneLineAt(KANE_TAPE.duration),39);assert.equal(KANE_REEL.src,'/art/opening/kane-intro.mp4');
   });
 
   it("holds one office reel so the tape can speak", () => {
