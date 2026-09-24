@@ -249,7 +249,7 @@ export function shiftRadio(kind: string) {
     run: "Tyrone · Caps on the card. Feet on the ground. That is a shift.",
     tribute: "Tyrone · Kane collects. Pay, stall, or make him work for it.",
     crisis: "Tyrone · This is the board telling the truth. Handle it before the next watch.",
-    cabinet: "Tyrone · T-0888 is scored. Play it like a job, not a carnival.",
+    cabinet: "Tyrone · Thirty-Eight is scored. Play it like a job, not a carnival.",
     market: "Tyrone · The Exchange is closed. The Gate still sells if you walk it.",
     tower: "Tyrone · Climb. Listen. The tower talks whether we are on it or not.",
     salvage: "Tyrone · Pin a site. The map is the job. Dice are the loud ones.",

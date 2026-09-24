@@ -5,7 +5,7 @@ import type { CatalogItem } from "./hollow-catalog";
  * These are intentionally region-authored so later zones feel materially
  * different instead of sharing one generic loot pool.
  */
-export const TREASURE_CATALOG: CatalogItem[] = [
+const LEGACY_TREASURE_CATALOG: CatalogItem[] = [
   // IRONCLAD
   { name: "Railmaster's Torque", kind: "trinket", rarity: "Rare", effect: "+2 to rail, gate and heavy machinery checks.", lore: "Stamped with three defunct rail companies and one fresh bloodstain.", value: 1450, sourceRegion: "ironclad", classHint: "Merchant" },
   { name: "Pressure-Seal Plate", kind: "material", rarity: "Uncommon", effect: "Vault-grade plate used by higher-tier Vault 13 expansions.", lore: "Cut from a bunker door that lost the argument with time.", value: 620, sourceRegion: "ironclad" },
@@ -66,3 +66,5 @@ export const TREASURE_CATALOG: CatalogItem[] = [
   { name: "Null Warden Memory Shard", kind: "special", rarity: "Mythic", effect: "Apex boss treasure. Future endgame systems may consume it.", lore: "Contains twelve seconds of memory from something that should not remember being human.", value: 24000, sourceRegion: "veyra" },
   { name: "Skyline Exoshell", kind: "armor", rarity: "Mythic", defense: 5, effect: "+1 STR, +1 SPD and resistance to rift damage.", lore: "Designed for city security teams that expected the skyline itself to attack.", value: 26000, sourceRegion: "veyra", classHint: "Warrior" },
 ];
+
+export const TREASURE_CATALOG=LEGACY_TREASURE_CATALOG.filter(row=>row.kind==="material"&&row.rarity!=="Cursed");

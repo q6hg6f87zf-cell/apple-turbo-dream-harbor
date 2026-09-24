@@ -1,3 +1,4 @@
+import {CANON_KANE_TRANSCRIPT} from "./opening-reel";
 import {
   ac,
   addMuteHook,
@@ -778,6 +779,7 @@ export async function playFoundYou() {
 }
 
 export function armKanePicture() {
+  if(CANON_KANE_TRANSCRIPT){++kaneLeadGen;live?.el.pause();introChapter='kane';mode='intro';introHold=null;currentTime=0;playing=false;kaneVoiceStarted=false;emit();return;}
   const my = ++kaneLeadGen;
   kaneVoiceStarted = false;
   kaneClickPlayed = false;
@@ -818,6 +820,7 @@ export function cueKaneVoiceFromPicture(t: number) {
 }
 
 export async function startKaneVoice() {
+  if(CANON_KANE_TRANSCRIPT)return;
   if (introChapter !== "kane" || kaneVoiceStarted || kaneVoiceStarting) return;
   kaneVoiceStarting = true;
   ac();

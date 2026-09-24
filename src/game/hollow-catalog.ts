@@ -18,7 +18,7 @@ export interface CatalogItem extends WeaponSpec {
   unlockRegion?: RegionId;
 }
 
-export const HOLLOW_FIELD_CATALOG: CatalogItem[] = [
+const LEGACY_FIELD_CATALOG: CatalogItem[] = [
   // IRONCLAD · practical, heavy, repairable.
   { name: "Vault 13 Work Knife", kind: "weapon", rarity: "Common", damage: "1d4", effect: "+1 on salvage checks involving cable, cloth or seals.", lore: "Issued from a drawer that has been labelled TEMPORARY since before anyone remembers.", value: 85, sourceRegion: "ironclad", classHint: "Rogue", weaponFamily: "melee", rangeBand: "close" },
   { name: "Rivetguard Vest", kind: "armor", rarity: "Common", defense: 1, effect: "First environmental chip damage each sortie is ignored.", lore: "Leather, boiler plate and enough rivets to offend an engineer.", value: 180, sourceRegion: "ironclad", classHint: "Warrior" },
@@ -70,4 +70,5 @@ export const HOLLOW_FIELD_CATALOG: CatalogItem[] = [
   { name: "Arc Lance", kind: "weapon", rarity: "Legendary", damage: "2d10", effect: "Chain 1 damage to a second nearby target on strong hit. AP 2.", lore: "Military-grade current wrapped in museum-grade design.", value: 5900, sourceRegion: "veyra", classHint: "Wizard", weaponFamily: "energy", ammoType: "cell", rangeBand: "mid", ap: 2, accuracy: 1, magSize: 8, mag: 8 },
 ];
 
+export const HOLLOW_FIELD_CATALOG=LEGACY_FIELD_CATALOG.filter(row=>['Vault 13 Work Knife','Rivetguard Vest','Ash Filter Respirator','Med-Gel Ampoule','Scrapsteel Bundle','Cinderlung Serum','Refractory Plate','Survey Lens','Blackglass Sample','Sealant Canister','Pressure Bandage','Citizen Prism','Genesis Ampoule','Dredger Coat'].includes(row.name));
 export const HOLLOW_CATALOG: CatalogItem[] = [...HOLLOW_FIELD_CATALOG, ...ARSENAL_CATALOG];

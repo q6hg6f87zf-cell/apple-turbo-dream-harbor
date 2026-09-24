@@ -26,6 +26,7 @@ export function PauseMenu({ open, onClose, initial = "menu" }: { open: boolean; 
   const s = useGame((g) => g.s);
   const setScreen = useGame((g) => g.setScreen);
   const resolveScenario = useGame((g) => g.resolveScenario);
+  const [chosen,setChosen]=useState<string|null>(null);
   const [pane, setPane] = useState<Pane>(initial);
   useEffect(() => {
     if (open) setPane(initial);
@@ -40,7 +41,7 @@ export function PauseMenu({ open, onClose, initial = "menu" }: { open: boolean; 
     scenarios.find((x) => x.poiId && x.poiId === s.selectedPoiId) ??
     scenarios.find((x) => x.locationId && x.locationId === s.selectedLoc) ??
     scenarios[0];
-  const openScenario = pinned;
+  const openScenario = scenarios.find(x=>x.id===chosen)??pinned;
 
   return (
     <div className="fixed inset-0 z-[140] flex items-end justify-center md:items-center" data-pause-menu="1" role="dialog" aria-label="Field menu">
@@ -155,8 +156,9 @@ export function PauseMenu({ open, onClose, initial = "menu" }: { open: boolean; 
             </div>
           ) : null}
 
+          {pane==='scenario'?<div className="mb-3 flex flex-wrap gap-2" aria-label="Available situations">{scenarios.map(scene=><button type="button" key={scene.id} className="min-h-11 rounded border border-line px-3 text-label text-paper" onClick={()=>setChosen(scene.id)}>{scene.title}</button>)}</div>:null}
           {pane === "scenario" && openScenario ? (
-            <ScenarioPane
+            <ScenarioPane key={openScenario.id}
               scenarioId={openScenario.id}
               onBack={() => setPane("menu")}
               onResolved={onClose}
@@ -209,9 +211,10 @@ function ScenarioPane({
   scenarioId: string;
   onBack: () => void;
   onResolved: () => void;
-  resolve: (scenarioId: string, approachId: string) => string | null;
+  resolve: (scenarioId: string, approachId: string) => Promise<string | null>;
 }) {
   const s = useGame((g) => g.s);
+  const [busy,setBusy]=useState(false);const [error,setError]=useState<string|null>(null);
   const def = scenarioById(scenarioId);
   if (!def) return null;
   const approaches = availableApproaches(s, def);
@@ -221,6 +224,7 @@ function ScenarioPane({
       <button type="button" className="text-label uppercase tracking-[0.12em] text-ember" onClick={onBack}>
         ← Menu
       </button>
+      {error?<p role="alert" className="text-label text-danger">{error}</p>:null}
       <p className="text-secondary text-paper">{def.setup}</p>
       <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted">{def.locationLabel}</p>
       <div className="space-y-2">
@@ -229,13 +233,13 @@ function ScenarioPane({
             key={a.id}
             type="button"
             data-scenario-approach={a.id}
+            disabled={busy}
             className={cn(
               "flex min-h-12 w-full flex-col items-start rounded-[var(--radius-sm)] border border-line/50 bg-ink/40 px-3 py-2 text-left hover:border-ember/50",
             )}
-            onClick={() => {
-              sfx.click();
-              resolve(scenarioId, a.id);
-              onResolved();
+            onClick={async () => {
+              if(busy)return;sfx.click();setBusy(true);setError(null);
+              try{const error=await resolve(scenarioId,a.id);if(error)setError(error);else onResolved();}catch(error){setError(error instanceof Error?error.message:'Could not save this choice.');}finally{setBusy(false);}
             }}
           >
             <span className="font-display text-body text-paper">{a.label}</span>

@@ -53,6 +53,7 @@ export type AttachmentSlot =
   | "receiver";
 
 export type AmmoType =
+  | ".357" | ".45-70" | ".50" | "survey" | "12g-magnum" | "violet-plasma" | "10mm" | "5.7" | "8.6"
   | "9mm"
   | ".45"
   | "5.56"
@@ -621,6 +622,8 @@ export interface Combatant {
 }
 
 export interface CombatState {
+  aimId?: string; supportUsed?: boolean; suppressNext?: boolean;
+  scenarioChoice?: {scenarioId:string;approachId:string};
   locationId: LocationId;
   missionKind: MissionKind;
   partyIds: string[];
@@ -822,6 +825,7 @@ export interface TravisBay {
 export type NarrativeState = import("./narrative-state").NarrativeState
 
 export interface GameState {
+  combatSupplies?: Record<string, Pick<Item,"mag"|"ammoCount"|"loadAp"|"loadDamage"|"loadAccuracy">>;
   version: number;
   started: boolean;
   tutorial: TutorialStep;

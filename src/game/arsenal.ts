@@ -1,3 +1,4 @@
+import {CANON_EQUIPMENT,canonEquipment} from './canon-equipment';
 import { gradeFromLoad } from "./ammo-matrix";
 import type {
   AmmoType,
@@ -172,9 +173,10 @@ function gunFrom(frame: Frame, region: RegionId): ArsenalEntry {
   };
 }
 
-const GUNS: ArsenalEntry[] = FRAMES.flatMap((frame) =>
-  (frame.regions ?? REGIONS).map((region) => gunFrom(frame, region)),
-);
+const GUNS:ArsenalEntry[]=FRAMES.filter(f=>!['Coil Pistol','Arc Rifle','Phase Carbine','Rail Cannon','L9 Long'].includes(f.stem)).map(frame=>{
+ const region:RegionId=frame.family==='energy'?'veyra':frame.unlockRegion??(frame.family==='sniper'?'blackspire':'ironclad');
+ const row=gunFrom(frame,region);return {...row,name:frame.stem==='Pump'?'Pump Shotgun':frame.stem==='L8 Rifle'?'L8 Coherent':frame.stem,rarity:frame.rarity,unlockRegion:frame.family==='energy'?'veyra':frame.unlockRegion};
+});
 
 const UNIQUES: ArsenalEntry[] = [
   {
@@ -635,12 +637,14 @@ function dedupe(list: ArsenalEntry[]): ArsenalEntry[] {
   return out;
 }
 
+const CANON_AMMO:ArsenalEntry[]=Array.from(new Map(CANON_EQUIPMENT.filter(r=>r.ammoType).map(r=>[r.ammoType,r])).values()).filter(r=>!['.338','6.8'].includes(r.ammoType!)).map(r=>({name:`${r.ammoType} Service Box`,kind:'consumable',rarity:'Rare',ammoType:r.ammoType,ammoCount:Math.max(6,(r.magSize??4)*2),effect:`Compatible ${r.ammoType} ammunition.`,lore:`Issued for ${r.name}; incompatible calibers cannot be substituted.`,sourceRegion:r.sourceRegion,value:400,...(r.sourceRegion==='veyra'?{unlockRegion:'veyra' as const}:{})}));
 export const ARSENAL_CATALOG: ArsenalEntry[] = dedupe([
   ...GUNS,
-  ...UNIQUES,
+  ...UNIQUES.filter(row=>["Pack Tooth","Furnace Court M14","Ashen Gate M94","Cinder Bess"].includes(row.name)),
   ...ATTACHMENTS,
-  ...AMMO,
-  ...ARMOR_EXTRA,
+  ...AMMO.filter(row=>row.ammoType!=="cell"&&row.ammoType!=="rail").map(row=>row.ammoType==="laser"?{...row,sourceRegion:"veyra" as const,unlockRegion:"veyra" as const}:row),
+  ...CANON_AMMO,
+  ...ARMOR_EXTRA.filter(row=>/Plate Carrier|Bulwark|Dredger/.test(row.name)),
   ...CONSUMABLE_EXTRA,
 ]);
 
@@ -674,13 +678,10 @@ function aliasName(name: string): string {
   return out;
 }
 
-export function arsenalByName(name: string): ArsenalEntry | undefined {
-  const key = name.trim().toLowerCase();
-  const hit = ARSENAL_CATALOG.find((row) => row.name.toLowerCase() === key);
-  if (hit) return hit;
-  const aliased = aliasName(name).trim().toLowerCase();
-  if (aliased === key) return undefined;
-  return ARSENAL_CATALOG.find((row) => row.name.toLowerCase() === aliased);
+export function arsenalByName(name:string):ArsenalEntry|undefined{
+ const signature=canonEquipment(name);if(signature)return signature;
+ const aliased=aliasName(name).replace(/^(Watchworks|Union Forge|Nine-Lift|Dockcoil|Surplus 2753) /,'').replace(/^Pump$/,'Pump Shotgun').replace(/^L8 Rifle$/,'L8 Coherent');
+ return ARSENAL_CATALOG.find(r=>r.name.toLowerCase()===name.toLowerCase())??ARSENAL_CATALOG.find(r=>r.name.toLowerCase()===aliased.toLowerCase());
 }
 
 /** Location IDs that hold each region's campaign flag. */
@@ -776,8 +777,7 @@ export const CALIBER_ROSTER: {
   { model: "M10 Battle", ammo: ".308", family: "rifle", note: "Modern .308. Mag dumps with manners." },
   { model: "M24 Marksman", ammo: ".308", family: "sniper", note: "Long is home. Close is a problem." },
   { model: "M70 Magnum", ammo: ".300", family: "sniper", unlockRegion: "blackspire", note: ".300 Win Mag. After Slag Town. Recoil is a lifestyle." },
-  { model: "L4 Pulse", ammo: "laser", family: "energy", unlockRegion: "blackspire", note: "Arc III. Blackspire. Coil cells will not seat." },
-  { model: "L6 Carbine", ammo: "laser", family: "energy", unlockRegion: "brasswater", note: "Arc IV. Brasswater. No recoil. Powered plate notices." },
-  { model: "L8 Rifle", ammo: "laser", family: "energy", unlockRegion: "veyra", note: "Arc V. Veyra. Long laser. AP 2 vs AEGIS." },
-  { model: "L9 Long", ammo: "laser", family: "energy", unlockRegion: "veyra", note: "Arc V. Successor-pattern coherent. After the Sink." },
+  { model: "L4 Pulse", ammo: "laser", family: "energy", unlockRegion: "veyra", note: "Veyra. Blackspire. Coil cells will not seat." },
+  { model: "L6 Carbine", ammo: "laser", family: "energy", unlockRegion: "veyra", note: "Veyra. Brasswater. No recoil. Powered plate notices." },
+  { model: "L8 Coherent", ammo: "laser", family: "energy", unlockRegion: "veyra", note: "Arc V. Veyra. Long laser. AP 2 vs AEGIS." },
 ];

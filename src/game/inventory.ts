@@ -25,7 +25,7 @@ export const PACK_CATALOG: Record<
     useName: "bobby_pin",
     rarity: "Common",
     blurb: "Old lockpick leftover. New files start with 3.",
-    use: "Spend on the T-0888 lockpick cabinet. Miss and it snaps.",
+    use: "Spend on the Thirty-Eight lockpick cabinet. Miss and it snaps.",
     usable: true,
   },
   stimpak: {
@@ -71,7 +71,7 @@ export const PACK_CATALOG: Record<
 };
 
 const BOBBY_LINES = [
-  "Seat it in the T-0888 lockpick cabinet. The sweet spot is mean.",
+  "Seat it in the Thirty-Eight lockpick cabinet. The sweet spot is mean.",
   "Pins live on the glass now. Don't snap the last one.",
   "Three was the starter kit. The cabinet is why.",
 ];

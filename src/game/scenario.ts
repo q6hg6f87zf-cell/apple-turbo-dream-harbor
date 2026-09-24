@@ -1,3 +1,5 @@
+import {CANON_SCENARIOS} from './canon-campaign';
+import {canonItem,type Acquisition} from './canon-equipment';
 /**
  * Scenario architecture — authored situations with multiple approaches and
  * fail-forward outcomes. Options derive from narrative + world state.
@@ -25,6 +27,7 @@ export type ScenarioOutcomeKind =
 
 export interface ScenarioApproach {
   id: ScenarioApproachId;
+  grants?:string[]; acquisition?:Acquisition; trustDelta?:number; clearRegion?:LocationId; ending?:string;
   label: string;
   blurb: string;
   /** Diegetic reason this option exists (shown to player). */
@@ -62,6 +65,7 @@ export interface ScenarioDef {
 }
 
 export const SCENARIOS: ScenarioDef[] = [
+  ...CANON_SCENARIOS,
   {
     id: "caravan_missing",
     title: "Missing Caravan",
@@ -741,7 +745,7 @@ export function scenarioAtPoi(
 }
 
 export function availableApproaches(state: GameState, scenario: ScenarioDef): ScenarioApproach[] {
-  return scenario.approaches.filter((a) => checksPass(state, a.require));
+  return scenario.approaches.filter((a) => checksPass(state, a.require) && state.narrative?.beats[`resolved:${scenario.id}:${a.id}`]?.status !== "done");
 }
 
 export interface ScenarioResolveResult {
@@ -782,7 +786,7 @@ export function resolveScenarioApproach(
   opts?: { forceRoll?: number },
 ): ScenarioResolveResult | null {
   const scenario = scenarioById(scenarioId);
-  if (!scenario) return null;
+  if (!scenario || !checksPass(state,scenario.trigger) || checksPass(state,scenario.resolvedWhen) || state.combat || state.mission) return null;
   const approach = availableApproaches(state, scenario).find((a) => a.id === approachId);
   if (!approach) return null;
 
@@ -810,12 +814,18 @@ export function resolveScenarioApproach(
   const n = ensureNarrative(state);
   n.scenarioLog = [`${scenarioId}:${approachId}:${outcome}`, ...n.scenarioLog].slice(0, 32);
 
-  for (const f of approach.flagsSet ?? []) setFlag(state, f, true);
-  for (const f of approach.flagsClear ?? []) setFlag(state, f, false);
-
-  if (approach.faction) {
-    for (const [k, v] of Object.entries(approach.faction)) {
-      if (typeof v === "number") bumpFaction(state, k as keyof typeof approach.faction, v);
+  const succeeded=checkPassed!==false && outcome!=='combat';
+  n.beats[`resolved:${scenarioId}:${approachId}`]={id:`resolved:${scenarioId}:${approachId}`,status:'done',choiceId:approachId,day:state.day};
+  if(succeeded){
+    for(const f of approach.flagsSet??[])setFlag(state,f,true);
+    for(const f of approach.flagsClear??[])setFlag(state,f,false);
+    for(const [k,v] of Object.entries(approach.faction??{}))if(typeof v==='number')bumpFaction(state,k as keyof NonNullable<typeof approach.faction>,v);
+    if(approach.trustDelta)state.tyrone.relationship.trust=Math.max(0,Math.min(100,state.tyrone.relationship.trust+approach.trustDelta));
+    if(scenarioId.startsWith('canon_')){
+      n.beats[scenarioId]={id:scenarioId,status:'done',choiceId:approachId,day:state.day};
+      for(const name of approach.grants??[])if(![state.vault,...state.operatives.map(op=>op.inventory??[])].some(bag=>bag.some(i=>i.name===name)))state.vault.push(canonItem(name,`canon-${scenarioId}-${name}`,approach.acquisition??'found',state.day));
+      if(approach.clearRegion){state.locations[approach.clearRegion].bossDefeated=true;const next=({ironclad:'kingdom',kingdom:'caverns',caverns:'library',library:'veyra'} as Partial<Record<LocationId,LocationId>>)[approach.clearRegion];if(next)state.locations[next].unlocked=true;}
+      if(approach.ending){n.endingId=approach.ending;n.act='ending';}
     }
   }
   if (approach.heatDelta) {
@@ -834,14 +844,14 @@ export function resolveScenarioApproach(
       title: approach.journal.title,
       body:
         checkPassed === false
-          ? `${approach.journal.body} The roll went soft — the world noticed.`
-          : approach.journal.body,
+          ? `The approach failed: ${approach.label}. The evidence and promised rewards were not secured. Another approach remains possible.`
+          : outcome === "combat" ? `Contact begun: ${approach.label}. The outcome is not yet established.` : approach.journal.body,
       tags: approach.journal.tags ?? ["scenario"],
       id: `sc-${scenarioId}-${approachId}`,
     });
   }
 
-  if (approach.tyroneLine) {
+  if (approach.tyroneLine && succeeded) {
     rememberTyrone(state, {
       type: "mission",
       description: approach.tyroneLine,
@@ -884,4 +894,11 @@ export function resolveScenarioApproach(
     spawnCombat,
     followUpId,
   };
+}
+
+export function completeScenarioCombat(state:GameState,scenarioId:string,approachId:string){
+ const a=scenarioById(scenarioId)?.approaches.find(x=>x.id===approachId);if(!a)return;
+ for(const f of a.flagsSet??[])setFlag(state,f,true);for(const f of a.flagsClear??[])setFlag(state,f,false);
+ for(const [key,value] of Object.entries(a.faction??{}))if(typeof value==='number')bumpFaction(state,key as keyof NonNullable<typeof a.faction>,value);
+ if(a.journal)addJournal(state,{...a.journal,tags:a.journal.tags??[],act:ensureNarrative(state).act,id:`victory-${scenarioId}-${approachId}`});
 }
