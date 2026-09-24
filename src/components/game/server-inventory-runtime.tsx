@@ -1,3 +1,4 @@
+import {restoreSupplies} from '@/game/canon-combat';
 import { cloneState } from "@/game/engine";
 import { isSnowflake } from "@/game/discord";
 import {
@@ -54,9 +55,10 @@ function applySnapshot(snapshot: ServerInventorySnapshot, toast?: string) {
   try {
     useGame.setState((store) => {
       const s = cloneState(store.s);
-      s.vault = snapshot.items.filter((entry) => entry.ownerType === "vault").map((entry) => entry.item);
+      const liveItems=snapshot.items.map(entry=>({...entry,item:restoreSupplies(s,entry.item)}));
+      s.vault = liveItems.filter((entry) => entry.ownerType === "vault").map((entry) => entry.item);
       const byResident = new Map<string, Item[]>();
-      for (const entry of snapshot.items) {
+      for (const entry of liveItems) {
         if (entry.ownerType !== "resident" || !entry.residentId) continue;
         const list = byResident.get(entry.residentId) ?? [];
         list.push(entry.item);
