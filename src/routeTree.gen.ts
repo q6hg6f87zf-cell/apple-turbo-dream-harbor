@@ -27,6 +27,7 @@ import { Route as ApiDiscordStartRouteImport } from './routes/api/discord/start'
 import { Route as ApiGuestStartRouteImport } from './routes/api/guest/start'
 import { Route as ApiHollowAccessRouteImport } from './routes/api/hollow/access'
 import { Route as ApiHollowAcquisitionRouteImport } from './routes/api/hollow/acquisition'
+import { Route as ApiHollowCanonRouteImport } from './routes/api/hollow/canon'
 import { Route as ApiHollowChronicleRouteImport } from './routes/api/hollow/chronicle'
 import { Route as ApiHollowEconomyRouteImport } from './routes/api/hollow/economy'
 import { Route as ApiHollowInventoryRouteImport } from './routes/api/hollow/inventory'
@@ -127,6 +128,11 @@ const ApiHollowAcquisitionRoute = ApiHollowAcquisitionRouteImport.update({
   path: '/api/hollow/acquisition',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiHollowCanonRoute = ApiHollowCanonRouteImport.update({
+  id: '/api/hollow/canon',
+  path: '/api/hollow/canon',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiHollowChronicleRoute = ApiHollowChronicleRouteImport.update({
   id: '/api/hollow/chronicle',
   path: '/api/hollow/chronicle',
@@ -192,6 +198,7 @@ export interface FileRoutesByFullPath {
   '/api/guest/start': typeof ApiGuestStartRoute
   '/api/hollow/access': typeof ApiHollowAccessRoute
   '/api/hollow/acquisition': typeof ApiHollowAcquisitionRoute
+  '/api/hollow/canon': typeof ApiHollowCanonRoute
   '/api/hollow/chronicle': typeof ApiHollowChronicleRoute
   '/api/hollow/economy': typeof ApiHollowEconomyRoute
   '/api/hollow/inventory': typeof ApiHollowInventoryRoute
@@ -221,6 +228,7 @@ export interface FileRoutesByTo {
   '/api/guest/start': typeof ApiGuestStartRoute
   '/api/hollow/access': typeof ApiHollowAccessRoute
   '/api/hollow/acquisition': typeof ApiHollowAcquisitionRoute
+  '/api/hollow/canon': typeof ApiHollowCanonRoute
   '/api/hollow/chronicle': typeof ApiHollowChronicleRoute
   '/api/hollow/economy': typeof ApiHollowEconomyRoute
   '/api/hollow/inventory': typeof ApiHollowInventoryRoute
@@ -251,6 +259,7 @@ export interface FileRoutesById {
   '/api/guest/start': typeof ApiGuestStartRoute
   '/api/hollow/access': typeof ApiHollowAccessRoute
   '/api/hollow/acquisition': typeof ApiHollowAcquisitionRoute
+  '/api/hollow/canon': typeof ApiHollowCanonRoute
   '/api/hollow/chronicle': typeof ApiHollowChronicleRoute
   '/api/hollow/economy': typeof ApiHollowEconomyRoute
   '/api/hollow/inventory': typeof ApiHollowInventoryRoute
@@ -282,6 +291,7 @@ export interface FileRouteTypes {
     | '/api/guest/start'
     | '/api/hollow/access'
     | '/api/hollow/acquisition'
+    | '/api/hollow/canon'
     | '/api/hollow/chronicle'
     | '/api/hollow/economy'
     | '/api/hollow/inventory'
@@ -311,6 +321,7 @@ export interface FileRouteTypes {
     | '/api/guest/start'
     | '/api/hollow/access'
     | '/api/hollow/acquisition'
+    | '/api/hollow/canon'
     | '/api/hollow/chronicle'
     | '/api/hollow/economy'
     | '/api/hollow/inventory'
@@ -340,6 +351,7 @@ export interface FileRouteTypes {
     | '/api/guest/start'
     | '/api/hollow/access'
     | '/api/hollow/acquisition'
+    | '/api/hollow/canon'
     | '/api/hollow/chronicle'
     | '/api/hollow/economy'
     | '/api/hollow/inventory'
@@ -370,6 +382,7 @@ export interface RootRouteChildren {
   ApiGuestStartRoute: typeof ApiGuestStartRoute
   ApiHollowAccessRoute: typeof ApiHollowAccessRoute
   ApiHollowAcquisitionRoute: typeof ApiHollowAcquisitionRoute
+  ApiHollowCanonRoute: typeof ApiHollowCanonRoute
   ApiHollowChronicleRoute: typeof ApiHollowChronicleRoute
   ApiHollowEconomyRoute: typeof ApiHollowEconomyRoute
   ApiHollowInventoryRoute: typeof ApiHollowInventoryRoute
@@ -509,6 +522,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiHollowAcquisitionRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/hollow/canon': {
+      id: '/api/hollow/canon'
+      path: '/api/hollow/canon'
+      fullPath: '/api/hollow/canon'
+      preLoaderRoute: typeof ApiHollowCanonRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/hollow/chronicle': {
       id: '/api/hollow/chronicle'
       path: '/api/hollow/chronicle'
@@ -594,6 +614,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiGuestStartRoute: ApiGuestStartRoute,
   ApiHollowAccessRoute: ApiHollowAccessRoute,
   ApiHollowAcquisitionRoute: ApiHollowAcquisitionRoute,
+  ApiHollowCanonRoute: ApiHollowCanonRoute,
   ApiHollowChronicleRoute: ApiHollowChronicleRoute,
   ApiHollowEconomyRoute: ApiHollowEconomyRoute,
   ApiHollowInventoryRoute: ApiHollowInventoryRoute,
