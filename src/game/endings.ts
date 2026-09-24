@@ -143,17 +143,4 @@ export function applyEnding(state: GameState, id?: EndingId): EndingDef | null {
 }
 
 /** Soft check at dawn — never blindsides early game. */
-export function considerEndingAtDawn(state: GameState): EndingDef | null {
-  if (!endingEligible(state)) return null;
-  // Only auto-close once the player has finished the invoice or halo branch.
-  if (
-    !hasFlag(state, "invoice_copied") &&
-    !hasFlag(state, "invoice_burned") &&
-    !hasFlag(state, "invoice_sold") &&
-    !hasFlag(state, "halo_reported") &&
-    !hasFlag(state, "halo_ambushed")
-  ) {
-    return null;
-  }
-  return applyEnding(state);
-}
+export function considerEndingAtDawn(_state: GameState): EndingDef | null { return null; }
