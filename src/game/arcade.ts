@@ -246,7 +246,7 @@ const SHAPE_DECOYS = [
   "VAULT 76",
   "VAULT 11",
   "T-0880",
-  "T-0888",
+  "Thirty-Eight",
   "T-2753",
   "T-0013",
   "AEGIS 2753",
@@ -386,7 +386,7 @@ export function settleArcade(state: GameState, pay: ArcadePayout): void {
   if (xp) grantXp(state, xp);
   if (pay.loc) addIntel(state, pay.loc);
   if (pay.moonFavor) state.moonFavor += pay.moonFavor;
-  if (pay.pack) grantPackLoot(state, { source: "T-0888" });
+  if (pay.pack) grantPackLoot(state, { source: "Thirty-Eight" });
   if (pay.packKey && !pay.pack) addPack(state, pay.packKey as PackKey, 1);
   const a = state.arcade;
   if (pay.retireId && pay.retireKind === "trivia" && !a.triviaSeen.includes(pay.retireId)) a.triviaSeen.push(pay.retireId);
@@ -404,7 +404,7 @@ export function settleArcade(state: GameState, pay: ArcadePayout): void {
           ? ` · +${Math.max(1, Math.round(caps * 0.25))} on the card`
           : "";
   const line = pay.note + (caps ? ` +${caps} caps${card}` : "") + (xp ? ` · +${xp} XP` : "");
-  pushLog(state, "loot", "T-0888", line);
+  pushLog(state, "loot", "Thirty-Eight", line);
   state.toast = line;
   if (caps > 0) finishCabinetJob(state, line);
 }
