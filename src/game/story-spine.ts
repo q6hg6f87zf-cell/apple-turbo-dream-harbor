@@ -1,3 +1,4 @@
+import {CANON_SCENARIOS} from './canon-campaign';
 /**
  * Main-story spine for Hollow Realm — built on existing Kane / Project Vesper /
  * TyroneBot / AEGIS canon. Beats gate content; they do not replace day boards.
@@ -348,6 +349,13 @@ export function activeStoryBeat(state: GameState): StoryBeatDef | null {
 }
 
 export function storyObjective(state: GameState): string {
+ if(forged(state)&&(state.tutorial==='done'||state.narrative?.beats.canon_bay)){
+  if(state.narrative?.endingId)return `Epilogue · ${state.narrative.endingId.replaceAll('_',' ')}`;
+  const next=CANON_SCENARIOS.find(scene=>!state.narrative?.beats[scene.id]&&checksPass(state,scene.trigger));
+  if(next)return `${next.title} · Open Pause → Situation.`;
+  const pending=CANON_SCENARIOS.find(scene=>!state.narrative?.beats[scene.id]&&checksPass(state,scene.trigger.filter(c=>c.type!=='region_intel_gte')));
+  const gate=pending?.trigger.find(c=>c.type==='region_intel_gte');if(gate?.type==='region_intel_gte')return `${pending!.title} · Gather ${gate.n} Intel in ${pending!.locationLabel}.`;
+ }
   const beat = activeStoryBeat(state);
   if (beat) return beat.objective;
   if (!forged(state)) return "Cut your file in the Machine Shop.";
