@@ -1,3 +1,4 @@
+import {bossIntent,tyroneRebuilt,fieldLoad} from '@/game/canon-combat';
 import { Button } from "@/components/ui/button";
 import { CLASS_GIFT, COMPANIONS, PRIMARY_STAT, locById, villainById, WORLD } from "@/game/data";
 import { className, displayLineage, displayRace } from "@/game/presentation";
@@ -342,8 +343,11 @@ const ACT_SHORT = {
 } as const;
 
 const ACT_HELP = {
-  strike: "d20 + primary vs DC. Magazines matter. Dry click is half damage and a -4.",
-  guard: "Hold. +2 DEF this round.",
+  aim:"Costs a turn. Next strike: +3 accuracy, +1 AP.",
+  reload:"Seat compatible ammunition. Costs a turn.",
+  support:"After the rebuild: heal an ally and disrupt sensors once per encounter.",
+  strike: "d20 + primary vs DC. Magazines matter. Dry clicks spend a turn. Reload before firing.",
+  guard: "Guard disrupts the prepared attack and raises defense this round.",
   skill: "Signature. The thing they are known for.",
   gift: "Once per day. Do not waste it.",
   item: "Burn a consumable from the rucksack. Ammo is not a drink.",
@@ -469,7 +473,7 @@ export function CombatOverlay() {
         "3": "skill",
         "4": "gift",
         "5": "item",
-        "6": "flee",
+        "6": "flee", "7":"aim", "8":"reload", "9":"support",
       };
       const a = map[e.key];
       if (!a) return;
@@ -497,6 +501,9 @@ export function CombatOverlay() {
     ? [
         { id: "strike", label: "Strike", icon: Swords, variant: "ember" },
         { id: "guard", label: "Guard", icon: Shield, variant: "ghost" },
+        {id:'aim',label:'Aim',icon:Swords,variant:'ghost'},
+        {id:'reload',label:'Reload',icon:Package,variant:'quiet',disabled:!actorGun?.ammoType},
+        {id:'support',label:'Tyrone',icon:Shield,variant:'ghost',disabled:!tyroneRebuilt(s)||combat.supportUsed},
         { id: "skill", label: actor.skillName, icon: Sparkles, variant: "ghost" },
         { id: "gift", label: CLASS_GIFT[actor.cls].name, icon: Heart, variant: "ghost", disabled: actor.giftUsed },
         { id: "item", label: "Item", icon: Package, variant: "quiet", disabled: !hasItem },
@@ -519,6 +526,9 @@ export function CombatOverlay() {
       />
 
       <div className="relative z-[1] flex min-h-0 flex-1 flex-col overflow-hidden">
+        <p role="status" className="px-4 pt-2 text-label text-ember">{bossIntent(s)}</p>
+        {actor?<p className="px-4 text-label text-muted">Load {fieldLoad(actor).load}/{fieldLoad(actor).capacity}{fieldLoad(actor).penalty?` · Overloaded: −${fieldLoad(actor).penalty} accuracy`:''}</p>:null}
+
         <div className="shrink-0 px-4 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))]">
           <div className="flex items-baseline justify-between gap-3">
             <span className="font-display text-label uppercase tracking-[0.22em] text-danger">
