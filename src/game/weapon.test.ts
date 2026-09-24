@@ -86,8 +86,8 @@ describe("arsenal catalog", () => {
   });
 
   it("does not clone the named legendaries already in the field catalog", () => {
-    assert.equal(HOLLOW_CATALOG.filter((r) => r.name === "Railspike Carbine").length, 1);
-    assert.equal(HOLLOW_CATALOG.filter((r) => r.name === "Obsidian Coilgun").length, 1);
+    assert.equal(HOLLOW_CATALOG.filter((r) => r.name === "Railspike Carbine").length, 0);
+    assert.equal(HOLLOW_CATALOG.filter((r) => r.name === "Obsidian Coilgun").length, 0);
   });
 
   it("chambers real rifle models and hunting calibers", () => {
@@ -107,7 +107,7 @@ describe("arsenal catalog", () => {
   });
 
   it("hydrates old Service Rifle names onto M16", () => {
-    assert.equal(arsenalByName("Watchworks Service Rifle")?.name, "Watchworks M16 Service");
+    assert.equal(arsenalByName("Watchworks Service Rifle")?.name, "M16 Service");
     assert.equal(arsenalByName("Furnace Court Service Rifle")?.name, "Furnace Court M14");
   });
 
@@ -115,27 +115,25 @@ describe("arsenal catalog", () => {
     const pulse = arsenalByName("Nine-Lift L4 Pulse")!;
     const carbine = arsenalByName("Dockcoil L6 Carbine")!;
     const long = arsenalByName("Surplus 2753 L8 Rifle")!;
-    const l9 = arsenalByName("Surplus 2753 L9 Long")!;
+    assert.equal(arsenalByName("Surplus 2753 L9 Long"),undefined);
     assert.equal(pulse.ammoType, "laser");
     const early = { day: 10, open: campaignOpenRegions(10) };
     assert.equal(arsenalUnlocked(pulse, early), false);
     assert.equal(arsenalUnlocked(carbine, early), false);
     assert.equal(arsenalUnlocked(long, early), false);
-    assert.equal(arsenalUnlocked(l9, early), false);
     assert.ok(!early.open.includes("veyra"));
     assert.ok(!early.open.includes("blackspire"));
 
     const afterSlag = { day: 20, open: ["ironclad", "slagtown", "blackspire"] as const };
-    assert.equal(arsenalUnlocked(pulse, { day: 20, open: [...afterSlag.open] }), true);
+    assert.equal(arsenalUnlocked(pulse, { day: 20, open: [...afterSlag.open] }), false);
     assert.equal(arsenalUnlocked(carbine, { day: 20, open: [...afterSlag.open] }), false);
 
     const afterBrass = { day: 30, open: ["ironclad", "slagtown", "blackspire", "brasswater"] as const };
-    assert.equal(arsenalUnlocked(carbine, { day: 30, open: [...afterBrass.open] }), true);
+    assert.equal(arsenalUnlocked(carbine, { day: 30, open: [...afterBrass.open] }), false);
     assert.equal(arsenalUnlocked(long, { day: 30, open: [...afterBrass.open] }), false);
 
     const veyra = { day: 40, open: ["ironclad", "slagtown", "blackspire", "brasswater", "veyra"] as const };
     assert.equal(arsenalUnlocked(long, { day: 40, open: [...veyra.open] }), true);
-    assert.equal(arsenalUnlocked(l9, { day: 40, open: [...veyra.open] }), true);
 
     const dayOne = rollMarket(1);
     assert.ok(!dayOne.lots.some((l) => l.ammoType === "laser"));
@@ -157,7 +155,7 @@ describe("arsenal catalog", () => {
   });
 
   it("lists every roster model", () => {
-    assert.equal(CALIBER_ROSTER.length, 14);
+    assert.equal(CALIBER_ROSTER.length, 13);
     assert.ok(CALIBER_ROSTER.every((row) => FRAMES_HAVE(row.model)));
   });
 });
@@ -342,11 +340,11 @@ describe("armor and bosses", () => {
     assert.ok(laser >= 12, `got ${laser}`);
   });
 
-  it("Gravenor is beast/close and weak to shotgun", () => {
+  it("Gravenor is human, armored and holds long range", () => {
     const g = VILLAINS.find((v) => v.id === "gravenor")!;
-    assert.equal(g.armorClass, "beast");
-    assert.equal(g.preferredRange, "close");
-    assert.ok(g.weakness?.includes("shotgun"));
+    assert.equal(g.armorClass, "plate");
+    assert.equal(g.preferredRange, "long");
+    assert.ok(g.weakness?.includes("sniper"));
     const dmg = applyArmor(6, {
       family: "shotgun",
       rangeBand: "close",
@@ -359,7 +357,7 @@ describe("armor and bosses", () => {
       roundsPerShot: 1,
       dry: false,
     }, foe({ armorClass: g.armorClass, preferredRange: g.preferredRange, resist: g.resist, weakness: g.weakness }));
-    assert.ok(dmg >= 8);
+    assert.ok(dmg>0&&dmg<=6);
   });
 
   it("quotes range: shotgun close vs long is a problem", () => {
