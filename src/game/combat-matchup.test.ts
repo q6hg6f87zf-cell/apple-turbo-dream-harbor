@@ -86,7 +86,7 @@ describe("the matchup layer reaches combat", () => {
   });
 
   it("a weakness hits harder than a resistance, on the same roll", () => {
-    // Gravenor: beast, resists melee, opens up to a shotgun.
+    // Gravenor: human escort, armored at long range; precision fire beats a blade.
     const runs = 600;
     const damage = (weapon: Item) => {
       let total = 0;
@@ -98,7 +98,7 @@ describe("the matchup layer reaches combat", () => {
       }
       return total / runs;
     };
-    const shot = damage(gun({ weaponFamily: "shotgun", ammoType: "12g", rangeBand: "close" }));
+    const shot = damage(gun({ weaponFamily: "sniper", ammoType: ".338", rangeBand: "long", ap:3, mag:4, magSize:4 }));
     const blade = damage(gun({ weaponFamily: "melee", rangeBand: "close" }));
     assert.ok(shot > blade + 0.5, `shotgun ${shot.toFixed(2)} should beat cleaver ${blade.toFixed(2)}`);
   });
@@ -149,7 +149,7 @@ describe("boss phases are mechanical", () => {
     assert.ok(speakers.length > 0, "no villain has a round of lucidity");
     for (const v of speakers) {
       assert.ok(v.lastWord, `${v.name} speaks and has nothing to say`);
-      let s = atBoss(v.id, gun({ weaponFamily: "shotgun", ammoType: "12g", rangeBand: "close" }));
+      let s = atBoss(v.id, gun({ weaponFamily: "sniper", ammoType: ".338", rangeBand: "long", ap:3, mag:4, magSize:4 }));
       s.combat!.enemies[0]!.hp = 1;
       let guard = 0;
       while (s.combat && !s.combat.reckoning && guard++ < 40) s = resolvePlayerAction(s, "strike");
@@ -173,7 +173,7 @@ describe("boss phases are mechanical", () => {
 describe("a beaten villain gets the last line", () => {
   it("the debrief carries the words, because the fight log does not survive it", () => {
     for (const v of VILLAINS) {
-      let s = atBoss(v.id, gun({ weaponFamily: "shotgun", ammoType: "12g", rangeBand: "close" }), 3);
+      let s = atBoss(v.id, gun({ weaponFamily: "sniper", ammoType: ".338", rangeBand: "long", ap:3, mag:4, magSize:4 }), 3);
       s.combat!.enemies[0]!.hp = 1;
       let guard = 0;
       while (s.combat && guard++ < 60) s = resolvePlayerAction(s, "strike");
@@ -195,7 +195,7 @@ describe("a focused villain hunts the one hurting it", () => {
     let onThreat = 0;
     let swings = 0;
     for (let i = 0; i < runs; i++) {
-      const s = atBoss("gravenor", gun({ weaponFamily: "shotgun", ammoType: "12g", rangeBand: "close" }), 3);
+      const s = atBoss("gravenor", gun({ weaponFamily: "sniper", ammoType: ".338", rangeBand: "long", ap:3, mag:4, magSize:4 }), 3);
       const enemy = s.combat!.enemies[0]!;
       enemy.phase = hunter;
       enemy.hp = v.phases[hunter]!.at;
