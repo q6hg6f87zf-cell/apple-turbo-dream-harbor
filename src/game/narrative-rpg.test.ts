@@ -146,7 +146,8 @@ describe("scenario fail-forward", () => {
     assert.ok(result);
     assert.equal(result!.checkPassed, false);
     assert.equal(result!.failForward, true);
-    assert.ok(hasFlag(s, "caravan_investigated"));
+    assert.equal(hasFlag(s, "caravan_investigated"),false);
+    assert.equal(resolveScenarioApproach(s,"caravan_missing","tracks",{forceRoll:20}),null);
     assert.ok(s.narrative!.journal.length >= 1);
   });
 
