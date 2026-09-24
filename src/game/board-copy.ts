@@ -11,7 +11,7 @@ export const BOARD_KIND_LABEL: Record<DayTaskKind, string> = {
   run: "Supply",
   tribute: "Kane",
   crisis: "Crisis",
-  cabinet: "T-0888",
+  cabinet: "Thirty-Eight",
   market: "Market",
   tower: "Relay",
   salvage: "Site",
