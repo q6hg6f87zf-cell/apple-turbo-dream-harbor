@@ -319,6 +319,8 @@ export type NarrativeCheck =
   | { type: "tutorial_done" }
   | { type: "character_forged" }
   | { type: "beat"; id: string; status: StoryBeatStatus }
+  | { type: "choice"; id: string; choices: string[] }
+  | { type: "item"; name:string }
   | { type: "all"; of: NarrativeCheck[] }
   | { type: "any"; of: NarrativeCheck[] };
 
@@ -362,6 +364,8 @@ export function checkNarrative(state: GameState, check: NarrativeCheck): boolean
       return state.operatives.some((o) => o.status !== "dead");
     case "beat":
       return beatStatus(state, check.id) === check.status;
+    case "choice": return check.choices.includes(state.narrative?.beats[check.id]?.choiceId ?? '');
+    case "item": return [state.vault??[],...state.operatives.map(op=>op.inventory??[])].some(bag=>bag.some(item=>item.name===check.name));
     case "all":
       return check.of.every((c) => checkNarrative(state, c));
     case "any":
