@@ -1,3 +1,4 @@
+import {CANON_KANE_TRANSCRIPT} from "@/game/opening-reel";
 import { Button } from "@/components/ui/button";
 import { sfx } from "@/game/audio";
 import { kaneLineAt, replyLineAt, wakeLineAt } from "@/game/opening-reel";
@@ -24,7 +25,7 @@ export function TalkOverlay() {
   const full = line ? renderTalk(line.text, state) : "";
   const locked = isTalkLocked(state);
   const pregame = isPregameTalk(state);
-  const liveTape = talk?.script === "wake" || talk?.script === "kane" || talk?.script === "tyrone-reply";
+  const liveTape = talk?.script === "wake" || (!CANON_KANE_TRANSCRIPT && talk?.script === "kane") || talk?.script === "tyrone-reply";
   const total = talk ? (TALK[talk.script]?.length ?? 1) : 1;
   shownRef.current = shown;
 
@@ -233,7 +234,7 @@ export function TalkOverlay() {
                   ? talk.script === "welcome"
                     ? "Tap to open Vault 13 · File holds her"
                     : talk.script === "kane"
-                      ? "Listening · Kane on the tape"
+                      ? "Tap to continue · recovered transcript"
                       : talk.script === "tyrone-reply"
                         ? "Listening · he is still in the room"
                       : talk.script === "wing"
