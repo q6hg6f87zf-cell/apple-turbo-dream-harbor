@@ -1,3 +1,5 @@
+import {CANON_EQUIPMENT} from './canon-equipment';
+import {RETIRED_EQUIPMENT} from './retired-equipment';
 import { ARMOR, BB_GUN, BB_TIN, LEDGER_POOLS, RACES, WEAPONS, resolveRaceName } from "./data";
 import { HOLLOW_CATALOG } from "./hollow-catalog";
 import { TREASURE_CATALOG } from "./treasure-catalog";
@@ -352,6 +354,7 @@ templates.push({
   value: 0,
 });
 
+for(const row of CANON_EQUIPMENT)templates.push({...row,key:keyFor(row.kind,row.name),slot:slotFor(row.kind)});
 const byKey = new Map<string, AuthorityItemTemplate>();
 for (const template of templates) if (!byKey.has(template.key)) byKey.set(template.key, template);
 
@@ -363,7 +366,7 @@ export function authorityTemplate(kind: ItemKind, name: string) {
 }
 
 export function authorityTemplateByKey(key: string) {
-  return byKey.get(key) ?? null;
+  return byKey.get(key) ?? RETIRED_EQUIPMENT.find(row=>row.key===key) ?? null;
 }
 
 export function legacyItemTemplate(raw: Pick<Item, "name" | "kind"> & Partial<Item>) {
@@ -433,6 +436,7 @@ export function itemFromAuthorityTemplate(
     equipped: !!opts?.equipped,
     value,
     tags: [
+      ...(CANON_EQUIPMENT.some(row=>row.name===template.name)?["canon:v3","unique",`owner:${CANON_EQUIPMENT.find(row=>row.name===template.name)!.owner}`]:[]),
       ...enchantments.flatMap((entry) => [`enchant:${entry.name}`, `enchant-rarity:${entry.rarity}`]),
       ...attachments.flatMap((entry) => [`socket:${entry.attachmentSlot}:${entry.name}`]),
     ],
@@ -454,9 +458,9 @@ export function itemFromAuthorityTemplate(
 }
 
 export const SERVER_TREASURE_BY_REGION: Record<RegionId, AuthorityItemTemplate[]> = {
-  ironclad: AUTHORITY_ITEM_CATALOG.filter((item) => item.sourceRegion === "ironclad"),
-  slagtown: AUTHORITY_ITEM_CATALOG.filter((item) => item.sourceRegion === "slagtown"),
-  blackspire: AUTHORITY_ITEM_CATALOG.filter((item) => item.sourceRegion === "blackspire"),
-  brasswater: AUTHORITY_ITEM_CATALOG.filter((item) => item.sourceRegion === "brasswater"),
-  veyra: AUTHORITY_ITEM_CATALOG.filter((item) => item.sourceRegion === "veyra"),
+  ironclad: AUTHORITY_ITEM_CATALOG.filter((item) => !CANON_EQUIPMENT.some(row=>row.name===item.name) && item.sourceRegion === "ironclad"),
+  slagtown: AUTHORITY_ITEM_CATALOG.filter((item) => !CANON_EQUIPMENT.some(row=>row.name===item.name) && item.sourceRegion === "slagtown"),
+  blackspire: AUTHORITY_ITEM_CATALOG.filter((item) => !CANON_EQUIPMENT.some(row=>row.name===item.name) && item.sourceRegion === "blackspire"),
+  brasswater: AUTHORITY_ITEM_CATALOG.filter((item) => !CANON_EQUIPMENT.some(row=>row.name===item.name) && item.sourceRegion === "brasswater"),
+  veyra: AUTHORITY_ITEM_CATALOG.filter((item) => !CANON_EQUIPMENT.some(row=>row.name===item.name) && item.sourceRegion === "veyra"),
 };
