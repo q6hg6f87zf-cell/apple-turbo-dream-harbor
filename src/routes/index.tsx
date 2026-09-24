@@ -1,3 +1,4 @@
+import {CanonCampaignRuntime} from '@/components/game/canon-campaign-runtime';
 import { createFileRoute } from '@tanstack/react-router'
 import { AuthorityClaimRuntime } from "@/components/game/authority-claim-runtime";
 import { CampaignBalancePanel } from "@/components/game/campaign-balance-panel";
@@ -47,6 +48,7 @@ function Home() {
       <ServerEconomyRuntime />
       <ServerProgressionRuntime />
       <ServerInventoryRuntime />
+      <CanonCampaignRuntime />
       <ClassAliasLayer />
       <CampaignBalanceRuntime />
       <ResidentProgressionRuntime />
