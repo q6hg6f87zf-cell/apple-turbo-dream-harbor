@@ -111,6 +111,24 @@ const ART = {
   mastKnife: "/art/items/mast-knife.jpg",
   manifest: "/art/items/manifest-rifle.jpg",
   warrant: "/art/items/warrant-spike.jpg",
+  lastReceipt: "/art/items/last-receipt.jpg",
+  houndsTooth: "/art/items/hounds-tooth.jpg",
+  gateSix: "/art/items/gate-six.jpg",
+  trueNorth: "/art/items/true-north.jpg",
+  paleHorse: "/art/items/pale-horse.jpg",
+  balance: "/art/items/the-balance.jpg",
+  saltWren: "/art/items/salt-wren.jpg",
+  cinderBess: "/art/items/cinder-bess.jpg",
+  cleaver: "/art/items/furnace-cleaver.jpg",
+  packTooth: "/art/items/pack-tooth.jpg",
+  greyGuitar: "/art/items/grey-guitar.jpg",
+  deadmanKey: "/art/items/deadman-key.jpg",
+  blackKey: "/art/items/black-key.jpg",
+  bottomKey: "/art/items/bottom-key.jpg",
+  clause: "/art/items/clause.jpg",
+  bayRoll: "/art/items/bay-13-roll.jpg",
+  helios: "/art/items/helios-regulator.jpg",
+  blackglass: "/art/items/blackglass-lattice.jpg",
 };
 
 function ammoStill(ammoType: AmmoType | undefined, name: string): string {
@@ -205,6 +223,24 @@ export function itemArt(input: {
   if (n === "mast knife") return ART.mastKnife;
   if (n === "manifest") return ART.manifest;
   if (n === "warrant spike") return ART.warrant;
+  if (n === "last receipt") return ART.lastReceipt;
+  if (n === "hound's tooth" || n === "hounds tooth") return ART.houndsTooth;
+  if (n === "gate six revolver") return ART.gateSix;
+  if (n === "true north") return ART.trueNorth;
+  if (n === "pale horse") return ART.paleHorse;
+  if (n === "the balance") return ART.balance;
+  if (/salt-wren|salt wren/.test(n)) return ART.saltWren;
+  if (/cinder bess/.test(n)) return ART.cinderBess;
+  if (/furnace cleaver/.test(n)) return ART.cleaver;
+  if (/pack-tooth|pack tooth/.test(n)) return ART.packTooth;
+  if (n === "grey guitar") return ART.greyGuitar;
+  if (n === "deadman key") return ART.deadmanKey;
+  if (n === "black key") return ART.blackKey;
+  if (n === "bottom key") return ART.bottomKey;
+  if (n === "clause") return ART.clause;
+  if (/bay 13 roll/.test(n)) return ART.bayRoll;
+  if (/helios thermal/.test(n)) return ART.helios;
+  if (/blackglass cognition|blackglass lattice/.test(n)) return ART.blackglass;
   if (/key|token|seal$|white token/.test(n) && /key|token|seal|warden/.test(n)) return ART.key;
   if (/grease/.test(n)) return ART.grease;
   if (/thermite/.test(n)) return ART.thermite;

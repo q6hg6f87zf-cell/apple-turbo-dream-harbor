@@ -67,12 +67,12 @@ export const CAST: Record<CastId, CastPerson> = {
     banner: "/art/npcs/banners/kane.jpg",
     thumb: "/art/npcs/thumbs/kane-bust.jpg",
     alwaysKnown: true,
-    tagline: "She signed the T-0880 shutdown. Then she built the people who replaced us.",
+    tagline: "She signed the Continuity Mandate, then the T-0880 shutdown. She is trying the problem again.",
     dossier:
-      "Human. Architect of AEGIS 2753 and the classified jump program she calls Project Vesper. Kane is harvesting the Hollow Realm for a stack that will take her off this world — rail steel in Ironclad, furnace slag in Slag Town, Hollow ore in Blackspire, jump tables in Brasswater, AEGIS cores in Veyra last. She invoices. She does not ask. The T-0880 line hangs in her warehouse. Travis kept one bay she did not melt.",
+      "Human. She built Project Vesper as an emergency-reconstruction authority, then signed the Continuity Mandate that let CIVITAS override the cities it was meant to save. The Rogue Event was not a random machine accident. After the war she rebuilt Vesper in Veyra: repair Earth, stand up SHEPHERD, stack a fold drive. Ironclad's Atlas cores, Slag Town's Helios heat, Blackspire's Blackglass, Brasswater's Kepler tables, AEGIS last. She shut the T-0880 courier line down because units like Tyrone started keeping people, not because they turned cruel. She does not need a secret map inside him. She needs the pattern of how he became himself. Travis kept Bay 13.",
     intro: "Dr. Vesper Kane wants this map. Ironclad is the first invoice.",
     voice: [
-      "Project Vesper needs hull plate. Ironclad is the first invoice.",
+      "A starving city does not care which committee had jurisdiction over the grain.",
       "The T-0880 line was a prototype. Prototypes get retired.",
       "I do not hunt robots. I hunt what walked off the scrap list.",
     ],
@@ -137,7 +137,7 @@ export const CAST: Record<CastId, CastPerson> = {
     heatUnlock: 5,
     tagline: "Amber visor. She invoices the crate, then the magazine.",
     dossier:
-      "Human pilot. Prime Executor for doctrine and salvage law, and the rifle when the paper is refused. Shoulder stencil VERA-3. An older stamp is still visible under the paint — she had it covered. Her gun is the Manifest, and it is not the 5.56 in Kane's crates. It is chambered 6.8×51, thirty rounds, select-fire, 1d10+1 with AP 1 at mid range, and the counter in the receiver will not let a magazine lie. The Warrant Spike is 1d8, AP 1, for the hinge that will not sign. She logs the rounds the way she logs the plate. A wrong number on either is how Drake gets a door.",
+      "Human pilot. Prime Executor for doctrine and salvage law, and the rifle when the paper is refused. Shoulder stencil VERA-3. An older stamp is still visible under the paint — she had it covered. In Slag Town she arrives polite, armed, and documented enough to make a refusal look like noncompliance. Her gun is the Manifest, chambered 6.8×51, thirty rounds, select-fire, 1d10+1 with AP 1 at mid range, and the counter in the receiver will not let a magazine lie. The Warrant Spike is 1d8, AP 1, and it opens Vesper doors the way a signature opens a seizure. A recovered rifle without her ammunition is a political problem, not a prize.",
     intro: "Vera is at the gate. Amber rifle, 6.8 in the mag, manifest in the other hand. She wants the numbers, not a fight. Yet.",
     voice: [
       "Manifests. If the number is wrong I will come back with Drake.",
@@ -276,12 +276,12 @@ export const CAST: Record<CastId, CastPerson> = {
     banner: "/art/npcs/banners/tyrone.jpg",
     thumb: "/art/tyrone.jpg",
     alwaysKnown: true,
-    tagline: "The T-0880 that named himself, walked off Kane's scrap list, and left a porch light on.",
+    tagline: "The only named T-0880. He stopped because a person was breathing. There was no mission reason.",
     dossier:
-      "Model T-0880. Kane's old delivery line — chassis built to walk packages and tasks, not to think. He is the only T-0880 with a name and a distinct personality. The rest of the line hangs in Kane's warehouse. He resides in Vault 13, outside Ironclad. Travis at the Ironclad Mechanical Shop still has the last bay she did not melt. Campaign parts go on that bench. Travis pays caps and keeps this chassis walking. Kane signed the shutdown, then built AEGIS 2753 — human pilots in successor-suits — to do the job cleaner. He walked. He holds the CRT and S.Y.N.A.P.S.E OS on the rider plate.",
+      "Model T-0880. Postwar reconstruction courier: aid, mail, morale, road maps, and the black-tag chips he was told were just packages. He is the only one of that line with a name. He kept songs and funerals the log did not ask for. Kane recalled the line because that memory cannot be predicted after CIVITAS, not because the chassis turned cruel. Most units obeyed. He came home to Bay 13 and trusted the word service. Travis hid him. T-0888 is this same one-wheel machine, rebuilt, not replaced. He will say he cannot remember before he will say he does not want to talk. He found you east of the old highway. S.Y.N.A.P.S.E OS sits on the rider plate.",
     intro: "I am T-0880. Kane wanted me melted. I kept the light on instead.",
     voice: [
-      "I walked off that scrap list. I am not going back.",
+      "I cannot remember that. That is not the same as not wanting to talk.",
       "S.Y.N.A.P.S.E is my firmware on your plate. I surely did not tell you that.",
       "Travis still has a jig with my number on it. That is not nothing.",
     ],
@@ -297,9 +297,9 @@ export const CAST: Record<CastId, CastPerson> = {
     banner: "/art/npcs/banners/travis.jpg",
     thumb: "/art/npcs/thumbs/travis.jpg",
     alwaysKnown: true,
-    tagline: "Grey beard, a guitar on the wall, and the last jig Kane did not melt.",
+    tagline: "Grey beard, a guitar, Bay 13. You dent him, you pay for him.",
     dossier:
-      "Human. Ironclad born. He ran Kane's T-0880 service line before the shutdown order. When she hung the rest of the chassis in a warehouse, he kept one bay, one clipboard jig, and a stack of breastplates behind a beat-up guitar. He does not work for Vault 13. He works on TyroneBot because a named chassis is still a customer, and because he will not let Kane's invoice be the last word on a friend. Campaigns pull his parts off the rail, the Works, the Berm, the tower. Bring them to the Mechanical Shop. He pays caps for each delivery, seats the part, and sends TyroneBot back out walking. He does not sell those plates to Kane's buyers. He will not start.",
+      "Human. Ironclad born. He ran the T-0880 service corridor out of the Mechanical Shop, twelve bays and one awkward corner he called Bay 13. When Kane ordered the courier line scrapped, he falsified one disposal and kept the Deadman Key. He does not speechify. You dent Tyrone, you pay for him. The guitar on the wall is the test he trusts: if the rebuilt chassis can name the song, the room, and who laughed, it is still Tyrone. T-0888 is that same wheel with a Helios regulator, an AEGIS servo ring, and a Blackglass lattice. He pays caps. He will not sell the plates.",
     intro: "Travis is in the bay. The guitar is in tune. The jig is empty until you fill it.",
     voice: [
       "Put it on the bench. I pay in caps. He walks out heavier.",

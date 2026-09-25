@@ -40,23 +40,23 @@ export const STORY_BEATS: StoryBeatDef[] = [
     id: "prologue_wake",
     act: "prologue",
     title: "Found You",
-    summary: "Tyrone pulled you off the East Highway. No tracks leading in.",
-    objective: "Hear Tyrone out. Cut your file in the Machine Shop.",
+    summary: "Tyrone stopped. Three miles east of the old highway. No tracks. No mission reason.",
+    objective: "Hear why he stopped. Cut your file in the Machine Shop.",
     require: [{ type: "flag", id: "wake_complete" }],
     completeWhen: [{ type: "character_forged" }],
     journalOnComplete: {
       title: "A file with a face",
-      body: "The Machine Shop stamped a soul. Kane already wants the town. Tyrone remembers the highway.",
+      body: "The Machine Shop stamped a soul. Kane already wants the chassis that stopped. Tyrone will not explain the war to a person who is still thirsty.",
       tags: ["prologue", "tyrone"],
     },
-    tyroneNote: "File is cut. You are not a rumor anymore.",
+    tyroneNote: "File is cut. I stopped for you. I do not have a clean reason yet.",
   },
   {
     id: "prologue_first_sortie",
     act: "prologue",
     title: "First Watch",
-    summary: "Kane's weigh-in is at the Rail Cut. Count crates before they count you.",
-    objective: "Open World. Scout the Rail Cut.",
+    summary: "Water, the board, the shop, the Gate. Somebody is already on the West Berm.",
+    objective: "Open World. Scout the Rail Cut. Count the crates.",
     require: [
       { type: "character_forged" },
       { type: "any", of: [{ type: "flag", id: "file_cut" }, { type: "character_forged" }] },
@@ -73,17 +73,17 @@ export const STORY_BEATS: StoryBeatDef[] = [
     ],
     journalOnComplete: {
       title: "Crates on the Cut",
-      body: "Rail steel ticks in the cold. Kane's surveyors left a stencil that says VESPER.",
+      body: "Rail steel ticks in the cold. A stencil says VESPER. That is a buyer, not a history lesson. The West Berm has a white glint.",
       tags: ["ironclad", "kane"],
     },
     unlocksAct: "act_i",
-    tyroneNote: "You walked the Cut. Kane still has the invoice. We have the count.",
+    tyroneNote: "You walked the Cut. I kept the count. History can wait until you can stand.",
   },
   {
     id: "act_i_lyra",
     act: "act_i",
     title: "White Light on the Berm",
-    summary: "Lyra paints Vault 13's outline. How loud you are tonight matters.",
+    summary: "Lyra paints Vault 13 from the West Berm. Hide, lie, fight, or give her a reason to doubt the report.",
     objective: "Handle Lyra on the West Berm — hide, lie, or fight.",
     require: [{ type: "act", id: "act_i" }],
     completeWhen: [
@@ -99,7 +99,7 @@ export const STORY_BEATS: StoryBeatDef[] = [
     ],
     journalOnComplete: {
       title: "Ridge transcript",
-      body: "Lyra left with something. Whether it was an empty ridge or a fight depends on you.",
+      body: "Lyra is a person in a suit, not old equipment. She left with an empty ridge, a fight, or a report she may not trust. Ridge Glass remembers what she looked at.",
       tags: ["aegis", "lyra"],
     },
   },
@@ -107,8 +107,8 @@ export const STORY_BEATS: StoryBeatDef[] = [
     id: "act_i_gate",
     act: "act_i",
     title: "The Iron Gate",
-    summary: "Steel leaves Ironclad through one mouth. Watch it or lose the town.",
-    objective: "Watch the Gate. Learn what Kane invoices.",
+    summary: "Vesper is buying rail steel on a contract the Compact signed in a bad winter. Legal. Predatory.",
+    objective: "Watch the Gate. Read what the Compact signed.",
     require: [
       { type: "act", id: "act_i" },
       { type: "min_day", day: 2 },
@@ -125,16 +125,16 @@ export const STORY_BEATS: StoryBeatDef[] = [
     ],
     journalOnComplete: {
       title: "What the Gate swallowed",
-      body: "Invoice books. A crate stamped VESPER. A visor on a peg that is not ours.",
+      body: "Invoice books. Rail steel leaving under a winter contract. Vera is not here yet. Her doctrine already is: if the paper is clean, the taking is not a raid.",
       tags: ["ironclad", "vesper"],
     },
   },
   {
     id: "act_i_travis",
     act: "act_i",
-    title: "Last T-0880 Bay",
-    summary: "Travis kept the bay Kane did not melt. Campaign parts seat in TyroneBot.",
-    objective: "Find Travis in the Mechanical Shop.",
+    title: "Bay 13",
+    summary: "Travis looks at you, looks at Tyrone, and says you dent him, you pay for him.",
+    objective: "Find Travis in the Mechanical Shop. Bay 13.",
     require: [{ type: "act", id: "act_i" }],
     completeWhen: [
       {
@@ -148,16 +148,17 @@ export const STORY_BEATS: StoryBeatDef[] = [
     ],
     journalOnComplete: {
       title: "Sparks and a guitar",
-      body: "The jig still says 0880. Travis pays caps. Kane's invoice is not the last word.",
+      body: "Twelve bays and one awkward corner. This is where the recall chime ended and Tyrone did not. The guitar stays on the wall. The speech does not.",
       tags: ["travis", "tyrone"],
     },
+    tyroneNote: "He said you dent me, you pay for me. That is Travis being kind.",
   },
   {
     id: "act_i_vesper_named",
     act: "act_i",
-    title: "Project Vesper",
-    summary: "The stencil is not a rumor. Hull plate for a stack that should not exist.",
-    objective: "Confirm Project Vesper from field evidence.",
+    title: "The Black-Tag Ledger",
+    summary: "Not just steel. Atlas cores, old T-0880 bays, machine-war salvage. Reeve's mark.",
+    objective: "Confirm the black-tag ledger. Watch Tyrone go quiet.",
     require: [
       { type: "act", id: "act_i" },
       {
@@ -180,19 +181,19 @@ export const STORY_BEATS: StoryBeatDef[] = [
       },
     ],
     journalOnComplete: {
-      title: "A name on the plate",
-      body: "Project Vesper. Kane needs hull. Ironclad is the first invoice. The stack is not supposed to exist.",
+      title: "Reeve's pattern",
+      body: "Project Vesper was mapping Atlas industrial cores and the courier bays it shut down. Tyrone knows the authorization mark. He will not lecture. Gravenor is already taking their cargo. The Compact calls that banditry. The radio calls it weather.",
       tags: ["vesper", "kane"],
     },
     unlocksAct: "act_ii",
-    tyroneNote: "I was not supposed to hear that name. Now we both have.",
+    tyroneNote: "I remember that stamp. I am not ready to say from where.",
   },
   {
     id: "act_ii_regions",
     act: "act_ii",
-    title: "Beyond the Gate",
-    summary: "Slag, Blackspire, Brasswater — each has what Kane wants next.",
-    objective: "Open a second region. Follow the invoice.",
+    title: "What the Furnace Owes",
+    summary: "Slag Town sells Helios heat. The Union says the contract is written on people who cannot refuse.",
+    objective: "Open the furnace road. Learn who owns the heat.",
     require: [{ type: "act", id: "act_ii" }],
     completeWhen: [
       {
@@ -208,17 +209,18 @@ export const STORY_BEATS: StoryBeatDef[] = [
       },
     ],
     journalOnComplete: {
-      title: "The map widens",
-      body: "Ironclad was never the whole Hollow. Kane's buyers already knew that.",
-      tags: ["world"],
+      title: "Value model incomplete",
+      body: "A damaged manifest says SHEPHERD, then VALUE MODEL INCOMPLETE. Vera arrives polite, armed, and over-documented. Valdris calls Tyrone the courier who kept receipts nobody asked for. The Helios regulator is too good for an old delivery machine. Travis starts designing the mount anyway.",
+      tags: ["world", "slagtown"],
     },
+    tyroneNote: "Those two words feel familiar. I cannot tell you why. That is different from not wanting to.",
   },
   {
     id: "act_ii_caravan",
     act: "act_ii",
-    title: "Missing Caravan",
-    summary: "A weigh-in that never arrived. Tracks, witnesses, or a staged vanishing.",
-    objective: "Investigate the missing caravan outside Ironclad.",
+    title: "The Hound's Road",
+    summary: "A weigh-in that never arrived. Gravenor's old route whistle. Tyrone goes quiet on purpose.",
+    objective: "Investigate the missing caravan. Decide if Tyrone has to talk about the old route.",
     require: [
       { type: "act", id: "act_ii" },
       { type: "min_day", day: 4 },
@@ -236,7 +238,7 @@ export const STORY_BEATS: StoryBeatDef[] = [
     ],
     journalOnComplete: {
       title: "What the road kept",
-      body: "The caravan story branched. Your version is the one Tyrone will remember.",
+      body: "The Ashen Pack hits Vesper cargo. Tyrone recognizes the route marks. He walked beside the Hound once. Whether he says so is your call, not a lore button.",
       tags: ["scenario", "ironclad"],
     },
   },
@@ -244,7 +246,7 @@ export const STORY_BEATS: StoryBeatDef[] = [
     id: "act_ii_orion",
     act: "act_ii",
     title: "Orion Wants a Word",
-    summary: "Successor suits. Serials. He wants the robot, not your speech.",
+    summary: "Not paperwork. He wants the serial, and a look at whether the courier is an asset or a risk.",
     objective: "Survive contact with Orion — or keep Tyrone dark.",
     require: [
       { type: "act", id: "act_ii" },
@@ -262,7 +264,7 @@ export const STORY_BEATS: StoryBeatDef[] = [
     ],
     journalOnComplete: {
       title: "Violet light",
-      body: "Orion logs serials. Whether Tyrone stays hidden is a choice you already made.",
+      body: "Orion does not pretend this is administration. Halo Lance opens a room. His hands close it. He is here for the serial. The mountain maps are next, if Kane's heat stays this high.",
       tags: ["aegis", "orion", "tyrone"],
     },
     unlocksAct: "act_iii",
@@ -271,8 +273,8 @@ export const STORY_BEATS: StoryBeatDef[] = [
     id: "act_iii_halo",
     act: "act_iii",
     title: "Halo Yard",
-    summary: "Orion trained 2753 frames here. The outlines still scorch.",
-    objective: "Scout Halo Yard. Learn who is staging in Ironclad.",
+    summary: "AEGIS staging, not a robot nest. A servo ring off one of these frames is how Bay 13 starts T-0888.",
+    objective: "Scout Halo Yard. Learn what the suits left that Travis can use.",
     require: [{ type: "act", id: "act_iii" }],
     completeWhen: [
       {
@@ -285,16 +287,16 @@ export const STORY_BEATS: StoryBeatDef[] = [
     ],
     journalOnComplete: {
       title: "Scorched outlines",
-      body: "2753 boot prints. A spent cell still warm. Vault 13 is already on their map.",
+      body: "2753 boot prints. Human pilots, not a second Tyrone. A servo ring will torque the old wheel without replacing it. Blackspire still has to give up the lattice, and Thessaly does not trust couriers.",
       tags: ["halo", "aegis"],
     },
   },
   {
     id: "act_iii_secret",
     act: "act_iii",
-    title: "What Tyrone Does Not Know",
-    summary: "Gaps in the tape. A shutdown order. Limitations that matter.",
-    objective: "Earn Tyrone's trust. Dig into the T-0880 shutdown.",
+    title: "The Map That Lied",
+    summary: "Shutdown gaps. A falsified survey. Soren's note: relational memory, the constraint CIVITAS lacked.",
+    objective: "Earn the trust. Let the shutdown come back as a place, not a speech.",
     require: [
       { type: "act", id: "act_iii" },
       { type: "tyrone_trust_gte", n: 55 },
@@ -309,23 +311,24 @@ export const STORY_BEATS: StoryBeatDef[] = [
       },
     ],
     journalOnComplete: {
-      title: "Gaps in the tape",
-      body: "He is not omniscient. The shutdown left holes. Those holes are part of the story.",
+      title: "Persistent relational memory",
+      body: "He carried the revised Blackspire report because he was given it. He does not defend that. Most of the T-0880 line obeyed the recall. Travis kept Bay 13, the Deadman Key, and a guitar recording Tyrone once refused to delete. The plate that comes next will say T-0888. Still the same wheel.",
       tags: ["tyrone", "mystery"],
     },
     unlocksAct: "convergence",
+    tyroneNote: "I remember the chime. RETURN FOR SERVICE. I went because I trusted the word service. I do not want to talk about the units that stayed.",
   },
   {
     id: "convergence_choice",
     act: "convergence",
-    title: "Whose Hollow",
-    summary: "Factions pull. Promises stand. The invoice still wants payment.",
-    objective: "Choose a standing — vault, town, or something harder.",
+    title: "Whose Future",
+    summary: "Not a Kane duel. The jump stack, SHEPHERD, and who is allowed to own a mind.",
+    objective: "Carry the ledger into Veyra. Decide whose future the stack serves.",
     require: [{ type: "act", id: "convergence" }],
     completeWhen: [{ type: "flag", id: "ending_ready" }],
     journalOnComplete: {
-      title: "A version of the Hollow",
-      body: "Your history is recorded. The ending is not a cutscene — it is the ledger of what you did.",
+      title: "A version of the future",
+      body: "Brasswater still hates the city that sealed the flood. Veyra still runs on an emergency that never ended. Kane does not need a secret map inside Tyrone. She needs the pattern of how he became himself. The ending is who lived, what you promised, and what you refused to copy.",
       tags: ["ending"],
     },
     unlocksAct: "ending",
@@ -466,13 +469,13 @@ export function actTitle(act: StoryActId): string {
     case "prologue":
       return "Prologue — Found You";
     case "act_i":
-      return "Act I — The Ironclad Invoice";
+      return "Act I — Ironclad: The Invoice";
     case "act_ii":
-      return "Act II — Competing Claims";
+      return "Act II — Slag Town: What the Furnace Owes";
     case "act_iii":
-      return "Act III — Project Vesper";
+      return "Act III — Blackspire: The Map That Lied";
     case "convergence":
-      return "Convergence — Whose Hollow";
+      return "Convergence — Whose Future";
     case "ending":
       return "Aftermath";
   }
@@ -481,17 +484,17 @@ export function actTitle(act: StoryActId): string {
 export function actBlurb(act: StoryActId): string {
   switch (act) {
     case "prologue":
-      return "Awakening. Tyrone. Uncertainty. The Hollow has a name for what Kane wants.";
+      return "He found you east of the old highway. The question is why a courier with no mission stopped.";
     case "act_i":
-      return "Rail steel. Gate books. A white light on the Berm. Ironclad is the first invoice.";
+      return "West Berm. A winter steel contract. Bay 13. A black-tag ledger with Reeve's mark. Gravenor already knows the road.";
     case "act_ii":
-      return "Regions open. Caravans vanish. AEGIS stops pretending to be a rumor.";
+      return "Helios heat, a union that will not sign, and a manifest that says SHEPHERD. VALUE MODEL INCOMPLETE.";
     case "act_iii":
-      return "Halo Yard. Successor suits. Gaps in Tyrone's tape. The stack that should not exist.";
+      return "Thessaly's real survey. Orion, if the heat is high. Soren already wrote down the memory Kane is afraid of. T-0888 is the same wheel.";
     case "convergence":
-      return "Promises, factions, and the ledger of what you chose.";
+      return "Veyra kept the lights on by sealing the delta. The jump stack and SHEPHERD are the argument, not a boss with a secret map.";
     case "ending":
-      return "Your version of Hollow Realm is recorded.";
+      return "Who lived, what was promised, and what nobody was allowed to copy.";
   }
 }
 
@@ -504,7 +507,7 @@ export function bootstrapNarrative(state: GameState): void {
     addJournal(state, {
       act: "prologue",
       title: "East of the old highway",
-      body: "Facedown. No tracks leading in. Tyrone talks. The file is not yet cut.",
+      body: "Facedown. No tracks leading in. No supplies. Tyrone stopped anyway. The file is not yet cut, and he will not explain the war until you can stand.",
       tags: ["wake"],
       id: "wake-open",
     });

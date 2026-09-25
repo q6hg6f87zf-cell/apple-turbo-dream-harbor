@@ -55,6 +55,11 @@ export type AttachmentSlot =
 export type AmmoType =
   | "9mm"
   | ".45"
+  | ".357"
+  | ".45-70"
+  | ".50"
+  | "10mm"
+  | "8.6"
   | "5.56"
   | ".30-30"
   | ".270"

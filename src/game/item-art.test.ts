@@ -39,6 +39,13 @@ describe("itemArt catalogue stills", () => {
     assert.equal(itemArt({ kind: "weapon", name: "Mast Knife", weaponFamily: "melee" }), "/art/items/mast-knife.jpg");
     assert.equal(itemArt({ kind: "weapon", name: "Manifest", weaponFamily: "rifle" }), "/art/items/manifest-rifle.jpg");
     assert.equal(itemArt({ kind: "weapon", name: "Warrant Spike", weaponFamily: "melee" }), "/art/items/warrant-spike.jpg");
+    assert.equal(itemArt({ kind: "weapon", name: "Last Receipt", weaponFamily: "rifle" }), "/art/items/last-receipt.jpg");
+    assert.equal(itemArt({ kind: "weapon", name: "Hound's Tooth", weaponFamily: "sniper" }), "/art/items/hounds-tooth.jpg");
+    assert.equal(itemArt({ kind: "weapon", name: "True North", weaponFamily: "sniper" }), "/art/items/true-north.jpg");
+    assert.equal(itemArt({ kind: "weapon", name: "Pale Horse", weaponFamily: "rifle" }), "/art/items/pale-horse.jpg");
+    assert.equal(itemArt({ kind: "weapon", name: "The Balance", weaponFamily: "melee" }), "/art/items/the-balance.jpg");
+    assert.equal(itemArt({ kind: "trinket", name: "Grey Guitar" }), "/art/items/grey-guitar.jpg");
+    assert.equal(itemArt({ kind: "special", name: "Black Key" }), "/art/items/black-key.jpg");
     assert.equal(itemArt({ kind: "consumable", name: "Steel BB Tin", ammoType: "bb" }), "/art/items/bb-tin.jpg");
   });
 });
