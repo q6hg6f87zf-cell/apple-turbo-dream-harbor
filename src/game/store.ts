@@ -195,6 +195,8 @@ interface Store {
   rollBeat: () => void;
   continueMission: () => void;
   combatAct: (a: Action) => void;
+  setStance: (stance: "close" | "hold" | "back") => void;
+  clearSpoils: () => void;
   rest: () => void;
   cancelRest: () => void;
   extractCombat: () => void;
@@ -1247,6 +1249,16 @@ export const useGame = create<Store>((set, get) => ({
       else sfx.win();
     }
   },
+  setStance: (stance) =>
+    mutate(set, (st) => {
+      if (!st.combat) return;
+      st.combat.stance = stance;
+    }),
+  clearSpoils: () =>
+    mutate(set, (st) => {
+      st.spoils = undefined;
+      if (st.mission) st.mission.spoils = undefined;
+    }),
   extractCombat: () =>
     mutate(set, (st) => {
       if (!st.combat) return;

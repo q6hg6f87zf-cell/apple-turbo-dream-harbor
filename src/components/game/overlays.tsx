@@ -1,8 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { CLASS_GIFT, COMPANIONS, PRIMARY_STAT, locById, villainById, WORLD } from "@/game/data";
 import { className, displayLineage, displayRace } from "@/game/presentation";
-import { BAND_COPY, BAND_LABEL, combatActor, computeStats, equippedWeapon, healCost } from "@/game/engine";
-import { magLine, isAmmoConsumable } from "@/game/weapon-ops";
+import { BAND_COPY, BAND_LABEL, combatActor, computeStats, equippedWeapon, healCost, stanceAim } from "@/game/engine";
+import { magLine, isAmmoConsumable, resolveWeapon } from "@/game/weapon-ops";
 import { restPenalties, WATCH_LABEL } from "@/game/shift";
 import { sfx, rumble } from "@/game/audio";
 import { useGame } from "@/game/store";
@@ -16,6 +16,7 @@ import { CAST, AEGIS_FIELD_STILL, castById } from "@/game/cast";
 import { storyScene } from "@/game/story";
 import { poiById } from "@/game/field-ops";
 import { itemArt, itemThumbUrl } from "@/game/item-art";
+import { plateFor } from "@/game/enemy-plates";
 import {
   ClassGlyph,
   Coin,
@@ -91,6 +92,48 @@ function HaulPlate({ item }: { item: Item }) {
       </div>
       <p className="mt-1 line-clamp-2 text-xs leading-tight text-paper">{item.name}</p>
       <p className={cn("mt-0.5 truncate text-[10px] uppercase tracking-[0.14em]", HAUL_WORD[item.rarity])}>{item.rarity}</p>
+    </div>
+  );
+}
+
+function SpoilsTake({
+  enemy,
+  flavor,
+  portrait,
+  caps,
+  items,
+}: {
+  enemy: string;
+  flavor?: string;
+  portrait?: string;
+  caps: number;
+  items: Item[];
+}) {
+  return (
+    <div className="flex min-h-0 flex-1 flex-col justify-end px-3 pb-3">
+      <div className="rounded-[var(--radius-md)] bg-ink/92 px-3 py-3 shadow-[var(--shadow-border)]">
+        <div className="flex gap-3">
+          <div className="h-36 w-24 shrink-0 overflow-hidden rounded-[var(--radius-sm)] bg-ink shadow-[var(--shadow-border)]">
+            {portrait ? <img src={portrait} alt="" className="size-full object-cover object-top" /> : null}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="font-display text-label uppercase tracking-[0.18em] text-danger">Down</p>
+            <p className="mt-1 font-display text-2xl leading-tight text-paper">{enemy}</p>
+            {flavor ? <p className="mt-1 line-clamp-3 text-secondary leading-snug text-muted">{flavor}</p> : null}
+            <p className="mt-2 font-display text-xl tabular-nums text-ember">+{caps} caps</p>
+          </div>
+        </div>
+        {items.length ? (
+          <div className="mt-3 border-t border-line/40 pt-2">
+            <SectionLabel>Recovered</SectionLabel>
+            <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+              {items.map((it) => (
+                <HaulPlate key={it.id} item={it} />
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -196,6 +239,7 @@ export function MissionOverlay() {
   const rollBeat = useGame((g) => g.rollBeat);
   const pickTactic = useGame((g) => g.pickTactic);
   const cont = useGame((g) => g.continueMission);
+  const clearSpoils = useGame((g) => g.clearSpoils);
   const [spin, setSpin] = useState(false);
   const [held, setHeld] = useState(false);
   const holdTimer = useRef<number | null>(null);
@@ -255,7 +299,37 @@ export function MissionOverlay() {
     return () => window.removeEventListener("keydown", onKey);
   }, [open, waiting, spin, cont, rollBeat]);
 
-  if (!mission || combat) return null;
+  if (!mission || combat) {
+    if (!mission && !combat && s.spoils) {
+      return (
+        <div data-spoils="1" className={FIELD_SHELL} style={shellStyle(frame)}>
+          <SpoilsTake
+            enemy={s.spoils.enemy}
+            flavor={s.spoils.flavor}
+            portrait={s.spoils.portrait}
+            caps={s.spoils.caps}
+            items={s.spoils.relic ? [s.spoils.relic] : []}
+          />
+          <div className="shrink-0 border-t border-line/70 bg-ink">
+            <CommandBar>
+              <Button
+                className="w-full"
+                variant="ember"
+                sound="none"
+                onClick={() => {
+                  sfx.coin();
+                  clearSpoils();
+                }}
+              >
+                Take it
+              </Button>
+            </CommandBar>
+          </div>
+        </div>
+      );
+    }
+    return null;
+  }
   const beat = mission.beats[mission.beatIndex];
   const last = mission.beatIndex >= mission.beats.length - 1;
   const loc = locById(mission.locationId);
@@ -267,9 +341,11 @@ export function MissionOverlay() {
   const choosing = !!(mission.waiting && beat?.tactics && !beat.tacticId);
   const site = poiById(mission.locationId, mission.poiId);
   const face = castById(mission.npcId);
-  const resolved = !!(mission.lastRoll || mission.lastConsequence || mission.loot.length);
+  const resolved = !!(mission.lastRoll || mission.lastConsequence || mission.loot.length || mission.spoils);
   const tape = resolved ? mission.narrative.slice(-2) : [];
   const showResult = !choosing && !spin && !held && resolved;
+  const relic = mission.spoils?.relic;
+  const haul = relic ? [relic, ...mission.loot.filter((it) => it.id !== relic.id)] : mission.loot;
 
   return (
     <div data-mission="1" className={FIELD_SHELL} style={shellStyle(frame)}>
@@ -309,8 +385,25 @@ export function MissionOverlay() {
         <div className="min-h-16 flex-1" />
 
         {showResult ? (
-          <div className="ms-scroll max-h-[32%] shrink-0 overflow-y-auto px-3">
+          <div className={cn("ms-scroll shrink-0 overflow-y-auto px-3", mission.spoils ? "max-h-[48%]" : "max-h-[32%]")}>
             <div className="rounded-[var(--radius-md)] bg-ink/90 px-3 py-2 shadow-[var(--shadow-border)]">
+              {mission.spoils ? (
+                <div data-spoils="1" className="flex gap-3 pb-2">
+                  <div className="h-32 w-24 shrink-0 overflow-hidden rounded-[var(--radius-sm)] bg-ink shadow-[var(--shadow-border)]">
+                    {mission.spoils.portrait ? (
+                      <img src={mission.spoils.portrait} alt="" className="size-full object-cover object-top" />
+                    ) : null}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-display text-label uppercase tracking-[0.18em] text-danger">Down</p>
+                    <p className="mt-1 truncate font-display text-xl leading-tight text-paper">{mission.spoils.enemy}</p>
+                    {mission.spoils.flavor ? (
+                      <p className="mt-1 line-clamp-2 text-secondary leading-snug text-muted">{mission.spoils.flavor}</p>
+                    ) : null}
+                    <p className="mt-2 font-display text-lg tabular-nums text-ember">+{mission.spoils.caps} caps</p>
+                  </div>
+                </div>
+              ) : null}
               {mission.lastRoll ? (
                 <div className="flex items-center gap-3 py-1">
                   <DiceFace value={mission.lastRoll.value} band={mission.lastRoll.band} size={72} mark={false} />
@@ -322,11 +415,11 @@ export function MissionOverlay() {
               {mission.lastConsequence ? (
                 <p className="mt-2 border-l-2 border-ember pl-3 text-body leading-relaxed text-paper">{mission.lastConsequence}</p>
               ) : null}
-              {mission.loot.length ? (
+              {haul.length ? (
                 <div className="border-t border-line/40 py-2">
                   <SectionLabel>Recovered</SectionLabel>
                   <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
-                    {mission.loot.map((it) => (
+                    {haul.map((it) => (
                       <HaulPlate key={it.id} item={it} />
                     ))}
                   </div>
@@ -443,6 +536,7 @@ export function CombatOverlay() {
   const combat = useGame((g) => g.s.combat);
   const s = useGame((g) => g.s);
   const act = useGame((g) => g.combatAct);
+  const setStance = useGame((g) => g.setStance);
   const extract = useGame((g) => g.extractCombat);
   const [float, setFloat] = useState({ n: 0, tick: 0 });
   const [faceFlash, setFaceFlash] = useState(false);
@@ -588,6 +682,11 @@ export function CombatOverlay() {
 
   const hasItem = !!actor?.inventory.some((i) => i.kind === "consumable" && !isAmmoConsumable(i));
   const actorGun = actor ? equippedWeapon(actor) : undefined;
+  const chamber = actorGun ? resolveWeapon(actorGun) : null;
+  const dry = !!chamber?.dry;
+  const stance = combat.stance ?? "hold";
+  const aim = chamber ? stanceAim(stance, chamber.family, chamber.rangeBand) : 0;
+  const shownDc = enemy ? Math.max(6, enemy.dc - aim) : 0;
   const actions: { id: FightAct; label: string; icon: typeof Swords; variant: "ember" | "ghost" | "quiet" | "danger"; disabled?: boolean }[] = actor
     ? [
         { id: "strike", label: "Strike", icon: Swords, variant: "ember" },
@@ -598,6 +697,7 @@ export function CombatOverlay() {
         { id: "flee", label: "Flee", icon: Wind, variant: "danger" },
       ]
     : [];
+  const strikeShort = dry ? "Reload" : "d20 vs DC";
 
   const standing = combat.enemies.filter((e) => e.hp > 0).length;
   const hullPct = enemy ? Math.max(0, Math.min(100, (enemy.hp / Math.max(1, enemy.maxHp)) * 100)) : 0;
@@ -638,7 +738,7 @@ export function CombatOverlay() {
                 Hull {enemy?.hp ?? 0}/{enemy?.maxHp ?? 0}
               </span>
               <span className="truncate">
-                DC {enemy?.dc}
+                DC {shownDc}
                 {enemy?.armorClass ? ` · ${enemy.armorClass}` : ""}
                 {enemy?.preferredRange ? ` · ${enemy.preferredRange}` : ""}
               </span>
@@ -650,14 +750,17 @@ export function CombatOverlay() {
         </div>
 
         <div data-enemy-face="1" className="relative min-h-[7.5rem] flex-1">
-          {enemy?.portrait ? (
+          {enemy ? (
             <div className="absolute inset-y-0 left-1/2 w-[70%] max-w-sm -translate-x-1/2 overflow-hidden rounded-[var(--radius-md)] shadow-[var(--shadow-border)]">
               <img
-                src={enemy.portrait}
+                src={enemy.portrait || plateFor(enemy.name)}
                 alt=""
                 className={cn("size-full object-cover object-top", faceFlash && "ms-hit")}
               />
               {faceFlash ? <div className="ms-hit-wash pointer-events-none absolute inset-0" /> : null}
+              <p className="pointer-events-none absolute inset-x-0 bottom-0 bg-ink/75 px-2 py-1 text-center font-display text-label uppercase tracking-[0.16em] text-paper">
+                {stance === "close" ? "In their teeth" : stance === "back" ? "Falling back" : "Holding"}
+              </p>
             </div>
           ) : null}
           {float.n ? <FloatNum n={float.n} kind={float.n > 0 ? "dmg" : "heal"} tick={float.tick} /> : null}
@@ -690,7 +793,30 @@ export function CombatOverlay() {
 
         <CommandBar>
           {actor && actor.hp > 0 ? (
-            <div className="grid grid-cols-3 gap-2">
+            <>
+              <div className="mb-2 grid grid-cols-3 gap-1.5" role="group" aria-label="Stance">
+                {(
+                  [
+                    ["close", "Close"],
+                    ["hold", "Hold"],
+                    ["back", "Fall back"],
+                  ] as const
+                ).map(([id, label]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    aria-pressed={stance === id}
+                    onClick={() => setStance(id)}
+                    className={cn(
+                      "min-h-11 rounded-[var(--radius-sm)] px-2 font-display text-label uppercase tracking-[0.12em]",
+                      stance === id ? "bg-paper text-ink" : "bg-raised text-muted",
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <div className="grid grid-cols-3 gap-2">
               {actions.map((a) => {
                 const Icon = a.icon;
                 return (
@@ -721,12 +847,13 @@ export function CombatOverlay() {
                         a.variant === "ember" ? "text-ink/70" : "opacity-70",
                       )}
                     >
-                      {ACT_SHORT[a.id]}
+                      {a.id === "strike" ? strikeShort : ACT_SHORT[a.id]}
                     </span>
                   </button>
                 );
               })}
-            </div>
+              </div>
+            </>
           ) : (
             <>
               <p className="mb-2 text-secondary text-danger">No one standing.</p>

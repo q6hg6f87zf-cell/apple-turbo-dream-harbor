@@ -604,6 +604,17 @@ export interface LogEntry {
   result?: number;
 }
 
+export type FightStance = "close" | "hold" | "back";
+
+export interface CombatSpoils {
+  enemy: string;
+  flavor?: string;
+  portrait?: string;
+  caps: number;
+  /** Named trophy already in the vault. Shown on the debrief, not granted twice. */
+  relic?: Item;
+}
+
 export interface Combatant {
   id: string;
   name: string;
@@ -645,6 +656,8 @@ export interface CombatState {
   incomingSoft?: number;
   /** Damage each operative has dealt this fight. A focused boss hunts the top. */
   threat?: Record<string, number>;
+  /** Where the squad chose to stand. Hold is the default. */
+  stance?: FightStance;
   /** Set when a boss has entered a `speaks` phase: it is down, and owed a beat. */
   reckoning?: string;
 }
@@ -696,6 +709,8 @@ export interface MissionState {
   poiId?: string;
   approach?: MissionApproach;
   npcId?: string;
+  /** What the last fight put in their hands. Cleared when the beat advances. */
+  spoils?: CombatSpoils;
 }
 
 export interface LocationProgress {
@@ -892,4 +907,6 @@ export interface GameState {
   travis: TravisBay;
   /** Story spine, flags, journal — optional on old saves; restored with defaults. */
   narrative?: NarrativeState;
+  /** A fight that ended with nobody left to debrief. One card, then it is gone. */
+  spoils?: CombatSpoils;
 }

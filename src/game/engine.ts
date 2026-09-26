@@ -19,6 +19,7 @@ import type {
   ShopOffer,
   Stats,
   StatKey,
+  FightStance,
 } from "./types";
 import {
   BASE_ROOMS,
@@ -55,7 +56,7 @@ import {
   weaponDamageAvg,
 } from "./data";
 import { REGION_LOCATION, campaignOpenRegions } from "./arsenal";
-import { applyArmor, fieldArmor, rangeHitMod, resolveWeapon } from "./weapon-ops";
+import { applyArmor, fieldArmor, hydrateWeapon, rangeHitMod, reloadWeapon, resolveWeapon, spendShot } from "./weapon-ops";
 import { APPROACHES, locationToRegion, poiById, tacticsFor, type FieldDeploy } from "./field-ops";
 import { eventBriefing, beatPrompt, contactFlavor, debriefLines, KIND_LABEL, radioFor, rollLines } from "./event-theater";
 import { emptyMarket } from "./market";
@@ -67,7 +68,8 @@ import { freshClocks, grantPackLoot, starterPack } from "./inventory";
 import { queueTalk } from "./talk";
 import { ensureSquad, maybeSpendArcTurn, stampSeatedPlate } from "./squad";
 import { isPlaceholderName } from "./discord";
-import { CAST, aegisOnDuty, meetCast } from "./cast";
+import { CAST, aegisOnDuty, meetCast, type CastId } from "./cast";
+import { plateFor } from "./enemy-plates";
 import { aegisRunner, dawnDispatch, nightTale, resolveMissionSite, storyBeatResult, storyTactics } from "./story";
 import { rollLoot } from "./loot";
 import { emptyNarrative } from "./narrative-state";
@@ -585,8 +587,7 @@ function lootTable(state: GameState, loc: LocationId, kind: MissionKind, total: 
   return items;
 }
 
-function fieldKillLoot(_state: GameState, yard: boolean): Item | null {
-  if (Math.random() > (yard ? 0.78 : 0.48)) return null;
+function fieldKillLoot(_state: GameState, yard: boolean): Item {
   const early: Omit<Item, "id">[] = [
     { ...BB_TIN },
     {
@@ -610,7 +611,37 @@ function fieldKillLoot(_state: GameState, yard: boolean): Item | null {
       value: 80,
     },
   ];
-  return makeItem({ ...pick(early) });
+  const wider: Omit<Item, "id">[] = [
+    ...early,
+    {
+      name: "Watchworks 9mm Box",
+      kind: "consumable",
+      rarity: "Common",
+      condition: "Worn",
+      effect: "24 rounds of 9mm. Load a pistol or SMG.",
+      lore: "Still sealed. The owner is not.",
+      equipped: false,
+      value: 80,
+      ammoType: "9mm",
+      ammoCount: 24,
+    },
+  ];
+  return makeItem({ ...pick(yard ? early : wider) });
+}
+
+/** Close rewards a short gun and lets them hit you. Back is the opposite. Hold is the middle. */
+export function stanceAim(stance: FightStance, family: string, rangeBand: string): number {
+  const closeGun = family === "melee" || family === "shotgun" || rangeBand === "close";
+  const longGun = family === "sniper" || family === "heavy" || rangeBand === "long";
+  if (stance === "close") return closeGun ? 2 : longGun ? -2 : 0;
+  if (stance === "back") return longGun ? 2 : closeGun ? -2 : 1;
+  return 0;
+}
+
+function plateEnemy(enemy: Combatant, bossId?: string): Combatant {
+  if (enemy.portrait) return enemy;
+  if (bossId && bossId in CAST) return { ...enemy, portrait: CAST[bossId as CastId].portrait };
+  return { ...enemy, portrait: plateFor(enemy.name) };
 }
 
 export function applyRollToBeat(
@@ -789,6 +820,7 @@ export function advanceBeat(state: GameState): GameState {
   m.beatIndex += 1;
   m.lastRoll = undefined;
   m.lastConsequence = undefined;
+  m.spoils = undefined;
   if (m.beatIndex >= m.beats.length) {
     return completeMission(state);
   }
@@ -1006,19 +1038,21 @@ export function spawnCombat(state: GameState, opts: { boss?: boolean }): GameSta
       }
     }
   }
+  const plated = enemies.map((e) => plateEnemy(e, opts.boss ? locById(loc).bossId : undefined));
   const combat: CombatState = {
     locationId: loc,
     missionKind: m.kind,
     partyIds: m.partyIds,
-    enemies,
+    enemies: plated,
     turn: 1,
     actorIndex: 0,
+    stance: "hold",
     log: [
       `SYNAPSE · ${contactFlavor(state, loc, opts.boss, m.kind === "bounty")}.`,
-      `Hollow · ${enemies.map((e) => e.name).join(" & ")} — ${enemies[0]?.flavor ?? "the field notices."}`,
+      `Hollow · ${plated.map((e) => e.name).join(" & ")} — ${plated[0]?.flavor ?? "the field notices."}`,
       opts.boss
         ? `Tyrone · Phases are not flavor. When it speaks, let it. Then finish.`
-        : `Tyrone · Magazines matter. Shame is cheaper than a grave.`,
+        : `Tyrone · Close, hold, or fall back. An empty gun is a turn, not a click.`,
     ],
     bossId: opts.boss ? locById(loc).bossId : undefined,
     rewardMult: opts.boss ? 3 : m.kind === "raid" ? 1.6 : 1,
@@ -1223,6 +1257,32 @@ export function resolvePlayerAction(
     return enemyTurn(state);
   }
 
+  if (action === "strike" && weapon) {
+    hydrateWeapon(weapon);
+    const chamber = resolveWeapon(weapon);
+    if (chamber.dry) {
+      const seated = reloadWeapon(actor, weapon);
+      if (seated) log.push(`${actor.name} reloads. ${seated.log}`);
+      else {
+        weapon.mag = Math.max(chamber.roundsPerShot, 1);
+        const now = resolveWeapon(weapon);
+        log.push(`${actor.name} strips one round off a body. ${weapon.mag}/${now.magSize}. The next shot is live.`);
+      }
+      combat.log = log.slice(-12);
+      state.combat = combat;
+      return enemyTurn(state);
+    }
+  }
+
+  let shotAcc = 0;
+  let shotDmg = 0;
+  if (action === "strike" && weapon && resolveWeapon(weapon).family !== "melee") {
+    const shot = spendShot(actor, weapon);
+    shotAcc = shot.accuracyBonus;
+    shotDmg = shot.damageBonus;
+    if (shot.log) log.push(shot.log);
+  }
+
   const roll = d20();
   const atkStat = PRIMARY_STAT[actor.cls];
   const surge = combat.surge === actor.id ? 2 : 1;
@@ -1250,16 +1310,18 @@ export function resolvePlayerAction(
   // Bringing a close-range gun to a target that fights at distance is a choice
   // the squad makes in the Vault, and it is paid for here.
   const profile = resolveWeapon(weapon);
+  const aim = action === "strike" ? stanceAim(combat.stance ?? "hold", profile.family, profile.rangeBand) : 0;
   const reach = action === "strike" ? rangeHitMod(profile.rangeBand, target.preferredRange, profile.family) : 0;
-  const swing = total + reach;
-  const hit = swing >= target.dc || b === "crit";
+  const swing = total + reach + shotAcc;
+  const dc = Math.max(6, target.dc - aim);
+  const hit = swing >= dc || b === "crit";
   if (action === "guard") {
     log.push(`${actor.name} sets a guard.`);
     combat.guardId = actor.id;
   }
   if (hit && action === "strike") {
     const avg = weapon ? weaponDamageAvg(weapon.damage ?? "1d6") : 3;
-    let dmg = Math.max(1, avg - Math.floor(target.def / 2) + (b === "crit" ? 4 : b === "strong" ? 2 : 0));
+    let dmg = Math.max(1, avg + shotDmg - Math.floor(target.def / 2) + (b === "crit" ? 4 : b === "strong" ? 2 : 0));
     const plain = dmg;
     dmg = applyArmor(dmg, profile, target);
     dmg *= surge;
@@ -1268,7 +1330,7 @@ export function resolvePlayerAction(
     combat.threat = { ...(combat.threat ?? {}), [actor.id]: (combat.threat?.[actor.id] ?? 0) + dmg };
     const matchup = dmg > plain * surge ? " Weak point." : dmg < plain * surge ? " Armor eats it." : "";
     log.push(
-      `${actor.name} strikes ${target.name} for ${dmg}. ${BAND_LABEL[b]} (${roll}→${swing} vs ${target.dc}).${matchup}`,
+      `${actor.name} strikes ${target.name} for ${dmg}. ${BAND_LABEL[b]} (${roll}→${swing} vs ${dc}).${matchup}`,
     );
     if (target.isBoss && combat.bossId) {
       const v = villainById(combat.bossId);
@@ -1285,7 +1347,7 @@ export function resolvePlayerAction(
     }
   } else if (action === "strike") {
     const short = reach < 0 ? " Wrong range." : "";
-    log.push(`${actor.name} misses ${target.name}. ${BAND_LABEL[b]} (${roll}→${swing} vs ${target.dc}).${short}`);
+    log.push(`${actor.name} misses ${target.name}. ${BAND_LABEL[b]} (${roll}→${swing} vs ${dc}).${short}`);
   }
 
   combat.enemies = combat.enemies.map((e) => (e.id === target.id ? { ...target } : e));
@@ -1323,12 +1385,13 @@ function enemyTurn(state: GameState): GameState {
       const dc = 8 + Math.floor(stats.DEF / 2);
       const guard = combat.guardId === target.id;
       const shield = combat.shield;
+      const press = combat.stance === "close" ? 2 : combat.stance === "back" ? -2 : 0;
       if (shield) {
         combat.shield = undefined;
         log.push(`${e.name} hits nothing. Shield Block.`);
         return;
       }
-      const hit = roll + e.atk >= dc + (guard ? 2 : 0);
+      const hit = roll + e.atk + press >= dc + (guard ? 2 : 0);
       if (hit) {
         const dmg = Math.max(1, e.atk - Math.floor(stats.DEF / 4) + (roll >= 18 ? 2 : 0));
         const i = state.operatives.findIndex((o) => o.id === target.id);
@@ -1339,7 +1402,8 @@ function enemyTurn(state: GameState): GameState {
           status: hp <= 0 ? "downed" : state.operatives[i].status,
         };
         target.hp = hp;
-        log.push(`${e.name} hits ${target.name} for ${dmg}.`);
+        const reachNote = press > 0 ? " Too close." : press < 0 ? " They had to reach." : "";
+        log.push(`${e.name} hits ${target.name} for ${dmg}.${reachNote}`);
         if (hp <= 0) log.push(`${target.name} is downed.`);
       } else {
         log.push(`${e.name} fails to land on ${target.name}.`);
@@ -1385,13 +1449,15 @@ export function finishCombat(state: GameState, won: boolean, fled = false): Game
         fled ? "They left a body and a question." : `The field goes still. +${payout} caps.`,
       ];
     }
+    const foe = combat.enemies[0];
+    let relic: Item | undefined;
     if (combat.bossId) {
       const loc = combat.locationId;
       state.locations[loc].bossDefeated = true;
       grantPackLoot(state, { sure: true, source: "Boss" });
       const v = villainById(combat.bossId);
       if (v) {
-        const relic = makeItem({
+        relic = makeItem({
           name: v.lootName,
           kind: "trinket",
           rarity: v.id === "warden" ? "Mythic" : "Legendary",
@@ -1405,18 +1471,24 @@ export function finishCombat(state: GameState, won: boolean, fled = false): Game
         if (v.id === "warden") state.challengeCoin = true;
         state.moonFavor += 8;
         pushLog(state, "combat", v.name, `Fallen. ${v.lootName} recovered.`);
-        state.toast = `${v.name} is down. ${v.arc} breaks.`;
+        state.toast = `${v.name} is down. ${relic.name}. +${payout} caps.`;
       }
     } else {
       const drop = fieldKillLoot(state, yard);
-      if (drop) {
-        state.vault.push(drop);
-        if (state.mission) state.mission.loot = [...state.mission.loot, drop];
-        pushLog(state, "loot", combat.enemies[0]?.name ?? "Field", `${drop.name} hits the vault.`);
-      } else {
-        grantPackLoot(state, { source: locById(combat.locationId).short });
-      }
+      state.vault.push(drop);
+      if (state.mission) state.mission.loot = [...state.mission.loot, drop];
+      pushLog(state, "loot", foe?.name ?? "Field", `${drop.name} hits the vault.`);
+      state.toast = `${foe?.name ?? "The contact"} is down. ${drop.name}. +${payout} caps.`;
     }
+    const spoils = {
+      enemy: foe?.name ?? "The contact",
+      flavor: foe?.flavor,
+      portrait: foe?.portrait ?? plateFor(foe?.name),
+      caps: payout,
+      relic,
+    };
+    if (state.mission) state.mission.spoils = spoils;
+    else state.spoils = spoils;
     pushLog(state, "combat", "SYNAPSE", won ? "The field is ours." : "We left.");
   } else if (!fled) {
     pushLog(state, "combat", "SYNAPSE", "The field took them. Get them home.");
@@ -1719,6 +1791,7 @@ export function spawnAegisYard(state: GameState): GameState {
     actorIndex: 0,
     log: [`${named.name} sent a 2753. ${named.tagline}`],
     rewardMult: 1.4,
+    stance: "hold",
   };
   return state;
 }
@@ -1778,6 +1851,7 @@ export function spawnScenarioCombat(state: GameState, scenarioId: string): GameS
         dc: e.dc,
         tags: ["scenario", "pack"],
         flavor: e.flavor,
+        portrait: plateFor(e.name),
         ...fieldArmor(e.name),
       },
     ];
@@ -1794,9 +1868,10 @@ export function spawnScenarioCombat(state: GameState, scenarioId: string): GameS
     log: [
       `Situation · ${scenarioId.replaceAll("_", " ")} went hot.`,
       `Hollow · ${enemies.map((e) => e.name).join(" & ")} — ${enemies[0]?.flavor ?? "the field notices."}`,
-      `Tyrone · Magazines matter. Shame is cheaper than a grave.`,
+      `Tyrone · Close, hold, or fall back. An empty gun is a turn, not a click.`,
     ],
     rewardMult: 1.35,
+    stance: "hold",
   };
   party.forEach((id) => {
     const i = state.operatives.findIndex((o) => o.id === id);
