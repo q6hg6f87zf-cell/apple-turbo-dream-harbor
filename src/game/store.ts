@@ -511,7 +511,7 @@ export const useGame = create<Store>((set, get) => ({
       s.bounty = rollBounty(s);
       ensureSquad(s);
       pushLog(s, "session", "Tyrone", "Found you east of the highway. Kane's surveyors are already in Ironclad. Vault 13 holds.");
-      s.nightNote = "Kane's surveyors posted a weigh-in at the Rail Cut. Count their crates before they count ours.";
+      s.nightNote = "No tracks on the East Highway. Tyrone stopped anyway. Walk it before Kane writes the reason.";
       s.metCast = Array.from(new Set([...(s.metCast ?? []), "kane", "tyrone"]));
       queueTalk(s, "wake", true);
     });

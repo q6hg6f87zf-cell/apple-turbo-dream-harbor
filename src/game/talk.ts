@@ -370,7 +370,11 @@ export const TALK: Record<string, TalkLine[]> = {
     },
     {
       who: WHO,
-      text: "Ironclad is west. East highway is where I found you. Under the Iron Gate is the Moon Squad Market — Holt Kade reprints crates at dawn. West of that, Travis keeps the last T-0880 bay Kane did not melt. Relay Tower Three is Calder Rourke. Climb it when the board says listen.",
+      text: "First job is not a crate count. East highway is where I found you. No tracks. Walk it and see what showed up after I carried you home. A white visor is already on the West Berm. She can wait until you have looked at the dirt.",
+    },
+    {
+      who: WHO,
+      text: "After that, Ironclad is west. Moon Squad Market sits under the Iron Gate — Holt reprints at dawn. Travis keeps the last T-0880 bay Kane did not melt. Relay Tower Three is Calder Rourke. Climb it when you actually need a radio, not before you have seen the highway.",
     },
     {
       who: WHO,

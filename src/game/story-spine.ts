@@ -54,9 +54,9 @@ export const STORY_BEATS: StoryBeatDef[] = [
   {
     id: "prologue_first_sortie",
     act: "prologue",
-    title: "First Watch",
-    summary: "Water, the board, the shop, the Gate. Somebody is already on the West Berm.",
-    objective: "Open World. Scout the Rail Cut. Count the crates.",
+    title: "No Tracks",
+    summary: "Walk the East Highway. The dirt is still clean. The chit was not there when he stopped.",
+    objective: "Walk the East Highway. Find what Tyrone did not.",
     require: [
       { type: "character_forged" },
       { type: "any", of: [{ type: "flag", id: "file_cut" }, { type: "character_forged" }] },
@@ -65,6 +65,7 @@ export const STORY_BEATS: StoryBeatDef[] = [
       {
         type: "any",
         of: [
+          { type: "flag", id: "highway_walked" },
           { type: "flag", id: "first_sortie_done" },
           { type: "flag", id: "rail_cut_scouted" },
           { type: "region_intel_gte", loc: "ironclad", n: 2 },
@@ -72,12 +73,12 @@ export const STORY_BEATS: StoryBeatDef[] = [
       },
     ],
     journalOnComplete: {
-      title: "Crates on the Cut",
-      body: "Rail steel ticks in the cold. A stencil says VESPER. That is a buyer, not a history lesson. The West Berm has a white glint.",
-      tags: ["ironclad", "kane"],
+      title: "The chit was new",
+      body: "No tracks in. A fresh Vesper weigh-chit on the mile marker. Tyrone says it was not there when he stopped. He remembers, and he does not want to talk yet. The paper names the Rail Cut.",
+      tags: ["ironclad", "kane", "tyrone"],
     },
     unlocksAct: "act_i",
-    tyroneNote: "You walked the Cut. I kept the count. History can wait until you can stand.",
+    tyroneNote: "I stopped because you were breathing. The chit is new. That is all I am saying.",
   },
   {
     id: "act_i_lyra",
@@ -376,7 +377,11 @@ export function syncStorySpine(state: GameState): void {
   if (forged(state)) setFlag(state, "file_cut", true);
   if ((state.locations.ironclad?.missions ?? 0) >= 1) {
     setFlag(state, "first_sortie_done", true);
-    setFlag(state, "rail_cut_scouted", true);
+    // Files already past the opening should not be walked back to the highway.
+    if (state.day >= 3 && !n.flags.highway_walked) {
+      setFlag(state, "highway_walked", true);
+      setFlag(state, "rail_cut_scouted", true);
+    }
   }
   if ((state.locations.ironclad?.discoveredPois ?? []).includes("ironclad-gate")) {
     setFlag(state, "gate_watched", true);

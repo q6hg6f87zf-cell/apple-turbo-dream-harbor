@@ -12,6 +12,7 @@ export const NARRATIVE_FLAG_IDS = [
   "file_cut",
   "first_sortie_done",
   "first_dawn_survived",
+  "highway_walked",
   // Act I — Ironclad invoice
   "rail_cut_scouted",
   "rail_cut_foraged",

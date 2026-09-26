@@ -5,7 +5,7 @@ import { CAST, meetCast } from "./cast";
 import { queueTalk } from "./talk";
 import { applyAegisChoice } from "./consequences";
 import { syncStorySpine } from "./story-spine";
-import { bumpFaction, setFlag } from "./narrative-state";
+import { bumpFaction, hasFlag, setFlag } from "./narrative-state";
 import type {
   DayTask,
   GameState,
@@ -251,7 +251,34 @@ function crisisTask(day: number, heat: number): DayTask {
   };
 }
 
+function openingBoard(state: GameState): ShiftState {
+  const board: DayTask[] = [
+    sortieJob(state),
+    aegisJob(state),
+    {
+      id: uid("job"),
+      kind: "scan",
+      title: "Leave the porch light",
+      brief: "One walk of the ridge after the highway. The light means the shelter is still his. If the white visor is already up, do not wave.",
+      why: "Lyra paints outlines. A dark porch is a choice. A lit porch is also a choice.",
+      watchCost: 1,
+      required: false,
+      failNote: "The ridge went unwalked. She painted whatever the lamps gave her.",
+      status: "open",
+    },
+  ];
+  return {
+    day: state.day,
+    watch: "dawn",
+    watchesLeft: SHIFT_WATCHES,
+    board,
+    log: [boardPostedLine(state, board)],
+    activeId: null,
+  };
+}
+
 export function generateBoard(state: GameState): ShiftState {
+  if (state.day <= 1 && !hasFlag(state, "highway_walked")) return openingBoard(state);
   const rand = seedRng(state.day * 9176 + (state.kaneHeat ?? 0) * 13 + state.level * 7);
   const board: DayTask[] = [];
   const field = unlockedField(state);

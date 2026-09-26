@@ -191,6 +191,18 @@ export function DayBoard() {
   const dark = unansweredWatches(board, left);
   const take = (id: string) => err(openTask(id));
   const situation = availableScenarios(s)[0] ?? null;
+  const opening =
+    s.day <= 3 && !s.narrative?.flags?.highway_walked
+      ? {
+          kicker: "Opening · No Tracks",
+          line: "He stopped for you. There were no tracks. Walk the East Highway, then decide what the white visor on the Berm gets to report.",
+        }
+      : s.day <= 3 && !s.narrative?.flags?.rail_cut_scouted
+        ? {
+            kicker: "Opening · The Invoice",
+            line: "The chit names a weigh-in at the Rail Cut. Read the contract. One line is not about steel.",
+          }
+        : null;
 
   return (
     <section className="ms-day-board mt-4 overflow-hidden rounded-[var(--radius-md)]" data-day-board="1">
@@ -217,6 +229,13 @@ export function DayBoard() {
         <div className="mt-3">
           <WatchRibbon current={watch} left={left} />
         </div>
+
+        {opening ? (
+          <div className="mt-4 rounded-[var(--radius-sm)] border border-ember/40 bg-ink/50 px-3 py-3">
+            <p className="font-mono text-label uppercase tracking-[0.2em] text-ember">{opening.kicker}</p>
+            <p className="mt-1 text-secondary leading-relaxed text-paper">{opening.line}</p>
+          </div>
+        ) : null}
 
         {situation ? (
           <div className="mt-4">

@@ -1,6 +1,7 @@
 import { aegisOnDuty, CAST, kaneHeatLine, meetCast, type CastId, type CastPerson } from "./cast";
 import { locById } from "./data";
 import { KANE_STAKES, discoverPoi, locationToRegion, poiById, poisForLocation } from "./field-ops";
+import { hasFlag } from "./narrative-state";
 import type { DayTask, GameState, LocationId, MissionKind, RegionPointOfInterest } from "./types";
 
 export interface SiteCopy {
@@ -24,11 +25,11 @@ interface SitePack {
 const SITES: Record<string, SitePack> = {
   "ironclad-rail": {
     scout: {
-      title: "Scout the Rail Cut",
+      title: "The Invoice",
       brief:
-        "Kane's surveyors posted a dawn weigh-in. Night crews have been pulling spikes for Project Vesper — hull plate for a stack that is not supposed to exist. Count the crates. Mark the route home. Do not sit with them.",
-      why: "Rail steel is hull plate. If she finishes the invoice, Ironclad is a quarry.",
-      fail: "Kane's surveyors walked the Cut without us. The weigh-in is already on her desk.",
+        "The chit from the East Highway names a dawn weigh-in at the Rail Cut. Read the contract. Do not just count crates. Winter steel, signed when Ironclad was hungry. One line is a black-tag list of old T-0880 bays. If Tyrone goes quiet, that line is why.",
+      why: "Project Vesper is not buying scrap. It is buying the town, and it already knows where the couriers slept.",
+      fail: "Kane's surveyors walked the Cut without us. The invoice is on her desk, including the line that is not steel.",
     },
     forage: {
       title: "Strip the Rail Cut",
@@ -36,20 +37,20 @@ const SITES: Record<string, SitePack> = {
       why: "Every spike we take is a spike Project Vesper does not get.",
       fail: "Kane's buyers loaded the trench. We kept the map and lost the steel.",
     },
-    approach: "{lead} drops into the Cut along the slag side. Surveyor lamps are already live on the far bank. Count crates, not faces.",
-    sweep: "Weigh-chits nailed to the ties. A stencil that says VESPER. {lead} copies serials and leaves the lamps burning so nobody knows we were here.",
-    report: "SYNAPSE wants the crate count and the route they will take at dusk. {lead} calls it in before Kane's people do.",
+    approach: "{lead} drops into the Cut along the slag side. The chit said dawn. The lamps are already live.",
+    sweep: "The contract is legal and mean. Winter steel, paid in parts no local forge can make. Under the tonnage, a black-tag line: T-0880 bays, Atlas cores, Reeve's mark. {lead} copies it. Tyrone does not comment.",
+    report: "SYNAPSE gets the page, not a crate count. {lead} brings the black-tag line home. Tyrone says he remembers the mark and does not want to talk. That is different from not remembering.",
     hollow: "Rail steel ticks in the cold. Kane's yard is never empty for long.",
     range: "{lead} fans the trench for dropped plate. The Cut still smells like a mill that has not admitted it died.",
     haul: "The pack gets heavy with spikes. Something on the far bank notices the taking.",
   },
   "ironclad-highway": {
     scout: {
-      title: "Walk the East Highway",
+      title: "No Tracks",
       brief:
-        "Tyrone found you facedown here. No tracks then. Walk it again. If Kane staged the drop, her people left a smear — visor paint, a weigh-chit, a reason.",
-      why: "Whoever put you on that asphalt still has not explained themselves.",
-      fail: "The highway stayed empty. Kane's people already know it better than we do.",
+        "Tyrone found you facedown on the East Highway. No supplies. No tracks in. Walk it before Kane's people rewrite the dirt. You are looking for what was not there when he stopped.",
+      why: "He had no mission reason to pick you up. The first job is to see the place with your own eyes.",
+      fail: "The highway stays his story. Kane writes the reason without us.",
     },
     forage: {
       title: "Salvage the East Highway",
@@ -57,9 +58,9 @@ const SITES: Record<string, SitePack> = {
       why: "This is where your file started. It still pays if you pick it clean.",
       fail: "The culverts stayed full of other people's leftovers.",
     },
-    approach: "{lead} takes the long shoulder, visor down. The asphalt still holds the shape of a body. No tracks leading in. Same as the night Tyrone found you.",
-    sweep: "Culverts, mile markers, a smear of violet visor paint on a guardrail. {lead} puts a finger on it. Lyra paints ridges. Someone painted this road.",
-    report: "If Kane staged the drop, this is the first page of the file. {lead} brings the smear home, not a speech.",
+    approach: "{lead} takes the long shoulder. The asphalt still holds the shape of a body. No tracks leading in. Same as the night Tyrone stopped.",
+    sweep: "The dirt is still clean. No boots, no tires, no drag marks. A Vesper weigh-chit is nailed to the mile marker. Fresh. It was not there when he carried you home. {lead} takes the paper, not a speech.",
+    report: "Tyrone reads the chit and goes quiet in the way that means he remembers and will not talk yet. The paper names a dawn weigh-in. {lead} files it. Tomorrow is the Rail Cut.",
     hollow: "The highway does not explain itself. It never did.",
   },
   "ironclad-gate": {
@@ -515,6 +516,13 @@ function packFor(poi: RegionPointOfInterest | undefined): SitePack | undefined {
   return SITES[poi.id];
 }
 
+function openingPoiId(state: GameState, loc: LocationId): string | null {
+  if (loc !== "ironclad" || state.day > 3) return null;
+  if (!hasFlag(state, "highway_walked")) return "ironclad-highway";
+  if (!hasFlag(state, "rail_cut_scouted")) return "ironclad-rail";
+  return null;
+}
+
 export function resolveMissionSite(
   state: GameState,
   loc: LocationId,
@@ -527,8 +535,8 @@ export function resolveMissionSite(
   );
   const discovered = new Set(state.locations[loc]?.discoveredPois ?? []);
   const known = usable.filter((p) => p.discovered || discovered.has(p.id));
-  if (state.day <= 1 && loc === "ironclad") {
-    return usable.find((p) => p.id === "ironclad-rail") ?? known[0] ?? usable[0];
+  if (state.day <= 1 && loc === "ironclad" && !hasFlag(state, "highway_walked")) {
+    return usable.find((p) => p.id === "ironclad-highway") ?? known[0] ?? usable[0];
   }
   const sortie = state.shift?.board.find((t) => t.kind === "sortie" && (t.status === "open" || t.status === "active"));
   if (sortie?.poiId && sortie.loc === loc) {
@@ -543,6 +551,9 @@ export function pickFieldSite(state: GameState): { loc: LocationId; poi: RegionP
     (id) => id !== "hq" && state.locations[id]?.unlocked,
   );
   const loc = (open[0] ?? "ironclad") as LocationId;
+  const forcedId = openingPoiId(state, loc);
+  const forced = forcedId ? poiById(loc, forcedId) : undefined;
+  if (forced) return { loc, poi: forced };
   const poi = resolveMissionSite(state, loc, state.selectedPoiId);
   const fallback = poisForLocation(loc)[0];
   return { loc, poi: poi ?? fallback! };
@@ -564,7 +575,7 @@ export function sortieJob(state: GameState): DayTask {
   ) as MissionKind;
   const copy = siteCopyFor(poi, kind);
   discoverPoi(state, loc, poi.id);
-  if (state.day <= 1 || !state.selectedPoiId) {
+  if (openingPoiId(state, loc) === poi.id || state.day <= 1 || !state.selectedPoiId) {
     state.selectedLoc = loc;
     state.selectedPoiId = poi.id;
   }
@@ -610,7 +621,7 @@ function aegisCopy(person: CastPerson, heat: number, day: number) {
     return {
       title: "White light on the West Berm",
       brief:
-        "Lyra is already listening. White visor, ridge above Vault 13. She is not knocking. She is painting our outline for the rest of the wing — Vera, then Drake, then Orion. Decide how loud we are tonight.",
+        "Lyra is already on the West Berm. White visor. She is painting Vault 13 because somebody told her a body was on the East Highway. She is not knocking. Decide what she gets to report — an empty ridge, a boring foundry, or a fight.",
       fail: "Lyra kept the transcript. Kane has our outline before we have hers.",
       choices: [
         { id: "hide", label: "Kill the porch lamps", blurb: "Let her paint an empty ridge. Perimeter Control helps if it is raised." },
@@ -671,8 +682,11 @@ export function dawnDispatch(state: GameState): string {
   const { poi } = pickFieldSite(state);
   const copy = siteCopyFor(poi, state.day % 3 === 0 ? "forage" : "scout");
   const heat = state.kaneHeat ?? 0;
-  if (state.day <= 1) {
-    return "Dr. Vesper Kane posted a weigh-in at the Rail Cut. Lyra is already listening on the West Berm. Count their crates before they count ours.";
+  if (!hasFlag(state, "highway_walked")) {
+    return "No tracks on the East Highway. Tyrone stopped anyway. Walk it before Kane writes the reason. Lyra is already listening on the West Berm.";
+  }
+  if (state.day <= 3 && !hasFlag(state, "rail_cut_scouted")) {
+    return "The chit names a weigh-in at the Rail Cut. Read the invoice. One line is not about steel.";
   }
   if (heat >= 10) {
     const person = aegisOnDuty(state.day, heat);
@@ -685,8 +699,11 @@ export function boardPostedLine(state: GameState, board: DayTask[]): string {
   const lead = board.find((t) => t.kind === "sortie") ?? board[0];
   const heat = kaneHeatLine(state.kaneHeat ?? 0);
   if (!lead) return `Day ${state.day}. The wall is blank. That is never good.`;
-  if (state.day <= 1) {
-    return `Day 1. Kane wants hull plate. ${lead.title} is the lead ticket.`;
+  if (!hasFlag(state, "highway_walked")) {
+    return `Day ${state.day}. No tracks. ${lead.title} is the lead ticket. Kane does not get to write this one first.`;
+  }
+  if (state.day <= 3 && !hasFlag(state, "rail_cut_scouted")) {
+    return `Day ${state.day}. The invoice is the lead ticket. ${lead.title}.`;
   }
   return `Day ${state.day}. ${lead.title} is the lead ticket. ${heat}`;
 }
@@ -696,7 +713,7 @@ export function kaneFileBlurb(state: GameState): string {
   const region = locationToRegion(state.selectedLoc ?? "ironclad") ?? "ironclad";
   const stake = KANE_STAKES[region];
   if (state.day <= 2) {
-    return "TyroneBot first. Kane signed the T-0880 shutdown and hung the rest of the line. Travis kept the last bay. Then she built AEGIS 2753. Project Vesper needs hull plate. Ironclad is the first invoice.";
+    return "Tyrone found you with no tracks and no reason to stop. Walk the East Highway before Kane writes one. The invoice at the Rail Cut can wait until you have seen the dirt.";
   }
   return `${stake.resource}. ${stake.why} ${kaneHeatLine(heat)}`;
 }

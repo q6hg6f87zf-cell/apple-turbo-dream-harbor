@@ -27,21 +27,33 @@ describe("campaign cast", () => {
     assert.equal(aegisOnDuty(4, 18).id, "orion");
   });
 
-  it("day one scouts the Rail Cut by name", () => {
+  it("day one walks the highway, not a crate count", () => {
     const s = defaultState();
     s.day = 1;
     s.locations.ironclad.unlocked = true;
     const { poi } = pickFieldSite(s);
+    assert.equal(poi.id, "ironclad-highway");
+    const copy = siteCopyFor(poi, "scout");
+    assert.match(copy.title, /No Tracks/);
+    assert.match(copy.brief, /Kane|Tyrone/);
+    const job = sortieJob(s);
+    assert.equal(job.poiId, "ironclad-highway");
+    assert.match(job.brief, /tracks|Tyrone|highway/i);
+    assert.match(dawnDispatch(s), /East Highway|No tracks/);
+    assert.equal(s.selectedPoiId, "ironclad-highway");
+  });
+
+  it("follows the chit to the Rail Cut once the highway is walked", () => {
+    const s = defaultState();
+    s.day = 2;
+    s.locations.ironclad.unlocked = true;
+    s.narrative = { ...(s.narrative ?? { act: "act_i", beats: {}, flags: {}, journal: [], endingId: null, promises: [] }), flags: { highway_walked: true } } as never;
+    const { poi } = pickFieldSite(s);
     assert.equal(poi.id, "ironclad-rail");
     const copy = siteCopyFor(poi, "scout");
-    assert.match(copy.title, /Rail Cut/);
-    assert.match(copy.brief, /Kane/);
-    const job = sortieJob(s);
-    assert.equal(job.poiId, "ironclad-rail");
-    assert.match(job.brief, /weigh-in|Kane|Project Vesper/i);
-    assert.match(dawnDispatch(s), /Rail Cut/);
-    assert.ok(s.locations.ironclad.discoveredPois?.includes("ironclad-rail"));
-    assert.equal(s.selectedPoiId, "ironclad-rail");
+    assert.match(copy.title, /Invoice/);
+    assert.match(copy.brief, /Rail Cut/);
+    assert.match(copy.brief, /black-tag|T-0880/);
   });
 
   it("does not post a cabinet job on the vault board", () => {
@@ -51,7 +63,9 @@ describe("campaign cast", () => {
     const shift = generateBoard(s);
     assert.equal(shift.board.some((t) => t.kind === "cabinet"), false);
     assert.ok(shift.board.some((t) => t.kind === "sortie"));
-    assert.match(shift.log[0] ?? "", /Rail Cut|lead ticket|Kane/i);
+    assert.equal(shift.board.filter((t) => t.required).length, 2);
+    assert.equal(shift.board.some((t) => t.kind === "market"), false);
+    assert.match(shift.board.find((t) => t.kind === "sortie")?.title ?? "", /No Tracks/);
   });
 
   it("posts Lyra on day one so Kane has a face", () => {
@@ -127,10 +141,10 @@ describe("campaign cast", () => {
     ];
     s.shift = generateBoard(s);
     const poi = defaultPoi(s, "ironclad");
-    assert.equal(poi?.id, "ironclad-rail");
-    assert.ok(knownPois(s, "ironclad").some((p) => p.id === "ironclad-rail"));
+    assert.equal(poi?.id, "ironclad-highway");
+    assert.ok(knownPois(s, "ironclad").some((p) => p.id === "ironclad-highway"));
     const brief = eventBriefing(s, "ironclad", "scout", ["op-1"]);
-    assert.match(brief.briefing, /Rail Cut/);
+    assert.match(brief.briefing, /No Tracks|East Highway/);
     assert.doesNotMatch(brief.briefing, /Scout in Ironclad/);
   });
 

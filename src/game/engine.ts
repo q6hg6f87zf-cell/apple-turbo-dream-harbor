@@ -72,7 +72,7 @@ import { aegisRunner, dawnDispatch, nightTale, resolveMissionSite } from "./stor
 import { rollLoot } from "./loot";
 import { emptyNarrative } from "./narrative-state";
 import { bootstrapNarrative, syncStorySpine } from "./story-spine";
-import { setFlag } from "./narrative-state";
+import { setFlag, hasFlag } from "./narrative-state";
 import { applyRadioWorldNote } from "./radio-world";
 import { considerEndingAtDawn } from "./endings";
 import { availableScenarios } from "./scenario";
@@ -902,7 +902,8 @@ export function completeMission(state: GameState): GameState {
   }
   state.toast = parts.join(" · ");
   setFlag(state, "first_sortie_done", true);
-  if (m.poiId === "ironclad-rail" || (m.locationId === "ironclad" && firstWatch)) {
+  if (m.poiId === "ironclad-highway") setFlag(state, "highway_walked", true);
+  if (m.poiId === "ironclad-rail") {
     setFlag(state, m.kind === "forage" ? "rail_cut_foraged" : "rail_cut_scouted", true);
   }
   if (m.poiId === "ironclad-gate") setFlag(state, "gate_watched", true);
@@ -1539,11 +1540,13 @@ export function nextObjective(state: GameState): { text: string; screen: Screen;
   const broken = state.operatives.find((o) => o.inventory.some((i) => i.equipped && i.condition === "Broken"));
   if (broken)
     return { text: `${broken.name}'s weapon is broken. Pay the Forge.`, screen: "roster", cta: "Repair", opId: broken.id };
+  const ironclad = state.locations.ironclad;
+  if (state.day <= 3 && characterForged(state) && !hasFlag(state, "highway_walked"))
+    return { text: "No tracks. Walk the East Highway and find what Tyrone did not.", screen: "hq", cta: "Board" };
+  if (state.day <= 3 && characterForged(state) && !hasFlag(state, "rail_cut_scouted"))
+    return { text: "The chit names the Rail Cut. Read the invoice. One line is not steel.", screen: "hq", cta: "Board" };
   if (state.coins < 350)
     return { text: "Caps are thin. Deploy a forage or crack a crate.", screen: "map", cta: "Deploy" };
-  const ironclad = state.locations.ironclad;
-  if (state.day <= 2 && (ironclad?.intel ?? 0) < 4 && characterForged(state))
-    return { text: "Kane's surveyors posted a weigh-in at the Rail Cut. Scout it.", screen: "hq", cta: "Board" };
   if (ironclad.bossUnlocked && !ironclad.bossDefeated)
     return { text: "Gravenor holds Ironclad. Arc I is open — it is someone's turn.", screen: "map", cta: "Hunt" };
   const nextBoss = WORLD.find(
