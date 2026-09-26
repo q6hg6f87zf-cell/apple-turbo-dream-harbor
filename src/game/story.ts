@@ -516,14 +516,45 @@ function packFor(poi: RegionPointOfInterest | undefined): SitePack | undefined {
   return SITES[poi.id];
 }
 
+const SCENES: Record<string, string> = {
+  "ironclad-highway": "/art/places/east-highway.jpg",
+  "ironclad-rail": "/art/places/rail-cut.jpg",
+  "ironclad-berm": "/art/places/west-berm.jpg",
+  "ironclad-gate": "/art/places/iron-gate.jpg",
+  "ironclad-shop": "/art/places/mechanical-shop.jpg",
+  "ironclad-works": "/art/places/ironclad-works.jpg",
+  "ironclad-halo": "/art/places/halo-yard.jpg",
+  "ironclad-tower": "/art/places/relay-tower.jpg",
+  "ironclad-exchange": "/art/places/the-exchange.jpg",
+  "ironclad-gravenor": "/art/places/ashen-hills.jpg",
+  "ironclad-vault13": "/art/places/vault-13-exterior.jpg",
+  "ironclad-market": "/art/places/ironclad-market.jpg",
+  "slag-foundry-row": "/art/places/foundry-row.jpg",
+  "slag-coke": "/art/places/coke-stacks.jpg",
+  "slag-pipewalk": "/art/places/pipewalk.jpg",
+  "slag-glass-yard": "/art/places/glass-yard.jpg",
+  "slag-valdris": "/art/places/furnace-court.jpg",
+  "blackspire-lift": "/art/places/grand-lift.jpg",
+  "blackspire-frost": "/art/places/frost-camp.jpg",
+  "blackspire-cage": "/art/places/cageworks.jpg",
+  "blackspire-deepworks": "/art/places/deepworks.jpg",
+  "blackspire-thessaly": "/art/places/survey-crown.jpg",
+  "brasswater-docks": "/art/places/brass-docks.jpg",
+  "brasswater-chapel": "/art/places/pontoon-chapel.jpg",
+  "brasswater-floodgate": "/art/places/floodgate.jpg",
+  "brasswater-archive": "/art/places/drowned-archive.jpg",
+  "brasswater-sink": "/art/places/the-sink.jpg",
+  "veyra-rift-market": "/art/places/rift-market.jpg",
+  "veyra-mast": "/art/places/signal-mast.jpg",
+  "veyra-hangar": "/art/places/aegis-hangar.jpg",
+  "veyra-spire": "/art/places/kane-spire.jpg",
+  "veyra-yards": "/art/places/suit-yards.jpg",
+  "veyra-warden": "/art/places/warden-line.jpg",
+};
+
 export function storyScene(poiId?: string | null): string | null {
-  if (poiId === "ironclad-highway") return "/art/places/east-highway.jpg";
-  if (poiId === "ironclad-rail") return "/art/places/rail-cut.jpg";
-  if (poiId === "ironclad-berm") return "/art/places/west-berm.jpg";
-  if (poiId === "ironclad-gate") return "/art/places/iron-gate.jpg";
-  if (poiId === "ironclad-shop") return "/art/places/mechanical-shop.jpg";
-  if (poiId === "slag-foundry-row" || poiId === "slag-coke" || poiId === "slag-valdris") return "/art/places/foundry-row.jpg";
-  return null;
+  if (!poiId) return null;
+  return SCENES[poiId] ?? null;
 }
 
 const OPENING_TACTICS: Record<string, Record<string, MissionTactic[]>> = {

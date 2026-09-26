@@ -30,7 +30,39 @@ import {
   StatGrid,
 } from "./primitives";
 import { Heart, Package, Shield, Sparkles, Swords, Wind, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
+
+function useScreenFrame() {
+  const [frame, setFrame] = useState({ top: 0, height: 0 });
+  useEffect(() => {
+    const read = () => {
+      const vv = window.visualViewport;
+      const height = Math.round(vv?.height ?? window.innerHeight);
+      const top = Math.round(vv?.offsetTop ?? 0);
+      setFrame((prev) => (prev.top === top && prev.height === height ? prev : { top, height }));
+    };
+    read();
+    const vv = window.visualViewport;
+    vv?.addEventListener("resize", read);
+    vv?.addEventListener("scroll", read);
+    window.addEventListener("resize", read);
+    window.addEventListener("orientationchange", read);
+    return () => {
+      vv?.removeEventListener("resize", read);
+      vv?.removeEventListener("scroll", read);
+      window.removeEventListener("resize", read);
+      window.removeEventListener("orientationchange", read);
+    };
+  }, []);
+  return frame;
+}
+
+function shellStyle(frame: { top: number; height: number }): CSSProperties {
+  if (!frame.height) return { top: 0, height: "100svh", maxHeight: "100svh" };
+  return { top: frame.top, height: frame.height, maxHeight: frame.height };
+}
+
+const FIELD_SHELL = "fixed inset-x-0 z-40 flex w-full flex-col overflow-hidden bg-ink";
 
 const HAUL_EDGE = {
   Common: "shadow-[inset_0_0_0_2px_var(--color-line)]",
@@ -167,6 +199,7 @@ export function MissionOverlay() {
   const [spin, setSpin] = useState(false);
   const [held, setHeld] = useState(false);
   const holdTimer = useRef<number | null>(null);
+  const frame = useScreenFrame();
   const waiting = !!mission?.waiting;
   const open = !!mission && !combat;
 
@@ -239,10 +272,7 @@ export function MissionOverlay() {
   const showResult = !choosing && !spin && !held && resolved;
 
   return (
-    <div
-      className="fixed inset-x-0 top-0 z-40 flex h-dvh max-h-dvh w-full flex-col overflow-hidden supports-[height:100svh]:h-svh supports-[height:100svh]:max-h-svh"
-      data-mission="1"
-    >
+    <div data-mission="1" className={FIELD_SHELL} style={shellStyle(frame)}>
       <EncounterBackdrop
         locationId={mission.locationId}
         tone={mission.kind === "boss" || mission.kind === "raid" ? "danger" : "neutral"}
@@ -263,9 +293,6 @@ export function MissionOverlay() {
             </span>
           </div>
           <h2 className="mt-1 font-display text-2xl leading-tight">{beat?.title ?? "Debrief"}</h2>
-          {choosing && beat?.prompt ? (
-            <p className="mt-2 line-clamp-3 text-secondary leading-snug text-moon">{beat.prompt}</p>
-          ) : null}
           <div className="mt-3 flex gap-1.5">
             {mission.beats.map((b, i) => (
               <span
@@ -279,10 +306,44 @@ export function MissionOverlay() {
           </div>
         </div>
 
-        <div className="relative min-h-0 flex-1">
+        <div className="min-h-16 flex-1" />
+
+        {showResult ? (
+          <div className="ms-scroll max-h-[32%] shrink-0 overflow-y-auto px-3">
+            <div className="rounded-[var(--radius-md)] bg-ink/90 px-3 py-2 shadow-[var(--shadow-border)]">
+              {mission.lastRoll ? (
+                <div className="flex items-center gap-3 py-1">
+                  <DiceFace value={mission.lastRoll.value} band={mission.lastRoll.band} size={72} mark={false} />
+                  <p className="text-secondary text-moon">
+                    {mission.lastRoll.text}. {BAND_COPY[mission.lastRoll.band]}
+                  </p>
+                </div>
+              ) : null}
+              {mission.lastConsequence ? (
+                <p className="mt-2 border-l-2 border-ember pl-3 text-body leading-relaxed text-paper">{mission.lastConsequence}</p>
+              ) : null}
+              {mission.loot.length ? (
+                <div className="border-t border-line/40 py-2">
+                  <SectionLabel>Recovered</SectionLabel>
+                  <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+                    {mission.loot.map((it) => (
+                      <HaulPlate key={it.id} item={it} />
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+              {tape.length ? <EventLog lines={tape} pin={false} /> : null}
+            </div>
+          </div>
+        ) : null}
+
+        <div className="shrink-0 border-t border-line/70 bg-ink">
           {choosing ? (
-            <div className="ms-scroll absolute inset-x-0 bottom-0 max-h-[42%] overflow-y-auto px-3 pb-1">
-              <div className="space-y-1.5">
+            <div className="px-3 pt-3">
+              {beat?.prompt ? (
+                <p className="line-clamp-2 text-secondary leading-snug text-paper">{beat.prompt}</p>
+              ) : null}
+              <div className="mt-2 space-y-1.5">
                 {beat?.tactics?.map((t) => (
                   <button
                     key={t.id}
@@ -291,7 +352,7 @@ export function MissionOverlay() {
                       sfx.click();
                       pickTactic(t.id);
                     }}
-                    className="flex min-h-11 w-full items-center gap-3 rounded-[var(--radius-sm)] bg-ink/80 px-3 py-2 text-left shadow-[var(--shadow-border)]"
+                    className="flex min-h-11 w-full items-center gap-3 rounded-[var(--radius-sm)] bg-raised px-3 py-2 text-left shadow-[var(--shadow-border)]"
                   >
                     <span className="min-w-0 flex-1">
                       <span className="block truncate font-display text-body text-paper">{t.label}</span>
@@ -305,68 +366,43 @@ export function MissionOverlay() {
                 ))}
               </div>
             </div>
-          ) : showResult ? (
-            <div className="ms-scroll absolute inset-x-0 bottom-0 max-h-[42%] overflow-y-auto px-3 pb-1">
-              <div className="rounded-[var(--radius-md)] bg-ink/78 px-3 py-2 shadow-[var(--shadow-border)] backdrop-blur-sm">
-                {mission.lastRoll ? (
-                  <div className="flex items-center gap-3 py-1">
-                    <DiceFace value={mission.lastRoll.value} band={mission.lastRoll.band} size={72} mark={false} />
-                    <p className="text-secondary text-moon">
-                      {mission.lastRoll.text}. {BAND_COPY[mission.lastRoll.band]}
-                    </p>
-                  </div>
-                ) : null}
-                {mission.lastConsequence ? (
-                  <p className="mt-2 border-l-2 border-ember pl-3 text-body leading-relaxed text-paper">{mission.lastConsequence}</p>
-                ) : null}
-                {mission.loot.length ? (
-                  <div className="border-t border-line/40 py-2">
-                    <SectionLabel>Recovered</SectionLabel>
-                    <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
-                      {mission.loot.map((it) => (
-                        <HaulPlate key={it.id} item={it} />
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-                {tape.length ? <EventLog lines={tape} pin={false} /> : null}
-              </div>
-            </div>
           ) : null}
-        </div>
 
-        <PartyRail party={party} />
+          <PartyRail party={party} />
 
-        {choosing ? null : (
-          <CommandBar>
-            {mission.waiting ? (
-              <>
-                {beat ? (
-                  <p className="mb-2 text-center font-display text-label uppercase tracking-[0.16em] text-moon">
-                    {beat.stat} vs DC {beat.dc}
-                  </p>
-                ) : null}
-                <Button className="w-full" variant="ember" onClick={onRoll} disabled={spin} sound="none" autoFocus>
-                  Roll d20
+          {choosing ? (
+            <div className="pb-[max(0.75rem,env(safe-area-inset-bottom))]" />
+          ) : (
+            <CommandBar>
+              {mission.waiting ? (
+                <>
+                  {beat ? (
+                    <p className="mb-2 text-center font-display text-label uppercase tracking-[0.16em] text-moon">
+                      {beat.stat} vs DC {beat.dc}
+                    </p>
+                  ) : null}
+                  <Button className="w-full" variant="ember" onClick={onRoll} disabled={spin} sound="none" autoFocus>
+                    Roll d20
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  className="w-full"
+                  variant="ember"
+                  sound="none"
+                  autoFocus
+                  data-mission-next="1"
+                  onClick={() => {
+                    sfx.click();
+                    cont();
+                  }}
+                >
+                  {last || partyDown ? "Return to HQ" : "Continue"}
                 </Button>
-              </>
-            ) : (
-              <Button
-                className="w-full"
-                variant="ember"
-                sound="none"
-                autoFocus
-                data-mission-next="1"
-                onClick={() => {
-                  sfx.click();
-                  cont();
-                }}
-              >
-                {last || partyDown ? "Return to HQ" : "Continue"}
-              </Button>
-            )}
-          </CommandBar>
-        )}
+              )}
+            </CommandBar>
+          )}
+        </div>
       </div>
       {(spin || held) && (
         <div
@@ -416,6 +452,7 @@ export function CombatOverlay() {
   const prevHp = useRef<number | null>(null);
   const prevParty = useRef<Record<string, number>>({});
   const logRef = useRef<HTMLDivElement>(null);
+  const frame = useScreenFrame();
 
   useEffect(() => {
     if (float.n <= 0) return;
@@ -566,10 +603,7 @@ export function CombatOverlay() {
   const hullPct = enemy ? Math.max(0, Math.min(100, (enemy.hp / Math.max(1, enemy.maxHp)) * 100)) : 0;
 
   return (
-    <div
-      className="fixed inset-x-0 top-0 z-40 flex h-dvh max-h-dvh w-full flex-col overflow-hidden supports-[height:100svh]:h-svh supports-[height:100svh]:max-h-svh"
-      data-combat="1"
-    >
+    <div data-combat="1" className={FIELD_SHELL} style={shellStyle(frame)}>
       <EncounterBackdrop
         locationId={combat.locationId}
         tone="danger"
