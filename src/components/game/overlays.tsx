@@ -10,9 +10,9 @@ import type { Item, Operative } from "@/game/types";
 import { STAT_COPY, STAT_ORDER } from "@/game/stats-copy";
 import { cn } from "@/lib/cn";
 import { CommandBar, EncounterBackdrop, EventChips, EventLog } from "./encounter-scene";
-import { KIND_LABEL, eventChips, eventStatHint, shiftRadio, dawnLines } from "@/game/event-theater";
+import { shiftRadio, dawnLines } from "@/game/event-theater";
 import { BOARD_KIND_LABEL, boardStake } from "@/game/board-copy";
-import { CAST, kaneHeatLine, AEGIS_FIELD_STILL, castById } from "@/game/cast";
+import { CAST, AEGIS_FIELD_STILL, castById } from "@/game/cast";
 import { storyScene } from "@/game/story";
 import { poiById } from "@/game/field-ops";
 import { itemArt, itemThumbUrl } from "@/game/item-art";
@@ -76,6 +76,81 @@ export function ToastHost() {
     <div className="ms-toast" data-toast="1">
       <div className="ms-rise ms-shake rounded-[var(--radius-md)] bg-panel px-4 py-3 text-center text-body text-paper shadow-[var(--shadow-border-hover)]">
         {toast}
+      </div>
+    </div>
+  );
+}
+
+function partyCols(n: number) {
+  if (n <= 1) return "grid-cols-1";
+  if (n === 2) return "grid-cols-2";
+  return "grid-cols-3";
+}
+
+function PartyRail({
+  party,
+  actorId,
+  hurtId,
+  mag,
+}: {
+  party: Operative[];
+  actorId?: string;
+  hurtId?: string | null;
+  mag?: string | null;
+}) {
+  if (!party.length) return null;
+  const acting = party.find((op) => op.id === actorId);
+  if (party.length === 1) {
+    const op = party[0];
+    return (
+      <div className="shrink-0 px-3 pt-1">
+        <div
+          className={cn(
+            "flex items-center gap-3 rounded-[var(--radius-sm)] bg-ink/70 px-2 py-2 backdrop-blur-sm",
+            acting ? "shadow-[var(--shadow-border-hover)]" : "shadow-[var(--shadow-border)]",
+            hurtId === op.id && "ms-hit",
+          )}
+        >
+          <Portrait op={op} size={36} />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="truncate text-label text-paper">{op.name}</span>
+              {acting ? (
+                <span className="shrink-0 truncate font-display text-label uppercase tracking-[0.14em] text-ember">
+                  {mag ?? "acting"}
+                </span>
+              ) : null}
+            </div>
+            <HpBar hp={op.hp} max={op.maxHp} className="mt-1" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="shrink-0 px-3 pt-1">
+      <div className={cn("grid gap-2", partyCols(party.length))}>
+        {party.map((op) => (
+          <div
+            key={op.id}
+            className={cn(
+              "min-w-0 rounded-[var(--radius-sm)] bg-ink/70 px-2 py-2 backdrop-blur-sm",
+              actorId === op.id ? "shadow-[var(--shadow-border-hover)]" : "shadow-[var(--shadow-border)]",
+              hurtId === op.id && "ms-hit",
+            )}
+          >
+            <div className="flex min-w-0 items-center gap-2">
+              <Portrait op={op} size={28} />
+              <span className="min-w-0 flex-1 truncate text-label text-paper">{op.name}</span>
+            </div>
+            <HpBar hp={op.hp} max={op.maxHp} className="mt-1.5" />
+            {actorId === op.id ? (
+              <p className="mt-1 truncate font-display text-label uppercase tracking-[0.14em] text-ember">
+                {mag ?? "acting"}
+              </p>
+            ) : null}
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -157,10 +232,11 @@ export function MissionOverlay() {
   const partyDown = party.length > 0 && party.every((o) => o.hp <= 0 || o.status === "dead");
 
   const choosing = !!(mission.waiting && beat?.tactics && !beat.tacticId);
-  const chips = eventChips(s, mission);
-  const heat = s.kaneHeat ?? 0;
   const site = poiById(mission.locationId, mission.poiId);
   const face = castById(mission.npcId);
+  const resolved = !!(mission.lastRoll || mission.lastConsequence || mission.loot.length);
+  const tape = resolved ? mission.narrative.slice(-2) : [];
+  const showResult = !choosing && !spin && !held && resolved;
 
   return (
     <div
@@ -174,29 +250,22 @@ export function MissionOverlay() {
       />
 
       <div className="relative z-[1] flex min-h-0 flex-1 flex-col overflow-hidden">
-        <div className="max-h-[34svh] shrink-0 overflow-y-auto px-4 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))]">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="font-display text-label uppercase tracking-[0.22em] text-ember">
-                {KIND_LABEL[mission.kind]} · {site?.name ?? loc.short} · {mission.approach ?? "standard"} · beat {mission.beatIndex + 1}/
-                {mission.beats.length}
-              </div>
-              <h2 className="mt-1 font-display text-2xl leading-tight">{beat?.title ?? "Debrief"}</h2>
-            </div>
-            <div className="flex shrink-0 items-start gap-2">
-              {face ? (
-                <img
-                  src={face.portrait}
-                  alt=""
-                  className="size-14 rounded-[var(--radius-sm)] object-cover object-top shadow-[var(--shadow-border)]"
-                />
-              ) : null}
-              <div className="text-right text-label text-muted">
-                <Coin n={mission.coins} />
-              </div>
-            </div>
+        <div className="shrink-0 px-4 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))]">
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="min-w-0 truncate font-display text-label uppercase tracking-[0.22em] text-ember">
+              {site?.name ?? loc.short}
+            </span>
+            <span className="flex shrink-0 items-center gap-3 text-label text-muted">
+              {mission.coins > 0 ? <Coin n={mission.coins} /> : null}
+              <span className="tabular-nums">
+                {mission.beatIndex + 1}/{mission.beats.length}
+              </span>
+            </span>
           </div>
-          <EventChips chips={chips} />
+          <h2 className="mt-1 font-display text-2xl leading-tight">{beat?.title ?? "Debrief"}</h2>
+          {choosing && beat?.prompt ? (
+            <p className="mt-2 line-clamp-3 text-secondary leading-snug text-moon">{beat.prompt}</p>
+          ) : null}
           <div className="mt-3 flex gap-1.5">
             {mission.beats.map((b, i) => (
               <span
@@ -210,42 +279,45 @@ export function MissionOverlay() {
           </div>
         </div>
 
-        {choosing ? (
-          <div className="relative min-h-0 flex-1">
-            <div className="ms-scroll absolute inset-x-0 bottom-0 max-h-[72%] overflow-y-auto px-3 pb-3">
-              <div className="rounded-[var(--radius-md)] bg-ink/78 px-3 py-3 shadow-[var(--shadow-border)] backdrop-blur-sm">
-                <p className="text-body leading-relaxed text-moon">{beat?.prompt}</p>
-                <div className="mt-4 space-y-2">
-                  <p className="font-display text-label uppercase tracking-[0.16em] text-ember">Call it</p>
-                  {beat?.tactics?.map((t) => (
-                    <button
-                      key={t.id}
-                      type="button"
-                      onClick={() => {
-                        sfx.click();
-                        pickTactic(t.id);
-                      }}
-                      className="flex min-h-14 w-full flex-col items-start justify-center rounded-[var(--radius-md)] bg-ink/75 px-3 py-2 text-left shadow-[var(--shadow-border)] backdrop-blur-sm"
-                    >
-                      <span className="font-display text-body text-paper">{t.label}</span>
-                      <span className="mt-0.5 text-secondary text-muted">{t.blurb}</span>
-                    </button>
-                  ))}
-                </div>
+        <div className="relative min-h-0 flex-1">
+          {choosing ? (
+            <div className="ms-scroll absolute inset-x-0 bottom-0 max-h-[42%] overflow-y-auto px-3 pb-1">
+              <div className="space-y-1.5">
+                {beat?.tactics?.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => {
+                      sfx.click();
+                      pickTactic(t.id);
+                    }}
+                    className="flex min-h-11 w-full items-center gap-3 rounded-[var(--radius-sm)] bg-ink/80 px-3 py-2 text-left shadow-[var(--shadow-border)]"
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-display text-body text-paper">{t.label}</span>
+                      <span className="mt-0.5 block truncate text-secondary text-muted">{t.blurb}</span>
+                    </span>
+                    <span className="shrink-0 text-right">
+                      <span className="block font-display text-label uppercase tracking-[0.14em] text-ember">{t.stat}</span>
+                      <span className="mt-0.5 block tabular-nums text-label text-muted">DC {beat.dc + t.dcMod}</span>
+                    </span>
+                  </button>
+                ))}
               </div>
             </div>
-          </div>
-        ) : (
-          <div className="relative min-h-0 flex-1">
-            <div className="ms-scroll absolute inset-x-0 bottom-0 max-h-[62%] overflow-y-auto px-3 pb-2">
+          ) : showResult ? (
+            <div className="ms-scroll absolute inset-x-0 bottom-0 max-h-[42%] overflow-y-auto px-3 pb-1">
               <div className="rounded-[var(--radius-md)] bg-ink/78 px-3 py-2 shadow-[var(--shadow-border)] backdrop-blur-sm">
-                {mission.lastRoll && !spin && !held ? (
+                {mission.lastRoll ? (
                   <div className="flex items-center gap-3 py-1">
                     <DiceFace value={mission.lastRoll.value} band={mission.lastRoll.band} size={72} mark={false} />
                     <p className="text-secondary text-moon">
                       {mission.lastRoll.text}. {BAND_COPY[mission.lastRoll.band]}
                     </p>
                   </div>
+                ) : null}
+                {mission.lastConsequence ? (
+                  <p className="mt-2 border-l-2 border-ember pl-3 text-body leading-relaxed text-paper">{mission.lastConsequence}</p>
                 ) : null}
                 {mission.loot.length ? (
                   <div className="border-t border-line/40 py-2">
@@ -257,38 +329,22 @@ export function MissionOverlay() {
                     </div>
                   </div>
                 ) : null}
-                {mission.lastConsequence && !spin && !held ? (
-                  <p className="mt-2 border-l-2 border-ember pl-3 text-body leading-relaxed text-paper">{mission.lastConsequence}</p>
-                ) : null}
-                {beat?.prompt ? <p className="text-body leading-relaxed text-moon">{beat.prompt}</p> : null}
-                {mission.stakes ? <p className="mt-2 text-label text-muted">{mission.stakes}</p> : null}
-                <p className="mt-2 text-label text-muted">Kane · {kaneHeatLine(heat)}</p>
-                <EventLog lines={mission.narrative} pin={false} />
+                {tape.length ? <EventLog lines={tape} pin={false} /> : null}
               </div>
             </div>
-          </div>
-        )}
-
-        <div className="shrink-0 px-3 py-2">
-          <div className="grid grid-cols-3 gap-2">
-            {party.map((op) => (
-              <div key={op.id} className="min-w-0 rounded-[var(--radius-sm)] bg-ink/70 px-2 py-2 backdrop-blur-sm shadow-[var(--shadow-border)]">
-                <div className="flex min-w-0 items-center gap-2">
-                  <Portrait op={op} size={28} />
-                  <span className="min-w-0 flex-1 truncate text-label text-paper">{op.name}</span>
-                </div>
-                <HpBar hp={op.hp} max={op.maxHp} className="mt-1.5" />
-              </div>
-            ))}
-          </div>
+          ) : null}
         </div>
+
+        <PartyRail party={party} />
 
         {choosing ? null : (
           <CommandBar>
             {mission.waiting ? (
               <>
                 {beat ? (
-                  <p className="mb-2 min-h-8 text-secondary text-moon">{eventStatHint(beat.stat, beat.dc)}</p>
+                  <p className="mb-2 text-center font-display text-label uppercase tracking-[0.16em] text-moon">
+                    {beat.stat} vs DC {beat.dc}
+                  </p>
                 ) : null}
                 <Button className="w-full" variant="ember" onClick={onRoll} disabled={spin} sound="none" autoFocus>
                   Roll d20
@@ -340,26 +396,18 @@ const ACT_SHORT = {
   strike: "d20 vs DC",
   guard: "+2 DEF",
   skill: "Signature",
-  gift: "Once / day",
-  item: "Consumable",
-  flee: "SPD check",
+  gift: "Once",
+  item: "Kit",
+  flee: "SPD",
 } as const;
 
-const ACT_HELP = {
-  strike: "d20 + primary vs DC. Magazines matter. Dry click is half damage and a -4.",
-  guard: "Hold. +2 DEF this round.",
-  skill: "Signature. The thing they are known for.",
-  gift: "Once per day. Do not waste it.",
-  item: "Burn a consumable from the rucksack. Ammo is not a drink.",
-  flee: "SPD check. Shame is cheaper than a grave.",
-} as const;
+type FightAct = keyof typeof ACT_SHORT;
 
 export function CombatOverlay() {
   const combat = useGame((g) => g.s.combat);
   const s = useGame((g) => g.s);
   const act = useGame((g) => g.combatAct);
   const extract = useGame((g) => g.extractCombat);
-  const [help, setHelp] = useState<keyof typeof ACT_HELP>("strike");
   const [float, setFloat] = useState({ n: 0, tick: 0 });
   const [faceFlash, setFaceFlash] = useState(false);
   const [hurtId, setHurtId] = useState<string | null>(null);
@@ -367,6 +415,7 @@ export function CombatOverlay() {
   const lockRef = useRef(false);
   const prevHp = useRef<number | null>(null);
   const prevParty = useRef<Record<string, number>>({});
+  const logRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (float.n <= 0) return;
@@ -407,7 +456,7 @@ export function CombatOverlay() {
     return () => window.clearTimeout(t);
   }, [hurtId]);
 
-  const go = (a: keyof typeof ACT_HELP) => {
+  const go = (a: FightAct) => {
     if (lockRef.current) return;
     const before = useGame.getState().s;
     if (!before.combat) return;
@@ -467,7 +516,7 @@ export function CombatOverlay() {
         }
         return;
       }
-      const map: Record<string, keyof typeof ACT_HELP> = {
+      const map: Record<string, FightAct> = {
         "1": "strike",
         "2": "guard",
         "3": "skill",
@@ -480,12 +529,17 @@ export function CombatOverlay() {
       e.preventDefault();
       if (a === "gift" && actorNow.giftUsed) return;
       if (a === "item" && !actorNow.inventory.some((i) => i.kind === "consumable" && !isAmmoConsumable(i))) return;
-      setHelp(a);
       go(a);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [combat, extract]);
+
+  useEffect(() => {
+    const el = logRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [combat?.log.length]);
 
   if (!combat) return null;
   const actor = combatActor(s);
@@ -497,7 +551,7 @@ export function CombatOverlay() {
 
   const hasItem = !!actor?.inventory.some((i) => i.kind === "consumable" && !isAmmoConsumable(i));
   const actorGun = actor ? equippedWeapon(actor) : undefined;
-  const actions: { id: keyof typeof ACT_HELP; label: string; icon: typeof Swords; variant: "ember" | "ghost" | "quiet" | "danger"; disabled?: boolean }[] = actor
+  const actions: { id: FightAct; label: string; icon: typeof Swords; variant: "ember" | "ghost" | "quiet" | "danger"; disabled?: boolean }[] = actor
     ? [
         { id: "strike", label: "Strike", icon: Swords, variant: "ember" },
         { id: "guard", label: "Guard", icon: Shield, variant: "ghost" },
@@ -534,122 +588,111 @@ export function CombatOverlay() {
               </span>
             ) : null}
           </div>
-          <h2 className="mt-1 font-display text-2xl leading-tight text-paper">{enemy?.name}</h2>
-          {v ? (
+          <h2 className="mt-1 truncate font-display text-2xl leading-tight text-paper">{enemy?.name}</h2>
+          {phase?.name || v?.title || enemy?.castId || enemy?.flavor ? (
             <p className="truncate text-label text-muted">
-              {v.title} · {v.arc}
+              {phase?.name ??
+                (v ? v.title : enemy?.castId ? CAST[enemy.castId as keyof typeof CAST]?.title : enemy?.flavor)}
             </p>
-          ) : enemy?.castId ? (
-            <p className="truncate text-label text-muted">{CAST[enemy.castId as keyof typeof CAST]?.title}</p>
-          ) : phase ? (
-            <p className="mt-1 font-display text-label uppercase tracking-[0.16em] text-ember">{phase.name}</p>
-          ) : enemy?.flavor ? (
-            <p className="mt-1 line-clamp-1 text-secondary text-moon">{enemy.flavor}</p>
           ) : null}
+          <div className="mt-2">
+            <div className="ms-hull-track">
+              <div className="ms-hull-fill" style={{ width: `${hullPct}%` }} />
+            </div>
+            <div className="mt-1 flex items-center justify-between gap-3 text-label tabular-nums text-muted">
+              <span>
+                Hull {enemy?.hp ?? 0}/{enemy?.maxHp ?? 0}
+              </span>
+              <span className="truncate">
+                DC {enemy?.dc}
+                {enemy?.armorClass ? ` · ${enemy.armorClass}` : ""}
+                {enemy?.preferredRange ? ` · ${enemy.preferredRange}` : ""}
+              </span>
+            </div>
+            {combat.incomingSoft ? (
+              <p className="mt-1 font-display text-label uppercase tracking-[0.16em] text-ember">Bracing</p>
+            ) : null}
+          </div>
         </div>
 
-        <div className="relative min-h-0 flex-1">
-          <div
-            data-enemy-face="1"
-            className="absolute inset-0 overflow-hidden"
-          >
-            {enemy?.portrait ? (
+        <div data-enemy-face="1" className="relative min-h-[7.5rem] flex-1">
+          {enemy?.portrait ? (
+            <div className="absolute inset-y-0 left-1/2 w-[70%] max-w-sm -translate-x-1/2 overflow-hidden rounded-[var(--radius-md)] shadow-[var(--shadow-border)]">
               <img
                 src={enemy.portrait}
                 alt=""
                 className={cn("size-full object-cover object-top", faceFlash && "ms-hit")}
               />
-            ) : null}
-            {faceFlash ? <div className="ms-hit-wash pointer-events-none absolute inset-0" /> : null}
-            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink via-ink/80 to-transparent px-3 pb-2 pt-12">
-              <div className="ms-hull-track">
-                <div className="ms-hull-fill" style={{ width: `${hullPct}%` }} />
-              </div>
-              <div className="mt-1 flex items-center justify-between text-label tabular-nums text-muted">
-                <span>
-                  Hull {enemy?.hp ?? 0}/{enemy?.maxHp ?? 0}
-                </span>
-                <span>
-                  DC {enemy?.dc}
-                  {enemy?.armorClass ? ` · ${enemy.armorClass}` : ""}
-                  {enemy?.preferredRange ? ` · ${enemy.preferredRange}` : ""}
-                </span>
-              </div>
-              {combat.incomingSoft ? (
-                <p className="mt-1 font-display text-label uppercase tracking-[0.16em] text-ember">
-                  Bracing · next hit lands softer
-                </p>
-              ) : null}
-              {combat.log.length ? (
-                <p className="mt-1 line-clamp-2 text-secondary text-paper">{combat.log[combat.log.length - 1]}</p>
-              ) : null}
+              {faceFlash ? <div className="ms-hit-wash pointer-events-none absolute inset-0" /> : null}
             </div>
-            {float.n ? <FloatNum n={float.n} kind={float.n > 0 ? "dmg" : "heal"} tick={float.tick} /> : null}
-          </div>
+          ) : null}
+          {float.n ? <FloatNum n={float.n} kind={float.n > 0 ? "dmg" : "heal"} tick={float.tick} /> : null}
         </div>
 
-        <div className="shrink-0 px-3 py-2">
-          <div className="grid grid-cols-3 gap-2">
-            {party.map((op) => (
-              <div
-                key={op.id}
-                className={cn(
-                  "min-w-0 rounded-[var(--radius-sm)] bg-ink/70 px-2 py-2 backdrop-blur-sm transition-colors duration-150",
-                  actor?.id === op.id
-                    ? "shadow-[var(--shadow-border-hover)]"
-                    : "shadow-[var(--shadow-border)]",
-                  hurtId === op.id && "ms-hit",
-                )}
-              >
-                <div className="flex min-w-0 items-center gap-2">
-                  <Portrait op={op} size={28} />
-                  <span className="min-w-0 flex-1 truncate text-label text-paper">{op.name}</span>
-                </div>
-                <HpBar hp={op.hp} max={op.maxHp} className="mt-1.5" />
-                {actor?.id === op.id ? (
-                  <p className="mt-1 truncate font-display text-label uppercase tracking-[0.14em] text-ember">
-                    {actorGun ? magLine(actorGun) : "acting"}
-                  </p>
-                ) : null}
-              </div>
-            ))}
-          </div>
+        <div
+          ref={logRef}
+          aria-live="polite"
+          className="ms-scroll mx-3 mt-1 max-h-12 shrink-0 overflow-y-auto"
+        >
+          {combat.log.slice(-10).map((line, i, all) => (
+            <p
+              key={`${i}-${line.slice(0, 24)}`}
+              className={cn(
+                "text-secondary leading-snug",
+                i === all.length - 1 ? "text-paper" : "text-muted",
+              )}
+            >
+              {line}
+            </p>
+          ))}
         </div>
+
+        <PartyRail
+          party={party}
+          actorId={actor?.id}
+          hurtId={hurtId}
+          mag={actorGun ? magLine(actorGun) : null}
+        />
 
         <CommandBar>
           {actor && actor.hp > 0 ? (
-            <>
-              <p className="mb-2 truncate text-secondary text-moon">{ACT_HELP[help]}</p>
-              <div className="grid grid-cols-3 gap-2">
-                {actions.map((a) => {
-                  const Icon = a.icon;
-                  return (
-                    <button
-                      key={a.id}
-                      type="button"
-                      disabled={a.disabled || lock}
-                      data-juice={a.variant === "ember" ? "commit" : undefined}
-                      onClick={() => {
-                        setHelp(a.id);
-                        go(a.id);
-                      }}
-                      className={cn(
-                        "flex min-h-12 flex-col items-center justify-center gap-1 rounded-[var(--radius-sm)] px-2 py-1.5 text-center disabled:opacity-40",
-                        a.variant === "ember" && "bg-ember text-ink",
-                        a.variant === "ghost" && "bg-ink/60 text-paper shadow-[var(--shadow-border)]",
-                        a.variant === "quiet" && "bg-raised/80 text-muted",
-                        a.variant === "danger" && "bg-danger/20 text-danger",
-                      )}
-                    >
-                      <Icon className="size-4 shrink-0" />
-                      <span className="line-clamp-2 w-full font-display text-label uppercase leading-tight tracking-[0.08em]">
+            <div className="grid grid-cols-3 gap-2">
+              {actions.map((a) => {
+                const Icon = a.icon;
+                return (
+                  <button
+                    key={a.id}
+                    type="button"
+                    disabled={a.disabled || lock}
+                    data-juice={a.variant === "ember" ? "commit" : undefined}
+                    onClick={() => go(a.id)}
+                    className={cn(
+                      "flex min-h-11 flex-col items-center justify-center gap-0.5 rounded-[var(--radius-sm)] px-2 py-1.5 text-center disabled:opacity-40",
+                      a.variant === "ember" && "bg-ember text-ink",
+                      a.variant === "ghost" && "bg-ink/60 text-paper shadow-[var(--shadow-border)]",
+                      a.variant === "quiet" && "bg-raised/80 text-muted",
+                      a.variant === "danger" && "bg-danger/20 text-danger",
+                    )}
+                  >
+                    <span className="flex max-w-full items-center justify-center gap-1">
+                      <Icon aria-hidden className="size-3.5 shrink-0" />
+                      <span className="truncate font-display text-label uppercase leading-tight tracking-[0.08em]">
                         {a.label}
                       </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </>
+                    </span>
+                    <span
+                      aria-hidden
+                      className={cn(
+                        "w-full truncate font-display text-label uppercase tracking-[0.12em]",
+                        a.variant === "ember" ? "text-ink/70" : "opacity-70",
+                      )}
+                    >
+                      {ACT_SHORT[a.id]}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           ) : (
             <>
               <p className="mb-2 text-secondary text-danger">No one standing.</p>
