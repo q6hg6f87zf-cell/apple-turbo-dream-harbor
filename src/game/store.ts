@@ -131,7 +131,7 @@ type Action =
 export type WorkJob =
   | { kind: "room"; room: RoomId }
   | { kind: "quarter"; quarter: QuarterId }
-  | { kind: "repair"; opId: string | "vault"; itemId: string }
+  | { kind: "repair"; opId: string | "vault"; itemId: string; favor?: boolean }
   | { kind: "travis"; itemId?: string };
 
 interface Store {

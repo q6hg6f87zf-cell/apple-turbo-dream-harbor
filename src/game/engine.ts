@@ -68,7 +68,7 @@ import { queueTalk } from "./talk";
 import { ensureSquad, maybeSpendArcTurn, stampSeatedPlate } from "./squad";
 import { isPlaceholderName } from "./discord";
 import { CAST, aegisOnDuty, meetCast } from "./cast";
-import { aegisRunner, dawnDispatch, nightTale, resolveMissionSite } from "./story";
+import { aegisRunner, dawnDispatch, nightTale, resolveMissionSite, storyBeatResult, storyTactics } from "./story";
 import { rollLoot } from "./loot";
 import { emptyNarrative } from "./narrative-state";
 import { bootstrapNarrative, syncStorySpine } from "./story-spine";
@@ -504,7 +504,7 @@ export function buildMission(
       stat,
       dc: clamp(dc + extra, 8, 19),
       kind: k,
-      tactics: tacticsFor({ beatKind: k, approach: approach.id, leadStat: PRIMARY_STAT[lead.cls] }),
+      tactics: storyTactics(site?.id, title) ?? tacticsFor({ beatKind: k, approach: approach.id, leadStat: PRIMARY_STAT[lead.cls] }),
     });
   };
 
@@ -748,6 +748,10 @@ export function applyRollToBeat(
     );
   }
 
+  const story = storyBeatResult(state, m.poiId, beat.tacticId, hit);
+  m.lastConsequence = story ?? undefined;
+  if (story) notes.push(story);
+
   if (!lead.destinyFired && raw >= 18 && Math.random() < 0.5) {
     const i = state.operatives.findIndex((o) => o.id === lead.id);
     if (i >= 0) {
@@ -784,6 +788,7 @@ export function advanceBeat(state: GameState): GameState {
   const m = { ...state.mission };
   m.beatIndex += 1;
   m.lastRoll = undefined;
+  m.lastConsequence = undefined;
   if (m.beatIndex >= m.beats.length) {
     return completeMission(state);
   }

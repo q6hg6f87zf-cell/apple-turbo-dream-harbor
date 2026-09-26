@@ -75,18 +75,18 @@ export function ArcadeView() {
         </div>
       ) : (
         <>
-          <div className="relative overflow-hidden rounded-[var(--radius-xl)] bg-ink shadow-[var(--shadow-border)]">
+          <div className="relative min-h-72 overflow-hidden rounded-[var(--radius-xl)] bg-ink shadow-[var(--shadow-border)]">
             <img
               src="/art/rooms/thirty-eight.jpg"
               alt=""
-              className="absolute inset-0 size-full object-cover object-center"
+              className="absolute inset-0 size-full object-cover object-[center_42%]"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/70 to-ink/30" />
             <div className="relative px-5 py-6">
-              <p className="font-display text-[10px] uppercase tracking-[0.42em] text-moon">T-0888 · penthouse floor</p>
+              <p className="font-display text-[10px] uppercase tracking-[0.42em] text-moon">T-0888 · the floor under the glass</p>
               <h2 className="mt-2 font-display text-3xl tracking-[0.12em] text-paper">The Thirty-Eight</h2>
               <p className="mt-2 max-w-xl text-sm text-moon">
-                Felt tables. One green zero. Six-deck shoe. The black card buys the stool. Table games pay the plate in full. Slots still rake a tenth.
+                Green felt. A vintage jukebox that still takes the black card. A cigarette burning itself out in a glass dish on the pool table. Table games pay the plate in full. Slots still rake a tenth.
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <Button variant="quiet" size="sm" onClick={() => setScreen("hq")}>

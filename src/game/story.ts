@@ -1,8 +1,8 @@
 import { aegisOnDuty, CAST, kaneHeatLine, meetCast, type CastId, type CastPerson } from "./cast";
 import { locById } from "./data";
 import { KANE_STAKES, discoverPoi, locationToRegion, poiById, poisForLocation } from "./field-ops";
-import { hasFlag } from "./narrative-state";
-import type { DayTask, GameState, LocationId, MissionKind, RegionPointOfInterest } from "./types";
+import { hasFlag, setFlag } from "./narrative-state";
+import type { DayTask, GameState, LocationId, MissionKind, MissionTactic, RegionPointOfInterest } from "./types";
 
 export interface SiteCopy {
   title: string;
@@ -38,8 +38,8 @@ const SITES: Record<string, SitePack> = {
       fail: "Kane's buyers loaded the trench. We kept the map and lost the steel.",
     },
     approach: "{lead} drops into the Cut along the slag side. The chit said dawn. The lamps are already live.",
-    sweep: "The contract is legal and mean. Winter steel, paid in parts no local forge can make. Under the tonnage, a black-tag line: T-0880 bays, Atlas cores, Reeve's mark. {lead} copies it. Tyrone does not comment.",
-    report: "SYNAPSE gets the page, not a crate count. {lead} brings the black-tag line home. Tyrone says he remembers the mark and does not want to talk. That is different from not remembering.",
+    sweep: "The contract is legal and mean. Winter steel, paid in parts no local forge can make. Under the tonnage, a black-tag line: T-0880 bays, Atlas cores, Reeve's mark. Tyrone does not comment. The page is still in your hand.",
+    report: "SYNAPSE wants a page, not a crate count. Tyrone is quiet in the way that means he remembers. What you file is the job.",
     hollow: "Rail steel ticks in the cold. Kane's yard is never empty for long.",
     range: "{lead} fans the trench for dropped plate. The Cut still smells like a mill that has not admitted it died.",
     haul: "The pack gets heavy with spikes. Something on the far bank notices the taking.",
@@ -59,8 +59,8 @@ const SITES: Record<string, SitePack> = {
       fail: "The culverts stayed full of other people's leftovers.",
     },
     approach: "{lead} takes the long shoulder. The asphalt still holds the shape of a body. No tracks leading in. Same as the night Tyrone stopped.",
-    sweep: "The dirt is still clean. No boots, no tires, no drag marks. A Vesper weigh-chit is nailed to the mile marker. Fresh. It was not there when he carried you home. {lead} takes the paper, not a speech.",
-    report: "Tyrone reads the chit and goes quiet in the way that means he remembers and will not talk yet. The paper names a dawn weigh-in. {lead} files it. Tomorrow is the Rail Cut.",
+    sweep: "The dirt is still clean. No boots, no tires, no drag marks. A Vesper weigh-chit is nailed to the mile marker. Fresh. It was not there when he carried you home. The paper is still on the nail.",
+    report: "The porch is waiting. Tyrone is quiet in the way that means he already knows you found something. What you do with the paper is the report.",
     hollow: "The highway does not explain itself. It never did.",
   },
   "ironclad-gate": {
@@ -514,6 +514,363 @@ function fallbackCopy(poi: RegionPointOfInterest, kind: MissionKind): SiteCopy {
 function packFor(poi: RegionPointOfInterest | undefined): SitePack | undefined {
   if (!poi) return undefined;
   return SITES[poi.id];
+}
+
+export function storyScene(poiId?: string | null): string | null {
+  if (poiId === "ironclad-highway") return "/art/places/east-highway.jpg";
+  if (poiId === "ironclad-rail") return "/art/places/rail-cut.jpg";
+  if (poiId === "ironclad-berm") return "/art/places/west-berm.jpg";
+  if (poiId === "ironclad-gate") return "/art/places/iron-gate.jpg";
+  if (poiId === "ironclad-shop") return "/art/places/mechanical-shop.jpg";
+  if (poiId === "slag-foundry-row" || poiId === "slag-coke" || poiId === "slag-valdris") return "/art/places/foundry-row.jpg";
+  return null;
+}
+
+const OPENING_TACTICS: Record<string, Record<string, MissionTactic[]>> = {
+  "ironclad-berm": {
+    Approach: [
+      { id: "berm-crawl", label: "Crawl the vault side", blurb: "Stay under the slag wind. Do not skyline. SPD.", stat: "SPD", dcMod: -1 },
+      { id: "berm-crest", label: "Walk the crest", blurb: "She will see you. You will see the nest. CHA.", stat: "CHA", dcMod: 1 },
+      { id: "berm-glass", label: "Glass the ridge first", blurb: "White light is Lyra. Wolves are not. WIS.", stat: "WIS", dcMod: 0 },
+    ],
+    Sweep: [
+      { id: "berm-nest", label: "Mark the nest, not the Pack", blurb: "A spent white cell is a painter, not a wolf. INT.", stat: "INT", dcMod: 0 },
+      { id: "berm-cell", label: "Pocket the spent cell", blurb: "Proof she was here. She will notice the gap. WIS.", stat: "WIS", dcMod: 0 },
+      { id: "berm-sign", label: "Leave the wolf sign", blurb: "Let the Pack keep the hill. Take the sightline. LCK.", stat: "LCK", dcMod: 0 },
+    ],
+    Report: [
+      { id: "berm-tell", label: "Tell Tyrone the light was real", blurb: "He stopped for a body. He should hear who is painting it. CHA.", stat: "CHA", dcMod: -1 },
+      { id: "berm-file", label: "File it as a ridge, not a name", blurb: "SYNAPSE gets a nest. Not Lyra. Not yet. INT.", stat: "INT", dcMod: 0 },
+      { id: "berm-wolves", label: "Call it wolves", blurb: "The porch sleeps. The wing does not. WIS.", stat: "WIS", dcMod: 1 },
+    ],
+  },
+  "ironclad-gate": {
+    Approach: [
+      { id: "gate-listen", label: "Listen at the table", blurb: "Kane's people already bought the chairs. Do not sit. WIS.", stat: "WIS", dcMod: -1 },
+      { id: "gate-crates", label: "Count what is leaving", blurb: "Crates first. Names second. INT.", stat: "INT", dcMod: 0 },
+      { id: "gate-dry", label: "Do not drink with them", blurb: "A dry mouth is a clean report. CHA.", stat: "CHA", dcMod: 0 },
+    ],
+    Sweep: [
+      { id: "gate-copy", label: "Copy the invoice, not the toast", blurb: "The Gate is a mouth. Write what it swallows. INT.", stat: "INT", dcMod: -1 },
+      { id: "gate-visor", label: "Clock the visor on the peg", blurb: "Not our paint. Note the color and leave it. WIS.", stat: "WIS", dcMod: 0 },
+      { id: "gate-book", label: "Leave the book where it is", blurb: "You saw the page. Empty hands look local. SPD.", stat: "SPD", dcMod: 0 },
+    ],
+    Report: [
+      { id: "gate-mouth", label: "Call the Gate a mouth", blurb: "Steel is leaving town. Say so. CHA.", stat: "CHA", dcMod: 0 },
+      { id: "gate-tonnage", label: "File tonnage only", blurb: "Numbers without the names. Safer. Thinner. INT.", stat: "INT", dcMod: 0 },
+      { id: "gate-burn", label: "Burn your notes", blurb: "You keep the memory. She does not get your handwriting. LCK.", stat: "LCK", dcMod: 1 },
+    ],
+  },
+  "ironclad-shop": {
+    Approach: [
+      { id: "shop-alley", label: "Come in off the alley", blurb: "The sign still says Mechanical Shop. Knock like you know that. WIS.", stat: "WIS", dcMod: -1 },
+      { id: "shop-front", label: "Walk in like a customer", blurb: "He charges customers. He talks to people who need the bay. CHA.", stat: "CHA", dcMod: 0 },
+      { id: "shop-sparks", label: "Wait until the sparks stop", blurb: "Interrupt a weld and you pay for the weld. SPD.", stat: "SPD", dcMod: 0 },
+    ],
+    Sweep: [
+      { id: "shop-jig", label: "Look at the jig. Do not touch it", blurb: "0880 in the lip. Empty until you fill it. WIS.", stat: "WIS", dcMod: -1 },
+      { id: "shop-guitar", label: "Ask about the grey guitar", blurb: "It is in tune. That is not an accident. CHA.", stat: "CHA", dcMod: 0 },
+      { id: "shop-clip", label: "Read the clipboard", blurb: "Breastplates, a price, a name he has not said. INT.", stat: "INT", dcMod: 0 },
+    ],
+    Report: [
+      { id: "shop-why", label: "Tell him the bay is why you came", blurb: "You dent Tyrone, you pay for him. Start there. CHA.", stat: "CHA", dcMod: -1 },
+      { id: "shop-quiet", label: "Say nothing about Tyrone", blurb: "A customer. Not a confession. INT.", stat: "INT", dcMod: 0 },
+      { id: "shop-price", label: "Ask the price of a weld", blurb: "He will tell you. It will not be a button. WIS.", stat: "WIS", dcMod: 0 },
+    ],
+  },
+  "ironclad-works": {
+    Approach: [
+      { id: "works-slag", label: "Slag door, not the office", blurb: "A chimney that breathes is a mill, not a ruin. SPD.", stat: "SPD", dcMod: -1 },
+      { id: "works-office", label: "Walk in like night shift", blurb: "They are still clocked in. Look like you are too. CHA.", stat: "CHA", dcMod: 0 },
+      { id: "works-chimney", label: "Read the chimney first", blurb: "If it is hers, the smoke already signed. WIS.", stat: "WIS", dcMod: 0 },
+    ],
+    Sweep: [
+      { id: "works-book", label: "Copy the night book", blurb: "Kane's mark under the heat. INT.", stat: "INT", dcMod: -1 },
+      { id: "works-rollers", label: "Count the hot rollers", blurb: "A mill with teeth. STR.", stat: "STR", dcMod: 0 },
+      { id: "works-steel", label: "Do not touch the steel", blurb: "Offcuts can wait. The page cannot. WIS.", stat: "WIS", dcMod: 0 },
+    ],
+    Report: [
+      { id: "works-hers", label: "Say the mill is hers", blurb: "An invoice with a chimney. CHA.", stat: "CHA", dcMod: 0 },
+      { id: "works-hungry", label: "Say the mill is only hungry", blurb: "True enough to file. Not true enough to stop her. INT.", stat: "INT", dcMod: 0 },
+      { id: "works-leave", label: "Leave the page in the book", blurb: "You saw the mark. Your handwriting stays home. LCK.", stat: "LCK", dcMod: 1 },
+    ],
+  },
+  "ironclad-halo": {
+    Approach: [
+      { id: "halo-berm", label: "Keep to the slag berm", blurb: "The square is scorched violet. Do not cross the paint yet. SPD.", stat: "SPD", dcMod: -1 },
+      { id: "halo-square", label: "Walk the old drill square", blurb: "Orion trained 2753 frames here. The concrete remembers. WIS.", stat: "WIS", dcMod: 0 },
+      { id: "halo-paint", label: "Stay off the paint", blurb: "Outlines are a map. Walking them is a signature. INT.", stat: "INT", dcMod: 0 },
+    ],
+    Sweep: [
+      { id: "halo-prints", label: "Count the 2753 prints", blurb: "Size of a frame, not a wolf. WIS.", stat: "WIS", dcMod: -1 },
+      { id: "halo-cell", label: "Pocket the warm cell", blurb: "Proof the square is live. They will miss it. INT.", stat: "INT", dcMod: 0 },
+      { id: "halo-shard", label: "Leave the visor shard", blurb: "You saw the color. Taking it is a boast. LCK.", stat: "LCK", dcMod: 0 },
+    ],
+    Report: [
+      { id: "halo-staging", label: "Say the wing is staging", blurb: "If this is true, Vault 13 is already on their map. CHA.", stat: "CHA", dcMod: 0 },
+      { id: "halo-cold", label: "Call the square cold", blurb: "A warm cell makes a liar of you later. INT.", stat: "INT", dcMod: 1 },
+      { id: "halo-quiet", label: "Do not say Orion's name", blurb: "Tyrone hears it anyway. WIS.", stat: "WIS", dcMod: -1 },
+    ],
+  },
+  "ironclad-tower": {
+    Approach: [
+      { id: "tower-cage", label: "Take the cage", blurb: "The iron spine talks whether you climb or not. STR.", stat: "STR", dcMod: 0 },
+      { id: "tower-stairs", label: "Take the stairs", blurb: "Slower. She already has a stool up there. SPD.", stat: "SPD", dcMod: -1 },
+      { id: "tower-foot", label: "Listen from the foot", blurb: "Frequencies fall. So do pages. WIS.", stat: "WIS", dcMod: 0 },
+    ],
+    Sweep: [
+      { id: "tower-freq", label: "Write the Kane frequency", blurb: "A day she talks and we do not is a donated map. INT.", stat: "INT", dcMod: -1 },
+      { id: "tower-stool", label: "Leave Lyra's stool", blurb: "She was here. Moving it is a hello. CHA.", stat: "CHA", dcMod: 0 },
+      { id: "tower-tear", label: "Tear the printed page", blurb: "Somebody should not have printed it. Now nobody has it. LCK.", stat: "LCK", dcMod: 1 },
+    ],
+    Report: [
+      { id: "tower-listen", label: "Say we were listening", blurb: "ICR 88 does not care. We should. CHA.", stat: "CHA", dcMod: 0 },
+      { id: "tower-shehas", label: "Admit she already has it", blurb: "Lyra's transcript is older than ours. WIS.", stat: "WIS", dcMod: 0 },
+      { id: "tower-rumor", label: "Pocket the stall rumor", blurb: "A site the board has not named. Heat, if she notices the gap. INT.", stat: "INT", dcMod: 0 },
+    ],
+  },
+  "slag-foundry-row": {
+    Approach: [
+      { id: "slag-carts", label: "Count the slag carts", blurb: "Speeches are cheap. Carts feed a jump stack. INT.", stat: "INT", dcMod: -1 },
+      { id: "slag-union", label: "Stand in the union door", blurb: "Look like you belong to the heat. CHA.", stat: "CHA", dcMod: 0 },
+      { id: "slag-catwalk", label: "Stay off the catwalk", blurb: "They watch the high iron. SPD.", stat: "SPD", dcMod: 0 },
+    ],
+    Sweep: [
+      { id: "slag-chit", label: "Read the furnace chit", blurb: "What the furnace owes is written, not shouted. WIS.", stat: "WIS", dcMod: -1 },
+      { id: "slag-heat", label: "Clock which boilers are live", blurb: "A cold boiler is a closed mouth. STR.", stat: "STR", dcMod: 0 },
+      { id: "slag-speech", label: "Ignore the speeches", blurb: "The union hall is loud so the invoice can be quiet. INT.", stat: "INT", dcMod: 0 },
+    ],
+    Report: [
+      { id: "slag-owes", label: "Say what the furnace owes", blurb: "Not a slogan. A number, and who it feeds. CHA.", stat: "CHA", dcMod: 0 },
+      { id: "slag-file", label: "File the carts and go", blurb: "Enough to come back. Not enough to sign. INT.", stat: "INT", dcMod: 0 },
+      { id: "slag-sign", label: "Do not sign anything", blurb: "A thumbprint in Slag Town is a debt. WIS.", stat: "WIS", dcMod: -1 },
+    ],
+  },
+};
+
+/** Real choices for the opening jobs. Null means the generic tactic row. */
+export function storyTactics(poiId: string | undefined, title: string): MissionTactic[] | null {
+  if (poiId === "ironclad-highway" && title === "Approach") {
+    return [
+      { id: "shoulder", label: "Stay on the shoulder", blurb: "Do not walk in the depression. WIS.", stat: "WIS", dcMod: -1 },
+      { id: "body-shape", label: "Stand where he found you", blurb: "See it the way the dirt remembers. STR.", stat: "STR", dcMod: 0 },
+      { id: "culvert", label: "Check the culverts first", blurb: "If someone staged this, they cached the proof. INT.", stat: "INT", dcMod: 0 },
+    ];
+  }
+  if (poiId === "ironclad-highway" && title === "Sweep") {
+    return [
+      { id: "take-chit", label: "Take the chit", blurb: "It was not here when he stopped. WIS.", stat: "WIS", dcMod: -1 },
+      { id: "leave-nail", label: "Leave it on the nail", blurb: "Read it. Do not move it. Kane notices empty nails. SPD.", stat: "SPD", dcMod: 0 },
+      { id: "one-more-track", label: "Look for tracks again", blurb: "If there is one print, the story changes. INT.", stat: "INT", dcMod: 1 },
+    ];
+  }
+  if (poiId === "ironclad-highway" && title === "Report") {
+    return [
+      { id: "show-tyrone", label: "Put it in Tyrone's hand", blurb: "He stopped for you. He should see why someone came back. CHA.", stat: "CHA", dcMod: 0 },
+      { id: "pocket-chit", label: "Pocket it", blurb: "Yours until you understand it. The empty nail is loud. INT.", stat: "INT", dcMod: 0 },
+      { id: "read-aloud", label: "Read the weigh-in aloud", blurb: "The Rail Cut is named. Say it on the porch. WIS.", stat: "WIS", dcMod: -1 },
+    ];
+  }
+  if (poiId === "ironclad-rail" && title === "Approach") {
+    return [
+      { id: "lamps", label: "Come in under the lamps", blurb: "Look like a night crew. CHA.", stat: "CHA", dcMod: 0 },
+      { id: "slag-side", label: "Drop the slag side", blurb: "They are watching the ties, not the bank. SPD.", stat: "SPD", dcMod: -1 },
+      { id: "wait-dawn", label: "Wait until the lamps thin", blurb: "Colder. Cleaner. WIS.", stat: "WIS", dcMod: 0 },
+    ];
+  }
+  if (poiId === "ironclad-rail" && title === "Sweep") {
+    return [
+      { id: "read-tag", label: "Read the line that is not steel", blurb: "Black-tag. Old T-0880 bays. WIS.", stat: "WIS", dcMod: -1 },
+      { id: "copy-page", label: "Copy the whole page", blurb: "Winter terms and the tag. INT.", stat: "INT", dcMod: 0 },
+      { id: "burn-page", label: "Burn the page", blurb: "Keep the memory. Deny her the copy. LCK.", stat: "LCK", dcMod: 1 },
+    ];
+  }
+  if (poiId === "ironclad-rail" && title === "Report") {
+    return [
+      { id: "let-him-quiet", label: "Let Tyrone stay quiet", blurb: "He remembers. Do not make him perform it. CHA.", stat: "CHA", dcMod: -1 },
+      { id: "ask-reeve", label: "Ask who Reeve is", blurb: "The mark has a name. He may not want it said. WIS.", stat: "WIS", dcMod: 0 },
+      { id: "hide-line", label: "Hide the black-tag line", blurb: "File the steel. Pocket the rest. INT.", stat: "INT", dcMod: 0 },
+    ];
+  }
+  const packed = poiId ? OPENING_TACTICS[poiId]?.[title] : undefined;
+  if (packed) return packed;
+  return null;
+}
+
+export function storyBeatResult(
+  state: GameState,
+  poiId: string | undefined,
+  tacticId: string | undefined,
+  hit: boolean,
+): string | null {
+  if (!tacticId) return null;
+  if (!hit) {
+    if (tacticId === "take-chit") return "The nail holds. You see the words and leave the paper.";
+    if (tacticId === "read-tag" || tacticId === "copy-page") return "A lamp swings. You get a tonnage and miss the line that is not steel.";
+    return null;
+  }
+  const trust = state.tyrone?.relationship;
+  const bumpTrust = (n: number) => {
+    if (!trust) return;
+    trust.trust = Math.min(100, trust.trust + n);
+  };
+  switch (tacticId) {
+    case "take-chit":
+      setFlag(state, "highway_chit", true);
+      return "The chit comes off the marker. Fresh wax. Tyrone did not put it there.";
+    case "leave-nail":
+      return "You leave the paper. You can still say the words. The nail stays honest.";
+    case "one-more-track":
+      return "Still no tracks. The chit is the only new thing in three miles.";
+    case "show-tyrone":
+      bumpTrust(4);
+      setFlag(state, "highway_chit", true);
+      return "You put the paper in his hand. He reads the weigh-in and does not joke.";
+    case "pocket-chit":
+      state.kaneHeat = (state.kaneHeat ?? 0) + 2;
+      setFlag(state, "highway_chit", true);
+      return "You pocket it. The empty nail is a message. Kane's heat climbs.";
+    case "read-aloud":
+      setFlag(state, "kane_weigh_in_seen", true);
+      return "The porch hears the Rail Cut named. Tomorrow is not a rumor.";
+    case "read-tag":
+      setFlag(state, "kane_weigh_in_seen", true);
+      bumpTrust(2);
+      return "The black-tag line names old T-0880 bays. Tyrone goes quiet on purpose.";
+    case "copy-page":
+      setFlag(state, "invoice_copied", true);
+      return "You copy the page. Winter steel, and Reeve's mark under the tonnage.";
+    case "burn-page":
+      setFlag(state, "invoice_burned", true);
+      state.kaneHeat = Math.max(0, (state.kaneHeat ?? 0) - 1);
+      return "The page burns. You keep the line that was not steel. She does not get this copy.";
+    case "let-him-quiet":
+      bumpTrust(3);
+      return "You do not make him explain. He says, later, 'I remember. I do not want to talk.'";
+    case "ask-reeve":
+      return "He says the name once. Reeve. Then he asks you to look at a bolt instead.";
+    case "hide-line":
+      state.kaneHeat = (state.kaneHeat ?? 0) + 1;
+      return "The steel goes in the file. The black-tag line stays in your pocket.";
+    case "berm-tell":
+      bumpTrust(3);
+      setFlag(state, "lyra_ridge_handled", true);
+      return "You tell him the light was real. He says her name once. Lyra. Then he looks at the road.";
+    case "berm-file":
+      setFlag(state, "lyra_ridge_handled", true);
+      return "SYNAPSE gets a nest on the West Berm. The name stays in your mouth.";
+    case "berm-wolves":
+      state.kaneHeat = (state.kaneHeat ?? 0) + 1;
+      return "You call it wolves. The porch sleeps. She already painted the ridge.";
+    case "berm-cell":
+      state.kaneHeat = (state.kaneHeat ?? 0) + 1;
+      return "The spent white cell is in your pocket. The nest looks picked.";
+    case "berm-nest":
+      return "You mark the nest. Wolf sign stays wolf sign. The cell is a painter.";
+    case "berm-crawl":
+    case "berm-glass":
+    case "berm-sign":
+    case "berm-crest":
+      return "The Berm keeps its wind. You keep the sightline.";
+    case "gate-copy":
+    case "gate-mouth":
+      setFlag(state, "gate_watched", true);
+      return "The Gate is a mouth. You write what left town, and who was buying.";
+    case "gate-listen":
+    case "gate-crates":
+    case "gate-visor":
+    case "gate-book":
+    case "gate-dry":
+      setFlag(state, "gate_watched", true);
+      return "You leave the table dry. The invoice still has a shape in your head.";
+    case "gate-tonnage":
+      return "Tonnage goes in the file. The names stay out. Thinner than the truth.";
+    case "gate-burn":
+      state.kaneHeat = Math.max(0, (state.kaneHeat ?? 0) - 1);
+      return "Your notes burn. The memory of the crate stamp does not.";
+    case "shop-jig":
+    case "shop-why":
+      setFlag(state, "travis_met", true);
+      bumpTrust(3);
+      return "Travis looks at the empty jig. 'You dent him, you pay for him.' He means it.";
+    case "shop-guitar":
+      setFlag(state, "travis_met", true);
+      bumpTrust(2);
+      return "He says the guitar stays in tune because the bay is still a bay. That is the whole sermon.";
+    case "shop-alley":
+    case "shop-sparks":
+    case "shop-clip":
+    case "shop-price":
+      setFlag(state, "travis_met", true);
+      return "The Mechanical Shop takes the job. A weld here is work, not a receipt.";
+    case "shop-quiet":
+      return "You do not say Tyrone's name. Travis hears it anyway and charges you like a customer.";
+    case "works-book":
+    case "works-hers":
+      setFlag(state, "kane_weigh_in_seen", true);
+      return "The night book has her mark. The mill in Ironclad is an invoice with a chimney.";
+    case "works-slag":
+    case "works-office":
+    case "works-chimney":
+    case "works-rollers":
+    case "works-steel":
+    case "works-hungry":
+      return "The Works is still hot. You come home with heat on your coat and a page in your head.";
+    case "works-leave":
+      return "The page stays in the book. You can still say the mark was hers.";
+    case "halo-prints":
+    case "halo-staging":
+      setFlag(state, "halo_yard_scouted", true);
+      setFlag(state, "halo_reported", true);
+      return "2753 prints on violet paint. If the wing is staging, Vault 13 is already on the map.";
+    case "halo-quiet":
+      bumpTrust(2);
+      setFlag(state, "halo_yard_scouted", true);
+      return "You do not say Orion. Tyrone thanks you by not answering.";
+    case "halo-cell":
+      state.kaneHeat = (state.kaneHeat ?? 0) + 1;
+      setFlag(state, "halo_yard_scouted", true);
+      return "The cell is still warm in your hand. The square will notice the gap.";
+    case "halo-berm":
+    case "halo-square":
+    case "halo-paint":
+    case "halo-shard":
+    case "halo-cold":
+      setFlag(state, "halo_yard_scouted", true);
+      return "Halo Yard keeps the scorch. You keep the count.";
+    case "tower-freq":
+    case "tower-listen":
+      return "Kane's frequency is in the log. A day she talks and we do not is no longer today.";
+    case "tower-stool":
+    case "tower-shehas":
+      return "Lyra's stool is where she left it. Her transcript is older than yours. You say so.";
+    case "tower-rumor":
+      state.kaneHeat = (state.kaneHeat ?? 0) + 1;
+      return "The stall rumor stays in your pocket. The board still does not have the name.";
+    case "tower-cage":
+    case "tower-stairs":
+    case "tower-foot":
+    case "tower-tear":
+      return "The iron spine talked. You were on it long enough to hear who else was.";
+    case "slag-chit":
+    case "slag-owes":
+      setFlag(state, "slag_entered", true);
+      return "The furnace chit is a debt, not a speech. You can say who it feeds.";
+    case "slag-carts":
+    case "slag-union":
+    case "slag-catwalk":
+    case "slag-heat":
+    case "slag-speech":
+    case "slag-file":
+      setFlag(state, "slag_entered", true);
+      return "Foundry Row is carts and live boilers. The speeches were cover.";
+    case "slag-sign":
+      setFlag(state, "slag_entered", true);
+      bumpTrust(1);
+      return "You do not sign. A thumbprint in Slag Town would have been a leash.";
+    default:
+      return null;
+  }
 }
 
 function openingPoiId(state: GameState, loc: LocationId): string | null {

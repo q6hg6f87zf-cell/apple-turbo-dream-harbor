@@ -1101,7 +1101,7 @@ export const MANUAL: Record<string, FieldCard> = {
   },
   arcade: {
     title: "The Thirty-Eight",
-    blurb: "T-0888's penthouse floor. Pit tables and machines. How to play lives inside the game you sit down at.",
+    blurb: "Green felt, a vintage jukebox, a cigarette dying on the pool table. How to play lives inside the game you sit down at.",
     tips: [
       "The floor shows names, not lectures.",
       "Trivia files retire when dealt. Slots can take the bet.",

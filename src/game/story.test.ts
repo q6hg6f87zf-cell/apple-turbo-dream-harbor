@@ -6,7 +6,7 @@ import { defaultPoi, knownPois } from "./field-ops.ts";
 import { generateBoard } from "./shift.ts";
 import { TALK, skipTalk, advanceTalk } from "./talk.ts";
 import { eventBriefing } from "./event-theater.ts";
-import { pickFieldSite, siteCopyFor, sortieJob, dawnDispatch } from "./story.ts";
+import { pickFieldSite, siteCopyFor, sortieJob, dawnDispatch, storyBeatResult, storyScene, storyTactics } from "./story.ts";
 import { rarityCap, rarityFromRoll, rollLoot, weaponsAllowed } from "./loot.ts";
 
 describe("campaign cast", () => {
@@ -169,6 +169,20 @@ describe("campaign cast", () => {
     assert.match(CAST.travis.dossier, /Mechanical Shop|T-0880/);
     assert.match(CAST.holt.dossier, /Moon Squad Market/);
     assert.match(CAST.rourke.dossier, /Relay Tower Three/);
+  });
+
+  it("gives the highway a real choice and keeps the chit when you take it", () => {
+    const tactics = storyTactics("ironclad-highway", "Sweep");
+    assert.ok(tactics?.some((t) => t.id === "take-chit"));
+    assert.equal(storyScene("ironclad-highway"), "/art/places/east-highway.jpg");
+    assert.equal(storyScene("ironclad-rail"), "/art/places/rail-cut.jpg");
+    assert.equal(storyScene("ironclad-gate"), "/art/places/iron-gate.jpg");
+    const s = defaultState();
+    const line = storyBeatResult(s, "ironclad-highway", "take-chit", true);
+    assert.match(line ?? "", /chit/i);
+    assert.equal(s.narrative?.flags.highway_chit, true);
+    const gate = storyTactics("ironclad-gate", "Sweep");
+    assert.ok(gate?.some((t) => t.id === "gate-copy"));
   });
 });
 

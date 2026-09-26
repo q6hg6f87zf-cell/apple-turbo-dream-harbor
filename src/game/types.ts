@@ -689,6 +689,8 @@ export interface MissionState {
     dc: number;
     text: string;
   };
+  /** Concrete outcome of the tactic just rolled. Cleared when the beat advances. */
+  lastConsequence?: string;
   combatQueued?: boolean;
   regionId?: RegionId;
   poiId?: string;

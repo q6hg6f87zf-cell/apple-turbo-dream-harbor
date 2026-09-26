@@ -6,9 +6,9 @@ import { BASE_ROOMS, QUARTERS } from "@/game/data";
 import { nextQuarterCost, nextRoomCost, repairCost } from "@/game/engine";
 import { itemArt } from "@/game/item-art";
 import { useGame, type WorkJob } from "@/game/store";
-import { fittedModules, pendingModules, travisBayBlurb, TRAVIS_MODULES } from "@/game/travis";
+import { fittedModules, pendingModules, travisBayBlurb, TRAVIS_MODULES, travisRepairFactor } from "@/game/travis";
 import { allRepairCandidates, travisCanFavorWeld, travisReadItem } from "@/game/item-story";
-import type { QuarterId, RoomId } from "@/game/types";
+import type { Item, QuarterId, RoomId } from "@/game/types";
 import { X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Coin, SectionLabel } from "./primitives";
@@ -39,6 +39,244 @@ const WORK_ART: Record<RoomId, string> = {
 
 type Phase = "inspect" | "working" | "done";
 
+const GUN_HANDS = [
+  { short: "Spring", label: "Seat the spring", detail: "Under the bolt. Not beside it." },
+  { short: "Pin", label: "Drift the pin", detail: "One punch. Straight. Do not mushroom the head." },
+  { short: "Bead", label: "Draw the bead", detail: "Short. If you chase it, you warp the rail." },
+];
+
+const PLATE_HANDS = [
+  { short: "Rivet", label: "Set the rivet", detail: "Proud first. Then drive it home." },
+  { short: "Peen", label: "Peen the edge", detail: "Close the crack. Do not chase it across the plate." },
+  { short: "Quench", label: "Quench the plate", detail: "Water after the color drops. Not before." },
+];
+
+function faultsFor(item: Item) {
+  const plate = item.kind === "armor" || item.weaponFamily === "melee";
+  if (item.condition === "Broken") {
+    return plate
+      ? [
+          { id: "tang", label: "Cracked tang", detail: "The steel let go where the handle meets the work.", right: true, miss: "The wrap is ugly. The tang is why it failed." },
+          { id: "wrap", label: "Loose wrap", detail: "Tape. Not the failure.", right: false, miss: "The wrap is ugly. The tang is why it failed." },
+          { id: "tip", label: "Chipped tip", detail: "A scar. It still would have cut.", right: false, miss: "The tip is a scar. Look where the handle meets the steel." },
+        ]
+      : [
+          { id: "pin", label: "Sheared crosspin", detail: "The action is in two pieces that used to be one.", right: true, miss: "The sight is a lie. The pin is the break." },
+          { id: "sight", label: "Bent front sight", detail: "It would still fire. It would not group.", right: false, miss: "The sight is a lie. The pin is the break." },
+          { id: "stock", label: "Cracked stock", detail: "Wood. The steel is the patient.", right: false, miss: "Wood can wait. The pin cannot." },
+        ];
+  }
+  if (item.condition === "Damaged") {
+    return plate
+      ? [
+          { id: "edge", label: "Rolled edge", detail: "It hits and skates.", right: true, miss: "The scuff is nothing. The edge is the job." },
+          { id: "scuff", label: "Scuffed face", detail: "Paint. Not structure.", right: false, miss: "The scuff is nothing. The edge is the job." },
+          { id: "strap", label: "Tired strap", detail: "It still hangs. It does not cut.", right: false, miss: "The strap can wait. Look at the edge." },
+        ]
+      : [
+          { id: "extractor", label: "Burred extractor", detail: "It feeds. It does not let go.", right: true, miss: "The swivel is a noise. The extractor is the stoppage." },
+          { id: "swivel", label: "Loose sling swivel", detail: "Annoying. Not the stoppage.", right: false, miss: "The swivel is a noise. The extractor is the stoppage." },
+          { id: "finish", label: "Scuffed finish", detail: "The gun is not a painting.", right: false, miss: "Finish does not stop a gun. Look at the extractor." },
+        ];
+  }
+  return plate
+    ? [
+        { id: "dry", label: "Dry wrap", detail: "The grip slips because nobody asked it to hold.", right: true, miss: "Dust is not wear. The wrap is dry." },
+        { id: "dust", label: "Dust in the lettering", detail: "It looks tired. It is not.", right: false, miss: "Dust is not wear. The wrap is dry." },
+        { id: "chip", label: "Small chip", detail: "Old. Not why it is worn.", right: false, miss: "That chip has been there for years. Oil the wrap." },
+      ]
+    : [
+        { id: "rails", label: "Dry rails", detail: "The action drags. Oil, then it remembers.", right: true, miss: "The tape is tired. The rails are dry." },
+        { id: "tape", label: "Tired tape on the grip", detail: "Looks neglected. Not the drag.", right: false, miss: "The tape is tired. The rails are dry." },
+        { id: "letter", label: "Dust in the lettering", detail: "A story. Not a fault.", right: false, miss: "Dust is not why it drags. Look at the rails." },
+      ];
+}
+
+function WeldJob({
+  item,
+  cost,
+  favor,
+  opId,
+  forgeReady,
+  onClose,
+}: {
+  item: Item | null;
+  cost: number | null;
+  favor: boolean;
+  opId: string | "vault";
+  forgeReady: boolean;
+  onClose: () => void;
+}) {
+  const repairItem = useGame((g) => g.repairItem);
+  const favorRepair = useGame((g) => g.travisFavorRepair);
+  const [step, setStep] = useState<"fault" | "hands" | "prove" | "done">("fault");
+  const [hands, setHands] = useState(0);
+  const [cycles, setCycles] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+
+  if (!item) return <p className="mt-4 text-sm text-muted">No steel on the bench.</p>;
+
+  const plan = item.kind === "armor" ? PLATE_HANDS : GUN_HANDS;
+  const prove = item.kind === "armor" ? "Flex the plate" : "Cycle the action";
+  const faults = faultsFor(item);
+  const steps = ["Fault", "Hands", "Proof"] as const;
+  const stepIndex = step === "fault" ? 0 : step === "hands" ? 1 : 2;
+
+  const pickFault = (id: string, right: boolean, miss: string) => {
+    if (!right) {
+      setError(miss);
+      sfx.hurt();
+      return;
+    }
+    if (!favor && !forgeReady) {
+      setError("The Machine Shop is still a rumor. Raise the forge, then bring it back.");
+      sfx.hurt();
+      return;
+    }
+    if (cost == null) {
+      setError("Already pristine.");
+      return;
+    }
+    const coins = useGame.getState().s.coins;
+    if (coins < cost) {
+      setError(`Need ${cost} caps on the bench before the torch.`);
+      sfx.hurt();
+      return;
+    }
+    setError(null);
+    setHands(0);
+    setStep("hands");
+    sfx.click();
+  };
+
+  const doHand = (index: number) => {
+    if (index < hands) return;
+    if (index !== hands) {
+      setHands(0);
+      setError(`Order. ${plan.map((h) => h.short).join(", then ")}.`);
+      sfx.hurt();
+      return;
+    }
+    const next = hands + 1;
+    setHands(next);
+    setError(null);
+    sfx.forge();
+    if (next >= plan.length) {
+      setCycles(0);
+      setStep("prove");
+    }
+  };
+
+  const cycle = () => {
+    if (step !== "prove") return;
+    const next = cycles + 1;
+    if (next < 3) {
+      setCycles(next);
+      sfx.click();
+      return;
+    }
+    const msg = favor ? favorRepair(item.id) : repairItem(opId, item.id);
+    if (msg) {
+      setError(msg);
+      setCycles(0);
+      sfx.hurt();
+      return;
+    }
+    setCycles(3);
+    setNote(favor ? "Travis leans off the jig. It holds. Do not thank him twice." : "It holds. Do not drop it on the way to the bunk.");
+    setStep("done");
+    sfx.unlock();
+  };
+
+  return (
+    <div className="mt-4" data-weld="1" data-weld-step={step}>
+      <div className="flex gap-2">
+        {steps.map((label, i) => (
+          <span
+            key={label}
+            className={i === stepIndex && step !== "done" ? "font-display text-[10px] uppercase tracking-[0.16em] text-ember" : i < stepIndex || step === "done" ? "font-display text-[10px] uppercase tracking-[0.16em] text-ok" : "font-display text-[10px] uppercase tracking-[0.16em] text-muted"}
+          >
+            {i < stepIndex || step === "done" ? "●" : i === stepIndex ? "●" : "○"} {label}
+          </span>
+        ))}
+      </div>
+
+      {step === "fault" ? (
+        <div className="mt-3 space-y-2">
+          <p className="text-sm text-paper">Find the fault. The wrong scratch wastes the torch.</p>
+          {faults.map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              onClick={() => pickFault(f.id, f.right, f.miss)}
+              className="flex min-h-14 w-full flex-col items-start justify-center rounded-[var(--radius-md)] bg-ink px-3 py-2 text-left"
+            >
+              <span className="font-display text-paper">{f.label}</span>
+              <span className="mt-0.5 text-sm text-muted">{f.detail}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {step === "hands" ? (
+        <div className="mt-3 space-y-2">
+          <p className="text-sm text-paper">Hands, in order. Miss the order and you start the sequence again.</p>
+          {plan.map((h, i) => (
+            <button
+              key={h.short}
+              type="button"
+              onClick={() => doHand(i)}
+              className="flex min-h-14 w-full flex-col items-start justify-center rounded-[var(--radius-md)] bg-ink px-3 py-2 text-left"
+            >
+              <span className="font-display text-paper">
+                {i < hands ? "Done · " : ""}
+                {h.label}
+              </span>
+              <span className="mt-0.5 text-sm text-muted">{h.detail}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {step === "prove" ? (
+        <div className="mt-3">
+          <p className="text-sm text-paper">Prove it. Three clean cycles, then the caps come off.</p>
+          <div className="mt-2 flex gap-1.5">
+            {[0, 1, 2].map((i) => (
+              <span key={i} className={i < cycles ? "h-1.5 flex-1 rounded-full bg-ok" : "h-1.5 flex-1 rounded-full bg-line"} />
+            ))}
+          </div>
+          <Button className="mt-3 w-full" variant="ember" onClick={cycle}>
+            {prove}
+            {cost != null ? (
+              <>
+                {" · "}
+                <Coin n={cost} />
+              </>
+            ) : null}
+          </Button>
+        </div>
+      ) : null}
+
+      {error ? <p className="mt-3 text-sm text-danger">{error}</p> : null}
+      {note ? <p className="mt-3 text-sm text-ok">{note}</p> : null}
+
+      <div className="mt-4 flex gap-2">
+        {step === "done" ? (
+          <Button className="flex-1" variant="ember" onClick={onClose}>
+            Back to Vault 13
+          </Button>
+        ) : (
+          <Button variant="quiet" onClick={onClose}>
+            Leave it
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function jobTitle(job: WorkJob, rooms: Record<RoomId, number>, quarters: Record<QuarterId, number>) {
   if (job.kind === "travis") {
     return { eyebrow: "Ironclad Mechanical Shop", title: "Last T-0880 bay", lvl: 0 };
@@ -61,7 +299,6 @@ export function WorkBench() {
   const close = useGame((g) => g.closeWork);
   const upgradeRoom = useGame((g) => g.upgradeRoom);
   const upgradeQuarter = useGame((g) => g.upgradeQuarter);
-  const repairItem = useGame((g) => g.repairItem);
   const [phase, setPhase] = useState<Phase>("inspect");
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
@@ -94,18 +331,21 @@ export function WorkBench() {
         ? s.vault.find((i) => i.id === job.itemId)
         : s.operatives.find((o) => o.id === job.opId)?.inventory.find((i) => i.id === job.itemId)
       : null;
+  const favor = job.kind === "repair" && !!job.favor;
   const cost =
     job.kind === "room"
       ? nextRoomCost(s, job.room)
       : job.kind === "quarter"
         ? nextQuarterCost(s, job.quarter)
         : item
-          ? repairCost(s, item)
+          ? favor
+            ? Math.max(35, Math.round(repairCost(s, item) * Math.min(1, travisRepairFactor(s) + 0.05)))
+            : repairCost(s, item)
           : null;
   const weaponArt = job.kind === "repair" && item ? itemArt(item) : null;
   const art =
     job.kind === "repair"
-      ? "/art/rooms/workbench.jpg"
+      ? "/art/rooms/weld.jpg"
       : job.kind === "room"
         ? WORK_ART[job.room]
         : FACILITY_ART.barracks;
@@ -114,7 +354,9 @@ export function WorkBench() {
       ? ROOM_LINE[job.room]
       : job.kind === "quarter"
         ? QUARTER_LINE[job.quarter]
-        : "Lay it on the bench. I will talk you through the weld. This is not a button. This is a job.";
+        : favor
+          ? "Favor weld. Find the fault. Do the hands in order. Caps come off when it holds."
+          : "Machine Shop. Find the fault. Seat it in order. Cycle it until it holds.";
   const nextBonus =
     job.kind === "room"
       ? BASE_ROOMS[job.room].tiers[Math.min(s.rooms[job.room] + 1, BASE_ROOMS[job.room].tiers.length - 1)]?.bonus
@@ -125,6 +367,7 @@ export function WorkBench() {
           : null;
 
   const begin = () => {
+    if (job.kind !== "room" && job.kind !== "quarter") return;
     if (cost == null) {
       setError("Already at peak.");
       return;
@@ -138,23 +381,14 @@ export function WorkBench() {
     setPhase("working");
     sfx.forge();
     window.setTimeout(() => {
-      const msg =
-        job.kind === "room"
-          ? upgradeRoom(job.room)
-          : job.kind === "quarter"
-            ? upgradeQuarter(job.quarter)
-            : repairItem(job.opId, job.itemId);
+      const msg = job.kind === "room" ? upgradeRoom(job.room) : upgradeQuarter(job.quarter);
       if (msg) {
         setError(msg);
         setPhase("inspect");
         sfx.hurt();
         return;
       }
-      setNote(
-        job.kind === "repair"
-          ? "It holds. Do not drop it on the way to the bunk."
-          : "It holds. Vault 13 is a little less of a rumor.",
-      );
+      setNote("It holds. Vault 13 is a little less of a rumor.");
       setPhase("done");
     }, 1400);
   };
@@ -163,7 +397,7 @@ export function WorkBench() {
     <div
       className="fixed inset-0 z-[92] flex items-end bg-ink/85 p-3 backdrop-blur-md md:items-center md:justify-center"
       onClick={() => {
-        if (phase !== "working") close();
+        if (phase !== "working" && job.kind !== "repair") close();
       }}
     >
       <div
@@ -197,9 +431,26 @@ export function WorkBench() {
           ) : (
             <p className="mt-1 text-sm text-muted">{item ? `${item.condition} · ${item.kind}` : "No steel on the bench."}</p>
           )}
-          <p className="mt-3 text-sm italic leading-relaxed text-moon">Tyrone · {line}</p>
-          {nextBonus ? <p className="mt-3 text-sm leading-relaxed text-paper">{nextBonus}</p> : null}
+          <p className="mt-3 text-sm italic leading-relaxed text-moon">{favor ? "Travis" : "Tyrone"} · {line}</p>
+          {nextBonus && job.kind !== "repair" ? <p className="mt-3 text-sm leading-relaxed text-paper">{nextBonus}</p> : null}
+          {job.kind === "repair" && item ? (
+            <p className="mt-3 text-sm leading-relaxed text-paper">
+              {item.condition} now. One step closer to holding if the work is clean.
+              {cost != null ? ` The bench wants ${cost} caps at the end, not at the start.` : ""}
+            </p>
+          ) : null}
 
+          {job.kind === "repair" ? (
+            <WeldJob
+              item={item ?? null}
+              cost={cost}
+              favor={favor}
+              opId={job.opId}
+              forgeReady={s.rooms.forge >= 1}
+              onClose={close}
+            />
+          ) : (
+            <>
           {phase === "working" ? (
             <div className="mt-5">
               <p className="font-display text-label uppercase tracking-[0.18em] text-ember">Sparks. Hold still.</p>
@@ -220,7 +471,7 @@ export function WorkBench() {
                 disabled={cost == null}
                 onClick={begin}
               >
-                {job.kind === "repair" ? "Begin the weld" : meta.lvl > 0 ? "Begin the raise" : "Raise it"}
+                {meta.lvl > 0 ? "Begin the raise" : "Raise it"}
                 {cost != null ? (
                   <>
                     {" · "}
@@ -240,6 +491,8 @@ export function WorkBench() {
               </Button>
             ) : null}
           </div>
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -249,8 +502,8 @@ export function WorkBench() {
 function TravisBay() {
   const s = useGame((g) => g.s);
   const close = useGame((g) => g.closeWork);
+  const openWork = useGame((g) => g.openWork);
   const deliver = useGame((g) => g.deliverTravis);
-  const favor = useGame((g) => g.travisFavorRepair);
   const pending = pendingModules(s);
   const fitted = fittedModules(s);
   const cracked = allRepairCandidates(s);
@@ -277,23 +530,6 @@ function TravisBay() {
     sfx.forge();
     window.setTimeout(() => {
       const msg = deliver(itemId);
-      if (msg) {
-        setError(msg);
-        sfx.hurt();
-      } else {
-        sfx.unlock();
-        setNote(useGame.getState().s.toast);
-      }
-      setBusy(null);
-    }, 900);
-  };
-
-  const weld = (itemId: string) => {
-    setError(null);
-    setBusy(`weld:${itemId}`);
-    sfx.forge();
-    window.setTimeout(() => {
-      const msg = favor(itemId);
       if (msg) {
         setError(msg);
         sfx.hurt();
@@ -376,12 +612,12 @@ function TravisBay() {
               <SectionLabel>Show him steel</SectionLabel>
               <p className="text-xs text-muted">
                 {canWeld
-                  ? "Jig trusts you. One favor weld per tap — toward pristine, not a full rebuild."
+                  ? "Jig trusts you. A favor weld is a job on the bench — fault, hands, then proof."
                   : "Seat a T-0880 part first. Then I favor-weld cracked weapons and plate."}
               </p>
-              {cracked.slice(0, 6).map(({ item }) => {
+              {cracked.slice(0, 6).map(({ item, opId }) => {
                 const cost = repairCost(s, item);
-                const favorCost = Math.max(35, Math.round(cost * 0.9));
+                const favorCost = Math.max(35, Math.round(cost * Math.min(1, travisRepairFactor(s) + 0.05)));
                 return (
                   <div key={item.id} className="flex gap-3 rounded-[var(--radius-sm)] bg-ink/40 p-3">
                     <div className="min-w-0 flex-1">
@@ -406,13 +642,12 @@ function TravisBay() {
                         size="sm"
                         variant="ember"
                         disabled={!!busy || !canWeld}
-                        onClick={() => weld(item.id)}
+                        onClick={() => {
+                          sfx.click();
+                          openWork({ kind: "repair", opId, itemId: item.id, favor: true });
+                        }}
                       >
-                        {busy === `weld:${item.id}` ? "Welding…" : (
-                          <>
-                            Weld · <Coin n={favorCost} />
-                          </>
-                        )}
+                        Bench · <Coin n={favorCost} />
                       </Button>
                     </div>
                   </div>

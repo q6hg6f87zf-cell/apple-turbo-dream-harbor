@@ -201,7 +201,6 @@ export function InventoryFast() {
   const selectLoc = useGame((g) => g.selectLoc);
   const attachFirearm = useGame((g) => g.attachFirearmPart);
   const stripFirearm = useGame((g) => g.stripFirearmPart);
-  const travisFavor = useGame((g) => g.travisFavorRepair);
   const showTravis = useGame((g) => g.showTravisItem);
 
   const session = inventorySession(SESSION_ID);
@@ -653,13 +652,13 @@ export function InventoryFast() {
                   variant="ghost"
                   className="w-full"
                   onClick={() => {
-                    sfx.forge();
-                    const msg = travisFavor(selected.item!.id);
-                    if (msg) setToast(msg);
-                    else setSelectedKey(null);
+                    sfx.click();
+                    const opId = selected.source === "operative" ? selected.ownerId : "vault";
+                    if (!opId || !selected.item) return;
+                    openWork({ kind: "repair", opId, itemId: selected.item.id, favor: true });
                   }}
                 >
-                  <Wrench className="size-4" /> Travis favor weld
+                  <Wrench className="size-4" /> Bench it with Travis
                 </Button>
               ) : null}
               {(selected.source === "vault" || selected.source === "operative") && selected.item && selected.item.condition !== "Pristine" ? (
@@ -671,7 +670,7 @@ export function InventoryFast() {
                     openWork({ kind: "repair", opId: selected.source === "vault" ? "vault" : selected.ownerId!, itemId: selected.item!.id });
                   }}
                 >
-                  <Wrench className="size-4" /> Repair at Vault Machine Shop
+                  <Wrench className="size-4" /> Lay it on the Machine Shop bench
                 </Button>
               ) : null}
               {selected.source === "operative" &&

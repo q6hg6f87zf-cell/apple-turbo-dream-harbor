@@ -6,6 +6,7 @@ import { locById } from "@/game/data";
 import { locationToRegion } from "@/game/field-ops";
 import { punchClick } from "@/game/juice";
 import { availableScenarios } from "@/game/scenario";
+import { storyScene } from "@/game/story";
 import { WATCH_LABEL, WATCH_ORDER } from "@/game/shift";
 import { useGame } from "@/game/store";
 import type { DayTask, WatchId } from "@/game/types";
@@ -21,6 +22,8 @@ function err(msg: string | null) {
 }
 
 function jobThumb(task: DayTask): string {
+  const scene = storyScene(task.poiId) ?? (task.npcId === "lyra" ? storyScene("ironclad-berm") : null);
+  if (scene) return scene;
   if (task.loc) {
     const region = locationToRegion(task.loc);
     if (region) return regionThumb(region);

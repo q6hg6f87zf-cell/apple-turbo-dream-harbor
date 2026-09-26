@@ -13,6 +13,7 @@ import { CommandBar, EncounterBackdrop, EventChips, EventLog } from "./encounter
 import { KIND_LABEL, eventChips, eventStatHint, shiftRadio, dawnLines } from "@/game/event-theater";
 import { BOARD_KIND_LABEL, boardStake } from "@/game/board-copy";
 import { CAST, kaneHeatLine, AEGIS_FIELD_STILL, castById } from "@/game/cast";
+import { storyScene } from "@/game/story";
 import { poiById } from "@/game/field-ops";
 import { itemArt, itemThumbUrl } from "@/game/item-art";
 import {
@@ -169,7 +170,7 @@ export function MissionOverlay() {
       <EncounterBackdrop
         locationId={mission.locationId}
         tone={mission.kind === "boss" || mission.kind === "raid" ? "danger" : "neutral"}
-        art={face?.still}
+        art={storyScene(mission.poiId) ?? face?.still}
       />
 
       <div className="relative z-[1] flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -255,6 +256,9 @@ export function MissionOverlay() {
                       ))}
                     </div>
                   </div>
+                ) : null}
+                {mission.lastConsequence && !spin && !held ? (
+                  <p className="mt-2 border-l-2 border-ember pl-3 text-body leading-relaxed text-paper">{mission.lastConsequence}</p>
                 ) : null}
                 {beat?.prompt ? <p className="text-body leading-relaxed text-moon">{beat.prompt}</p> : null}
                 {mission.stakes ? <p className="mt-2 text-label text-muted">{mission.stakes}</p> : null}
@@ -515,7 +519,7 @@ export function CombatOverlay() {
       <EncounterBackdrop
         locationId={combat.locationId}
         tone="danger"
-        art={enemy?.tags?.includes("aegis") ? AEGIS_FIELD_STILL : undefined}
+        art={storyScene(s.mission?.poiId) ?? (enemy?.tags?.includes("aegis") ? AEGIS_FIELD_STILL : undefined)}
       />
 
       <div className="relative z-[1] flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -820,7 +824,7 @@ export function OperativeSheet() {
               <SectionLabel>Destiny</SectionLabel>
               <p className="text-sm italic text-moon">{op.destiny}</p>
             </Panel>
-            <p className="text-xs text-muted">{op.repPassive}</p>
+            <p className="text-xs text-muted">{op.repTitle}</p>
           </div>
         ) : null}
 
@@ -849,7 +853,7 @@ export function OperativeSheet() {
                         openWork({ kind: "repair", opId: op.id, itemId: it.id });
                       }}
                     >
-                      Repair
+                      Repair on the bench
                     </Button>
                   ) : null}
                 </div>
@@ -1029,9 +1033,10 @@ export function ShiftSheet() {
   };
 
   const face = task.npcId ? CAST[(task.npcId as keyof typeof CAST)] : undefined;
+  const scene = task.npcId === "lyra" ? storyScene("ironclad-berm") : storyScene(task.poiId);
   return (
     <div className="fixed inset-0 z-[45] flex flex-col" data-shift-event="1">
-      <EncounterBackdrop locationId={task.loc ?? s.selectedLoc ?? "ironclad"} art={face?.still ?? (task.kind === "aegis" ? AEGIS_FIELD_STILL : undefined)} />
+      <EncounterBackdrop locationId={task.loc ?? s.selectedLoc ?? "ironclad"} art={scene ?? face?.still ?? (task.kind === "aegis" ? AEGIS_FIELD_STILL : undefined)} />
       <div className="relative z-[1] flex min-h-0 flex-1 flex-col">
         <div className="shrink-0 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
           <div className="flex items-start justify-between gap-3">
