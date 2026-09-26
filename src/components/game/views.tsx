@@ -80,7 +80,7 @@ import { MoonCard } from "./card";
 import { regionThumb, FACILITY_ART } from "@/game/art";
 import { RIDER_AVATARS, avatarsForGender, type RiderGender } from "@/game/avatars";
 import { CAST, AEGIS_LINE_STILL, AEGIS_WING, knownCast } from "@/game/cast";
-import { kaneFileBlurb, siteCopyFor } from "@/game/story";
+import { kaneFileBlurb, siteCopyFor, storyScene } from "@/game/story";
 import { CALIBER_ROSTER, ARC_OPEN, campaignOpenRegions } from "@/game/arsenal";
 import { APPROACHES, KANE_STAKES, defaultPoi, kaneBand, knownPois, locationToRegion } from "@/game/field-ops";
 import { MARKET_KEEPER } from "@/game/market";
@@ -115,6 +115,17 @@ const KIND_TAG: Record<MissionKind, string> = {
   bounty: "Named hunt",
   boss: "Arc closer",
 };
+
+/** Places you enter. Field sites stay a sortie — party, approach, deploy. */
+function placeVerb(poi: { id: string; action?: string; kind?: string } | undefined): string | null {
+  if (!poi) return null;
+  const act = poi.action ?? poi.kind;
+  if (act === "shop" || poi.kind === "merchant" || poi.id.includes("market")) return "Open the stalls";
+  if (act === "listen" || poi.kind === "radio") return "Climb and listen";
+  if (act === "home") return "Return to Vault 13";
+  if (act === "bay") return "Open the bay";
+  return null;
+}
 
 export { MainMenu as TitleScreen } from "./menu";
 
@@ -994,6 +1005,7 @@ export function MapView() {
   const [approach, setApproach] = useState<MissionApproach>("standard");
   const [orbit, setOrbit] = useState(false);
   const [sheet, setSheet] = useState(false);
+  const [picker, setPicker] = useState<null | "site" | "kind" | "approach">(null);
   const touched = useRef(false);
   const progress = s.locations[loc] ?? EMPTY_PROGRESS;
   const merchant = NPCS.find((n) => n.loc === loc);
@@ -1028,6 +1040,10 @@ export function MapView() {
     }
   }, [s.tutorial, idleIds, lastPartyKey]);
 
+  useEffect(() => {
+    setPicker(null);
+  }, [loc]);
+
   const kinds: { id: MissionKind; label: string; locked?: boolean }[] = [
     { id: "scout", label: "Scout" },
     { id: "forage", label: "Forage" },
@@ -1048,6 +1064,15 @@ export function MapView() {
 
   const dangerTone = ["text-ok", "text-ok", "text-ember", "text-danger", "text-danger"][Math.max(0, L.danger - 1)];
   const heat = kaneBand(s.kaneHeat ?? 0);
+  const verb = placeVerb(poi);
+  const chosenKind = kinds.find((k) => k.id === kind) ?? kinds[0];
+  const chosenApproach = APPROACHES.find((a) => a.id === approach) ?? APPROACHES[1];
+  const JobIcon = KIND_ICON[kind];
+  const brief = poi
+    ? verb
+      ? poi.description
+      : siteCopyFor(poi, kind === "forage" ? "forage" : "scout").brief
+    : L.desc;
 
   return (
     <div className="space-y-4 pb-8">
@@ -1111,234 +1136,309 @@ export function MapView() {
 
       {sheet ? (
         <RegionSheet
-          title={L.name}
+          title={picker === "site" ? L.name : (poi?.name ?? L.name)}
           locationId={loc}
+          art={storyScene(poi?.id)}
           onClose={() => setSheet(false)}
           command={
-            <Button
-              className={cn("w-full", s.tutorial === "sortie" && "ms-nudge")}
-              variant="ember"
-              sound="none"
-              disabled={!party.length || !progress.unlocked}
-              onClick={(e) => {
-                const msg = deploy(loc, kind, party, { poiId: poi?.id, approach });
-                if (msg) err(msg);
-                else {
-                  punchClick(e.clientX, e.clientY);
-                  shockwaveAt(e.clientX, e.clientY);
-                  sfx.deploy();
-                  touched.current = false;
-                  setParty([]);
-                  setSheet(false);
-                }
-              }}
-            >
-              {party.length ? `Deploy ${party.length} to ${poi?.name ?? L.short}` : "Pick who walks"}
-            </Button>
-          }
-        >
-        <div>
-          <p className="font-display text-[10px] uppercase tracking-[0.2em] text-ember">{regionById(regionId).continent}</p>
-          <h3 className="font-display text-lg">{L.name}</h3>
-          <p className="text-sm text-muted">{L.desc}</p>
-          {stake ? (
-            <p className="mt-2 text-sm text-ember">
-              Kane wants {stake.resource}. {stake.why}
-            </p>
-          ) : null}
-          <p className={cn("mt-1 font-display text-[10px] uppercase tracking-[0.16em]", dangerTone)}>
-            Danger {L.danger} · intel {progress.intel} · sorties {progress.missions}
-            <span className={cn("ml-2", heat.tone)}>{heat.label}</span>
-          </p>
-        </div>
-
-        {sites.length ? (
-          <>
-            <SectionLabel>Site</SectionLabel>
-            <div className="flex flex-wrap gap-1.5">
-              {sites.map((site) => (
-                <Chip
-                  key={site.id}
-                  active={poi?.id === site.id}
-                  onClick={() => {
-                    sfx.click();
-                    selectPoi(site.id);
-                  }}
-                >
-                  {site.name}
-                </Chip>
-              ))}
-            </div>
-            {poi ? (
-              <p className="mt-2 text-sm leading-relaxed text-moon">
-                {siteCopyFor(poi, kind === "forage" ? "forage" : "scout").brief}
-              </p>
-            ) : null}
-            {poi ? (
+            picker ? (
+              <Button variant="quiet" className="w-full" onClick={() => setPicker(null)}>
+                Back to {poi?.name ?? L.short}
+              </Button>
+            ) : verb ? (
               <Button
-                variant="ghost"
-                className="mt-3 w-full min-h-12"
-                data-poi-act={poi.id}
+                className="w-full"
+                variant="ember"
+                data-poi-act={poi?.id}
                 onClick={() => {
+                  if (!poi) return;
                   sfx.unlock();
                   const act = poi.action ?? poi.kind;
-                  if (act === "shop" || poi.id.includes("market")) {
+                  if (act === "shop" || poi.kind === "merchant" || poi.id.includes("market")) {
                     useGame.getState().openMarket();
+                    setSheet(false);
                     return;
                   }
                   const msg = useGame.getState().workSite(poi.id);
                   if (msg) err(msg);
+                  else setSheet(false);
                 }}
               >
-                {poi.action === "shop" || poi.kind === "merchant"
-                  ? "Open stalls"
-                  : poi.action === "listen" || poi.kind === "radio"
-                    ? "Climb and listen"
-                    : poi.action === "home"
-                      ? "Return to Vault 13"
-                      : poi.action === "boss"
-                        ? "This hill has a name"
-                        : poi.action === "bay"
-                          ? "Open Travis's bay"
-                        : poi.action === "salvage"
-                          ? "Salvage this site · 1 watch"
-                          : "Scout this site · 1 watch"}
+                {verb}
               </Button>
-            ) : null}
-          </>
-        ) : null}
-
-        {!progress.unlocked ? (
-          <p className="mt-3 text-sm text-muted">Sealed. Survive more days.</p>
-        ) : (
-          <>
-            <Button
-              variant="ghost"
-              className="mt-3 w-full"
-              onClick={(e) => {
-                punchClick(e.clientX, e.clientY);
-                sfx.unlock();
-                openRegionMap();
-              }}
-            >
-              Open ground map
-            </Button>
-            <div className="mt-4 grid grid-cols-3 gap-2">
-              {kinds.map((k) => {
-                const Icon = KIND_ICON[k.id];
+            ) : (
+              <Button
+                className={cn("w-full", s.tutorial === "sortie" && "ms-nudge")}
+                variant="ember"
+                sound="none"
+                disabled={!party.length || !progress.unlocked}
+                onClick={(e) => {
+                  const msg = deploy(loc, kind, party, { poiId: poi?.id, approach });
+                  if (msg) err(msg);
+                  else {
+                    punchClick(e.clientX, e.clientY);
+                    shockwaveAt(e.clientX, e.clientY);
+                    sfx.deploy();
+                    touched.current = false;
+                    setParty([]);
+                    setSheet(false);
+                  }
+                }}
+              >
+                {party.length ? `Deploy ${party.length} to ${poi?.name ?? L.short}` : "Pick who walks"}
+              </Button>
+            )
+          }
+        >
+          {!progress.unlocked ? (
+            <p className="text-sm text-muted">Sealed. Survive more days.</p>
+          ) : picker === "site" ? (
+            <div className="space-y-2">
+              <p className="font-display text-[10px] uppercase tracking-[0.22em] text-ember">Sites in {L.short}</p>
+              {sites.map((site) => {
+                const on = poi?.id === site.id;
                 return (
                   <button
-                    key={k.id}
+                    key={site.id}
                     type="button"
-                    disabled={k.locked}
-                    onClick={(e) => {
-                      punchClick(e.clientX, e.clientY);
+                    onClick={() => {
                       sfx.click();
-                      setKind(k.id);
+                      selectPoi(site.id);
+                      setPicker(null);
                     }}
                     className={cn(
-                      "flex min-h-16 flex-col items-start justify-center rounded-[var(--radius-md)] px-2.5 py-2 text-left disabled:opacity-30",
-                      kind === k.id
-                        ? "bg-ember/15 shadow-[var(--shadow-border-hover)]"
-                        : "bg-ink shadow-[var(--shadow-border)]",
+                      "flex min-h-14 w-full flex-col items-start justify-center rounded-[var(--radius-md)] px-4 py-3 text-left",
+                      on ? "bg-ember text-ink" : "bg-ink/80 text-paper shadow-[var(--shadow-border)]",
                     )}
                   >
-                    <span className="flex items-center gap-1.5 font-display text-[11px] uppercase tracking-wider">
-                      <Icon className="size-3.5 text-ember" /> {k.label}
+                    <span className="font-display text-[11px] uppercase tracking-[0.16em]">{site.name}</span>
+                    <span className={cn("mt-1 line-clamp-2 text-sm leading-snug", on ? "text-ink/75" : "text-muted")}>
+                      {site.description}
                     </span>
-                    <span className="mt-1 text-[11px] leading-snug text-muted">{KIND_TAG[k.id]}</span>
                   </button>
                 );
               })}
             </div>
-            <p className="mt-3 text-sm leading-relaxed text-moon" data-kind-help={kind}>
-              {KIND_HELP[kind]}
-            </p>
-            {kind === "bounty" && s.bounty ? (
-              <p className="mt-3 text-sm text-moon">
-                {s.bounty.name} · DC {s.bounty.dc} · {s.bounty.reward}
-              </p>
-            ) : null}
-            {kind === "boss" ? (
-              <p className="mt-3 text-sm text-ember">{VILLAINS.find((v) => v.loc === loc)?.tagline}</p>
-            ) : null}
-
-            <SectionLabel>Approach</SectionLabel>
-            <div className="grid grid-cols-3 gap-2">
-              {APPROACHES.map((a) => (
-                <button
-                  key={a.id}
-                  type="button"
-                  onClick={(e) => {
-                    punchClick(e.clientX, e.clientY);
-                    sfx.click();
-                    setApproach(a.id);
-                  }}
-                  className={cn(
-                    "min-h-16 rounded-[var(--radius-md)] px-2.5 py-2 text-left",
-                    approach === a.id
-                      ? "bg-ember/15 shadow-[var(--shadow-border-hover)]"
-                      : "bg-ink shadow-[var(--shadow-border)]",
-                  )}
-                >
-                  <span className="block font-display text-[11px] uppercase tracking-wider">{a.label}</span>
-                  <span className="mt-1 block text-[11px] leading-snug text-muted">{a.blurb}</span>
-                </button>
-              ))}
-            </div>
-
-            <SectionLabel>Party · max 3</SectionLabel>
-            {idle.length === 0 ? (
-              <p className="text-sm text-muted">No idle operatives at HQ. Heal, rest, or wait for a return.</p>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                {idle.map((op) => {
-                  const on = party.includes(op.id);
+          ) : picker === "kind" ? (
+            <div>
+              <p className="font-display text-[10px] uppercase tracking-[0.22em] text-ember">The job</p>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                {kinds.map((k) => {
+                  const Icon = KIND_ICON[k.id];
                   return (
                     <button
-                      key={op.id}
+                      key={k.id}
                       type="button"
-                      onClick={(e) => {
-                        punchClick(e.clientX, e.clientY);
+                      disabled={k.locked}
+                      onClick={() => {
                         sfx.click();
-                        toggle(op.id);
+                        setKind(k.id);
+                        setPicker(null);
                       }}
                       className={cn(
-                        "flex min-h-14 items-center gap-2 rounded-[var(--radius-md)] px-2.5 py-2",
-                        on ? "bg-ember/15 shadow-[var(--shadow-border-hover)]" : "bg-ink shadow-[var(--shadow-border)]",
+                        "flex min-h-16 flex-col items-start justify-center rounded-[var(--radius-md)] px-3 py-2 text-left disabled:opacity-30",
+                        kind === k.id ? "bg-ember text-ink" : "bg-ink/80 text-paper shadow-[var(--shadow-border)]",
                       )}
                     >
-                      <Portrait op={op} size={32} />
-                      <span className="text-left">
-                        <span className="block font-display text-sm">{op.name}</span>
-                        <span className="block text-[11px] text-muted">{className(op.cls)}</span>
+                      <span className="flex items-center gap-1.5 font-display text-[11px] uppercase tracking-wider">
+                        <Icon className={cn("size-3.5", kind === k.id ? "text-ink" : "text-ember")} /> {k.label}
+                      </span>
+                      <span className={cn("mt-1 text-[11px] leading-snug", kind === k.id ? "text-ink/75" : "text-muted")}>
+                        {KIND_TAG[k.id]}
                       </span>
                     </button>
                   );
                 })}
               </div>
-            )}
-          </>
-        )}
-
-      {merchant && progress.unlocked ? (
-        <Panel>
-          <SectionLabel>
-            {merchant.name} · {merchant.title}
-          </SectionLabel>
-          <p className="text-sm italic text-moon">“{merchant.quote}”</p>
-          <div className="mt-3 space-y-2">
-            {merchant.stock.map((st) => (
-              <div key={st.name} className="flex items-center justify-between gap-3 text-sm">
-                <span>{st.name}</span>
-                <Button size="sm" variant="ghost" onClick={() => err(buy(st.name, st.price))}>
-                  <Coin n={st.price} />
-                </Button>
+              <p className="mt-3 text-sm leading-relaxed text-moon" data-kind-help={kind}>
+                {KIND_HELP[kind]}
+              </p>
+            </div>
+          ) : picker === "approach" ? (
+            <div className="space-y-2">
+              <p className="font-display text-[10px] uppercase tracking-[0.22em] text-ember">How you go in</p>
+              {APPROACHES.map((a) => {
+                const on = approach === a.id;
+                return (
+                  <button
+                    key={a.id}
+                    type="button"
+                    onClick={() => {
+                      sfx.click();
+                      setApproach(a.id);
+                      setPicker(null);
+                    }}
+                    className={cn(
+                      "flex min-h-16 w-full flex-col items-start justify-center rounded-[var(--radius-md)] px-4 py-3 text-left",
+                      on ? "bg-ember text-ink" : "bg-ink/80 text-paper shadow-[var(--shadow-border)]",
+                    )}
+                  >
+                    <span className="font-display text-[11px] uppercase tracking-[0.16em]">{a.label}</span>
+                    <span className={cn("mt-1 text-sm leading-snug", on ? "text-ink/75" : "text-muted")}>{a.blurb}</span>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <>
+              <div className="rounded-[var(--radius-lg)] bg-ink/82 px-4 py-4 shadow-[var(--shadow-border)] backdrop-blur-md">
+                <p className="font-display text-[10px] uppercase tracking-[0.22em] text-ember">
+                  {regionById(regionId).continent}
+                </p>
+                <p className="mt-2 text-sm leading-relaxed text-moon">{brief}</p>
+                {stake && !verb ? (
+                  <p className="mt-2 text-sm text-ember">Kane wants {stake.resource}.</p>
+                ) : null}
+                <p className={cn("mt-3 font-display text-[10px] uppercase tracking-[0.16em]", dangerTone)}>
+                  Danger {poi?.danger ?? L.danger} · intel {progress.intel}
+                  <span className={cn("ml-2", heat.tone)}>{heat.label}</span>
+                </p>
+                <div className="mt-4 flex gap-5">
+                  {sites.length > 1 ? (
+                    <button
+                      type="button"
+                      className="font-display text-[10px] uppercase tracking-[0.18em] text-ember"
+                      onClick={() => {
+                        sfx.click();
+                        setPicker("site");
+                      }}
+                    >
+                      Other sites
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="font-display text-[10px] uppercase tracking-[0.18em] text-muted"
+                    aria-label="Open ground map"
+                    onClick={(e) => {
+                      punchClick(e.clientX, e.clientY);
+                      sfx.unlock();
+                      openRegionMap();
+                    }}
+                  >
+                    Ground map
+                  </button>
+                </div>
               </div>
-            ))}
-          </div>
-        </Panel>
-      ) : null}
+
+              {verb ? null : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sfx.click();
+                      setPicker("kind");
+                    }}
+                    className="flex min-h-14 w-full items-center justify-between gap-3 rounded-[var(--radius-md)] bg-ink/80 px-4 py-3 text-left shadow-[var(--shadow-border)] backdrop-blur-sm"
+                  >
+                    <span className="min-w-0">
+                      <span className="block font-display text-[10px] uppercase tracking-[0.18em] text-muted">Job</span>
+                      <span className="mt-0.5 flex items-center gap-2 font-display text-sm uppercase tracking-[0.12em] text-paper">
+                        <JobIcon className="size-3.5 text-ember" />
+                        {chosenKind?.label ?? "Scout"}
+                      </span>
+                      <span className="mt-0.5 block text-sm text-moon">{KIND_TAG[kind]}</span>
+                    </span>
+                    <span className="shrink-0 font-display text-[10px] uppercase tracking-[0.16em] text-ember">Change</span>
+                  </button>
+
+                  {kind === "bounty" && s.bounty ? (
+                    <p className="text-sm text-moon">
+                      {s.bounty.name} · DC {s.bounty.dc} · {s.bounty.reward}
+                    </p>
+                  ) : null}
+                  {kind === "boss" ? (
+                    <p className="text-sm text-ember">{VILLAINS.find((v) => v.loc === loc)?.tagline}</p>
+                  ) : null}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sfx.click();
+                      setPicker("approach");
+                    }}
+                    className="flex min-h-14 w-full items-center justify-between gap-3 rounded-[var(--radius-md)] bg-ink/80 px-4 py-3 text-left shadow-[var(--shadow-border)] backdrop-blur-sm"
+                  >
+                    <span className="min-w-0">
+                      <span className="block font-display text-[10px] uppercase tracking-[0.18em] text-muted">Approach</span>
+                      <span className="mt-0.5 block font-display text-sm uppercase tracking-[0.12em] text-paper">
+                        {chosenApproach?.label}
+                      </span>
+                      <span className="mt-0.5 block text-sm leading-snug text-moon">{chosenApproach?.blurb}</span>
+                    </span>
+                    <span className="shrink-0 font-display text-[10px] uppercase tracking-[0.16em] text-ember">Change</span>
+                  </button>
+
+                  <div className="rounded-[var(--radius-md)] bg-ink/80 px-4 py-3 shadow-[var(--shadow-border)] backdrop-blur-sm">
+                    <SectionLabel>Who walks · max 3</SectionLabel>
+                    {idle.length === 0 ? (
+                      <p className="text-sm text-moon">Nobody idle at the vault. Forge a file, or wait for a return.</p>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {idle.map((op) => {
+                          const on = party.includes(op.id);
+                          return (
+                            <button
+                              key={op.id}
+                              type="button"
+                              onClick={(e) => {
+                                punchClick(e.clientX, e.clientY);
+                                sfx.click();
+                                toggle(op.id);
+                              }}
+                              className={cn(
+                                "flex min-h-14 items-center gap-2 rounded-[var(--radius-md)] px-2.5 py-2",
+                                on ? "bg-ember/15 shadow-[var(--shadow-border-hover)]" : "bg-ink shadow-[var(--shadow-border)]",
+                              )}
+                            >
+                              <Portrait op={op} size={32} />
+                              <span className="text-left">
+                                <span className="block font-display text-sm">{op.name}</span>
+                                <span className="block text-[11px] text-muted">{className(op.cls)}</span>
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {poi && (poi.action === "scout" || poi.action === "salvage" || !poi.action) ? (
+                      <button
+                        type="button"
+                        data-poi-act={poi.id}
+                        className="mt-3 w-full text-left font-display text-[10px] uppercase tracking-[0.16em] text-muted"
+                        onClick={() => {
+                          sfx.unlock();
+                          const msg = useGame.getState().workSite(poi.id);
+                          if (msg) err(msg);
+                        }}
+                      >
+                        {poi.action === "salvage" ? "Strip it without a party · 1 watch" : "Or walk it alone · 1 watch"}
+                      </button>
+                    ) : null}
+                  </div>
+                </>
+              )}
+
+              {merchant && progress.unlocked && kind === "trade" && !verb ? (
+                <Panel>
+                  <SectionLabel>
+                    {merchant.name} · {merchant.title}
+                  </SectionLabel>
+                  <p className="text-sm italic text-moon">“{merchant.quote}”</p>
+                  <div className="mt-3 space-y-2">
+                    {merchant.stock.map((st) => (
+                      <div key={st.name} className="flex items-center justify-between gap-3 text-sm">
+                        <span>{st.name}</span>
+                        <Button size="sm" variant="ghost" onClick={() => err(buy(st.name, st.price))}>
+                          <Coin n={st.price} />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </Panel>
+              ) : null}
+            </>
+          )}
         </RegionSheet>
       ) : null}
 

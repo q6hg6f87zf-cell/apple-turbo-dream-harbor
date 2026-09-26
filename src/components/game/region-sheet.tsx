@@ -19,12 +19,14 @@ import { useDialogFocus } from "./use-dialog-focus";
 export function RegionSheet({
   title,
   locationId,
+  art,
   onClose,
   command,
   children,
 }: {
   title: string;
   locationId: LocationId;
+  art?: string | null;
   onClose: () => void;
   command: ReactNode;
   children: ReactNode;
@@ -42,7 +44,7 @@ export function RegionSheet({
 
   const focus = useDialogFocus<HTMLDivElement>();
   const region = locationToRegion(locationId);
-  const art = (region && REGION_STREET[region]) || roomArtFor("map");
+  const plate = art || (region && REGION_STREET[region]) || roomArtFor("map");
 
   const sheet = (
     <div
@@ -54,7 +56,7 @@ export function RegionSheet({
       data-region-sheet={locationId}
     >
       <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
-        <img src={art} alt="" decoding="async" className="ms-scene-photo absolute inset-0 size-full object-cover" />
+        <img src={plate} alt="" decoding="async" className="ms-scene-photo absolute inset-0 size-full object-cover" />
         <div className="ms-encounter-veil absolute inset-0" />
       </div>
 
