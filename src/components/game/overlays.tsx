@@ -65,6 +65,10 @@ function shellStyle(frame: { top: number; height: number }): CSSProperties {
 
 const FIELD_SHELL = "fixed inset-x-0 z-40 flex w-full flex-col overflow-hidden bg-ink";
 
+function DeskScrim({ z = "z-[39]" }: { z?: string }) {
+  return <div className={cn("fixed inset-0 hidden bg-ink/75 lg:block", z)} aria-hidden />;
+}
+
 const HAUL_EDGE = {
   Common: "shadow-[inset_0_0_0_2px_var(--color-line)]",
   Uncommon: "shadow-[inset_0_0_0_2px_var(--color-ok)]",
@@ -302,7 +306,9 @@ export function MissionOverlay() {
   if (!mission || combat) {
     if (!mission && !combat && s.spoils) {
       return (
-        <div data-spoils="1" className={FIELD_SHELL} style={shellStyle(frame)}>
+        <>
+          <DeskScrim />
+          <div data-spoils="1" className={FIELD_SHELL} style={shellStyle(frame)}>
           <SpoilsTake
             enemy={s.spoils.enemy}
             flavor={s.spoils.flavor}
@@ -325,7 +331,8 @@ export function MissionOverlay() {
               </Button>
             </CommandBar>
           </div>
-        </div>
+          </div>
+        </>
       );
     }
     return null;
@@ -348,7 +355,9 @@ export function MissionOverlay() {
   const haul = relic ? [relic, ...mission.loot.filter((it) => it.id !== relic.id)] : mission.loot;
 
   return (
-    <div data-mission="1" className={FIELD_SHELL} style={shellStyle(frame)}>
+    <>
+      <DeskScrim />
+      <div data-mission="1" className={FIELD_SHELL} style={shellStyle(frame)}>
       <EncounterBackdrop
         locationId={mission.locationId}
         tone={mission.kind === "boss" || mission.kind === "raid" ? "danger" : "neutral"}
@@ -518,6 +527,7 @@ export function MissionOverlay() {
         </div>
       )}
     </div>
+    </>
   );
 }
 
@@ -703,7 +713,9 @@ export function CombatOverlay() {
   const hullPct = enemy ? Math.max(0, Math.min(100, (enemy.hp / Math.max(1, enemy.maxHp)) * 100)) : 0;
 
   return (
-    <div data-combat="1" className={FIELD_SHELL} style={shellStyle(frame)}>
+    <>
+      <DeskScrim />
+      <div data-combat="1" className={FIELD_SHELL} style={shellStyle(frame)}>
       <EncounterBackdrop
         locationId={combat.locationId}
         tone="danger"
@@ -873,6 +885,7 @@ export function CombatOverlay() {
         </CommandBar>
       </div>
     </div>
+    </>
   );
 }
 
@@ -1239,7 +1252,9 @@ export function ShiftSheet() {
   const face = task.npcId ? CAST[(task.npcId as keyof typeof CAST)] : undefined;
   const scene = task.npcId === "lyra" ? storyScene("ironclad-berm") : storyScene(task.poiId);
   return (
-    <div className="fixed inset-0 z-[45] flex flex-col" data-shift-event="1">
+    <>
+      <DeskScrim z="z-[44]" />
+      <div className="fixed inset-0 z-[45] flex flex-col" data-shift-event="1">
       <EncounterBackdrop locationId={task.loc ?? s.selectedLoc ?? "ironclad"} art={scene ?? face?.still ?? (task.kind === "aegis" ? AEGIS_FIELD_STILL : undefined)} />
       <div className="relative z-[1] flex min-h-0 flex-1 flex-col">
         <div className="shrink-0 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
@@ -1388,6 +1403,7 @@ export function ShiftSheet() {
         </div>
       </div>
     </div>
+    </>
   );
 }
 

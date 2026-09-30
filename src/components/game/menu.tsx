@@ -281,7 +281,7 @@ export function MainMenu() {
       {introFilm ? null : <div className="title-veil pointer-events-none absolute inset-0 z-[1]" />}
       <OpeningBoot>
       <div className={cn("relative z-[2] flex min-h-0 flex-1 flex-col justify-end px-4 pb-8 pt-16 md:px-10 md:pb-10", introFilm && "pointer-events-none opacity-0")}>
-        <div className="mx-auto flex w-full max-w-lg flex-col gap-3 md:max-w-xl">
+        <div className="mx-auto flex w-full max-w-lg flex-col gap-3 md:max-w-xl lg:max-w-2xl">
           <div className="ms-title-dock rounded-[var(--radius-xl)] bg-ink/62 p-4 shadow-[var(--shadow-border)] backdrop-blur-md md:p-5">
             <p className="font-display text-[11px] uppercase tracking-[0.42em] text-ember">S.Y.N.A.P.S.E T-0880</p>
             <p className="mt-1 text-xs text-moon">Tyrone keeps the porch light on.</p>

@@ -87,5 +87,11 @@ export function RegionSheet({
   );
 
   if (typeof document === "undefined") return sheet;
-  return createPortal(sheet, document.body);
+  return createPortal(
+    <>
+      <div className="fixed inset-0 z-[59] hidden bg-ink/75 lg:block" aria-hidden />
+      {sheet}
+    </>,
+    document.body,
+  );
 }

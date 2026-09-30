@@ -2423,3 +2423,38 @@ body[data-region-map="1"] .ms-help,
     opacity: 0;
   }
 }
+
+/* Desktop is a desk, not a stretched phone. Field sheets stay a readable
+   column. Phones keep the full-bleed shell. The world HUD lives in the
+   center column, so it stays in flow beside the rail instead of being
+   shoved further right. */
+@media (min-width: 768px) {
+  [data-world-hud="1"] {
+    position: static;
+    padding-top: 0.75rem;
+  }
+  .ms-shell-world-pad {
+    padding-top: 0;
+  }
+  [data-chrome="hub"] .ms-toast,
+  [data-chrome="task"] .ms-toast,
+  [data-chrome="world"] .ms-toast,
+  [data-chrome="focused"] .ms-toast {
+    bottom: 1.5rem;
+  }
+}
+@media (min-width: 1024px) {
+  .fixed[data-combat],
+  .fixed[data-mission],
+  .fixed[data-spoils],
+  .fixed[data-region-sheet],
+  .fixed[data-shift-event] {
+    left: 50%;
+    right: auto;
+    width: min(36rem, calc(100vw - 3rem));
+    transform: translateX(-50%);
+    box-shadow:
+      0 0 0 1px color-mix(in oklab, var(--color-line) 75%, transparent),
+      0 28px 80px color-mix(in oklab, black 62%, transparent);
+  }
+}

@@ -257,7 +257,7 @@ class MapErrorBoundary extends Component<{ children: ReactNode; onReset?: () => 
 
 export function HQView() {
   return (
-    <div className="space-y-5 pb-24" data-hq-pane="compound">
+    <div className="space-y-5" data-hq-pane="compound">
       <CompoundWing />
     </div>
   );
@@ -277,7 +277,7 @@ function CompoundWing() {
   const living = s.operatives.filter((o) => o.status !== "dead");
 
   return (
-    <div className="space-y-5 pb-24">
+    <div className="space-y-5 pb-2">
       <div className="ms-well overflow-hidden rounded-[var(--radius-xl)] p-4 shadow-[var(--shadow-border)] md:p-5">
         <div className="flex items-center gap-4">
           <div className="ms-moon !size-14 shrink-0" />
@@ -1082,7 +1082,7 @@ export function MapView() {
         <p className="mt-1 text-secondary text-muted">The planet is the board. Orbit first. Brief on the ground.</p>
       </div>
 
-      <div className="grid grid-cols-1 gap-2">
+      <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
         {WORLD.filter((w) => w.id !== "hq").map((w) => {
           const unlocked = !!s.locations[w.id]?.unlocked;
           const rid = locationToRegion(w.id) ?? "ironclad";
@@ -1123,7 +1123,7 @@ export function MapView() {
       {/* A chooser has no single commit, so Orbit stays secondary. */}
       <Button
         variant="ghost"
-        className="w-full min-h-14"
+        className="w-full min-h-14 lg:w-auto lg:min-w-64"
         onClick={(e) => {
           punchClick(e.clientX, e.clientY);
           sfx.whoosh();
@@ -1680,7 +1680,7 @@ export function MarketView() {
           <p className="text-secondary">Stalls are dark until you assume command.</p>
         </Panel>
       ) : (
-        <div className="space-y-2">{stalls.map(card)}</div>
+        <div className="grid gap-2 lg:grid-cols-2">{stalls.map(card)}</div>
       )}
 
       <div className="grid grid-cols-3 gap-2">

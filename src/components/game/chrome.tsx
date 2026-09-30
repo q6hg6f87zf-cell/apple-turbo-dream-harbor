@@ -63,11 +63,11 @@ export function HubHeader() {
       <header
         data-hub-header="1"
         style={{ paddingTop: "max(0.25rem, env(safe-area-inset-top))" }}
-        className="flex shrink-0 items-center gap-2 border-b border-line/50 bg-ink/45 px-2 pb-1 backdrop-blur-md md:gap-3 md:px-4"
+        className="flex shrink-0 items-center gap-2 border-b border-line/50 bg-ink/45 px-2 pb-1 backdrop-blur-md md:gap-3 md:px-4 lg:justify-end lg:border-0 lg:bg-transparent"
       >
         <button
           type="button"
-          className="flex size-11 shrink-0 items-center justify-center"
+          className="flex size-11 shrink-0 items-center justify-center lg:hidden"
           onClick={() => {
             sfx.click();
             setScreen("title");
@@ -78,7 +78,7 @@ export function HubHeader() {
         </button>
         <button
           type="button"
-          className="ms-hud-plate min-h-11 min-w-0 flex-1 px-2.5 py-1.5 text-left"
+          className="ms-hud-plate min-h-11 min-w-0 flex-1 px-2.5 py-1.5 text-left lg:hidden"
           onClick={() => {
             sfx.click();
             setScreen("file");
@@ -325,7 +325,7 @@ export function GuidanceRow() {
         setScreen(row.screen);
       }}
       className={cn(
-        "flex min-h-11 w-full items-center justify-between gap-3 border-b border-line/70 bg-raised/90 px-4 text-left md:px-6",
+        "flex min-h-11 w-full items-center justify-between gap-3 border-b border-line/70 bg-raised/90 px-4 text-left md:px-6 lg:hidden",
         row.mode === "urgent" && "bg-danger/10",
       )}
     >

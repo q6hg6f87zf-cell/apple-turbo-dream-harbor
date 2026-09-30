@@ -211,8 +211,7 @@ export function GameApp() {
       data-shake="1"
     >
       <SceneBackdrop />
-      {kind === "hub" ? <Rail /> : null}
-      {kind === "world" ? <Rail /> : null}
+      {kind === "hub" || kind === "task" || kind === "world" ? <Rail /> : null}
       <div className="relative z-[1] flex min-w-0 flex-1 flex-col">
         {kind === "hub" ? <HubHeader /> : null}
         {kind === "task" ? <TaskHeader /> : null}
