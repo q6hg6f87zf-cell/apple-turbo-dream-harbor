@@ -971,6 +971,8 @@ export function sortieJob(state: GameState): DayTask {
     id: uid("job"),
     kind: "sortie",
     title: copy.title,
+    order: `Open the map. Pin ${poi.name}. Pick ghost, straight, or breach. Deploy. The die names the skill.`,
+    spoken: { who: "Tyrone", line: "That one is the site. I am not walking it for you." },
     brief: copy.brief,
     why: copy.why,
     watchCost: kind === "raid" || kind === "boss" || kind === "bounty" ? 2 : 1,
@@ -978,6 +980,7 @@ export function sortieJob(state: GameState): DayTask {
     loc,
     poiId: poi.id,
     missionKind: kind,
+    skill: kind === "raid" || kind === "bounty" || kind === "boss" ? "guns" : kind === "forage" ? "survival" : kind === "trade" ? "barter" : "sneak",
     failNote: copy.fail,
     status: "open",
   };
@@ -993,11 +996,20 @@ export function aegisJob(state: GameState): DayTask {
     id: uid("job"),
     kind: "aegis",
     title: pack.title,
+    order:
+      person.id === "lyra" && state.day <= 1
+        ? "Decide what Lyra reports: dark ridge, boring foundry, or a fight."
+        : `Hide, lie, or meet ${person.name} armed. Speech sells the lie. Sneak sells the dark.`,
+    spoken: {
+      who: person.name,
+      line: person.tagline,
+    },
     brief: pack.brief,
     why: "Kane does not roll dice. She sends people with names.",
     watchCost: 1,
     required: heat >= 10 || state.day === 1,
     npcId: person.id,
+    skill: "speech",
     failNote: pack.fail,
     choices: pack.choices,
     status: "open",
@@ -1012,9 +1024,9 @@ function aegisCopy(person: CastPerson, heat: number, day: number) {
         "Lyra is already on the West Berm. White visor. She is painting Vault 13 because somebody told her a body was on the East Highway. She is not knocking. Decide what she gets to report — an empty ridge, a boring foundry, or a fight.",
       fail: "Lyra kept the transcript. Kane has our outline before we have hers.",
       choices: [
-        { id: "hide", label: "Kill the porch lamps", blurb: "Let her paint an empty ridge. Perimeter Control helps if it is raised." },
-        { id: "lie", label: "Look like a foundry", blurb: "Busy. Boring. She is listening for a T-0880, not a mill." },
-        { id: "fight", label: "Walk the ridge armed", blurb: "She will call Drake. Do not start that on day one unless you mean it." },
+        { id: "hide", label: "Kill the porch lamps", blurb: "“Paint an empty ridge.” Sneak 50 does it without cameras. Perimeter Control does it louder." },
+        { id: "lie", label: "Look like a foundry", blurb: "“Busy. Boring. No robot.” Speech 45 sells it. A bard sells it better." },
+        { id: "fight", label: "Walk the ridge armed", blurb: "“You want a body count, come get one.” She will call Drake." },
       ],
     };
   }

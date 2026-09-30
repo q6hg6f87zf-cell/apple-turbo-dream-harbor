@@ -468,6 +468,19 @@ export function DeskRail() {
         <DeskStat label="Plate" value={Number(me.personalCaps ?? 0).toLocaleString()} />
         <DeskStat label="File" value={`${living}`} />
       </div>
+      {s.skillSheet && s.skillSheet.points > 0 ? (
+        <button
+          type="button"
+          className="rounded-[var(--radius-sm)] border border-ember/50 bg-ember/10 px-3 py-2 text-left"
+          onClick={() => {
+            sfx.click();
+            useGame.getState().openSkills();
+          }}
+        >
+          <p className="font-display text-[10px] uppercase tracking-[0.18em] text-ember">Bench</p>
+          <p className="mt-1 text-sm text-paper">{s.skillSheet.points} skill points</p>
+        </button>
+      ) : null}
       {row && !s.mission && !s.combat ? (
         <button
           type="button"

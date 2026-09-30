@@ -10,6 +10,8 @@ import type {
   RoomId,
   QuarterId,
   Screen,
+  SkillId,
+  RiderLook,
 } from "./types";
 import { BASE_ROOMS, COMPANIONS, QUARTERS, locById } from "./data";
 import { chromeKind, isHubScreen, isTaskScreen } from "./shell";
@@ -23,6 +25,7 @@ import {
   clamp,
   characterForged,
   cloneState,
+  computeStats,
   companionCost,
   completeMission,
   d20,
@@ -108,6 +111,7 @@ import { workPoi, markFieldJob } from "./field-ops";
 import { deliverTravisPart } from "./travis";
 import { showTravisItem, travisFavorRepair } from "./item-story";
 import { attachPart, stripPart } from "./weapon-ops";
+import { buildSheet, spendPoint, SKILLS } from "./skills";
 import { setFlag, ensureNarrative, addJournal } from "./narrative-state";
 import type { AttachmentSlot } from "./types";
 import { meetCast } from "./cast";
@@ -115,6 +119,7 @@ import {
   canRestClean,
   ensureShift,
   resolveTask as applyTask,
+  completeCog,
   restPenalties,
   sortieWatchCost,
   type TaskPayload,
@@ -169,6 +174,7 @@ interface Store {
     origin: string;
     rolls: Record<string, number>;
     portraitId?: string;
+    look?: RiderLook;
   }) => string | null;
   upgradeRoom: (room: RoomId) => string | null;
   upgradeQuarter: (q: QuarterId) => string | null;
@@ -239,6 +245,12 @@ interface Store {
   openTask: (id: string) => string | null;
   closeTask: () => void;
   resolveTask: (payload: TaskPayload) => string | null;
+  stampCog: (tags: SkillId[], travisTags: SkillId[]) => string | null;
+  spendSkill: (id: SkillId, n?: number) => string | null;
+  openSkills: () => void;
+  openCog: () => string | null;
+  closeSkills: () => void;
+  setLook: (look: RiderLook, portraitId?: string) => void;
   settleArcade: (pay: ArcadePayout) => void;
   mutateArcade: (fn: (s: GameState) => unknown) => unknown;
 }
@@ -708,6 +720,7 @@ export const useGame = create<Store>((set, get) => ({
         day: st.day,
         rolls: opts.rolls as never,
         portraitId: opts.portraitId,
+        look: opts.look,
       });
       st.operatives = [op, ...st.operatives];
       if (st.tutorial === "forge") {
@@ -1580,6 +1593,74 @@ export const useGame = create<Store>((set, get) => ({
     });
     return msg;
   },
+  stampCog: (tags, travisTags) => {
+    let msg: string | null = null;
+    mutate(set, (st) => {
+      if (st.skillSheet) {
+        msg = "The sheet is already stamped.";
+        return;
+      }
+      const op = st.operatives[0];
+      if (!op) {
+        msg = "Cut the file first. Travis will not test an empty bay.";
+        return;
+      }
+      if (tags.length !== 3) {
+        msg = "Three tags. Not two. Not four.";
+        return;
+      }
+      const stats = computeStats(op);
+      st.skillSheet = buildSheet(stats, tags, travisTags, st.skillBank ?? 0);
+      st.skillBank = 0;
+      setFlag(st, "travis_cog", true);
+      setFlag(st, "travis_met", true);
+      meetCast(st, "travis");
+      const names = st.skillSheet.tags.map((id) => SKILLS[id].name).join(", ");
+      completeCog(st, `Travis stamped ${names}. ${st.skillSheet.points} points on the bench.`);
+      st.skillOpen = true;
+      st.toast = `${names}. Spend them or leave them on the bench.`;
+    });
+    return msg;
+  },
+  spendSkill: (id, n = 1) => {
+    let msg: string | null = null;
+    mutate(set, (st) => {
+      if (!st.skillSheet) {
+        msg = "No sheet. Sit Bay 13.";
+        return;
+      }
+      msg = spendPoint(st.skillSheet, id, n);
+      if (!msg) st.toast = `${SKILLS[id].name} is ${st.skillSheet.values[id]}.`;
+    });
+    return msg;
+  },
+  openSkills: () =>
+    mutate(set, (st) => {
+      st.skillOpen = true;
+    }),
+  openCog: () => {
+    let msg: string | null = null;
+    mutate(set, (st) => {
+      ensureShift(st);
+    });
+    const id = get().s.shift?.board.find((t) => t.kind === "cog")?.id;
+    if (!id) {
+      return "Bay 13 is not on the board.";
+    }
+    msg = get().openTask(id);
+    return msg;
+  },
+  closeSkills: () =>
+    mutate(set, (st) => {
+      st.skillOpen = false;
+    }),
+  setLook: (look, portraitId) =>
+    mutate(set, (st) => {
+      const op = st.operatives[0];
+      if (!op) return;
+      st.operatives[0] = { ...op, look, portraitId: portraitId ?? op.portraitId };
+      st.toast = "Plate recut.";
+    }),
   settleArcade: (pay) =>
     mutate(set, (st) => {
       settleArcade(st, pay);

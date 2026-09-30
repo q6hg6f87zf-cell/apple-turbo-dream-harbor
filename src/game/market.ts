@@ -1,5 +1,6 @@
 import { HOLLOW_CATALOG, type CatalogItem } from "./hollow-catalog";
 import { TREASURE_CATALOG } from "./treasure-catalog";
+import { barterCut } from "./skills";
 import { plateMember } from "./squad";
 import { arsenalUnlocked, campaignOpenRegions } from "./arsenal";
 import { copyWeaponSpec, hydrateWeapon } from "./weapon-ops";
@@ -191,7 +192,7 @@ export function rollMarket(day: number, locations?: GameState["locations"]): Mar
 
 export function marketPrice(state: GameState, lot: MarketLot) {
   const disc = state.rooms.ledger >= 3 ? 0.85 : 1;
-  return Math.round(lot.price * disc);
+  return Math.round(lot.price * disc * barterCut(state));
 }
 
 export function lotToItem(lot: MarketLot, paid: number): Item {

@@ -253,6 +253,7 @@ export function shiftRadio(kind: string) {
     market: "Tyrone · The Exchange is closed. The Gate still sells if you walk it.",
     tower: "Tyrone · Climb. Listen. The tower talks whether we are on it or not.",
     salvage: "Tyrone · Pin a site. The map is the job. Dice are the loud ones.",
+    cog: "Travis · Sit. Eight words. I am not interested in the performance.",
   };
   return lines[kind] ?? "Tyrone · Do the job in front of you.";
 }

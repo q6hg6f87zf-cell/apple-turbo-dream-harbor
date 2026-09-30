@@ -6,6 +6,7 @@ import { queueTalk } from "./talk";
 import { applyAegisChoice } from "./consequences";
 import { syncStorySpine } from "./story-spine";
 import { bumpFaction, hasFlag, setFlag } from "./narrative-state";
+import { crateRead, jobSkill, medicineHeal, repairSteps, skillValue } from "./skills";
 import type {
   DayTask,
   GameState,
@@ -49,6 +50,35 @@ function pickN<T>(rand: () => number, arr: T[]): T {
 
 function uid(prefix: string) {
   return `${prefix}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function cogTask(): DayTask {
+  return {
+    id: "job-travis-cog",
+    kind: "cog",
+    title: "Sit Travis's cognitive",
+    order: "Bay 13. Eight words. Tag three skills. Spend what he puts on the bench.",
+    spoken: {
+      who: "Travis",
+      line: "I don't fit a chassis I haven't tested. Sit. First word. Don't perform.",
+    },
+    brief:
+      "He stamps three skills from how you answer, not from the class you wish you rolled. You can change the tags. The jobs use whatever you stamp.",
+    why: "Until this is stamped, the board does not know which way you bend.",
+    watchCost: 1,
+    required: true,
+    npcId: "travis",
+    loc: "ironclad",
+    skill: "science",
+    failNote: "You skipped Bay 13. Travis files you unsorted. The jobs stay dumb until you sit.",
+    status: "open",
+  };
+}
+
+function withCog(state: GameState, board: DayTask[]): DayTask[] {
+  if (!state.operatives.length || hasFlag(state, "travis_cog")) return board;
+  if (board.some((t) => t.kind === "cog")) return board;
+  return [cogTask(), ...board];
 }
 
 function note(state: GameState, what: string) {
@@ -111,10 +141,16 @@ function crateTask(rand: () => number): DayTask {
     id: uid("job"),
     kind: "crates",
     title: "Crack the depot crates",
+    order: "Open one crate. Leave the other two. Lockpick 45 names the tick.",
+    spoken: {
+      who: "Tyrone",
+      line: "Three boxes. One ticks, one pays, one is an insult. I am not guessing for you.",
+    },
     brief: "Three unmarked boxes came in overnight. One still ticks. One smells like oil. One has a Kane stencil half scraped. Pick one. Leave the rest.",
     why: "Salvage is a decision, not a roll.",
     watchCost: 1,
     required: false,
+    skill: "lockpick",
     failNote: "The crates went to Kane's people or the rats. Same difference.",
     crates: labels.map((label, i) => ({
       id: `c${i}`,
@@ -135,29 +171,35 @@ function visitorTask(rand: () => number, day: number): DayTask {
   const pack = [
     {
       title: "Slag-blood at the gate",
+      order: "She will not come in. Buy the map, feed her, or send her down the road.",
+      spoken: { who: "Slag-blood", line: "I don't cross your door. I crossed the ridge. The map is wet. I'm thirsty. Pick." },
       brief: "She will not come inside. She has a map fragment and a thirst.",
       choices: [
-        { id: "buy", label: "Buy the whispers", blurb: "80 caps. Ironclad intel.", need: "caps" as const, cost: 80 },
-        { id: "feed", label: "Feed her", blurb: "Moon favor. She remembers Vault 13." },
-        { id: "turn", label: "Turn her away", blurb: "The gate stays simple." },
+        { id: "buy", label: "Buy the whispers", blurb: "“Eighty caps. Talk, then go.” Intel on Ironclad.", need: "caps" as const, cost: 80 },
+        { id: "feed", label: "Feed her", blurb: "“Sit. Eat. Don't say our name on the road.” She will anyway." },
+        { id: "turn", label: "Turn her away", blurb: "“Gate's closed. Kane's road is that way.”" },
       ],
     },
     {
       title: "Slag Town runner",
+      order: "Move his slag, tax the run, or tell him the road is his.",
+      spoken: { who: "Runner", line: "Furnace slag. Kane's buyers price it at dusk. I need it gone before they name a number." },
       brief: "He wants furnace slag moved before Kane's buyers price it.",
       choices: [
-        { id: "move", label: "Move the slag", blurb: "Spend a watch of labor. Caps now." },
-        { id: "tax", label: "Tax the run", blurb: "Take a cut. He will not forget." },
-        { id: "turn", label: "Not our problem", blurb: "He takes the road alone." },
+        { id: "move", label: "Move the slag", blurb: "“Load it. I walk with you as far as the cut.” Caps now." },
+        { id: "tax", label: "Tax the run", blurb: "“Vault 13's road. You pay for the quiet.” He will not forget." },
+        { id: "turn", label: "Not our problem", blurb: "“Take the road alone. Don't use our name.”" },
       ],
     },
     {
       title: "Brasswater diver",
+      order: "A bunk, the page for caps, or a sealed door.",
+      spoken: { who: "Diver", line: "Page is from the drowned stacks. I want a dry floor for one night. You can buy the ink and keep the door shut." },
       brief: "She offers a wet page from the Drowned Archive. Wants a bunk for one night.",
       choices: [
-        { id: "bunk", label: "Give her a bunk", blurb: "Jump-table fragment. Heat stays cold." },
-        { id: "buy", label: "Buy the page only", blurb: "120 caps. No guests.", need: "caps" as const, cost: 120 },
-        { id: "turn", label: "Keep the vault sealed", blurb: "Kane's divers will find her first." },
+        { id: "bunk", label: "Give her a bunk", blurb: "“One night. You leave at dawn with less paper.”" },
+        { id: "buy", label: "Buy the page only", blurb: "“One twenty. You sleep in the wet.”", need: "caps" as const, cost: 120 },
+        { id: "turn", label: "Keep the vault sealed", blurb: "“No guests. Kane's divers are already looking.”" },
       ],
     },
   ];
@@ -169,10 +211,13 @@ function visitorTask(rand: () => number, day: number): DayTask {
     id: uid("job"),
     kind: "visitor",
     title: v.title,
+    order: v.order,
+    spoken: v.spoken,
     brief: v.brief,
     why: "People at the gate are the Realm talking.",
     watchCost: 1,
     required: false,
+    skill: "speech",
     failNote: "They walked. The Realm talked to someone else.",
     choices: v.choices,
     status: "open",
@@ -188,11 +233,14 @@ function tributeTask(state: GameState): DayTask {
     id: uid("job"),
     kind: "tribute",
     title: `Kane wants ${stake.resource.toLowerCase()}`,
+    order: `Hand over the ${stake.resource.toLowerCase()}, refuse, or pack a fake. Sneak or Explosives sells the fake. A Rogue does too.`,
+    spoken: { who: "Kane's buyer", line: `${stake.why} I'm not here to negotiate the noun. I'm here for the weight.` },
     brief: `${stake.why} A buyer is waiting at ${loc.short}.`,
     why: "Paying her buys time. Refusing buys a hunt.",
     watchCost: 1,
     required: state.kaneHeat >= 8,
     loc: loc.id,
+    skill: "barter",
     failNote: `Kane took the ${stake.resource.toLowerCase()} anyway. Heat up.`,
     choices: [
       { id: "pay", label: `Hand over ${stake.resource.toLowerCase()}`, blurb: "1 Hollow Ore. She pays. Heat drops.", need: "ore", cost: 1 },
@@ -259,10 +307,13 @@ function openingBoard(state: GameState): ShiftState {
       id: uid("job"),
       kind: "scan",
       title: "Leave the porch light",
+      order: "Walk the ridge once. If the white visor is up, do not wave.",
+      spoken: { who: "Tyrone", line: "The light means the shelter is still mine. A dark porch is also a choice. Don't make it by accident." },
       brief: "One walk of the ridge after the highway. The light means the shelter is still his. If the white visor is already up, do not wave.",
       why: "Lyra paints outlines. A dark porch is a choice. A lit porch is also a choice.",
       watchCost: 1,
       required: false,
+      skill: "sneak",
       failNote: "The ridge went unwalked. She painted whatever the lamps gave her.",
       status: "open",
     },
@@ -271,7 +322,7 @@ function openingBoard(state: GameState): ShiftState {
     day: state.day,
     watch: "dawn",
     watchesLeft: SHIFT_WATCHES,
-    board,
+    board: withCog(state, board),
     log: [boardPostedLine(state, board)],
     activeId: null,
   };
@@ -292,10 +343,13 @@ export function generateBoard(state: GameState): ShiftState {
       id: uid("job"),
       kind: "treat",
       title: wounded.some((o) => o.status === "downed") ? "Med pass — someone is down" : "Med pass",
+      order: "Pick who gets the needle. Downed riders do not see another dawn without it.",
+      spoken: { who: "Tyrone", line: "Blood first. Pride second. I will not watch you sort this with a speech." },
       brief: `${wounded.map((o) => o.name).join(", ")} need a bunk and a needle. You pick who. Kane does not wait on the wounded.`,
       why: "Dawn will finish anyone still downed without a Med Bay.",
       watchCost: 1,
       required: wounded.some((o) => o.status === "downed"),
+      skill: "medicine",
       failNote: "The wounded were left to the night.",
       status: "open",
     });
@@ -311,10 +365,13 @@ export function generateBoard(state: GameState): ShiftState {
       id: uid("job"),
       kind: "repair",
       title: "Machine Shop hour",
+      order: "Pick a broken piece, or oil the line if nothing is proud. Repair 55 jumps the condition twice.",
+      spoken: { who: "Travis", line: "Put it on the bench. Don't narrate the weld." },
       brief: "Oil, weld, swear. The BB gun still kicks if the receiver is proud. Pick a piece of kit or spend the watch on the line.",
       why: "Broken steel is a choice you already made.",
       watchCost: 1,
       required: broken,
+      skill: "repair",
       failNote: "A broken piece stays broken. Next sortie will notice.",
       status: "open",
     });
@@ -324,10 +381,13 @@ export function generateBoard(state: GameState): ShiftState {
     id: uid("job"),
     kind: "scan",
     title: "Walk the perimeter",
+    order: "Count visors on the West Berm. Do not wave. Sneak 40 marks one extra site.",
+    spoken: { who: "Tyrone", line: "Look twice. The Hollow hides the important thing under the loud thing." },
     brief: "Cameras, such as they are. Count visors on the West Berm. Lyra paints ridges. If a white light is out there, the rest of the wing already has a map.",
     why: "Intel is how Ghost routes open. Kane's outline of us is the other number.",
     watchCost: 1,
     required: false,
+    skill: "sneak",
     failNote: "The perimeter walked itself. Kane's outline of us is sharper.",
     status: "open",
   });
@@ -345,10 +405,13 @@ export function generateBoard(state: GameState): ShiftState {
       id: uid("job"),
       kind: "run",
       title: "Supply run",
+      order: "Send one idle operative down the slag road. Survival 40 means they come back unhurt.",
+      spoken: { who: "Tyrone", line: "Caps on the card. Feet on the ground. Pick who walks. Class still decides the haul." },
       brief: "Send one operative down the slag road. They walk. You get the report. Kane's buyers use the same road after dusk.",
       why: "The roster is the mechanic. Class decides the haul.",
       watchCost: 1,
       required: false,
+      skill: "survival",
       failNote: "Nobody walked. The pantry stayed thin.",
       status: "open",
     });
@@ -358,12 +421,15 @@ export function generateBoard(state: GameState): ShiftState {
     id: uid("job"),
     kind: "market",
     title: "Walk the Moon Squad Market",
+    order: "Go to the Iron Gate. Buy with the black card. Barter 45 shaves the price.",
+    spoken: { who: "Holt Kade", line: "Dawn stock. Qty is not a suggestion. I don't take the vault drawer." },
     brief: "Stalls under the Iron Gate. Kane's surveyors already bought a table at the gatehouse. Limited stock. Dawn reset. The black card pays.",
     why: "Gear lives on the ground now, not in a ledger drawer.",
     watchCost: 1,
     required: state.day % 2 === 1,
     loc: "ironclad",
     poiId: "ironclad-market",
+    skill: "barter",
     failNote: "The stalls packed up without Moon Squad. Dawn will reprint thinner.",
     status: "open",
   });
@@ -372,12 +438,15 @@ export function generateBoard(state: GameState): ShiftState {
     id: uid("job"),
     kind: "tower",
     title: "Climb Relay Tower Three",
+    order: "Climb. Listen. Science is what you bring back that wasn't on the board.",
+    spoken: { who: "Tyrone", line: "The tower talks whether we are on it or not. I'd rather it talk to us." },
     brief: "ICR 88's iron spine. Kane frequencies, visiting stalls, sites the board has not named yet. Lyra listens here whether we climb or not.",
     why: "A day Kane talks and we do not is a day we donate the map.",
     watchCost: 1,
     required: state.day >= 2 && state.day % 2 === 0,
     loc: "ironclad",
     poiId: "ironclad-tower",
+    skill: "science",
     failNote: "The tower talked to empty air. Lyra kept the transcript.",
     status: "open",
   });
@@ -403,7 +472,7 @@ export function generateBoard(state: GameState): ShiftState {
     day: state.day,
     watch: "dawn",
     watchesLeft: SHIFT_WATCHES,
-    board,
+    board: withCog(state, board),
     log: [boardPostedLine(state, board)],
     activeId: null,
   };
@@ -471,6 +540,7 @@ export function ensureShift(state: GameState): ShiftState {
       status: "open",
     });
   }
+  state.shift.board = withCog(state, state.shift.board);
   return state.shift;
 }
 
@@ -520,6 +590,21 @@ function finish(state: GameState, task: DayTask, report: string, watches = task.
     const still = openJobs(state).length;
     if (!still) state.tutorial = "rest";
   }
+}
+
+export function completeCog(state: GameState, report: string) {
+  const shift = state.shift;
+  if (!shift) return;
+  const task = shift.board.find((t) => t.kind === "cog" && (t.status === "open" || t.status === "active"));
+  if (!task) return;
+  if (shift.watchesLeft < task.watchCost) {
+    task.status = "done";
+    task.report = report;
+    shift.activeId = null;
+    state.toast = report;
+    return;
+  }
+  finish(state, task, report);
 }
 
 export function finishCabinetJob(state: GameState, report: string) {
@@ -592,11 +677,18 @@ export function resolveTask(state: GameState, taskId: string, payload: TaskPaylo
     } else if (crate.result === "trap") {
       state.kaneHeat = Math.min(40, (state.kaneHeat ?? 0) + 2);
       const idle = state.operatives.find((o) => o.status === "idle");
+      const soft = skillValue(state, "explosives") >= 50;
       if (idle) {
         const i = state.operatives.findIndex((o) => o.id === idle.id);
-        state.operatives[i] = { ...idle, hp: Math.max(1, idle.hp - 3) };
+        state.operatives[i] = { ...idle, hp: Math.max(1, idle.hp - (soft ? 1 : 3)) };
       }
-      finish(state, task, `Trap. ${crate.payload}. Kane just got a ping.`);
+      finish(
+        state,
+        task,
+        soft
+          ? `Trap. ${crate.payload}. Explosives ${skillValue(state, "explosives")} — you stepped off. Kane still got a ping.`
+          : `Trap. ${crate.payload}. Kane just got a ping.`,
+      );
     } else {
       finish(state, task, `Junk. ${crate.payload}. The watch is still spent.`);
     }
@@ -608,11 +700,13 @@ export function resolveTask(state: GameState, taskId: string, payload: TaskPaylo
     if (!op) return "Pick who gets the needle.";
     const i = state.operatives.findIndex((o) => o.id === op.id);
     if (op.status === "downed") {
-      state.operatives[i] = { ...op, hp: Math.max(2, Math.floor(op.maxHp / 3)), status: "idle", location: "hq" };
-      finish(state, task, `${op.name} is standing. Ugly, but standing.`);
+      const heal = Math.max(2, medicineHeal(skillValue(state, "medicine")));
+      state.operatives[i] = { ...op, hp: Math.max(2, Math.min(op.maxHp, heal)), status: "idle", location: "hq" };
+      finish(state, task, `${op.name} is standing. Medicine put ${heal} back. Ugly, but standing.`);
     } else {
-      state.operatives[i] = { ...op, hp: Math.min(op.maxHp, op.hp + 6) };
-      finish(state, task, `${op.name} took the med pass. +6 HP.`);
+      const heal = medicineHeal(skillValue(state, "medicine"));
+      state.operatives[i] = { ...op, hp: Math.min(op.maxHp, op.hp + heal) };
+      finish(state, task, `${op.name} took the med pass. Medicine ${skillValue(state, "medicine")}. +${heal} HP.`);
     }
     return null;
   }
@@ -634,9 +728,19 @@ export function resolveTask(state: GameState, taskId: string, payload: TaskPaylo
     if (found) {
       const op = state.operatives[found.oi]!;
       const it = op.inventory[found.ii]!;
-      const next = it.condition === "Broken" ? "Damaged" : it.condition === "Damaged" ? "Worn" : "Pristine";
+      const steps = repairSteps(skillValue(state, "repair"));
+      let next = it.condition;
+      for (let s = 0; s < steps; s++) {
+        next = next === "Broken" ? "Damaged" : next === "Damaged" ? "Worn" : "Pristine";
+      }
       it.condition = next;
-      finish(state, task, `${it.name} is ${next}. The line holds.`);
+      finish(
+        state,
+        task,
+        steps > 1
+          ? `${it.name} is ${next}. Repair ${skillValue(state, "repair")} jumped it twice.`
+          : `${it.name} is ${next}. The line holds.`,
+      );
     } else {
       state.coins += 25;
       finish(state, task, "Nothing broken. You oiled the line. +25 caps in saved parts.");
@@ -647,14 +751,15 @@ export function resolveTask(state: GameState, taskId: string, payload: TaskPaylo
   if (task.kind === "scan") {
     const loc = (payload.loc ?? unlockedField(state)[0]?.id ?? "ironclad") as LocationId;
     if (!state.locations[loc]?.unlocked) return "That region is sealed.";
-    state.locations[loc] = { ...state.locations[loc], intel: state.locations[loc].intel + 2 };
+    const bonus = skillValue(state, "sneak") >= 40 ? 1 : 0;
+    state.locations[loc] = { ...state.locations[loc], intel: state.locations[loc].intel + 2 + bonus };
     const found = discoverNextPoi(state, loc);
     finish(
       state,
       task,
       found
-        ? `Perimeter marked ${found.name} in ${locById(loc).short}. Ghost routes open when intel is on the board.`
-        : `${locById(loc).short} scanned. Intel +2. Kane's people were already walking it.`,
+        ? `Perimeter marked ${found.name} in ${locById(loc).short}.${bonus ? ` Sneak ${skillValue(state, "sneak")} saw one more.` : ""} Ghost routes open when intel is on the board.`
+        : `${locById(loc).short} scanned. Intel +${2 + bonus}. Kane's people were already walking it.`,
     );
     return null;
   }
@@ -680,7 +785,7 @@ export function resolveTask(state: GameState, taskId: string, payload: TaskPaylo
       report = `${op.name} comes back with ore that should not have been on that road.`;
     } else {
       state.coins += 90;
-      const hurt = op.hp > 4 && Math.random() < 0.35;
+      const hurt = op.hp > 4 && Math.random() < 0.35 && skillValue(state, "survival") < 40;
       if (hurt) {
         state.operatives[i] = { ...state.operatives[i]!, hp: op.hp - 2, status: "deployed", location: "ironclad" };
         report = `${op.name} hauls scrap. +90 caps. They will feel it.`;
@@ -702,7 +807,9 @@ export function resolveTask(state: GameState, taskId: string, payload: TaskPaylo
   if (task.kind === "visitor") {
     if (choice.id === "buy") {
       state.locations.ironclad.intel += 2;
-      finish(state, task, "Whispers bought. Ironclad intel +2.");
+      const haggle = skillValue(state, "barter") >= 45;
+      if (haggle) state.coins += 20;
+      finish(state, task, haggle ? "Whispers bought. Barter talked twenty caps back. Ironclad intel +2." : "Whispers bought. Ironclad intel +2.");
     } else if (choice.id === "feed" || choice.id === "bunk") {
       state.moonFavor += 2;
       state.locations.ironclad.intel += 1;
@@ -712,31 +819,41 @@ export function resolveTask(state: GameState, taskId: string, payload: TaskPaylo
       finish(state, task, "Slag moved. +110 caps. Kane's buyer is late.");
     } else if (choice.id === "tax") {
       state.coins += 50;
-      state.kaneHeat = Math.min(40, (state.kaneHeat ?? 0) + 1);
-      finish(state, task, "You took a cut. He will mention it.");
+      const smooth = skillValue(state, "speech") >= 50;
+      if (!smooth) state.kaneHeat = Math.min(40, (state.kaneHeat ?? 0) + 1);
+      finish(state, task, smooth ? "You taxed him and he thanked you. Speech. Kane did not hear it." : "You took a cut. He will mention it.");
     } else {
-      finish(state, task, "Gate stays simple. The Realm does not.");
+      const talked = skillValue(state, "speech") >= 40;
+      if (talked) state.coins += 30;
+      finish(state, task, talked ? "You turned them out. They still talked on the road. Speech. +30 caps." : "Gate stays simple. The Realm does not.");
     }
     return null;
   }
 
   if (task.kind === "aegis") {
-    const tower = state.rooms.watchtower >= 1;
-    const talker = state.operatives.find((o) => o.status === "idle" && (o.cls === "Bard" || o.cls === "Merchant"));
+    const tower = state.rooms.watchtower >= 1 || skillValue(state, "sneak") >= 50;
+    const talker =
+      state.operatives.find((o) => o.status === "idle" && (o.cls === "Bard" || o.cls === "Merchant")) ||
+      skillValue(state, "speech") >= 45;
     const person = CAST[(task.npcId as keyof typeof CAST) ?? "lyra"] ?? CAST.lyra;
     meetCast(state, person.id);
     if (choice.id === "hide") {
-      if (tower) {
+      if (tower && state.rooms.watchtower >= 1) {
         state.kaneHeat = Math.max(0, (state.kaneHeat ?? 0) - 1);
         finish(state, task, `Perimeter Control buried me. ${person.name} logged an empty ridge.`);
+      } else if (tower) {
+        state.kaneHeat = Math.max(0, (state.kaneHeat ?? 0) - 1);
+        finish(state, task, `Sneak ${skillValue(state, "sneak")}. ${person.name} painted an empty ridge. No cameras. Just you, gone.`);
       } else {
         state.kaneHeat = Math.min(40, (state.kaneHeat ?? 0) + 2);
         finish(state, task, `No cameras. ${person.name} walked a bunk. Heat up. I stayed in the walls.`);
       }
       applyAegisChoice(state, "hide", person.id);
     } else if (choice.id === "lie") {
-      if (talker) {
+      if (talker && typeof talker !== "boolean") {
         finish(state, task, `${talker.name} sold ${person.name} the salvage-outfit line. They bought it. For now.`);
+      } else if (talker) {
+        finish(state, task, `Speech ${skillValue(state, "speech")}. ${person.name} bought the salvage-outfit line. For now.`);
       } else {
         state.kaneHeat = Math.min(40, (state.kaneHeat ?? 0) + 3);
         finish(state, task, `Nobody here talks like a foundry. ${person.name} logged a question mark.`);
@@ -764,10 +881,17 @@ export function resolveTask(state: GameState, taskId: string, payload: TaskPaylo
       finish(state, task, "Vault 13 does not tithe. The buyer left a mark.");
     } else {
       const rogue = state.operatives.some((o) => o.status === "idle" && o.cls === "Rogue");
-      if (rogue) {
+      const packed = rogue || skillValue(state, "sneak") >= 45 || skillValue(state, "explosives") >= 50;
+      if (packed) {
         state.coins += 70;
         state.kaneHeat = Math.min(40, (state.kaneHeat ?? 0) + 1);
-        finish(state, task, "The shipment looked right. It was sand. A Rogue made it so.");
+        finish(
+          state,
+          task,
+          rogue
+            ? "The shipment looked right. It was sand. A Rogue made it so."
+            : `The shipment looked right. It was sand. ${skillValue(state, "sneak") >= 45 ? "Sneak" : "Explosives"} packed it.`,
+        );
       } else {
         state.ore = Math.max(0, state.ore - 1);
         state.kaneHeat = Math.min(40, (state.kaneHeat ?? 0) + 5);

@@ -7,6 +7,7 @@ import { locationToRegion } from "@/game/field-ops";
 import { punchClick } from "@/game/juice";
 import { availableScenarios } from "@/game/scenario";
 import { storyScene } from "@/game/story";
+import { skillLine, taskSkillId } from "@/game/skills";
 import { WATCH_LABEL, WATCH_ORDER } from "@/game/shift";
 import { useGame } from "@/game/store";
 import type { DayTask, WatchId } from "@/game/types";
@@ -29,6 +30,24 @@ function jobThumb(task: DayTask): string {
     if (region) return regionThumb(region);
   }
   return BOARD_JOB_ART[task.kind];
+}
+
+function JobFacts({ task }: { task: DayTask }) {
+  const s = useGame((g) => g.s);
+  const skill = taskSkillId(task);
+  return (
+    <>
+      {task.order ? <span className="mt-2 block text-secondary leading-relaxed text-paper">{task.order}</span> : null}
+      {task.spoken ? (
+        <span className="mt-1 block text-secondary leading-relaxed text-moon">
+          {task.spoken.who}: “{task.spoken.line}”
+        </span>
+      ) : (
+        <span className="mt-2 block text-secondary leading-relaxed text-moon">{task.brief}</span>
+      )}
+      {skill ? <span className="mt-2 block font-mono text-[11px] leading-relaxed text-ember">{skillLine(s, skill)}</span> : null}
+    </>
+  );
 }
 
 function WatchRibbon({ current, left }: { current: WatchId; left: number }) {
@@ -109,7 +128,7 @@ function LeadTicket({ task, left, onTake }: { task: DayTask; left: number; onTak
           {task.required ? " · required" : ""}
         </span>
         <span className="mt-1 block font-display text-xl text-paper">{task.title}</span>
-        <span className="mt-2 block text-secondary leading-relaxed text-moon">{task.brief}</span>
+        <JobFacts task={task} />
         <span className="mt-2 block font-mono text-label uppercase tracking-[0.14em] text-muted">
           {boardWatchLabel(task.watchCost)} · {place}
         </span>
@@ -162,7 +181,7 @@ function Ticket({ task, left, onTake }: { task: DayTask; left: number; onTake: (
           </span>
         </span>
         <span className="mt-0.5 block font-display text-body text-paper">{task.title}</span>
-        <span className="mt-1 block text-secondary leading-relaxed text-moon">{task.brief}</span>
+        <JobFacts task={task} />
         <span className="mt-1 block font-mono text-label text-muted">
           {boardWatchLabel(task.watchCost)}
           {place ? ` · ${place}` : ""}
@@ -193,6 +212,7 @@ export function DayBoard() {
   const closed = board.filter((task) => task.status === "done" || task.status === "failed");
   const dark = unansweredWatches(board, left);
   const take = (id: string) => err(openTask(id));
+  const openSkills = useGame((g) => g.openSkills);
   const situation = availableScenarios(s)[0] ?? null;
   const opening =
     s.day <= 3 && !s.narrative?.flags?.highway_walked
@@ -232,6 +252,25 @@ export function DayBoard() {
         <div className="mt-3">
           <WatchRibbon current={watch} left={left} />
         </div>
+
+        {s.operatives.length > 0 && !s.skillSheet ? (
+          <p className="mt-3 border-l-2 border-ember pl-3 text-secondary leading-relaxed text-paper">
+            Travis is in Bay 13. The cognitive is required. Until he stamps you, jobs will not bend.
+          </p>
+        ) : null}
+        {s.skillSheet && s.skillSheet.points > 0 ? (
+          <button
+            type="button"
+            className="mt-3 flex min-h-11 w-full items-center justify-between rounded-[var(--radius-sm)] bg-ember/10 px-3 text-left"
+            onClick={() => {
+              sfx.click();
+              openSkills();
+            }}
+          >
+            <span className="text-secondary text-paper">{s.skillSheet.points} skill points on the bench.</span>
+            <span className="font-display text-label uppercase tracking-[0.14em] text-ember">Spend</span>
+          </button>
+        ) : null}
 
         {opening ? (
           <div className="mt-4 rounded-[var(--radius-sm)] border border-ember/40 bg-ink/50 px-3 py-3">

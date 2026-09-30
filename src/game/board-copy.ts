@@ -15,6 +15,7 @@ export const BOARD_KIND_LABEL: Record<DayTaskKind, string> = {
   market: "Market",
   tower: "Relay",
   salvage: "Site",
+  cog: "Bay 13",
 };
 
 export function boardStake(task: DayTask): string {

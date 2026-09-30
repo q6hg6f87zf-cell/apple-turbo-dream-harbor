@@ -4,6 +4,7 @@ import { chromeKind, isTaskScreen } from "@/game/shell";
 import { useGame } from "@/game/store";
 import { cn } from "@/lib/cn";
 import { useEffect, useLayoutEffect, useState } from "react";
+import { SkillDesk } from "./skill-desk";
 import {
   CombatOverlay,
   MissionOverlay,
@@ -268,6 +269,7 @@ export function GameApp() {
       <OperativeSheet />
       <RestConfirm />
       <ShiftSheet />
+      <SkillDesk />
       <ToastHost />
       <TerminalOverlay />
       <TalkOverlay />

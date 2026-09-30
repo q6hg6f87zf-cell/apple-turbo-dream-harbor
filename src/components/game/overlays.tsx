@@ -12,6 +12,7 @@ import { cn } from "@/lib/cn";
 import { CommandBar, EncounterBackdrop, EventChips, EventLog } from "./encounter-scene";
 import { shiftRadio, dawnLines } from "@/game/event-theater";
 import { BOARD_KIND_LABEL, boardStake } from "@/game/board-copy";
+import { beatSkill, crateRead, fightSkill, skillBonus, skillLine, skillValue, SKILLS, taskSkillId } from "@/game/skills";
 import { CAST, AEGIS_FIELD_STILL, castById } from "@/game/cast";
 import { storyScene } from "@/game/story";
 import { poiById } from "@/game/field-ops";
@@ -462,6 +463,9 @@ export function MissionOverlay() {
                     </span>
                     <span className="shrink-0 text-right">
                       <span className="block font-display text-label uppercase tracking-[0.14em] text-ember">{t.stat}</span>
+                      <span className="mt-0.5 block font-display text-label uppercase tracking-[0.12em] text-moon">
+                        {SKILLS[beatSkill(t.stat, beat.kind)].name}
+                      </span>
                       <span className="mt-0.5 block tabular-nums text-label text-muted">DC {beat.dc + t.dcMod}</span>
                     </span>
                   </button>
@@ -480,7 +484,9 @@ export function MissionOverlay() {
                 <>
                   {beat ? (
                     <p className="mb-2 text-center font-display text-label uppercase tracking-[0.16em] text-moon">
-                      {beat.stat} vs DC {beat.dc}
+                      {beat.stat} · {SKILLS[beatSkill(beat.stat, beat.kind)].name}{" "}
+                      {s.skillSheet ? `${skillValue(s, beatSkill(beat.stat, beat.kind))} ${skillBonus(s, beatSkill(beat.stat, beat.kind)) >= 0 ? "+" : ""}${skillBonus(s, beatSkill(beat.stat, beat.kind))}` : "unstamped"}{" "}
+                      vs DC {beat.dc}
                     </p>
                   ) : null}
                   <Button className="w-full" variant="ember" onClick={onRoll} disabled={spin} sound="none" autoFocus>
@@ -696,7 +702,9 @@ export function CombatOverlay() {
   const dry = !!chamber?.dry;
   const stance = combat.stance ?? "hold";
   const aim = chamber ? stanceAim(stance, chamber.family, chamber.rangeBand) : 0;
-  const shownDc = enemy ? Math.max(6, enemy.dc - aim) : 0;
+  const trained =
+    chamber && s.skillSheet && actor?.id === s.operatives[0]?.id ? skillBonus(s, fightSkill(chamber.family)) : 0;
+  const shownDc = enemy ? Math.max(6, enemy.dc - aim - trained) : 0;
   const actions: { id: FightAct; label: string; icon: typeof Swords; variant: "ember" | "ghost" | "quiet" | "danger"; disabled?: boolean }[] = actor
     ? [
         { id: "strike", label: "Strike", icon: Swords, variant: "ember" },
@@ -751,6 +759,7 @@ export function CombatOverlay() {
               </span>
               <span className="truncate">
                 DC {shownDc}
+                {trained && chamber ? ` · ${SKILLS[fightSkill(chamber.family)].name} +${trained}` : ""}
                 {enemy?.armorClass ? ` · ${enemy.armorClass}` : ""}
                 {enemy?.preferredRange ? ` · ${enemy.preferredRange}` : ""}
               </span>
@@ -1238,7 +1247,7 @@ export function ShiftSheet() {
   const task = s.shift?.board.find((t) => t.id === s.shift.activeId);
   const idle = s.operatives.filter((o) => o.status === "idle" && o.hp > 0);
   const wounded = s.operatives.filter((o) => o.status === "downed" || (o.hp < o.maxHp && o.status !== "dead"));
-  if (!task || task.kind === "sortie" || task.kind === "cabinet") return null;
+  if (!task || task.kind === "sortie" || task.kind === "cabinet" || task.kind === "cog") return null;
   if (task.kind === "market" || task.kind === "tower" || task.kind === "salvage") return null;
   if (s.combat || s.mission) return null;
 
@@ -1296,9 +1305,9 @@ export function ShiftSheet() {
         </div>
         <EventLog
           lines={[
-            shiftRadio(task.kind),
-            `SYNAPSE · ${task.brief}`,
-            `Hollow · ${task.why}`,
+            task.spoken ? `${task.spoken.who} · ${task.spoken.line}` : shiftRadio(task.kind),
+            task.order ? `Do this · ${task.order}` : `SYNAPSE · ${task.brief}`,
+            taskSkillId(task) ? skillLine(s, taskSkillId(task)!) : `Hollow · ${task.why}`,
             `If you skip · ${boardStake(task)}`,
           ]}
         />
@@ -1306,6 +1315,11 @@ export function ShiftSheet() {
 
         {task.kind === "crates" && task.crates ? (
           <div className="mt-5 space-y-2">
+            {crateRead(s, task.crates) ? (
+              <p className="border-l-2 border-ember pl-3 text-secondary leading-relaxed text-paper">{crateRead(s, task.crates)}</p>
+            ) : (
+              <p className="text-secondary text-muted">Lockpick 45 names the ticking crate. 65 names the gift too.</p>
+            )}
             {task.crates.map((c) => (
               <button
                 key={c.id}

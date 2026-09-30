@@ -20,6 +20,7 @@ import type {
   Stats,
   StatKey,
   FightStance,
+  RiderLook,
 } from "./types";
 import {
   BASE_ROOMS,
@@ -63,6 +64,7 @@ import { emptyMarket } from "./market";
 import { emptyShift } from "./shift";
 import { emptyTyrone } from "./tyrone-mind";
 import { emptyTravis, isTravisPart, maybeTravisPart, travisIncomeBonus, travisRepairFactor } from "./travis";
+import { rankPoints, beatSkill, skillBonus, fightSkill } from "./skills";
 import { scoreFromDice, STAT_ORDER } from "./stats-copy";
 import { freshClocks, grantPackLoot, starterPack } from "./inventory";
 import { queueTalk } from "./talk";
@@ -264,8 +266,12 @@ export function grantXp(state: GameState, n: number): void {
     state.xp -= state.xpToNext;
     state.level += 1;
     state.xpToNext = Math.round(state.xpToNext * 1.35);
-    state.toast = `SYNAPSE rank ${state.level}. Tyrone nods.`;
-    pushLog(state, "hq", "Tyrone", `Rank ${state.level}. The CRT holds a little longer.`);
+    const intel = state.operatives[0] ? computeStats(state.operatives[0]).INT : 10;
+    const pts = rankPoints(intel);
+    if (state.skillSheet) state.skillSheet.points += pts;
+    else state.skillBank = (state.skillBank ?? 0) + pts;
+    state.toast = `Rank ${state.level}. ${pts} skill points. The sheet is on the bench.`;
+    pushLog(state, "hq", "Tyrone", `Rank ${state.level}. ${pts} points on the bench.`);
   }
 }
 
@@ -358,6 +364,8 @@ export function defaultState(): GameState {
     tyrone: emptyTyrone(),
     travis: emptyTravis(),
     narrative: emptyNarrative(),
+    skillBank: 0,
+    skillOpen: false,
   };
 }
 
@@ -395,6 +403,7 @@ export function forgeOperative(opts: {
   day: number;
   rolls?: Partial<Record<"rep" | "trait" | "skill" | "shadow" | "enchant" | "destiny" | StatKey, number>>;
   portraitId?: string;
+  look?: RiderLook;
 }): Operative {
   const rolls = {
     rep: opts.rolls?.rep ?? d20(),
@@ -468,6 +477,7 @@ export function forgeOperative(opts: {
     notes: "",
     joinedDay: opts.day,
     portraitId: opts.portraitId,
+    look: opts.look,
     statDice,
   };
 }
@@ -661,7 +671,9 @@ export function applyRollToBeat(
     beat.stat === "STR" || beat.stat === "SPD" ? conditionPenalty(weapon?.condition ?? "Pristine") : 0;
   const hollow = locById(m.locationId).hollow && lead.enchantName.includes("Hollow") ? 1 : 0;
   const chem = state.mentatsLuck > 0 && (beat.kind === "loot" || beat.stat === "LCK") ? 3 : 0;
-  const total = raw + Math.floor((stats[beat.stat] - 5) / 2) + assist + bunk + weapMod + hollow + chem;
+  const sk = state.skillSheet ? beatSkill(beat.stat, beat.kind) : null;
+  const skBonus = sk ? skillBonus(state, sk) : 0;
+  const total = raw + Math.floor((stats[beat.stat] - 5) / 2) + assist + bunk + weapMod + hollow + chem + skBonus;
   const b = band(raw);
   const hit = total >= beat.dc || b === "crit";
   const strong = b === "strong" || b === "crit";
@@ -800,7 +812,7 @@ export function applyRollToBeat(
     band: b,
     total,
     dc: beat.dc,
-    text: `${BAND_LABEL[b]} · ${raw} → ${total} vs DC ${beat.dc}`,
+    text: `${BAND_LABEL[b]} · ${raw} → ${total} vs DC ${beat.dc}${sk && skBonus ? ` · ${sk} ${skBonus > 0 ? "+" : ""}${skBonus}` : ""}`,
   };
   m.narrative = [...m.narrative, ...notes];
   if (m.beatIndex >= m.beats.length - 1) {
@@ -1311,9 +1323,13 @@ export function resolvePlayerAction(
   // the squad makes in the Vault, and it is paid for here.
   const profile = resolveWeapon(weapon);
   const aim = action === "strike" ? stanceAim(combat.stance ?? "hold", profile.family, profile.rangeBand) : 0;
+  const trained =
+    action === "strike" && state.skillSheet && actor.id === state.operatives[0]?.id
+      ? skillBonus(state, fightSkill(profile.family))
+      : 0;
   const reach = action === "strike" ? rangeHitMod(profile.rangeBand, target.preferredRange, profile.family) : 0;
   const swing = total + reach + shotAcc;
-  const dc = Math.max(6, target.dc - aim);
+  const dc = Math.max(6, target.dc - aim - trained);
   const hit = swing >= dc || b === "crit";
   if (action === "guard") {
     log.push(`${actor.name} sets a guard.`);
@@ -1329,8 +1345,9 @@ export function resolvePlayerAction(
     target.hp = Math.max(0, target.hp - dmg);
     combat.threat = { ...(combat.threat ?? {}), [actor.id]: (combat.threat?.[actor.id] ?? 0) + dmg };
     const matchup = dmg > plain * surge ? " Weak point." : dmg < plain * surge ? " Armor eats it." : "";
+    const trainedNote = trained ? ` ${fightSkill(profile.family)} +${trained}.` : "";
     log.push(
-      `${actor.name} strikes ${target.name} for ${dmg}. ${BAND_LABEL[b]} (${roll}→${swing} vs ${dc}).${matchup}`,
+      `${actor.name} strikes ${target.name} for ${dmg}. ${BAND_LABEL[b]} (${roll}→${swing} vs ${dc}).${matchup}${trainedNote}`,
     );
     if (target.isBoss && combat.bossId) {
       const v = villainById(combat.bossId);

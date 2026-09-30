@@ -2448,7 +2448,8 @@ body[data-region-map="1"] .ms-help,
   .fixed[data-mission],
   .fixed[data-spoils],
   .fixed[data-region-sheet],
-  .fixed[data-shift-event] {
+  .fixed[data-shift-event],
+  .fixed[data-cog] {
     left: 50%;
     right: auto;
     width: min(36rem, calc(100vw - 3rem));

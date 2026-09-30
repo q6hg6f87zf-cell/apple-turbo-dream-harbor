@@ -79,6 +79,8 @@ import { ForgeBody } from "./forge-body";
 import { MoonCard } from "./card";
 import { regionThumb, FACILITY_ART } from "@/game/art";
 import { RIDER_AVATARS, avatarsForGender, type RiderGender } from "@/game/avatars";
+import { EMPTY_LOOK, KITS, MARKS, RiderPlate, WASHES } from "./rider-plate";
+import type { RiderKit, RiderLook, RiderMark, RiderWash } from "@/game/types";
 import { CAST, AEGIS_LINE_STILL, AEGIS_WING, knownCast } from "@/game/cast";
 import { kaneFileBlurb, siteCopyFor, storyScene } from "@/game/story";
 import { CALIBER_ROSTER, ARC_OPEN, campaignOpenRegions } from "@/game/arsenal";
@@ -603,6 +605,42 @@ export function RosterView({ embedded = false }: { embedded?: boolean }) {
   );
 }
 
+function ForgeChips<T extends string>({
+  label,
+  options,
+  value,
+  onPick,
+}: {
+  label: string;
+  options: { id: T; label: string }[];
+  value: T;
+  onPick: (id: T) => void;
+}) {
+  return (
+    <div>
+      <p className="font-display text-[10px] uppercase tracking-wider text-ember">{label}</p>
+      <div className="mt-1 flex flex-wrap gap-1">
+        {options.map((opt) => (
+          <button
+            key={opt.id}
+            type="button"
+            onClick={() => {
+              sfx.click();
+              onPick(opt.id);
+            }}
+            className={cn(
+              "min-h-9 rounded-[var(--radius-xs)] px-2 font-display text-[10px] uppercase tracking-[0.08em]",
+              value === opt.id ? "bg-ember text-ink" : "bg-ink text-moon shadow-[var(--shadow-border)]",
+            )}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function ForgeView() {
   const s = useGame((g) => g.s);
   const forge = useGame((g) => g.forge);
@@ -616,6 +654,7 @@ export function ForgeView() {
   const lineages = Object.keys(RACES[race].lineage);
   const [lineage, setLineage] = useState(lineages[0]);
   const [portraitId, setPortraitId] = useState<string | null>(null);
+  const [look, setLook] = useState<RiderLook>(EMPTY_LOOK);
   const [genderFilter, setGenderFilter] = useState<RiderGender | null>(null);
   const [bodyI, setBodyI] = useState(0);
   const [rolls, setRolls] = useState<Record<string, number>>({});
@@ -707,6 +746,14 @@ export function ForgeView() {
     const pick = faces[Math.floor(Math.random() * faces.length)] ?? RIDER_AVATARS[0]!;
     setPortraitId(pick.id);
     if (!genderFilter) setGenderFilter(pick.gender);
+    const marks: RiderMark[] = ["none", "slag", "stitch", "burn", "soot", "brow"];
+    const kits: RiderKit[] = ["none", "goggles", "mask", "hood", "collar", "pin"];
+    const washes: RiderWash[] = ["plain", "ember", "slag", "tide", "brass", "ash"];
+    setLook({
+      mark: marks[Math.floor(Math.random() * marks.length)] ?? "none",
+      kit: kits[Math.floor(Math.random() * kits.length)] ?? "none",
+      wash: washes[Math.floor(Math.random() * washes.length)] ?? "plain",
+    });
     setStep(2);
     setBodyI(7);
     useGame.setState((st) => ({
@@ -773,8 +820,15 @@ export function ForgeView() {
           </div>
           <label className="mt-5 block font-display text-[10px] uppercase tracking-wider text-ember">Face</label>
           <p className="mt-1 text-xs text-muted">
-            Women or men first. Then a face. Generic kit. No glasses. No headphones. This locks with the file.
+            Pick a face, then cut it. Mark, kit, and wash stay yours. You can recut the plate from the file.
           </p>
+          {portraitId ? (
+            <RiderPlate
+              src={RIDER_AVATARS.find((r) => r.id === portraitId)?.src ?? RIDER_AVATARS[0]!.src}
+              look={look}
+              className="mx-auto mt-3 aspect-[2/3] w-36 rounded-[var(--radius-md)] shadow-[var(--shadow-border)]"
+            />
+          ) : null}
           <div className="mt-2 grid grid-cols-2 gap-2">
             {([
               ["female", "Women"],
@@ -827,6 +881,13 @@ export function ForgeView() {
           ) : (
             <p className="mt-3 text-sm italic text-moon">Pick women or men. The shop will not show faces until you do.</p>
           )}
+          {portraitId ? (
+            <div className="mt-4 space-y-3">
+              <ForgeChips label="Mark" options={MARKS} value={look.mark} onPick={(mark) => setLook({ ...look, mark })} />
+              <ForgeChips label="Kit" options={KITS} value={look.kit} onPick={(kit) => setLook({ ...look, kit })} />
+              <ForgeChips label="Wash" options={WASHES} value={look.wash} onPick={(wash) => setLook({ ...look, wash })} />
+            </div>
+          ) : null}
           <label className="mt-5 block font-display text-[10px] uppercase tracking-wider text-ember">Class</label>
           <div className="mt-2 grid grid-cols-2 gap-2">
             {CLASSES.map((c) => (
@@ -971,7 +1032,7 @@ export function ForgeView() {
               className="w-full"
               variant="ember"
               disabled={!canForge}
-              onClick={() => err(forge({ name: fileName, cls, race, lineage, origin, rolls, portraitId: portraitId ?? undefined }))}
+              onClick={() => err(forge({ name: fileName, cls, race, lineage, origin, rolls, portraitId: portraitId ?? undefined, look }))}
             >
               Stamp the file
             </Button>

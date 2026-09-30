@@ -158,6 +158,8 @@ export function loadSave(): GameState {
     merged.tyrone = restoreTyrone((parsed as GameState).tyrone);
     merged.travis = restoreTravis((parsed as GameState).travis);
     merged.narrative = restoreNarrative((parsed as GameState).narrative);
+    merged.skillOpen = false;
+    merged.skillBank = (parsed as GameState).skillBank ?? 0;
     seedPackIfNeeded(merged);
     ensureSquad(merged);
     bootstrapNarrative(merged);

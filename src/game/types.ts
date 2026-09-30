@@ -288,7 +288,8 @@ export type DayTaskKind =
   | "cabinet"
   | "market"
   | "tower"
-  | "salvage";
+  | "salvage"
+  | "cog";
 
 export interface TaskChoice {
   id: string;
@@ -322,6 +323,12 @@ export interface DayTask {
   status: "open" | "active" | "done" | "failed";
   report?: string;
   failNote?: string;
+  /** Imperative. The title is the name. This is what you do. */
+  order?: string;
+  /** Someone talking. The brief can stay a clerk note. */
+  spoken?: { who: string; line: string };
+  /** Which skill this job leans on. Missions name theirs on the die. */
+  skill?: SkillId;
 }
 
 export interface ShiftState {
@@ -449,6 +456,40 @@ export interface Stats {
   LCK: number;
 }
 
+/** Fallout-style skills. SPECIAL is the body. These are what the jobs ask. */
+export type SkillId =
+  | "guns"
+  | "energy"
+  | "melee"
+  | "explosives"
+  | "sneak"
+  | "lockpick"
+  | "science"
+  | "repair"
+  | "medicine"
+  | "speech"
+  | "barter"
+  | "survival";
+
+export interface SkillSheet {
+  values: Record<SkillId, number>;
+  /** Exactly three. +15 at the stamp. Jobs read the number, not the wish. */
+  tags: SkillId[];
+  /** What Travis recommended. Kept so the sheet can argue with you. */
+  travisTags: SkillId[];
+  points: number;
+}
+
+export type RiderMark = "none" | "slag" | "stitch" | "burn" | "soot" | "brow";
+export type RiderKit = "none" | "goggles" | "mask" | "hood" | "collar" | "pin";
+export type RiderWash = "plain" | "ember" | "slag" | "tide" | "brass" | "ash";
+
+export interface RiderLook {
+  mark: RiderMark;
+  kit: RiderKit;
+  wash: RiderWash;
+}
+
 export interface RollEntry {
   r: [number, number];
   title?: string;
@@ -519,6 +560,8 @@ export interface Operative {
   joinedDay: number;
   /** Rider face chosen at the Machine Shop. Missing on old saves — Portrait falls back to class. */
   portraitId?: string;
+  /** Cut on top of the face. Missing means a bare plate. */
+  look?: RiderLook;
   /** d20s stamped at the forge. Missing on old saves — computeStats uses class floor. */
   statDice?: Stats;
 }
@@ -909,4 +952,10 @@ export interface GameState {
   narrative?: NarrativeState;
   /** A fight that ended with nobody left to debrief. One card, then it is gone. */
   spoils?: CombatSpoils;
+  /** Stamped in Bay 13. Missing until Travis's cognitive is sat. */
+  skillSheet?: SkillSheet;
+  /** Points earned before the sheet existed. Folded in when he stamps you. */
+  skillBank?: number;
+  /** The sheet is up. Not a screen — a bench you can close. */
+  skillOpen?: boolean;
 }

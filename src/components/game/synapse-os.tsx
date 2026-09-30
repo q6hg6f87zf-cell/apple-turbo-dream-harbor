@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { CLASS_PORTRAIT, OS_PHOSPHOR } from "@/game/art";
-import { avatarSrc } from "@/game/avatars";
+import { avatarSrc, RIDER_AVATARS } from "@/game/avatars";
 import { sfx } from "@/game/audio";
 import { BOARD_KIND_LABEL, boardStake, boardWatchLabel, liveJobs, unansweredWatches } from "@/game/board-copy";
 import { CLASS_GIFT, locById, villainById } from "@/game/data";
@@ -15,13 +15,14 @@ import { knownCast, type CastPerson, type IssuePiece } from "@/game/cast";
 import { kaneFileBlurb } from "@/game/story";
 import { fittedModules, travisBayBlurb } from "@/game/travis";
 import { currentPorch } from "@/game/porch";
-import type { Operative, Screen } from "@/game/types";
+import type { Operative, RiderLook, Screen } from "@/game/types";
 import { resolveWeapon } from "@/game/weapon-ops";
 import { cn } from "@/lib/cn";
 import { CreditCard, Database, IdCard, ScanFace, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { MoonCard, MoonCardSheet } from "./card";
 import { Coin, HpBar, Portrait, SectionLabel, StatusPill } from "./primitives";
+import { EMPTY_LOOK, KITS, MARKS, RiderPlate, WASHES } from "./rider-plate";
 
 type OsTab = "stat" | "plate" | "roster" | "data" | "people";
 type StatSub = "status" | "special" | "gear";
@@ -79,7 +80,99 @@ function Bust({ op }: { op: Operative }) {
   const face = avatarSrc(op.portraitId) ?? CLASS_PORTRAIT[op.cls];
   return (
     <div className="ms-os-bust">
-      <img src={face} alt="" className={cn("size-full object-cover", op.status === "dead" && "grayscale opacity-50")} />
+      <RiderPlate
+        src={face}
+        look={op.look}
+        className="size-full"
+        imgClassName={cn(op.status === "dead" && "grayscale opacity-50")}
+      />
+    </div>
+  );
+}
+
+function PlateCutter({
+  portraitId,
+  look,
+  onChange,
+}: {
+  portraitId?: string;
+  look: RiderLook;
+  onChange: (look: RiderLook, portraitId?: string) => void;
+}) {
+  const face = avatarSrc(portraitId) ?? RIDER_AVATARS[0]!.src;
+  return (
+    <div className="mt-3 space-y-3 rounded-[var(--radius-sm)] bg-ink/50 p-3">
+      <RiderPlate src={face} look={look} className="mx-auto aspect-[2/3] w-28" />
+      <div className="grid grid-cols-6 gap-1">
+        {RIDER_AVATARS.map((row) => (
+          <button
+            key={row.id}
+            type="button"
+            aria-label={row.label}
+            onClick={() => {
+              sfx.click();
+              onChange(look, row.id);
+            }}
+            className={cn("overflow-hidden rounded-[var(--radius-xs)]", portraitId === row.id && "ring-2 ring-ember")}
+          >
+            <img src={row.src} alt="" className="aspect-[2/3] w-full object-cover object-top" />
+          </button>
+        ))}
+      </div>
+      <ChipRow
+        label="Mark"
+        options={MARKS}
+        value={look.mark}
+        onPick={(mark) => onChange({ ...look, mark }, portraitId)}
+      />
+      <ChipRow
+        label="Kit"
+        options={KITS}
+        value={look.kit}
+        onPick={(kit) => onChange({ ...look, kit }, portraitId)}
+      />
+      <ChipRow
+        label="Wash"
+        options={WASHES}
+        value={look.wash}
+        onPick={(wash) => onChange({ ...look, wash }, portraitId)}
+      />
+    </div>
+  );
+}
+
+function ChipRow<T extends string>({
+  label,
+  options,
+  value,
+  onPick,
+}: {
+  label: string;
+  options: { id: T; label: string }[];
+  value: T;
+  onPick: (id: T) => void;
+}) {
+  return (
+    <div>
+      <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-ember">{label}</p>
+      <div className="mt-1 flex flex-wrap gap-1">
+        {options.map((opt) => (
+          <button
+            key={opt.id}
+            type="button"
+            onClick={() => {
+              sfx.click();
+              onPick(opt.id);
+            }}
+            className={cn(
+              "min-h-9 rounded-[var(--radius-xs)] px-2 font-display text-[10px] uppercase tracking-[0.08em]",
+              value === opt.id ? "bg-ember text-ink" : "bg-raised text-moon",
+            )}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -89,6 +182,9 @@ function StatPane() {
   const setScreen = useGame((g) => g.setScreen);
   const op = s.operatives.find((o) => o.status !== "dead") ?? s.operatives[0];
   const [sub, setSub] = useState<StatSub>("status");
+  const [recut, setRecut] = useState(false);
+  const openSkills = useGame((g) => g.openSkills);
+  const setLook = useGame((g) => g.setLook);
   const loc = currentArcLoc(s);
   if (!op) {
     return (
@@ -146,6 +242,32 @@ function StatPane() {
       <div className="min-w-0">
         <p className="font-mono text-label uppercase tracking-[0.2em] text-ember">Rider file</p>
         <h2 className="mt-0.5 font-display text-2xl text-paper">{op.name}</h2>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              sfx.click();
+              if (s.skillSheet) openSkills();
+              else {
+                const msg = useGame.getState().openCog();
+                if (msg) useGame.setState((st) => ({ s: { ...st.s, toast: msg } }));
+              }
+            }}
+          >
+            {s.skillSheet ? `Skills${s.skillSheet.points ? ` · ${s.skillSheet.points}` : ""}` : "Travis's cognitive"}
+          </Button>
+          <Button size="sm" variant="quiet" onClick={() => setRecut((v) => !v)}>
+            Recut the plate
+          </Button>
+        </div>
+        {recut ? (
+          <PlateCutter
+            portraitId={op.portraitId}
+            look={op.look ?? EMPTY_LOOK}
+            onChange={(look, portraitId) => setLook(look, portraitId)}
+          />
+        ) : null}
         <p className="text-secondary text-moon">
           {className(op.cls)} · {displayRace(op.race)} · {op.repTitle}
         </p>

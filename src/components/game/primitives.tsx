@@ -1,5 +1,6 @@
 import { CLASS_PORTRAIT } from "@/game/art";
 import { avatarSrc } from "@/game/avatars";
+import { RiderPlate } from "./rider-plate";
 import { sfx } from "@/game/audio";
 import { cn } from "@/lib/cn";
 import { className, displayRace } from "@/game/presentation";
@@ -33,7 +34,7 @@ export function Portrait({
   size = 40,
   className,
 }: {
-  op: Pick<Operative, "id" | "name" | "cls" | "status" | "portraitId">;
+  op: Pick<Operative, "id" | "name" | "cls" | "status" | "portraitId" | "look">;
   size?: number;
   className?: string;
 }) {
@@ -57,14 +58,11 @@ export function Portrait({
       aria-hidden
     >
       <span className={cn("flex size-full items-center justify-center overflow-hidden rounded-full bg-ink", ring)}>
-        <img
+        <RiderPlate
           src={face}
-          alt=""
-          className={cn(
-            "size-full object-cover",
-            op.status === "dead" && "grayscale opacity-50",
-            op.status === "downed" && "opacity-70",
-          )}
+          look={op.look}
+          className="size-full"
+          imgClassName={cn(op.status === "dead" && "grayscale opacity-50", op.status === "downed" && "opacity-70")}
         />
         <span
           className="pointer-events-none absolute inset-0 bg-gradient-to-t from-ink/50 to-transparent"

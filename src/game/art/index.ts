@@ -42,6 +42,7 @@ export const BOARD_JOB_ART: Record<DayTaskKind, string> = {
   tower: "/art/rooms/tower.jpg",
   salvage: "/art/board/jobs/salvage.jpg",
   sortie: "/art/rooms/war-room.jpg",
+  cog: "/art/npcs/travis.jpg",
 };
 
 export const FACILITY_ART: Record<RoomId, string> = {

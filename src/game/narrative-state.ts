@@ -24,6 +24,7 @@ export const NARRATIVE_FLAG_IDS = [
   "lyra_lied",
   "gate_watched",
   "travis_met",
+  "travis_cog",
   "travis_bay_used",
   "ironclad_gate_saved",
   "ironclad_gate_lost",
