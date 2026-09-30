@@ -111,6 +111,7 @@ body.clean #hud,body.clean #views,body.clean #panel,body.clean #transport{displa
     <button class="chip" data-view="exit">Exit</button>
     <button class="chip" data-view="top">Top</button>
     <button class="chip" data-view="wide">Wide</button>
+    <button class="chip" data-view="floor">Floor</button>
   </div>
 
   <aside id="panel" aria-label="Simulation settings"></aside>
@@ -224,7 +225,7 @@ function tearFrom(dx, dy, dz, pd, bas, t0, f, phase) {
   const c = clamp(dx * pd[0] + dy * pd[1] + dz * pd[2], -1, 1); const ang = Math.acos(c);
   const az = Math.atan2(dx * bas[1][0] + dy * bas[1][1] + dz * bas[1][2], dx * bas[0][0] + dy * bas[0][1] + dz * bas[0][2]);
   const crack = 0.72 + 0.5 * Math.pow(Math.abs(Math.sin(az * 2.5 + phase)), 0.6); // radial crack lines run ahead of the front
-  const n = 0.75 + 0.5 * noise3(dx * 5 + 3.1, dy * 5 + 7.7, dz * 5 + 1.3);
+  const n = 0.9 + 0.2 * noise3(dx * 3 + 3.1, dy * 3 + 7.7, dz * 3 + 1.3);
   return t0 + ang * R / B.cTear * (ang < 0.12 ? 1 : crack) * n * f;
 }
 function tearTime(dx, dy, dz) {
@@ -296,7 +297,7 @@ function setup(p) {
   S = p.sprayPool;
   const G = () => new Float32Array(S);
   sx = G(); sy = G(); sz = G(); svx = G(); svy = G(); svz = G(); scx = G(); scy = G(); scz = G(); srad = G(); skind = G(); sbirth = G(); stau = G(); salive = new Uint8Array(S);
-  budget = { entry: 0.07 * S, exit: 0.4 * S, shed: 0.18 * S, splash: 0.35 * S }; used = { entry: 0, exit: 0, shed: 0, splash: 0 };
+  budget = { entry: 0.1 * S, exit: 0.45 * S, shed: 0.12 * S, splash: 0.33 * S }; used = { entry: 0, exit: 0, shed: 0, splash: 0 };
   wetT = new Float32Array(WET * WET).fill(65504);
 }
 
@@ -338,7 +339,7 @@ function sprayEmission(t0, t1) {
       emitCarry.entry -= 1; const tau = Math.max(t0, 0) + rand() * (Math.min(t1, EW) - Math.max(t0, 0)); const fade = Math.exp(-tau / 0.0003);
       const d = coneDir(-1, 0.55); const sp = B.U0 * 0.075 * Math.exp(0.5 * gauss()) * (0.35 + fade);
       const off = Math.sqrt(rand()) * 2.2 * a, oa = rand() * TAU;
-      const mist = rand() < 0.3 * mistAmt;
+      const mist = rand() < 0.08 * mistAmt;
       emit('entry', mist ? 1 : 0, B.xe - 0.002, B.yb + Math.cos(oa) * off, Math.sin(oa) * off, d[0] * sp, d[1] * sp + (rand() - 0.5), d[2] * sp, mist ? 0.00003 : dropletR(), tau);
     }
   }
@@ -352,9 +353,9 @@ function sprayEmission(t0, t1) {
       emitCarry.exit -= 1; const tau = tau0 + rand() * (tau1 - tau0); const fade = Math.exp(-tau / 0.0006);
       const spread = 0.22 + 0.5 * (1 - fade); const d = coneDir(1, spread);
       const offAx = Math.acos(clamp(d[0], -1, 1));
-      const sp = Math.max(2, B.U1 * 0.42 * fade * Math.exp(-offAx / 0.35) * Math.exp(0.45 * gauss()) + 4 * rand());
+      const sp = Math.max(2, B.U1 * 0.52 * fade * Math.exp(-offAx / 0.35) * Math.exp(0.45 * gauss()) + 4 * rand());
       const off = Math.sqrt(rand()) * (2 + 6 * (1 - fade)) * a, oa = rand() * TAU;
-      const mist = rand() < 0.38 * mistAmt;
+      const mist = rand() < 0.1 * mistAmt;
       emit('exit', mist ? 1 : 0, B.xx + 0.002, B.yb + Math.cos(oa) * off, Math.sin(oa) * off, d[0] * sp, d[1] * sp, d[2] * sp, mist ? 0.00003 : dropletR() * (0.6 + 0.8 * (1 - fade)), t0x + tau);
     }
   }
@@ -470,7 +471,7 @@ function step(t, dt) {
             const sp = -vyi * (0.9 + 0.5 * rand()); kx[i] += hx * sp; kz[i] += hz * sp;
             if (vyi < -1.2 && rand() < 0.8 * P.sprayAmount) { const nsp = 1 + Math.floor(rand() * 3); for (let e = 0; e < nsp; e++) { const ang = Math.atan2(hz, hx) + gauss() * 0.5, hs = -vyi * (1 + 1.1 * rand()), el = 0.35 + 0.35 * rand(); emit('splash', rand() < 0.08 * P.mistAmount ? 1 : 0, px[i], rp, pz[i], Math.cos(ang) * hs, hs * Math.tan(el), Math.sin(ang) * hs, dropletR() * 1.3, t1); } }
           } }
-        else if (last && (i & 7) === (stepCount & 7)) markWet(px[i], pz[i], t1); // the spreading film keeps wetting the floor
+        else if (last && nbc[i] >= 9 && (i & 7) === (stepCount & 7)) markWet(px[i], pz[i], t1); // the spreading film keeps wetting the floor
       } else if (last && py[i] > rp * 2.5) contact[i] = 0;
       if (memOn) {
         const dx = px[i] - CX, dy = py[i] - CY, dz = pz[i] - CZ; const r = Math.hypot(dx, dy, dz);
@@ -502,11 +503,11 @@ function step(t, dt) {
   }
   for (let i = 0; i < N; i++) {
     if (c > 0) { vx[i] += c * dpx[i]; vy[i] += c * dpy[i]; vz[i] += c * dpz[i]; }
-    if (y[i] < rp * 0.9) { const f = Math.exp(-dt * 1.2); vx[i] *= f; vz[i] *= f; }
+    if (y[i] < rp * 0.9) { const f = Math.exp(-dt * (nbc[i] < 9 ? 60 : 1.2)); vx[i] *= f; vz[i] *= f; }
     const sp = Math.hypot(vx[i], vy[i], vz[i]); if (sp > vmax) vmax = sp;
     // atomisation: fast, poorly connected water sheds mist and fine droplets
     if (sp > 5 && nbc[i] < 16 && sCount < S) {
-      const pr = dt * (sp - 5) * 9 * P.mistAmount;
+      const pr = dt * (sp - 5) * 4 * P.mistAmount;
       if (rand() < pr) { const j = 0.25 * sp; emit('shed', 1, x[i], y[i], z[i], vx[i] * 0.85 + gauss() * j * 0.3, vy[i] * 0.85 + gauss() * j * 0.3, vz[i] * 0.85 + gauss() * j * 0.3, 0.00003, t1); }
       if (rand() < pr * 0.8 * P.sprayAmount) { emit('shed', 0, x[i], y[i], z[i], vx[i] * (0.9 + 0.2 * rand()), vy[i] * (0.9 + 0.2 * rand()), vz[i] * (0.9 + 0.2 * rand()), dropletR() * 0.8, t1); }
     }
@@ -544,7 +545,7 @@ function memFrame(t) {
     const i0 = Math.floor(ft), j0 = Math.floor(fp), ut = ft - i0, up = fp - j0; const J0 = (j0 + BP) % BP, J1 = (j0 + 1 + BP) % BP;
     return (bins[i0 * BP + J0] * (1 - up) + bins[i0 * BP + J1] * up) * (1 - ut) + (bins[(i0 + 1) * BP + J0] * (1 - up) + bins[(i0 + 1) * BP + J1] * up) * ut;
   };
-  const wadC = [mem.neck[0], mem.neck[1] + 0.02 * R, mem.neck[2]];
+  const wadC = [mem.neck[0] + 0.03 * R, mem.neck[1] - 0.08 * R, mem.neck[2] - 0.02 * R];
   let allDone = true;
   for (let i = 0; i < nv; i++) {
     const tr = mem.tr[i]; let X, Y, Z;
@@ -576,9 +577,9 @@ function memFrame(t) {
       // contract into a crumpled wad hanging off the knot
       const w = smooth(0.45, 1, e);
       const al = 0.35 + (th0 - THN) / (Math.PI - THN) * 2.3; const wr = R * 0.15 * (0.6 + 0.8 * noise3(rx * 40, ry * 40, rz * 40));
-      const wx = wadC[0] + Math.sin(al) * Math.cos(ph) * wr, wy = wadC[1] + Math.cos(al) * wr * 0.8, wz = wadC[2] + Math.sin(al) * Math.sin(ph) * wr;
+      const wx = wadC[0] + Math.sin(al) * Math.cos(ph) * wr * 0.8, wy = wadC[1] + Math.cos(al) * wr * 1.3, wz = wadC[2] + Math.sin(al) * Math.sin(ph) * wr;
       ax += (wx - ax) * w; ay += (wy - ay) * w; az += (wz - az) * w;
-      const cr = R * 0.1 * e; const nx = rx * 70, ny = ry * 70, nz = rz * 70;
+      const cr = R * 0.13 * e; const nx = rx * 55, ny = ry * 55, nz = rz * 55;
       X = ax + cr * (noise3(nx, ny, nz) - 0.5) * 2; Y = ay + cr * (noise3(nx + 17, ny, nz) - 0.5) * 2; Z = az + cr * (noise3(nx, ny + 31, nz) - 0.5) * 2;
     }
     out[i * 3] = Math.round(X * Q); out[i * 3 + 1] = Math.round(Y * Q); out[i * 3 + 2] = Math.round(Z * Q);
@@ -812,7 +813,7 @@ vec3 lightTrans(vec3 p){
   float T = mix(1., .3, 1.-exp(-th*40.));
   float caus = clamp(-lap*18., 0., .7)*(1.-exp(-th*20.));
   vec3 t = vec3(T + caus);
-  t *= mix(vec3(1.), uRubber*uRubber*.9, 1.-exp(-L0.g*1.2));
+  t *= mix(vec3(1.), uRubber*.25 + .05, 1.-exp(-L0.g*1.5));
   return t;
 }
 vec3 shadeFloor(vec3 p, vec3 rd, float rough0){
@@ -855,7 +856,7 @@ const float ISO = .42;
 float dens(vec3 p){ return texture(uVol, (p-uVMin)/uVSize).r*(255./128.); }
 float aerAt(vec3 p){ return texture(uVol, (p-uVMin)/uVSize).g*(255./128.); }
 vec3 volNormal(vec3 p){
-  float e = uVStep;
+  float e = uVStep*1.6;
   vec3 g = vec3(dens(p+vec3(e,0,0))-dens(p-vec3(e,0,0)), dens(p+vec3(0,e,0))-dens(p-vec3(0,e,0)), dens(p+vec3(0,0,e))-dens(p-vec3(0,0,e)));
   return -normalize(g + 1e-7);
 }
@@ -910,10 +911,14 @@ vec3 shadeWater(vec3 p, vec3 n, vec3 rd){
 }
 vec3 shadeMembrane(vec3 behind, vec3 p, vec3 n, vec3 rd){
   if(dot(n,rd) > 0.) n = -n;
+  // tied neck: pinched, creased rubber
+  float nk = smoothstep(uKnot.y - .06, uKnot.y - .02, p.y);
+  if(nk > 0.){ float a = atan(p.z-uKnot.z, p.x-uKnot.x); vec3 tg = normalize(vec3(-sin(a), 0., cos(a)));
+    n = normalize(n + nk*.45*tg*sin(a*11. + p.y*420. + 3.*vnoise(vec2(a*3., p.y*200.)))); if(dot(n,rd) > 0.) n = -n; }
   float ndv = max(dot(n,-rd), 0.);
   float F = .045 + .955*pow(1.-ndv, 5.);
   vec3 R = reflect(rd, n);
-  vec3 refl = env(R, .32)*.8 + trace(p + n*.002, R, .3)*.2;
+  vec3 refl = env(R, .16);
   float ndl = dot(n, uL);
   vec3 base = uRubber;
   vec3 diff = base*(uKeyI*uKeyCol*max(ndl,0.)/3.14159 + uAmb*1.2);
@@ -999,7 +1004,7 @@ void main(){
 const BULKDROP_VS = HDR + `
 in vec3 aA; in vec3 aB; in float aAer; in float aIsoA; in float aIsoB;
 uniform mat4 uVP; uniform vec3 uCamPos, uCamFwd, uCamRight, uCamUp; uniform vec2 uRes;
-uniform float uMix, uQ, uFdt, uShutter, uFpx, uDropR, uSpread;
+uniform float uMix, uQ, uFdt, uShutter, uFpx, uDropR, uSpread, uYCut;
 out vec2 vLoc; out float vLen, vRad, vKind, vAlpha, vZ; out vec3 vCol; out vec3 vAx, vAy, vV;
 float h1(float n){ return fract(sin(n*12.9898)*43758.5453); }
 void main(){
@@ -1010,6 +1015,7 @@ void main(){
   vec3 off = normalize(vec3(h1(id)-.5, h1(id+.37)-.5, h1(id+.71)-.5)+1e-4)*uSpread*(.3+.7*h1(id+.13));
   float r = uDropR*(.45 + .8*h1(id+.91));
   vec3 pa = aA*uQ + off, pb = aB*uQ + off; vec3 p = mix(pa, pb, uMix); vec3 vel = (pb-pa)/uFdt;
+  if(mix(aA.y, aB.y, uMix)*uQ < uYCut) return;
   float z = dot(p-uCamPos, uCamFwd); if(z < .02) return;
   vZ = z; vKind = 0.; vV = normalize(p-uCamPos);
   vec3 hv = vel*uShutter*.5;
@@ -1038,11 +1044,12 @@ void main(){
     vec3 n = normalize(vAx*q.x + vAy*q.y - vV*sqrt(1.-q2));
     float ndv = max(dot(n,-vV),0.); float F = .02 + .98*pow(1.-ndv,5.);
     vec3 refl = env(reflect(vV,n), 0.);
-    vec3 refr = env(normalize(vV + n*.9), .05)*.9;   // a droplet is a tiny ball lens: it shows an inverted view of what is behind it
+    vec3 refr = env(normalize(vV + n*.9), .45)*.8 + uAmb*1.2;   // a droplet is a tiny ball lens: it shows an inverted view of what is behind it
     vec3 c = refl*F + refr*(1.-F) + uAmb*.3;
     // unresolved droplets: integrate the key light's reflection glint and the forward-refracted lens flash
     float small = 1. - smoothstep(1., 4., vRad);
-    c += small*uKeyI*uKeyCol*(.06 + .9*pow(max(dot(uL, vV), 0.), 6.));
+    c += uKeyI*uKeyCol*(.05 + .9*pow(max(dot(uL, vV), 0.), 6.))*(.12 + .88*small);
+    c += pow(1.-ndv, 3.)*uKeyI*uKeyCol*.05; // bright rim
     float a = cov*vAlpha;
     o = vec4(c*a, a*.9);
   } else {
@@ -1163,7 +1170,7 @@ const S = {
   caliber: '9mm', speed: 370, offset: 0, radius: 8, height: 1.0, tension: 42, color: 'red',
   gravity: 9.81, viscosity: 0.35, spray: 1, mist: 1, air: 1, coupling: 0.5,
   back: 0.16, keyI: 3.2, keyAz: -40, keyEl: 42, fill: 1, rim: 1, env: 'studio', exposure: 0,
-  fstop: 11, shutter: 50000, fov: 30, quality: 'medium', scale: 1,
+  fstop: 11, shutter: 25000, fov: 30, quality: 'medium', scale: 1,
   t: -0.0004, playing: true, speedMode: 'ramp'
 };
 const cam = { yaw: 0.35, pitch: 0.08, dist: 0.95, target: [0, 1.0, 0] };
@@ -1255,7 +1262,7 @@ gl.texImage3D(gl.TEXTURE_3D, 0, gl.RG8, 1, 1, 1, 0, gl.RG, gl.UNSIGNED_BYTE, new
 function buildVolume(fp) {
   const key = fp.a + ':' + fp.b + ':' + fp.m.toFixed(4) + ':' + (sim.aerKey || 0); if (key === vol.key) return; vol.key = key;
   const A = sim.frames[fp.a], Bf = sim.frames[fp.b], m = fp.m, N = sim.N, iq = 1 / 4096;
-  const sp = sim.s, h = 1.9 * sp, yCut = sim.rp * 1.35;
+  const sp = sim.s, h = 2.25 * sp, yCut = sim.rp * 1.35;
   if (!vol.pts) vol.pts = new Float32Array(N * 4);
   const pts = vol.pts; let n = 0; let x0 = 1e9, y0 = 1e9, z0 = 1e9, x1 = -1e9, y1 = -1e9, z1 = -1e9;
   const aerK = S.t <= 0 ? 0 : Math.min(1, S.t / Math.max(sim.bullet.tx, 1e-5)) * Math.exp(-S.t / 0.35);
@@ -1339,6 +1346,7 @@ const VIEWS = {
   front: { yaw: -1.35, pitch: 0.1, dist: 0.8, dy: 0 },
   exit: { yaw: 1.2, pitch: 0.12, dist: 0.95, dy: 0 },
   top: { yaw: 0.2, pitch: 1.25, dist: 0.9, dy: 0 },
+  floor: { yaw: 0.5, pitch: 0.42, dist: 1.5, dy: -0.88 },
   wide: { yaw: 0.45, pitch: 0.18, dist: 2.3, dy: -0.45 }
 };
 function setView(name) { const v = VIEWS[name]; cam.yaw = v.yaw; cam.pitch = v.pitch; cam.dist = v.dist * Math.max(1, S.radius / 8); cam.target = [0, (sim && sim.center ? sim.center[1] : S.height) + v.dy * (sim && sim.center ? sim.center[1] : S.height), 0]; dirty = true; }
@@ -1443,7 +1451,7 @@ function render() {
   gl.bindVertexArray(vaoSpray); gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, sim.S);
   p = P.bulkDrop; gl.useProgram(p); setCommon(p);
   gl.uniformMatrix4fv(p.u('uVP'), false, VP); gl.uniform1f(p.u('uMix'), fp.m); gl.uniform1f(p.u('uQ'), 1 / 4096); gl.uniform1f(p.u('uFdt'), fp.dt);
-  gl.uniform1f(p.u('uShutter'), 1 / S.shutter); gl.uniform1f(p.u('uFpx'), fpx); gl.uniform1f(p.u('uDropR'), sim.s * 0.36); gl.uniform1f(p.u('uSpread'), sim.s * 0.7);
+  gl.uniform1f(p.u('uShutter'), 1 / S.shutter); gl.uniform1f(p.u('uFpx'), fpx); gl.uniform1f(p.u('uDropR'), sim.s * 0.36); gl.uniform1f(p.u('uSpread'), sim.s * 0.7); gl.uniform1f(p.u('uYCut'), rp * 1.35);
   bindTex(p, 'uSceneZ', G.comp.tex[1], 0);
   gl.bindVertexArray(vaoBulkDrop); gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, sim.N * 5);
   gl.disable(gl.BLEND);
