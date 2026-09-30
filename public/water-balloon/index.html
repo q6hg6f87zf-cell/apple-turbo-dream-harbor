@@ -144,7 +144,7 @@ body.clean #hud,body.clean #views,body.clean #panel,body.clean #transport{displa
 'use strict';
 const TAU = Math.PI * 2, Q = 4096, SENT = -32768, THN = 0.36;
 let P, rand, R, CX, CY, CZ, s, h, h2, rp, N, S;
-let x, y, z, vx, vy, vz, px, py, pz, lam, lam2, dpx, dpy, dpz, nb, nbc, hit, aer, contact;
+let kx, kz, gcx = 0, gcz = 0, x, y, z, vx, vy, vz, px, py, pz, lam, lam2, dpx, dpy, dpz, nb, nbc, hit, aer, contact;
 let head, nxt, TS;
 let poly6K, spikyK, eps, rho0;
 let B; // bullet
@@ -189,8 +189,7 @@ function surfPoint(dx, dy, dz, out) {
 
 function insideBody(X, Y, Z, margin) {
   const dx = X - CX, dy = Y - CY, dz = Z - CZ; const r = Math.hypot(dx, dy, dz); if (r < 1e-9) return true;
-  const cy = dy / r; if (Math.acos(clamp(cy, -1, 1)) < THN * 1.08) return false;
-  return r < shapeR(cy) - margin;
+  const cy = dy / r; return r < shapeR(Math.min(cy, Math.cos(THN))) * (cy > Math.cos(THN) ? 0.97 : 1) - margin;
 }
 
 function icosphere(level) {
@@ -224,7 +223,7 @@ function basisFor(d) { const a = Math.abs(d[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0]; l
 function tearFrom(dx, dy, dz, pd, bas, t0, f, phase) {
   const c = clamp(dx * pd[0] + dy * pd[1] + dz * pd[2], -1, 1); const ang = Math.acos(c);
   const az = Math.atan2(dx * bas[1][0] + dy * bas[1][1] + dz * bas[1][2], dx * bas[0][0] + dy * bas[0][1] + dz * bas[0][2]);
-  const crack = 0.45 + 0.9 * Math.pow(Math.abs(Math.sin(az * 3.5 + phase)), 0.55); // radial crack lines run ahead of the front
+  const crack = 0.72 + 0.5 * Math.pow(Math.abs(Math.sin(az * 2.5 + phase)), 0.6); // radial crack lines run ahead of the front
   const n = 0.75 + 0.5 * noise3(dx * 5 + 3.1, dy * 5 + 7.7, dz * 5 + 1.3);
   return t0 + ang * R / B.cTear * (ang < 0.12 ? 1 : crack) * n * f;
 }
@@ -249,7 +248,7 @@ function setup(p) {
   }
   N = pts.length / 3;
   const F = () => new Float32Array(N);
-  x = F(); y = F(); z = F(); vx = F(); vy = F(); vz = F(); px = F(); py = F(); pz = F(); lam = F(); lam2 = F(); dpx = F(); dpy = F(); dpz = F(); aer = F();
+  x = F(); y = F(); z = F(); vx = F(); vy = F(); vz = F(); px = F(); py = F(); pz = F(); lam = F(); lam2 = F(); kx = F(); kz = F(); dpx = F(); dpy = F(); dpz = F(); aer = F();
   hit = new Uint8Array(N); contact = new Uint8Array(N); nbc = new Uint16Array(N); nb = new Int32Array(N * 64);
   for (let i = 0; i < N; i++) { x[i] = px[i] = pts[i * 3]; y[i] = py[i] = pts[i * 3 + 1]; z[i] = pz[i] = pts[i * 3 + 2]; }
   TS = 1; while (TS < N * 2) TS <<= 1; head = new Int32Array(TS); nxt = new Int32Array(N);
@@ -297,7 +296,7 @@ function setup(p) {
   S = p.sprayPool;
   const G = () => new Float32Array(S);
   sx = G(); sy = G(); sz = G(); svx = G(); svy = G(); svz = G(); scx = G(); scy = G(); scz = G(); srad = G(); skind = G(); sbirth = G(); stau = G(); salive = new Uint8Array(S);
-  budget = { entry: 0.12 * S, exit: 0.4 * S, shed: 0.23 * S, splash: 0.25 * S }; used = { entry: 0, exit: 0, shed: 0, splash: 0 };
+  budget = { entry: 0.07 * S, exit: 0.4 * S, shed: 0.18 * S, splash: 0.35 * S }; used = { entry: 0, exit: 0, shed: 0, splash: 0 };
   wetT = new Float32Array(WET * WET).fill(65504);
 }
 
@@ -370,7 +369,7 @@ function sprayStep(t, dt) {
       const sp = Math.hypot(svx[k], svy[k], svz[k]); const kd = 2.25e-4 / srad[k] * P.airDensity; const f = 1 / (1 + kd * sp * dt);
       svx[k] *= f; svy[k] *= f; svz[k] *= f;
       sx[k] += svx[k] * dt; sy[k] += svy[k] * dt; sz[k] += svz[k] * dt;
-      if (sy[k] < srad[k]) { salive[k] = 0; markWet(sx[k], sz[k], t + dt); }
+      if (sy[k] < srad[k]) { salive[k] = 0; if (rand() < Math.min(1, Math.pow(srad[k] / 0.0005, 2))) markWet(sx[k], sz[k], t + dt); }
     } else {
       const decay = Math.exp(-dt / 0.14); scx[k] *= decay; scy[k] *= decay; scz[k] *= decay;
       const X = sx[k] * 9, Y = sy[k] * 9, Z = sz[k] * 9; const amp = 0.35 * P.airDensity;
@@ -414,7 +413,9 @@ function bulletKick(t0, t1) {
 }
 
 // ---------- PBF step ----------
+let stepCount = 0;
 function step(t, dt) {
+  stepCount++;
   const g = P.gravity, t1 = t + dt; const kdrag = 0.053 * P.airDensity;
   for (let i = 0; i < N; i++) {
     vy[i] -= g * dt;
@@ -463,8 +464,13 @@ function step(t, dt) {
       px[i] += dpy[i]; py[i] += dpz[i]; pz[i] += lam2[i];
       if (py[i] < rp * 0.85) {
         py[i] = rp * 0.85;
-        if (last && !contact[i]) { contact[i] = 1; markWetR(px[i], pz[i], s * 1.2, t1); const vyi = vy[i];
-          if (vyi < -1.2 && rand() < 0.35 * P.sprayAmount) { const nsp = 1 + (rand() < 0.5 ? 1 : 0); for (let e = 0; e < nsp; e++) { const ang = rand() * TAU, hs = -vyi * (0.25 + 0.6 * rand()); emit('splash', rand() < 0.15 * P.mistAmount ? 1 : 0, px[i], rp, pz[i], vx[i] * 0.6 + Math.cos(ang) * hs, -vyi * (0.15 + 0.55 * rand()), vz[i] * 0.6 + Math.sin(ang) * hs, dropletR() * 1.2, t1); } } }
+        if (last && !contact[i]) { contact[i] = 1; markWetR(px[i], pz[i], s * 1.6, t1); const vyi = vy[i];
+          if (vyi < -0.4) {
+            let hx = px[i] - gcx, hz = pz[i] - gcz; const hl = Math.hypot(hx, hz); if (hl < 1e-4) { const a2 = rand() * TAU; hx = Math.cos(a2); hz = Math.sin(a2); } else { hx /= hl; hz /= hl; }
+            const sp = -vyi * (0.9 + 0.5 * rand()); kx[i] += hx * sp; kz[i] += hz * sp;
+            if (vyi < -1.2 && rand() < 0.8 * P.sprayAmount) { const nsp = 1 + Math.floor(rand() * 3); for (let e = 0; e < nsp; e++) { const ang = Math.atan2(hz, hx) + gauss() * 0.5, hs = -vyi * (1 + 1.1 * rand()), el = 0.35 + 0.35 * rand(); emit('splash', rand() < 0.08 * P.mistAmount ? 1 : 0, px[i], rp, pz[i], Math.cos(ang) * hs, hs * Math.tan(el), Math.sin(ang) * hs, dropletR() * 1.3, t1); } }
+          } }
+        else if (last && (i & 7) === (stepCount & 7)) markWet(px[i], pz[i], t1); // the spreading film keeps wetting the floor
       } else if (last && py[i] > rp * 2.5) contact[i] = 0;
       if (memOn) {
         const dx = px[i] - CX, dy = py[i] - CY, dz = pz[i] - CZ; const r = Math.hypot(dx, dy, dz);
@@ -481,10 +487,12 @@ function step(t, dt) {
     }
   }
   const idt = 1 / dt; let vmax = 0;
+  let sx0 = 0, sz0 = 0;
   for (let i = 0; i < N; i++) {
-    vx[i] = (px[i] - x[i]) * idt; vy[i] = (py[i] - y[i]) * idt; vz[i] = (pz[i] - z[i]) * idt;
-    x[i] = px[i]; y[i] = py[i]; z[i] = pz[i];
+    vx[i] = (px[i] - x[i]) * idt + kx[i]; vy[i] = (py[i] - y[i]) * idt; vz[i] = (pz[i] - z[i]) * idt + kz[i]; kx[i] = kz[i] = 0;
+    x[i] = px[i]; y[i] = py[i]; z[i] = pz[i]; sx0 += x[i]; sz0 += z[i];
   }
+  gcx = sx0 / N; gcz = sz0 / N;
   // XSPH viscosity
   const c = P.viscosity;
   if (c > 0) for (let i = 0; i < N; i++) {
@@ -494,7 +502,7 @@ function step(t, dt) {
   }
   for (let i = 0; i < N; i++) {
     if (c > 0) { vx[i] += c * dpx[i]; vy[i] += c * dpy[i]; vz[i] += c * dpz[i]; }
-    if (y[i] < rp * 0.9) { const f = Math.exp(-dt * 5); vx[i] *= f; vz[i] *= f; }
+    if (y[i] < rp * 0.9) { const f = Math.exp(-dt * 1.2); vx[i] *= f; vz[i] *= f; }
     const sp = Math.hypot(vx[i], vy[i], vz[i]); if (sp > vmax) vmax = sp;
     // atomisation: fast, poorly connected water sheds mist and fine droplets
     if (sp > 5 && nbc[i] < 16 && sCount < S) {
@@ -544,7 +552,18 @@ function memFrame(t) {
     const th0 = mem.th[i], ph = mem.ph[i];
     if (!(t > tr)) {
       let b = 1;
-      if (th0 >= THN) { const rr = shapeR(Math.cos(th0)); const bm = binAt(th0, ph); if (bm > rr) b = Math.min(bm / rr, 1.2); }
+      if (th0 >= THN) {
+        const rr = shapeR(Math.cos(th0)); const bm = binAt(th0, ph); if (bm > rr) b = Math.min(bm / rr, 1.2);
+        const dx0 = mem.dirs[i * 3], dy0 = mem.dirs[i * 3 + 1], dz0 = mem.dirs[i * 3 + 2];
+        const ae = Math.acos(clamp(dx0 * B.de[0] + dy0 * B.de[1] + dz0 * B.de[2], -1, 1)), ax2 = Math.acos(clamp(dx0 * B.dx[0] + dy0 * B.dx[1] + dz0 * B.dx[2], -1, 1));
+        // entry: the rubber dents inward as the nose pushes through; exit: it tents outward ahead of the bullet
+        b -= 0.05 * Math.exp(-Math.pow(ae / 0.12, 2)) * smooth(-0.00006, 0, t) * (1 - smooth(0, 0.00025, t));
+        b += 0.16 * Math.exp(-Math.pow(ax2 / 0.2, 2)) * smooth(B.tx - 0.00025, B.tx, t);
+        // pressure ripple running out from the entry over the stretched skin
+        if (t > 0) { const d = ae * R, front = 60 * t; b += 0.006 * Math.exp(-Math.pow((d - front) / 0.012, 2)) * Math.exp(-t / 0.002); }
+        // the free edge thickens and rolls just before the tear front arrives
+        if (isFinite(tr)) b += 0.035 * smooth(tr - 0.0004, tr, t);
+      }
       X = CX + (rx - CX) * b; Y = CY + (ry - CY) * b; Z = CZ + (rz - CZ) * b;
       if (isFinite(tr)) allDone = false;
     } else {
@@ -552,7 +571,7 @@ function memFrame(t) {
       const pr = Math.min(1, (t - tr) / dur); if (pr < 1) allDone = false;
       const e = 1 - (1 - pr) * (1 - pr);
       const th = th0 + (thF - th0) * e; const cy = Math.cos(th), sn = Math.sin(th);
-      const lift = 1 + 0.2 * Math.sin(Math.PI * e) + 0.04 * e; const rr = shapeR(cy) * lift;
+      const lift = 1 + 0.035 + 0.07 * Math.sin(Math.PI * e) + 0.05 * Math.pow(1 - e, 4) * (e > 0 ? 1 : 0); const rr = shapeR(cy) * lift;
       let ax = CX + sn * Math.cos(ph) * rr, ay = CY + cy * rr, az = CZ + sn * Math.sin(ph) * rr;
       // contract into a crumpled wad hanging off the knot
       const w = smooth(0.45, 1, e);
@@ -653,7 +672,7 @@ const QUAD_VS = HDR + `void main(){ vec2 p = vec2((gl_VertexID==1)?3.:-1., (gl_V
 
 const COMMON = `
 uniform vec3 uCamPos, uCamFwd, uCamRight, uCamUp; uniform float uTanH, uAspect; uniform vec2 uRes;
-uniform vec3 uL, uKeyCol, uRimL, uAmb; uniform float uKeyI, uRim, uFill; uniform int uEnv;
+uniform vec3 uL, uKeyCol, uRimL, uAmb; uniform float uKeyI, uRim, uFill, uBack; uniform int uEnv;
 float hash12(vec2 p){ vec3 p3 = fract(vec3(p.xyx)*.1031); p3 += dot(p3, p3.yzx+33.33); return fract((p3.x+p3.y)*p3.z); }
 float vnoise(vec2 p){ vec2 i=floor(p), f=fract(p); vec2 u=f*f*(3.-2.*f); return mix(mix(hash12(i),hash12(i+vec2(1,0)),u.x), mix(hash12(i+vec2(0,1)),hash12(i+vec2(1,1)),u.x),u.y); }
 float fbm(vec2 p){ float a=.5,s=0.; for(int i=0;i<5;i++){ s+=a*vnoise(p); p=p*2.03+vec2(17.1,3.7); a*=.5;} return s; }
@@ -671,6 +690,10 @@ vec3 envL(vec3 d, float rough, float lights){
     vec3 c = mix(vec3(.012,.013,.015), vec3(.03,.032,.036), smoothstep(-.1,.7,y));
     c += vec3(.02,.021,.023)*smoothstep(.75,1.,y);
     c *= uFill;
+    // backlit diffusion panel behind the set: soft gradient, always part of the scene
+    vec3 BL = normalize(vec3(0.,.12,-1.));
+    float bp = boxMask(d, BL, vec2(.75,.45), .3 + rough*.3);
+    c += uBack*vec3(.9,.95,1.)*bp*(.55 + .45*smoothstep(-.2,.35,d.y))*(1. - .5*abs(d.x));
     float sft = .015 + rough*.5;
     float kb = boxMask(d, uL, vec2(.36,.48), sft)*(.36*.48)/((.36+sft)*(.48+sft));
     // softbox diffuser: brighter centre, slight falloff
@@ -679,7 +702,7 @@ vec3 envL(vec3 d, float rough, float lights){
     return c;
   } else {
     float y = max(d.y, 0.);
-    vec3 sky = mix(vec3(.62,.72,.86)*1.3, vec3(.16,.34,.72)*1.1, pow(y,.45));
+    vec3 sky = mix(vec3(.55,.66,.82)*1.1, vec3(.12,.28,.66), pow(y,.4));
     sky += uKeyCol*.25*pow(max(dot(d,uL),0.), 8.);
     float sd = dot(d,uL);
     float sun = lights*smoothstep(.99985 - rough*.05, .99995 - rough*.02, sd);
@@ -694,12 +717,12 @@ vec3 env(vec3 d, float rough){ return envL(d, rough, 1.); }
 // ---- particle impostors (depth / thickness), view-space billboards
 const PART_VS = HDR + `
 in vec3 aA; in vec3 aB; in float aAer; in float aIsoA; in float aIsoB;
-uniform mat4 uV, uP; uniform float uMix, uQ, uR, uAerK, uSkipIso;
+uniform mat4 uV, uP; uniform float uMix, uQ, uR, uAerK, uSkipIso, uYCut;
 out vec2 vUV; out vec3 vC; out float vAer;
 void main(){
   int c = gl_VertexID; vec2 k = vec2((c==1||c==2||c==4)?1.:-1., (c==2||c==4||c==5)?1.:-1.);
   if(aA.x < -32000. || aB.x < -32000. || (uSkipIso > .5 && mix(aIsoA, aIsoB, uMix) > .5)){ gl_Position = vec4(2.,2.,2.,1.); return; }
-  vec3 p = mix(aA, aB, uMix)*uQ; vec4 v = uV*vec4(p,1.);
+  vec3 p = mix(aA, aB, uMix)*uQ; if(p.y < uYCut){ gl_Position = vec4(2.,2.,2.,1.); return; } vec4 v = uV*vec4(p,1.);
   vC = v.xyz; vUV = k; vAer = aAer*uAerK;
   v.xy += k*uR; gl_Position = uP*v;
 }`;
@@ -747,7 +770,7 @@ void main(){ vec2 sz = vec2(textureSize(uTex,0)); vec2 uv = gl_FragCoord.xy/sz;
 
 // ---- composite: primary + secondary rays against the analytic scene, screen-space water surface, rubber layer
 const COMP_FS = HDR + COMMON + `
-uniform sampler2D uWaterZ, uThick, uMemN, uMemZ, uLight, uWet;
+uniform sampler2D uMemN, uMemZ, uLight, uWet; uniform highp sampler3D uVol; uniform vec3 uVMin, uVSize; uniform float uVStep; uniform int uVolOn;
 uniform float uTime, uWetE, uAerMix; uniform mat4 uLightVP;
 uniform vec3 uBullet; uniform float uBA, uBLen; uniform int uBulletOn;
 uniform vec3 uKnot; uniform vec3 uRubber; uniform float uRubberT;
@@ -786,8 +809,8 @@ vec3 lightTrans(vec3 p){
   float lap = texture(uLight, uv+vec2(e,0)).r + texture(uLight, uv-vec2(e,0)).r + texture(uLight, uv+vec2(0,e)).r + texture(uLight, uv-vec2(0,e)).r - 4.*L0.r;
   float th = L0.r;
   // clear water: dark refraction rim, bright focused caustic where the water acts as a converging lens
-  float T = mix(1., .22, 1.-exp(-th*55.));
-  float caus = clamp(-lap*55., 0., 3.)*(1.-exp(-th*25.));
+  float T = mix(1., .3, 1.-exp(-th*40.));
+  float caus = clamp(-lap*18., 0., .7)*(1.-exp(-th*20.));
   vec3 t = vec3(T + caus);
   t *= mix(vec3(1.), uRubber*uRubber*.9, 1.-exp(-L0.g*1.2));
   return t;
@@ -809,7 +832,7 @@ vec3 shadeFloor(vec3 p, vec3 rd, float rough0){
   float F = .04 + .96*pow(1.-max(-rd.y,0.),5.);
   col += env(R, rough)*F*mix(.25, 1., wet);
   if(uEnv==0){ float far = smoothstep(3., 9., length(q)); col = mix(col, envL(normalize(vec3(rd.x,.02,rd.z)),0.,0.)*.9, far); }
-  else { float far = 1.-exp(-length(q)*.03); col = mix(col, env(normalize(vec3(rd.x,.0,rd.z)),.3), far*.7); }
+  else { float far = 1.-exp(-length(q)*.012); col = mix(col, env(normalize(vec3(rd.x,.0,rd.z)),.3)*.8, far*.5); }
   return col;
 }
 vec3 shadeBullet(vec3 p, vec3 n, vec3 rd){
@@ -827,40 +850,62 @@ vec3 trace(vec3 ro, vec3 rd, float rough){
   if(tf < 1e8) return shadeFloor(ro+rd*tf, rd, rough);
   return env(rd, rough);
 }
-float zAt(ivec2 q){ ivec2 s = textureSize(uWaterZ,0); return texelFetch(uWaterZ, clamp(q,ivec2(0),s-1), 0).r; }
-vec3 posFromZ(vec2 pix, float z){ vec3 rd = rayDir(pix/uRes); return uCamPos + rd*(z/dot(rd,uCamFwd)); }
-vec3 waterNormal(ivec2 pc, float z, vec3 rd){
-  vec3 p = posFromZ(vec2(pc)+.5, z);
-  float zl = zAt(pc-ivec2(1,0)), zr = zAt(pc+ivec2(1,0)), zd = zAt(pc-ivec2(0,1)), zu = zAt(pc+ivec2(0,1));
-  vec3 dx, dy;
-  bool okL = zl<1e4, okR = zr<1e4;
-  if(okR && (!okL || abs(zr-z) < abs(z-zl))) dx = posFromZ(vec2(pc+ivec2(1,0))+.5, zr) - p; else if(okL) dx = p - posFromZ(vec2(pc-ivec2(1,0))+.5, zl); else dx = uCamRight;
-  bool okD = zd<1e4, okU = zu<1e4;
-  if(okU && (!okD || abs(zu-z) < abs(z-zd))) dy = posFromZ(vec2(pc+ivec2(0,1))+.5, zu) - p; else if(okD) dy = p - posFromZ(vec2(pc-ivec2(0,1))+.5, zd); else dy = uCamUp;
-  vec3 n = normalize(cross(dx, dy)); if(dot(n, rd) > 0.) n = -n;
-  // silhouette pixels: bend toward the view-perpendicular so edges read as rounded
-  if(!(okL&&okR&&okD&&okU)) n = normalize(n + (-rd)*.0);
-  return n;
+// ---- water: ray marched through the particle density field (iso-surface at ISO) ----
+const float ISO = .42;
+float dens(vec3 p){ return texture(uVol, (p-uVMin)/uVSize).r*(255./128.); }
+float aerAt(vec3 p){ return texture(uVol, (p-uVMin)/uVSize).g*(255./128.); }
+vec3 volNormal(vec3 p){
+  float e = uVStep;
+  vec3 g = vec3(dens(p+vec3(e,0,0))-dens(p-vec3(e,0,0)), dens(p+vec3(0,e,0))-dens(p-vec3(0,e,0)), dens(p+vec3(0,0,e))-dens(p-vec3(0,0,e)));
+  return -normalize(g + 1e-7);
 }
-vec3 shadeWater(vec3 p, vec3 n, vec3 rd, float thick, float aerT){
+bool marchVol(vec3 ro, vec3 rd, float tMax, bool inside, out float tHit){
+  vec3 d = rd + vec3(rd.x>=0.?1e-7:-1e-7, rd.y>=0.?1e-7:-1e-7, rd.z>=0.?1e-7:-1e-7);
+  vec3 inv = 1./d; vec3 t0 = (uVMin-ro)*inv, t1 = (uVMin+uVSize-ro)*inv;
+  vec3 tn = min(t0,t1), tf = max(t0,t1);
+  float ta = max(max(tn.x,tn.y),max(tn.z,0.)), tb = min(min(tf.x,tf.y),min(tf.z,tMax));
+  tHit = 0.; if(tb <= ta) return false;
+  float sg = inside ? -1. : 1.; float st = uVStep*.75; float t = ta;
+  for(int i=0;i<420;i++){
+    float v = (dens(ro+rd*t)-ISO)*sg;
+    if(v > 0.){
+      float a = max(t-st, ta), b = t;
+      for(int k=0;k<6;k++){ float m = (a+b)*.5; if((dens(ro+rd*m)-ISO)*sg > 0.) b = m; else a = m; }
+      tHit = b; return true;
+    }
+    // empty-space skip: far below the iso level we can take longer strides
+    t += v < -.4 ? st*2. : st;
+    if(t > tb) break;
+  }
+  if(inside){ tHit = tb; return true; }
+  return false;
+}
+vec3 shadeWater(vec3 p, vec3 n, vec3 rd){
   float ndv = max(dot(n,-rd), 0.);
   float F = .02 + .98*pow(1.-ndv, 5.);
-  vec3 R = reflect(rd, n);
-  vec3 refl = trace(p + n*.002, R, 0.);
-  vec3 T = refract(rd, n, 1./1.333);
-  float d = clamp(thick, .0008, .5);
-  vec3 N2 = normalize(n - 2.*dot(n,T)*T);
-  vec3 Bp = p + T*d; Bp.y = max(Bp.y, .0005);
-  vec3 T2 = refract(T, -N2, 1.333);
-  vec3 refr;
-  if(dot(T2,T2) < .5){ T2 = reflect(T, -N2); refr = trace(Bp, T2, .05)*.8 + env(T2,.4)*.1; }
-  else refr = trace(Bp, T2, 0.);
-  vec3 absorb = exp(-vec3(.45,.07,.035)*d*2.5);
-  float aer = (1.-exp(-aerT*90.))*uAerMix;
-  vec3 scat = uKeyI*uKeyCol*.1*lightTrans(p).x + uAmb*2.2 + env(-rd, .8)*.3;
-  vec3 body = mix(refr*absorb, scat, clamp(aer,0.,.9));
-  // weak direct specular lobe from the key (keeps highlights when the softbox reflection is off-surface)
-  vec3 H = normalize(uL - rd); float spec = pow(max(dot(n,H),0.), 900.)*uKeyI*2.;
+  vec3 refl = trace(p + n*.002, reflect(rd, n), 0.);
+  // refracted path: enter, travel to the back surface, refract out (with up to one internal reflection)
+  vec3 dir = refract(rd, n, 1./1.333);
+  vec3 q = p - n*uVStep*.5;
+  vec3 thru = vec3(1.), acc = vec3(0.); float path = 0., aer = 0.;
+  for(int b=0;b<3;b++){
+    float te; marchVol(q, dir, 1.5, true, te); te = max(te, uVStep);
+    vec3 Bp = q + dir*te; path += te; aer += aerAt(q + dir*te*.5)*te;
+    vec3 n2 = volNormal(Bp);
+    if(dot(n2, dir) < 0.) n2 = -n2;
+    vec3 T2 = refract(dir, -n2, 1.333);
+    if(dot(T2,T2) < .5){ dir = reflect(dir, -n2); q = Bp - n2*uVStep*.3; continue; }
+    float c2 = max(dot(dir, n2), 0.); float F2 = .02 + .98*pow(1.-c2, 5.);
+    vec3 o = Bp + n2*.002; o.y = max(o.y, .0005);
+    acc += thru*(1.-F2)*trace(o, T2, 0.);
+    thru *= F2; dir = reflect(dir, -n2); q = Bp - n2*uVStep*.3;
+  }
+  acc += thru*env(dir, .3);
+  vec3 absorb = exp(-vec3(.45,.07,.035)*path*2.);
+  float cloud = (1.-exp(-aer*60.))*uAerMix;
+  vec3 scat = uKeyI*uKeyCol*.08 + uAmb*2. + env(-rd, .9)*.25;
+  vec3 body = mix(acc*absorb, scat, clamp(cloud, 0., .8));
+  vec3 H = normalize(uL - rd); float spec = pow(max(dot(n,H),0.), 1200.)*uKeyI*2.;
   return refl*F + body*(1.-F) + uKeyCol*spec*F*8.;
 }
 vec3 shadeMembrane(vec3 behind, vec3 p, vec3 n, vec3 rd){
@@ -868,14 +913,14 @@ vec3 shadeMembrane(vec3 behind, vec3 p, vec3 n, vec3 rd){
   float ndv = max(dot(n,-rd), 0.);
   float F = .045 + .955*pow(1.-ndv, 5.);
   vec3 R = reflect(rd, n);
-  vec3 refl = trace(p + n*.002, R, .14);
+  vec3 refl = env(R, .32)*.8 + trace(p + n*.002, R, .3)*.2;
   float ndl = dot(n, uL);
   vec3 base = uRubber;
   vec3 diff = base*(uKeyI*uKeyCol*max(ndl,0.)/3.14159 + uAmb*1.2);
-  vec3 transl = base*base*uKeyI*uKeyCol*max(-ndl,0.)*.22;
+  vec3 transl = base*uKeyI*uKeyCol*(max(-ndl,0.)*.35 + .08*pow(1.-ndv,2.)) + base*uBack*.25*max(dot(n, vec3(0.,-.1,1.)), 0.);
   float path = 1./max(ndv, .18);
   vec3 tr = pow(mix(vec3(1.), base, .92), vec3(path*1.1))*uRubberT;
-  vec3 H = normalize(uL - rd); float spec = pow(max(dot(n,H),0.), 180.)*uKeyI*.6;
+  vec3 H = normalize(uL - rd); float spec = pow(max(dot(n,H),0.), 60.)*uKeyI*.35;
   return refl*F + (1.-F)*(behind*tr + diff*(1.-uRubberT*.6) + transl) + uKeyCol*spec*F*4.;
 }
 void main(){
@@ -892,13 +937,12 @@ void main(){
   else if(id==2) col = shadeBullet(ro+rd*tS, nS, rd);
   else { vec3 p = ro+rd*tS; col = vec3(.75,.73,.7)*(uKeyI*uKeyCol*max(dot(nS,uL),0.)/3.14159*lightTrans(p) + uAmb*1.2); }
   float zOut = zS;
-  float zW = texelFetch(uWaterZ, pc, 0).r;
-  if(zW < zS){
-    vec3 p = ro + rd*(zW/cz);
-    vec3 n = waterNormal(pc, zW, rd);
-    vec2 th = texture(uThick, uv).rg;
-    col = shadeWater(p, n, rd, th.r, th.g);
-    zOut = zW;
+  float tw;
+  if(uVolOn==1 && marchVol(ro, rd, id==0 ? 1e3 : tS, false, tw)){
+    vec3 p = ro + rd*tw;
+    vec3 n = volNormal(p); if(dot(n, rd) > 0.) n = -n;
+    col = shadeWater(p, n, rd);
+    zOut = tw*cz;
   }
   float zM = texelFetch(uMemZ, pc, 0).r;
   if(zM > 0. && zM < zOut + .012){
@@ -940,12 +984,12 @@ void main(){
     vCol = vec3(0.);
     gl_Position = vec4((sp/uRes*2.-1.)*cm.w, cm.z, cm.w);
   } else {
-    float rm = min(.003 + .028*sqrt(age), .05);
+    float rm = min(.002 + .02*sqrt(age), .035);
     vec3 wp = p + (uCamRight*k.x + uCamUp*k.y)*rm;
     gl_Position = uVP*vec4(wp,1.);
     vLoc = k; vRad = rm; vLen = 0.;
     float fadeIn = smoothstep(0., .0006, age);
-    vAlpha = uMistK*.22*fadeIn*min(1., pow(.005/rm, 2.))*exp(-age*1.5);
+    vAlpha = uMistK*.06*fadeIn*min(1., pow(.004/rm, 2.))*exp(-age/.035);
     float g = .6; float ct = dot(uL, V);
     float ph = (1.-g*g)/pow(1.+g*g-2.*g*ct, 1.5);
     vCol = uKeyI*uKeyCol*ph*.35 + uAmb*3.;
@@ -1118,8 +1162,8 @@ const QUAL = { low: [3500, 9000], medium: [7000, 16000], high: [12000, 26000] };
 const S = {
   caliber: '9mm', speed: 370, offset: 0, radius: 8, height: 1.0, tension: 42, color: 'red',
   gravity: 9.81, viscosity: 0.35, spray: 1, mist: 1, air: 1, coupling: 0.5,
-  keyI: 3.2, keyAz: -40, keyEl: 42, fill: 1, rim: 1, env: 'studio', exposure: 0,
-  fstop: 8, shutter: 50000, fov: 30, quality: 'medium', scale: 1,
+  back: 0.16, keyI: 3.2, keyAz: -40, keyEl: 42, fill: 1, rim: 1, env: 'studio', exposure: 0,
+  fstop: 11, shutter: 50000, fov: 30, quality: 'medium', scale: 1,
   t: -0.0004, playing: true, speedMode: 'ramp'
 };
 const cam = { yaw: 0.35, pitch: 0.08, dist: 0.95, target: [0, 1.0, 0] };
@@ -1158,7 +1202,7 @@ function onSim(m) {
     if (m.attrs.length) sim.sprayAttr.set(m.attrs, m.attrStart * 3), sim.attrDirty = true;
     for (let i = 0; i < m.wet.length; i += 2) sim.wet[m.wet[i]] = m.wet[i + 1];
     if (m.wet.length) sim.wetDirty = true;
-    if (m.aer) { sim.aer = m.aer; sim.aerDirty = true; }
+    if (m.aer) { sim.aer = m.aer; sim.aerDirty = true; sim.aerKey = 1; }
     const pct = Math.round(100 * sim.frames.length / sim.times.length);
     $('bake').textContent = 'Simulating… ' + pct + '% (' + fmtT(m.t) + ' ready)';
     if (sim.frames.length <= 3 || S.t <= m.t + 0.01) dirty = true;
@@ -1200,6 +1244,54 @@ function framePair(t) {
   const last = f.length - 1; if (t >= f[last].t) return { a: last, b: last, m: 0, dt: last > 0 ? f[last].t - f[last - 1].t : 1e-4 };
   let lo = 0, hi = last; while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (f[mid].t <= t) lo = mid; else hi = mid; }
   const dt = f[hi].t - f[lo].t; return { a: lo, b: hi, m: dt > 0 ? (t - f[lo].t) / dt : 0, dt: Math.max(dt, 1e-6) };
+}
+
+// ------------------------------------------------------------------ water density volume (CPU splat → 3D texture)
+const vol = { tex: gl.createTexture(), key: '', on: false, min: [0, 0, 0], size: [1, 1, 1], step: 0.01, grid: null, agrid: null, bytes: null, pts: null };
+gl.bindTexture(gl.TEXTURE_3D, vol.tex);
+gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+[gl.TEXTURE_WRAP_S, gl.TEXTURE_WRAP_T, gl.TEXTURE_WRAP_R].forEach(w => gl.texParameteri(gl.TEXTURE_3D, w, gl.CLAMP_TO_EDGE));
+gl.texImage3D(gl.TEXTURE_3D, 0, gl.RG8, 1, 1, 1, 0, gl.RG, gl.UNSIGNED_BYTE, new Uint8Array(2));
+function buildVolume(fp) {
+  const key = fp.a + ':' + fp.b + ':' + fp.m.toFixed(4) + ':' + (sim.aerKey || 0); if (key === vol.key) return; vol.key = key;
+  const A = sim.frames[fp.a], Bf = sim.frames[fp.b], m = fp.m, N = sim.N, iq = 1 / 4096;
+  const sp = sim.s, h = 1.9 * sp, yCut = sim.rp * 1.35;
+  if (!vol.pts) vol.pts = new Float32Array(N * 4);
+  const pts = vol.pts; let n = 0; let x0 = 1e9, y0 = 1e9, z0 = 1e9, x1 = -1e9, y1 = -1e9, z1 = -1e9;
+  const aerK = S.t <= 0 ? 0 : Math.min(1, S.t / Math.max(sim.bullet.tx, 1e-5)) * Math.exp(-S.t / 0.35);
+  for (let i = 0; i < N; i++) {
+    const i3 = i * 3; if (A.bulk[i3] < -32000 || Bf.bulk[i3] < -32000) continue;
+    if (A.iso[i] * (1 - m) + Bf.iso[i] * m > 127) continue;
+    const X = (A.bulk[i3] + (Bf.bulk[i3] - A.bulk[i3]) * m) * iq, Y = (A.bulk[i3 + 1] + (Bf.bulk[i3 + 1] - A.bulk[i3 + 1]) * m) * iq, Z = (A.bulk[i3 + 2] + (Bf.bulk[i3 + 2] - A.bulk[i3 + 2]) * m) * iq;
+    if (Y < yCut) continue;
+    pts[n * 4] = X; pts[n * 4 + 1] = Y; pts[n * 4 + 2] = Z; pts[n * 4 + 3] = sim.aer[i] * aerK; n++;
+    if (X < x0) x0 = X; if (X > x1) x1 = X; if (Y < y0) y0 = Y; if (Y > y1) y1 = Y; if (Z < z0) z0 = Z; if (Z > z1) z1 = Z;
+  }
+  if (n < 4) { vol.on = false; return; }
+  x0 -= h; y0 -= h; z0 -= h; x1 += h; y1 += h; z1 += h;
+  const ext = Math.max(x1 - x0, y1 - y0, z1 - z0); const vs = Math.max(0.5 * sp, ext / 120);
+  const nx = Math.ceil((x1 - x0) / vs) + 1, ny = Math.ceil((y1 - y0) / vs) + 1, nz = Math.ceil((z1 - z0) / vs) + 1; const nv = nx * ny * nz;
+  if (!vol.grid || vol.grid.length < nv) { vol.grid = new Float32Array(nv); vol.agrid = new Float32Array(nv); vol.bytes = new Uint8Array(nv * 2); }
+  const g = vol.grid, ag = vol.agrid; g.fill(0, 0, nv); ag.fill(0, 0, nv);
+  const kr = h / vs, ih2 = 1 / (h * h), sxy = nx * ny;
+  for (let k = 0; k < n; k++) {
+    const fx = (pts[k * 4] - x0) / vs, fy = (pts[k * 4 + 1] - y0) / vs, fz = (pts[k * 4 + 2] - z0) / vs, ae = pts[k * 4 + 3];
+    const ia = Math.max(0, Math.ceil(fx - kr)), ib = Math.min(nx - 1, Math.floor(fx + kr));
+    const ja = Math.max(0, Math.ceil(fy - kr)), jb = Math.min(ny - 1, Math.floor(fy + kr));
+    const ka = Math.max(0, Math.ceil(fz - kr)), kb = Math.min(nz - 1, Math.floor(fz + kr));
+    for (let kk = ka; kk <= kb; kk++) { const dz = (kk - fz) * vs, dz2 = dz * dz;
+      for (let jj = ja; jj <= jb; jj++) { const dy = (jj - fy) * vs, dyz = dz2 + dy * dy; if (dyz >= h * h) continue; const row = kk * sxy + jj * nx;
+        for (let ii = ia; ii <= ib; ii++) { const dx = (ii - fx) * vs; const q = 1 - (dyz + dx * dx) * ih2; if (q <= 0) continue; const w = q * q * q; g[row + ii] += w; if (ae > 0) ag[row + ii] += w * ae; } } }
+  }
+  if (!sim.volNorm) { let mx = 0; for (let i = 0; i < nv; i++) if (g[i] > mx) mx = g[i]; sim.volNorm = 1 / (mx * 0.93); }
+  const nk = sim.volNorm * 128, by = vol.bytes;
+  for (let i = 0; i < nv; i++) { const v = g[i] * nk; by[i * 2] = v > 255 ? 255 : v; const a = ag[i] * nk; by[i * 2 + 1] = a > 255 ? 255 : a; }
+  gl.bindTexture(gl.TEXTURE_3D, vol.tex);
+  gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+  gl.texImage3D(gl.TEXTURE_3D, 0, gl.RG8, nx, ny, nz, 0, gl.RG, gl.UNSIGNED_BYTE, by.subarray(0, nv * 2));
+  vol.min = [x0, y0, z0]; vol.size = [(nx - 1) * vs, (ny - 1) * vs, (nz - 1) * vs]; vol.step = vs; vol.on = true;
+  // texture coords map voxel centres: shift min by half a voxel so sample (i+0.5)/n lands on voxel i
+  vol.min = [x0 - 0.5 * vs, y0 - 0.5 * vs, z0 - 0.5 * vs]; vol.size = [nx * vs, ny * vs, nz * vs];
 }
 
 function updateMembrane(fp) {
@@ -1289,38 +1381,8 @@ function render() {
 
   gl.disable(gl.BLEND); gl.disable(gl.DEPTH_TEST); gl.disable(gl.CULL_FACE);
 
-  // 1. water depth (sphere impostors)
-  target(G.wz); gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LESS); gl.depthMask(true);
-  gl.clearBufferfv(gl.COLOR, 0, [1e6, 0, 0, 0]); gl.clearDepth(1); gl.clear(gl.DEPTH_BUFFER_BIT);
-  let p = P.pDepth; gl.useProgram(p);
-  gl.uniformMatrix4fv(p.u('uV'), false, Vm); gl.uniformMatrix4fv(p.u('uP'), false, Pm);
-  gl.uniform1f(p.u('uMix'), fp.m); gl.uniform1f(p.u('uQ'), 1 / 4096); gl.uniform1f(p.u('uR'), rp); gl.uniform1f(p.u('uAerK'), aerK); gl.uniform1f(p.u('uSkipIso'), 1);
-  gl.bindVertexArray(vaoBulk); gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, sim.N);
-  gl.disable(gl.DEPTH_TEST);
-
-  // 2. thickness (additive, half res)
-  target(G.th); gl.clearBufferfv(gl.COLOR, 0, [0, 0, 0, 0]);
-  gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE);
-  p = P.pThick; gl.useProgram(p);
-  gl.uniformMatrix4fv(p.u('uV'), false, Vm); gl.uniformMatrix4fv(p.u('uP'), false, Pm);
-  gl.uniform1f(p.u('uMix'), fp.m); gl.uniform1f(p.u('uQ'), 1 / 4096); gl.uniform1f(p.u('uR'), rp * 1.15); gl.uniform1f(p.u('uAerK'), aerK); gl.uniform1f(p.u('uSkipIso'), 1);
-  gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, sim.N);
-  gl.disable(gl.BLEND);
-
-  // 3. bilateral depth smoothing (2 iterations, separable)
-  p = P.bilat; gl.useProgram(p); gl.uniform1f(p.u('uWR'), rp * 2.2); gl.uniform1f(p.u('uFpx'), fpx);
-  let src = G.wz.tex[0];
-  for (let it = 0; it < 3; it++) {
-    target(G.wz1); bindTex(p, 'uTex', src, 0); gl.uniform2f(p.u('uDir'), 1, 0); quad();
-    target(G.wz2); bindTex(p, 'uTex', G.wz1.tex[0], 0); gl.uniform2f(p.u('uDir'), 0, 1); quad();
-    src = G.wz2.tex[0];
-  }
-  // 4. thickness blur
-  p = P.gauss; gl.useProgram(p);
-  for (let it = 0; it < 2; it++) {
-    target(G.th2); bindTex(p, 'uTex', G.th.tex[0], 0); gl.uniform2f(p.u('uDir'), 1, 0); quad();
-    target(G.th); bindTex(p, 'uTex', G.th2.tex[0], 0); gl.uniform2f(p.u('uDir'), 0, 1); quad();
-  }
+  let p;
+  buildVolume(fp);
 
   // 5. membrane G-buffer
   target(G.mem); gl.clearBufferfv(gl.COLOR, 0, [0, 0, 0, 0]); gl.clearBufferfv(gl.COLOR, 1, [0, 0, 0, 0]); gl.clear(gl.DEPTH_BUFFER_BIT);
@@ -1340,12 +1402,12 @@ function render() {
     lastLightKey = lkey;
     target(lightF); gl.clearBufferfv(gl.COLOR, 0, [0, 0, 0, 0]); gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE);
     p = P.pThick; gl.useProgram(p); gl.uniformMatrix4fv(p.u('uV'), false, LV); gl.uniformMatrix4fv(p.u('uP'), false, LP);
-    gl.uniform1f(p.u('uMix'), fp.m); gl.uniform1f(p.u('uQ'), 1 / 4096); gl.uniform1f(p.u('uR'), rp * 1.3); gl.uniform1f(p.u('uAerK'), 0); gl.uniform1f(p.u('uSkipIso'), 0);
+    gl.uniform1f(p.u('uMix'), fp.m); gl.uniform1f(p.u('uQ'), 1 / 4096); gl.uniform1f(p.u('uR'), rp * 1.3); gl.uniform1f(p.u('uAerK'), 0); gl.uniform1f(p.u('uSkipIso'), 0); gl.uniform1f(p.u('uYCut'), rp * 1.35);
     gl.bindVertexArray(vaoBulk); gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, sim.N);
     if (memCount) { p = P.memLight; gl.useProgram(p); gl.uniformMatrix4fv(p.u('uV'), false, LV); gl.uniformMatrix4fv(p.u('uP'), false, LP); gl.bindVertexArray(vaoMem); gl.drawElements(gl.TRIANGLES, memCount, gl.UNSIGNED_SHORT, 0); }
     gl.disable(gl.BLEND);
     p = P.gauss; gl.useProgram(p);
-    for (let it = 0; it < 2; it++) {
+    for (let it = 0; it < 4; it++) {
       target(lightF2); bindTex(p, 'uTex', lightF.tex[0], 0); gl.uniform2f(p.u('uDir'), 1, 0); quad();
       target(lightF); bindTex(p, 'uTex', lightF2.tex[0], 0); gl.uniform2f(p.u('uDir'), 0, 1); quad();
     }
@@ -1356,10 +1418,12 @@ function render() {
     gl.uniform3fv(p.u('uCamPos'), cb.pos); gl.uniform3fv(p.u('uCamFwd'), cb.fwd); gl.uniform3fv(p.u('uCamRight'), cb.right); gl.uniform3fv(p.u('uCamUp'), cb.up);
     gl.uniform1f(p.u('uTanH'), tanH); gl.uniform1f(p.u('uAspect'), asp); gl.uniform2f(p.u('uRes'), W, H);
     gl.uniform3fv(p.u('uL'), L); gl.uniform3fv(p.u('uKeyCol'), keyCol); gl.uniform3fv(p.u('uRimL'), rimL); gl.uniform3fv(p.u('uAmb'), amb);
-    gl.uniform1f(p.u('uKeyI'), S.keyI); gl.uniform1f(p.u('uRim'), S.env === 'studio' ? S.rim : 0); gl.uniform1f(p.u('uFill'), S.fill); gl.uniform1i(p.u('uEnv'), S.env === 'studio' ? 0 : 1);
+    gl.uniform1f(p.u('uKeyI'), S.keyI); gl.uniform1f(p.u('uBack'), S.env === 'studio' ? S.back : 0); gl.uniform1f(p.u('uRim'), S.env === 'studio' ? S.rim : 0); gl.uniform1f(p.u('uFill'), S.fill); gl.uniform1i(p.u('uEnv'), S.env === 'studio' ? 0 : 1);
   };
   target(G.comp); p = P.comp; gl.useProgram(p); setCommon(p);
-  bindTex(p, 'uWaterZ', src, 0); bindTex(p, 'uThick', G.th.tex[0], 1); bindTex(p, 'uMemN', G.mem.tex[0], 2); bindTex(p, 'uMemZ', G.mem.tex[1], 3); bindTex(p, 'uLight', lightF.tex[0], 4); bindTex(p, 'uWet', wetTex, 5);
+  bindTex(p, 'uMemN', G.mem.tex[0], 2); bindTex(p, 'uMemZ', G.mem.tex[1], 3); bindTex(p, 'uLight', lightF.tex[0], 4); bindTex(p, 'uWet', wetTex, 5);
+  gl.activeTexture(gl.TEXTURE6); gl.bindTexture(gl.TEXTURE_3D, vol.tex); gl.uniform1i(p.u('uVol'), 6);
+  gl.uniform3fv(p.u('uVMin'), vol.min); gl.uniform3fv(p.u('uVSize'), vol.size); gl.uniform1f(p.u('uVStep'), vol.step); gl.uniform1i(p.u('uVolOn'), vol.on ? 1 : 0);
   gl.uniform1f(p.u('uTime'), t); gl.uniform1f(p.u('uWetE'), 2.56); gl.uniform1f(p.u('uAerMix'), 0.45);
   gl.uniformMatrix4fv(p.u('uLightVP'), false, LVP);
   const b = sim.bullet; const bx = bulletX(t);
@@ -1456,6 +1520,7 @@ const CONTROLS = [
   { id: 'keyAz', label: 'Key azimuth', min: -180, max: 180, step: 1, unit: '°' },
   { id: 'keyEl', label: 'Key elevation', min: 5, max: 88, step: 1, unit: '°' },
   { id: 'fill', label: 'Fill / ambient', min: 0, max: 3, step: 0.05, fmt: v => v.toFixed(2) },
+  { id: 'back', label: 'Backlight panel', min: 0, max: 2, step: 0.01, fmt: v => v.toFixed(2) },
   { id: 'rim', label: 'Rim strip light', min: 0, max: 4, step: 0.05, fmt: v => v.toFixed(2) },
   { id: 'exposure', label: 'Exposure', min: -3, max: 3, step: 0.1, fmt: v => (v >= 0 ? '+' : '') + v.toFixed(1) + ' EV' },
   ['Camera'],
