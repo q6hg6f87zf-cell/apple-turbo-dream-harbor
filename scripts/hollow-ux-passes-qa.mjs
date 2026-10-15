@@ -166,7 +166,13 @@ const browser = await chromium.launch({ headless: true, executablePath });
   }));
   check("world opens on the chooser", !hub.sheet && hub.dock);
 
-  await page.getByRole("button", { name: /Ironclad/i }).first().click();
+  const pause = page.locator("[data-pause-menu]");
+  if (await pause.isVisible().catch(() => false)) {
+    await pause.getByRole("button", { name: "Close", exact: true }).click();
+    await pause.waitFor({ state: "hidden", timeout: 5_000 });
+  }
+  const ironclad = page.locator('button:has(img[src*="/map/regions/thumbs/ironclad.jpg"])').first();
+  await ironclad.click();
   await page.waitForTimeout(800);
   const sheet = await page.evaluate(() => {
     const el = document.querySelector("[data-region-sheet]");
