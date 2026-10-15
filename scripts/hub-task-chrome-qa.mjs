@@ -18,7 +18,7 @@ function seedSave() {
         screen: "hq",
         openedFrom: null,
         playerName: "Brent",
-        seenTalk: ["wake", "welcome", "briefing", "forge"],
+        seenTalk: ["wake", "welcome", "briefing", "forge", "kane"],
         talk: null,
         talkQueue: [],
         operatives: [
@@ -277,6 +277,9 @@ const market = results["chrome-after-market"];
 const vh = hub?.viewport?.h ?? 844;
 const hubChrome = (hub?.header?.h ?? 999) + (hub?.dock?.h ?? 999);
 const hubPct = (hubChrome / vh) * 100;
+const taskVh = market?.viewport?.h ?? vh;
+const taskChrome = (market?.header?.h ?? 999) + (market?.dock?.h ?? 999);
+const taskPct = (taskChrome / taskVh) * 100;
 const artOk = (m) =>
   m?.art &&
   m.art.display !== "none" &&
@@ -299,13 +302,14 @@ const ok =
   veilNotOpaque(hub) &&
   !hub.overflowX &&
   market?.chrome === "task" &&
-  !market.dock &&
+  market.dock &&
+  taskPct <= 16 &&
   market.railDisplay === "none" &&
   !!market.back &&
   !market.fabVisible &&
   !market.guidance &&
   artOk(market) &&
-  ["ledger", "codex"].every((id) => results[`chrome-after-${id}`]?.chrome === "task" && !results[`chrome-after-${id}`]?.dock) &&
+  ["ledger", "codex"].every((id) => results[`chrome-after-${id}`]?.chrome === "task" && results[`chrome-after-${id}`]?.dock) &&
   results["chrome-after-inventory"]?.chrome === "hub" &&
   results["chrome-after-inventory"]?.dock &&
   results["chrome-after-safe-area"]?.back?.top >= 40 &&
@@ -315,5 +319,6 @@ const ok =
   !results["chrome-after-market-428"]?.overflowX;
 
 console.log("HUB_CHROME_PX", hubChrome, "PCT", hubPct.toFixed(1));
+console.log("TASK_CHROME_PX", taskChrome, "PCT", taskPct.toFixed(1));
 await browser.close();
 process.exit(ok ? 0 : 1);
