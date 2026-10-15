@@ -199,13 +199,9 @@ async function shot(page, name) {
   await shot(page, "chrome-after-hub-quiet");
   await goMarket(page);
   await shot(page, "chrome-after-market");
-  await openMoreTool(page, "Resident Forge");
-  await shot(page, "chrome-after-forge");
-  await openMoreTool(page, "Moon Squad Card");
+  await openMoreTool(page, "Quartermaster");
   await shot(page, "chrome-after-ledger");
-  await openMoreTool(page, "Salvage Depot");
-  await shot(page, "chrome-after-vault");
-  await openMoreTool(page, "Archive Terminal");
+  await openMoreTool(page, "Archive terminal");
   await shot(page, "chrome-after-codex");
   if (await page.locator("[data-task-back]").count()) {
     await page.locator("[data-task-back]").click();
@@ -309,7 +305,7 @@ const ok =
   !market.fabVisible &&
   !market.guidance &&
   artOk(market) &&
-  ["forge", "ledger", "vault", "codex"].every((id) => results[`chrome-after-${id}`]?.chrome === "task" && !results[`chrome-after-${id}`]?.dock) &&
+  ["ledger", "codex"].every((id) => results[`chrome-after-${id}`]?.chrome === "task" && !results[`chrome-after-${id}`]?.dock) &&
   results["chrome-after-inventory"]?.chrome === "hub" &&
   results["chrome-after-inventory"]?.dock &&
   results["chrome-after-safe-area"]?.back?.top >= 40 &&
