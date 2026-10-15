@@ -26,6 +26,11 @@ jobs:
         # lock mismatch visible as a separate repository hygiene issue.
         run: npm install --no-audit --no-fund
 
+      - name: Capture npm lockfile repair
+        run: |
+          git diff -- package-lock.json
+          exit 1
+
       - name: Typecheck
         run: npm run typecheck
 
