@@ -1,8 +1,5 @@
 name: Hollow Realm QA
 
-permissions:
-  contents: write
-
 on:
   pull_request:
     branches: [main]
@@ -16,8 +13,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: fix/tanstack-start-cve
 
       - name: Node 22
         uses: actions/setup-node@v4
@@ -26,16 +21,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
-
-      - name: Commit npm-generated lockfile
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package-lock.json
-          git commit -m "Refresh lockfile for patched TanStack Start"
-          git push origin HEAD:fix/tanstack-start-cve
-          exit 1
+        run: npm ci --no-audit --no-fund
 
       - name: Typecheck
         run: npm run typecheck
@@ -51,12 +37,17 @@ jobs:
           HOLLOW_SIM_RUNS: 2500
         run: node scripts/hollow-realm-sim.mjs
 
+      # The campaign sim models the economy and never enters a fight. This one
+      # drives the combat engine itself, and fails if what the squad carries
+      # stops changing how the boss goes.
       - name: Boss matchup simulation
         run: node --import ./scripts/register-ts-ext.mjs scripts/combat-balance-sim.mjs 400
 
       - name: Install Chromium for mobile smoke
         run: npx playwright install --with-deps chromium
 
+      # Needs no dev server: it compiles the globe's own shaders and compares
+      # the baked planet against the procedural one.
       - name: Globe terrain bake parity
         run: node scripts/globe-bake-qa.mjs
 
