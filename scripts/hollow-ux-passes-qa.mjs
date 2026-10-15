@@ -61,7 +61,7 @@ function baseSave(extra) {
     started: true,
     tutorial: "done",
     playerName: "Brent",
-    seenTalk: ["wake", "welcome", "briefing", "forge", "market", "map", "inventory"],
+    seenTalk: ["wake", "welcome", "briefing", "forge", "market", "map", "inventory", "kane"],
     talk: null,
     talkQueue: [],
     day: 4,
@@ -166,7 +166,13 @@ const browser = await chromium.launch({ headless: true, executablePath });
   }));
   check("world opens on the chooser", !hub.sheet && hub.dock);
 
-  await page.getByRole("button", { name: /Ironclad/i }).first().click();
+  const pause = page.locator("[data-pause-menu]");
+  if (await pause.isVisible().catch(() => false)) {
+    await pause.getByRole("button", { name: "Close", exact: true }).click();
+    await pause.waitFor({ state: "hidden", timeout: 5_000 });
+  }
+  const ironclad = page.locator('button:has(img[src*="/map/regions/thumbs/ironclad.jpg"])').first();
+  await ironclad.click();
   await page.waitForTimeout(800);
   const sheet = await page.evaluate(() => {
     const el = document.querySelector("[data-region-sheet]");
@@ -240,7 +246,6 @@ const browser = await chromium.launch({ headless: true, executablePath });
 {
   const save = baseSave({
     screen: "inventory",
-    shift: { watchesLeft: 3 },
     vault: [
       {
         id: "v1",
@@ -298,7 +303,7 @@ const browser = await chromium.launch({ headless: true, executablePath });
 // urgent state must silence the dots, or they duplicate the guidance row
 {
   const downed = { ...RESIDENT, status: "downed" };
-  const { ctx, page } = await open(browser, baseSave({ screen: "inventory", operatives: [downed], shift: { watchesLeft: 3 } }));
+  const { ctx, page } = await open(browser, baseSave({ screen: "inventory", operatives: [downed] }));
   const urgent = await page.evaluate(() => ({
     guidance: document.querySelector("[data-guidance]")?.getAttribute("data-guidance") ?? null,
     dots: document.querySelectorAll("[data-nav-dot]").length,

@@ -1,5 +1,5 @@
 import { X } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useDialogFocus } from "./use-dialog-focus";
 
@@ -24,6 +24,17 @@ export function ItemInspectShell({
 }) {
   const [zoom, setZoom] = useState(false);
   const focus = useDialogFocus<HTMLDivElement>();
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.repeat) return;
+      event.preventDefault();
+      if (zoom) setZoom(false);
+      else onClose();
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [onClose, zoom]);
 
   // Rendered out of the inventory list on purpose: inside it, the sheet was a
   // "fixed" element within a transformed scroll container, and its commit

@@ -196,7 +196,7 @@ for (const [label, expected] of destinations) {
 await page.getByRole("button", { name: "Pack", exact: true }).last().click();
 await page.locator('[data-inventory="1"]').waitFor();
 await page.getByRole("button", { name: /UX Rail Carbine/ }).click();
-const inventoryModal = page.locator("div.fixed.inset-0").filter({ hasText: "UX Rail Carbine" });
+const inventoryModal = page.locator('[data-item-inspect="1"]').filter({ hasText: "UX Rail Carbine" });
 await inventoryModal.waitFor();
 await page.keyboard.press("Escape");
 await inventoryModal.waitFor({ state: "detached", timeout: 5_000 });

@@ -21,10 +21,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        # The repository's existing package-lock is stale against package.json.
-        # Use install for QA so type/build/gameplay checks can run; keep the
-        # lock mismatch visible as a separate repository hygiene issue.
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
 
       - name: Typecheck
         run: npm run typecheck

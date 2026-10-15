@@ -336,8 +336,18 @@ await page.getByText(/Construction stock, not pocket clutter|Material stays in V
 // still open and changing screens should dismiss that component naturally.
 await page.getByRole("button", { name: "World", exact: true }).click({ force: true });
 await page.getByRole("heading", { name: "World", exact: true }).waitFor({ timeout: 20_000 });
-await page.getByText(/Pick a region to brief the sortie/i).waitFor({ timeout: 10_000 });
-await page.getByRole("button", { name: /Orbit the world/i }).click();
+// World can legitimately open a Tyrone narration card. Dismiss it through the
+// real UI before testing the Orbit control so the smoke follows a player path
+// instead of clicking through an active overlay.
+for (let i = 0; i < 4; i += 1) {
+  const skip = page.getByRole("button", { name: /^Skip$/i });
+  if (!(await skip.count()) || !(await skip.first().isVisible().catch(() => false))) break;
+  await skip.first().click();
+  await page.waitForTimeout(150);
+}
+const orbit = page.getByRole("button", { name: /Orbit the world/i });
+await orbit.waitFor({ timeout: 10_000 });
+await orbit.click();
 await page.waitForTimeout(800);
 assert.ok((await page.locator("canvas").count()) >= 1, "Orbit theater did not mount a canvas.");
 
