@@ -61,7 +61,7 @@ function baseSave(extra) {
     started: true,
     tutorial: "done",
     playerName: "Brent",
-    seenTalk: ["wake", "welcome", "briefing", "forge", "market", "map", "inventory"],
+    seenTalk: ["wake", "welcome", "briefing", "forge", "market", "map", "inventory", "kane"],
     talk: null,
     talkQueue: [],
     day: 4,
