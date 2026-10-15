@@ -246,7 +246,6 @@ const browser = await chromium.launch({ headless: true, executablePath });
 {
   const save = baseSave({
     screen: "inventory",
-    shift: { watchesLeft: 3 },
     vault: [
       {
         id: "v1",
@@ -304,7 +303,7 @@ const browser = await chromium.launch({ headless: true, executablePath });
 // urgent state must silence the dots, or they duplicate the guidance row
 {
   const downed = { ...RESIDENT, status: "downed" };
-  const { ctx, page } = await open(browser, baseSave({ screen: "inventory", operatives: [downed], shift: { watchesLeft: 3 } }));
+  const { ctx, page } = await open(browser, baseSave({ screen: "inventory", operatives: [downed] }));
   const urgent = await page.evaluate(() => ({
     guidance: document.querySelector("[data-guidance]")?.getAttribute("data-guidance") ?? null,
     dots: document.querySelectorAll("[data-nav-dot]").length,
