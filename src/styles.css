@@ -2336,7 +2336,13 @@ body[data-region-map="1"] .ms-help,
 .ms-board-lead-shade {
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, color-mix(in oklab, var(--color-ink) 20%, transparent) 0%, color-mix(in oklab, var(--color-ink) 88%, transparent) 72%);
+  /* Chrome shell: deepen bottom shade so lead ticket copy stays readable over busy art */
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--color-ink) 28%, transparent) 0%,
+    color-mix(in oklab, var(--color-ink) 72%, transparent) 48%,
+    color-mix(in oklab, var(--color-ink) 94%, transparent) 100%
+  );
 }
 .ms-board-lead-seal {
   position: absolute;
@@ -2353,6 +2359,7 @@ body[data-region-map="1"] .ms-help,
   z-index: 1;
   display: block;
   padding: 5.5rem 1rem 1rem;
+  text-shadow: 0 1px 2px color-mix(in oklab, var(--color-ink) 80%, transparent);
 }
 .ms-board-ticket {
   background: color-mix(in oklab, var(--color-paper) 12%, var(--color-ink));
