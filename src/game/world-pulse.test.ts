@@ -163,3 +163,36 @@ test("day-board next-offer graph applies boost unlock cool mutations", () => {
   assert.equal(offerCopyKeyHook("  scarred-sector  "), "scarred-sector");
   assert.equal(offerCopyKeyHook(""), null);
 });
+
+test("wire revision with region paints shared scar without extras", () => {
+  let pulse = emptyWorldPulse();
+  pulse = applyLiveBeat(pulse, {
+    type: "revision",
+    campaignRevision: 30,
+    memberRevision: 9,
+    eventType: "BossCleared",
+    theater: "BossCleared",
+    region: "blackspire",
+    kind: "boss",
+    heatDelta: 8,
+    intelDelta: 2,
+    beatId: "boss_clear",
+    eventId: "boss-cleared:wire-1",
+  });
+  assert.equal(pulse.beats.length, 1);
+  assert.equal(pulse.beats[0]?.region, "blackspire");
+  const heat = selectAtlasHeat(pulse);
+  assert.equal(heat.cells.blackspire.heat, 8);
+  assert.equal(regionIsScarred(heat.cells.blackspire), true);
+});
+
+test("revision eventType without region is watermark only", () => {
+  let pulse = applyLiveBeat(emptyWorldPulse(), {
+    type: "revision",
+    campaignRevision: 31,
+    memberRevision: 1,
+    eventType: "MissionSettled",
+  });
+  assert.equal(pulse.beats.length, 0);
+  assert.equal(pulse.campaignRevision, 31);
+});

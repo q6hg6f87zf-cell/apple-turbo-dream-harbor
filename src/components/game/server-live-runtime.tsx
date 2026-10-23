@@ -10,6 +10,7 @@ import {
   requestLiveRefresh,
   setLiveRailHealthy,
 } from "@/game/server-live-rail";
+import { applyLiveWorldBeat } from "@/game/server-live-pulse";
 import { playAtlasBeatCue, playLiveEventCue } from "@/game/live-cues";
 import { playSettleSpectacle, type SettleSpectacleBeat } from "@/game/spectacle-kits";
 import { settleBeatCueId } from "@/game/settle-beat-audio";
@@ -135,6 +136,9 @@ export function ServerLiveRuntime() {
       }
       if (beat.type === "revision") {
         markUp();
+        // Shared campaign pulses → world-pulse holder (Atlas heat / day-board later).
+        // eventType-alone stays watermark-only inside applyLiveBeat; region paints scars.
+        applyLiveWorldBeat(beat);
         // Forge settle theater on live rail + Resonance SFX.
         if (beat.eventType) {
           // Resonance: theater SFX from Pulse eventType (MissionSettled → mission.settled).

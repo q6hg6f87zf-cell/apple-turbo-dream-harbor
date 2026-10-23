@@ -108,6 +108,15 @@ export function applyTheaterEvent(state: WorldPulseState, input: TheaterEventInp
   return pushBeat(state, event);
 }
 
+/**
+ * Apply a Pulse SSE beat.
+ *
+ * - hello / heartbeat → watermark only
+ * - revision + eventType/theater **without region** → watermark only (no scar paint)
+ * - revision + region (+ theater/eventType) → shared atlas marks / board projections
+ *
+ * Soft-reads Pulse wire extras on the beat when extras omit them.
+ */
 export function applyLiveBeat(
   state: WorldPulseState,
   raw: LiveBeat | unknown,
@@ -116,36 +125,56 @@ export function applyLiveBeat(
   const live = parseLiveBeat(raw);
   if (!live) return state;
 
-  let next = bumpWatermark(state, live.campaignRevision, live.memberRevision);
+  const next = bumpWatermark(state, live.campaignRevision, live.memberRevision);
 
-  if (live.type !== "revision" || !live.eventType) {
+  if (live.type !== "revision") {
     return next;
   }
 
-  const theater = theaterFromLiveEventType(live.eventType);
+  const theater =
+    live.theater ??
+    theaterFromLiveEventType(live.eventType) ??
+    (extras.theater ? theaterFromLiveEventType(extras.theater) : null);
   if (!theater) return next;
 
-  const kind = extras.kind ?? null;
-  const region = extras.region ?? null;
+  // Shared marks require a region — eventType-alone is a watermark bump only.
+  const region = live.region ?? extras.region ?? null;
+  if (!region) {
+    return next;
+  }
+
+  const kind = live.kind ?? extras.kind ?? null;
   const heatDelta =
-    typeof extras.heatDelta === "number" ? extras.heatDelta : defaultHeatDelta(theater, kind);
+    typeof live.heatDelta === "number"
+      ? live.heatDelta
+      : typeof extras.heatDelta === "number"
+        ? extras.heatDelta
+        : defaultHeatDelta(theater, kind);
   const intelDelta =
-    typeof extras.intelDelta === "number"
-      ? extras.intelDelta
-      : theater === "MissionSettled" || theater === "BossCleared"
-        ? 1
-        : 0;
-  const beatId = extras.beatId ?? defaultBeatId(theater, { kind, intelDelta, heatDelta });
+    typeof live.intelDelta === "number"
+      ? live.intelDelta
+      : typeof extras.intelDelta === "number"
+        ? extras.intelDelta
+        : theater === "MissionSettled" || theater === "BossCleared"
+          ? 1
+          : 0;
+  const beatId =
+    live.beatId ??
+    extras.beatId ??
+    defaultBeatId(theater, { kind, intelDelta, heatDelta });
+
+  const worldConsequence = live.worldConsequence ?? extras.worldConsequence;
 
   const eventId =
+    live.eventId ??
     extras.eventId ??
-    `live:${theater}:${live.campaignRevision}:${live.memberRevision}:${region ?? "na"}`;
+    `live:${theater}:${live.campaignRevision}:${live.memberRevision}:${region}`;
 
   return applyTheaterEvent(next, {
     ...extras,
     eventId,
     theater,
-    region: region ?? undefined,
+    region,
     kind: kind ?? undefined,
     heatDelta,
     intelDelta,
@@ -156,7 +185,7 @@ export function applyLiveBeat(
     },
     at: extras.at,
     duplicate: extras.duplicate,
-    worldConsequence: extras.worldConsequence,
+    worldConsequence,
   });
 }
 

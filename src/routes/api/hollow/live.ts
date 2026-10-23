@@ -2,19 +2,24 @@ import { createFileRoute } from "@tanstack/react-router";
 import { getSql } from "@/lib/db";
 import { hollowVerifiedUser } from "@/lib/hollow-identity.server";
 import {
+  attachTheaterIdentity,
   formatSseComment,
   formatSseData,
-  normalizeLiveEventType,
-  type LiveEventType,
+  softParseDomainEvent,
+  type LiveDomainEventSoft,
   type LiveHelloBeat,
   type LiveRevisionBeat,
 } from "@/game/server-live";
 
 /**
- * Pulse Milestone 2 — campaign/member revision SSE.
+ * Pulse Milestone 2 / Design Bible v1.3 priority 3 — campaign revision SSE
+ * with shared theater identity fanout.
  *
  * - Node ReadableStream + text/event-stream (not edge).
  * - Revision detection from DB poll (~750ms), not an in-memory EventEmitter bus.
+ * - Soft-read hollow_domain_event payload (region/theater/kind/heat/intel/beatId/
+ *   worldConsequence.offerMutations) so Atlas applyLiveBeat can paint other riders'
+ *   MissionSettled / BossCleared as shared scars — not local-only memberRevision.
  * - Long-lived streams hit platform maxDuration; client reconnects with backoff.
  * - Heartbeats keep HTTP/1.1 proxies from killing idle connections.
  */
@@ -49,24 +54,49 @@ async function readRevisions(userId: string): Promise<RevisionRow | null> {
   return rows[0] ?? null;
 }
 
+type DomainEventRow = {
+  event_id: string | null;
+  event_type: string | null;
+  region: string | null;
+  theater: string | null;
+  kind: string | null;
+  beat_id: string | null;
+  heat_delta: unknown;
+  intel_delta: unknown;
+  world_consequence: unknown;
+};
+
 /**
- * Soft-read latest domain event type when Vault's hollow_domain_event exists.
- * Never creates the table; omit eventType when absent or unread.
+ * Soft-read latest allowlisted domain event + payload theater identity.
+ * Vault owns hollow_domain_event (migration 0018+). Fail quiet until present.
+ * Never invents fields — omit when payload lacks them.
  */
-async function readRecentEventType(): Promise<LiveEventType | undefined> {
-  // Soft probe: Vault owns hollow_domain_event (migration 0018+). Fail quiet until present.
-  // Column: event_type holds MissionSettled | TransferSettled (Vault contract).
+async function readRecentDomainEvent(): Promise<LiveDomainEventSoft | undefined> {
   try {
     const sql = await getSql();
-    const rows = await sql<{ event_type: string }>`
-      select event_type
+    const rows = await sql<DomainEventRow>`
+      select
+        event_id,
+        event_type,
+        payload->>'region' as region,
+        payload->>'theater' as theater,
+        payload->>'kind' as kind,
+        payload->>'beatId' as beat_id,
+        payload->'heatDelta' as heat_delta,
+        payload->'intelDelta' as intel_delta,
+        payload->'worldConsequence' as world_consequence
       from hollow_domain_event
       where campaign_id = ${CAMPAIGN_ID}
-        and created_at > now() - interval '8 seconds'
+        and event_type in ('MissionSettled', 'TransferSettled', 'RaidOpened', 'BossCleared')
+        and created_at > now() - interval '10 seconds'
       order by created_at desc
       limit 1
     `;
-    return normalizeLiveEventType(rows[0]?.event_type);
+    const row = rows[0];
+    if (!row) return undefined;
+    const soft = softParseDomainEvent(row);
+    if (!soft.eventType && !soft.region && !soft.theater) return undefined;
+    return soft;
   } catch {
     return undefined;
   }
@@ -160,14 +190,14 @@ export const Route = createFileRoute("/api/hollow/live")({
               const campaignRevision = Number(row.campaign_revision) || 0;
               const memberRevision = Number(row.member_revision) || 0;
               if (campaignRevision > lastCampaign || memberRevision > lastMember) {
-                const eventType = await readRecentEventType();
+                const soft = await readRecentDomainEvent();
                 const beat: LiveRevisionBeat = {
                   type: "revision",
                   campaignRevision,
                   memberRevision,
                   at: new Date().toISOString(),
                 };
-                if (eventType) beat.eventType = eventType;
+                attachTheaterIdentity(beat, soft);
                 push(formatSseData(beat));
                 lastCampaign = campaignRevision;
                 lastMember = memberRevision;
