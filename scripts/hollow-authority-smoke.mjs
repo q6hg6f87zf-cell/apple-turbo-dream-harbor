@@ -220,6 +220,31 @@ assert.equal(parallelMission.status, 409, "Server allowed two simultaneous missi
 
 const waitMs = Math.max(0, new Date(missionStart.ticket.availableAt).getTime() - Date.now() + 120);
 if (waitMs) await new Promise((resolve) => setTimeout(resolve, waitMs));
+// Honest settle: ledger scales from ticket.sealedPerformanceScore only.
+// Client performanceScore / vaultCaps / ore / residentXp must never mint.
+const sealedScore = Number(missionStart.ticket.sealedPerformanceScore);
+assert.ok(Number.isFinite(sealedScore), "start_mission did not expose sealedPerformanceScore.");
+assert.ok(sealedScore >= 300 && sealedScore <= 950, `Sealed score escaped envelope: ${sealedScore}`);
+const expectedScale = Math.round((0.55 + (sealedScore / 1000) * 0.9) * 1000) / 1000;
+const scaleAmount = (base) => (base ? Math.max(0, Math.round(base * expectedScale)) : 0);
+// Ironclad scout authority table (must match authorityMissionReward).
+const baseVaultCaps = 180;
+const baseCardCaps = Math.max(15, Math.round(baseVaultCaps * 0.18)); // 32
+const baseOre = 0;
+const baseFavor = 1;
+const baseResidentXp = 18;
+const baseRiderXp = 3;
+const baseIntel = 2;
+const expectedVaultCaps = scaleAmount(baseVaultCaps);
+const expectedCardCaps = scaleAmount(baseCardCaps);
+const expectedFavor = scaleAmount(baseFavor);
+const expectedResidentXp = scaleAmount(baseResidentXp);
+const expectedRiderXp = scaleAmount(baseRiderXp);
+const expectedIntel = scaleAmount(baseIntel);
+const expectedTreasuryCaps = 1721 + expectedVaultCaps;
+const expectedCardCapsTotal = 4000 + expectedCardCaps;
+const expectedCardXp = 87 + expectedRiderXp;
+
 const settleResponse = await progression({
   command: "settle_mission",
   ticketId: missionStart.ticket.id,
@@ -230,32 +255,31 @@ const settleResponse = await progression({
 });
 assert.equal(settleResponse.status, 200);
 const settled = await body(settleResponse);
-// Milestone 1: performanceScore 1000 → scale 1.45 on ironclad scout base (180/32/…).
-// Client-submitted vaultCaps/ore/residentXp must never mint; only the scaled server table applies.
-assert.equal(settled.reward.performanceScore, 1000);
-assert.equal(settled.reward.scaleFactor, 1.45);
-assert.equal(settled.reward.baseAmounts?.vaultCaps, 180, "Base table drifted from ironclad scout.");
-assert.equal(settled.reward.vaultCaps, 261, "Server did not apply performance-scaled vault caps.");
-assert.equal(settled.reward.cardCaps, 46);
-assert.equal(settled.reward.ore, 0);
-assert.equal(settled.reward.favor, 1);
-assert.equal(settled.reward.residentXp, 26);
-assert.equal(settled.reward.riderXp, 4);
+assert.equal(settled.reward.performanceScore, sealedScore, "Settle used client score instead of sealed performance.");
+assert.equal(settled.reward.scaleFactor, expectedScale);
+assert.equal(settled.reward.baseAmounts?.vaultCaps, baseVaultCaps, "Base table drifted from ironclad scout.");
+assert.equal(settled.reward.vaultCaps, expectedVaultCaps, "Server did not apply sealed performance-scaled vault caps.");
+assert.equal(settled.reward.cardCaps, expectedCardCaps);
+assert.equal(settled.reward.ore, baseOre);
+assert.equal(settled.reward.favor, expectedFavor);
+assert.equal(settled.reward.residentXp, expectedResidentXp);
+assert.equal(settled.reward.riderXp, expectedRiderXp);
+assert.notEqual(settled.reward.performanceScore, 1000, "Client performanceScore 1000 minted settle reward.");
 assert.notEqual(settled.reward.vaultCaps, 999999999, "Client chose the mission cap reward.");
 assert.equal(settled.campaign.missions.ironclad, 1);
-assert.equal(settled.campaign.intel.ironclad, 3);
-assert.equal(settled.treasury.caps, 1982);
-assert.equal(settled.card.caps, 4046);
-assert.equal(settled.card.xp, 91);
+assert.equal(settled.campaign.intel.ironclad, expectedIntel);
+assert.equal(settled.treasury.caps, expectedTreasuryCaps);
+assert.equal(settled.card.caps, expectedCardCapsTotal);
+assert.equal(settled.card.xp, expectedCardXp);
 const trained = settled.residents.find((resident) => resident.id === qaParty[0].id);
 assert.ok(trained, "Sealed mission resident disappeared from server progression.");
-assert.equal(trained.xpTotal, 26);
+assert.equal(trained.xpTotal, expectedResidentXp);
 
 const settleReplay = await body(await progression({ command: "settle_mission", ticketId: missionStart.ticket.id, performanceScore: 0 }));
 assert.equal(settleReplay.duplicate, true);
-assert.equal(settleReplay.treasury.caps, 1982);
-assert.equal(settleReplay.card.caps, 4046);
-assert.equal(settleReplay.residents.find((resident) => resident.id === qaParty[0].id)?.xpTotal, 26);
+assert.equal(settleReplay.treasury.caps, expectedTreasuryCaps);
+assert.equal(settleReplay.card.caps, expectedCardCapsTotal);
+assert.equal(settleReplay.residents.find((resident) => resident.id === qaParty[0].id)?.xpTotal, expectedResidentXp);
 
 const bossTooEarly = await progression({
   command: "start_mission",
