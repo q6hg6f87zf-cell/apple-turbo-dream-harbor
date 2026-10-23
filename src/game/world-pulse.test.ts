@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { atlasScarIntensity, regionIsScarred, selectAtlasHeat, atlasHeatIntensity } from "./atlas-heat.ts";
+import {
+  atlasScarIntensity,
+  regionIsDeadZone,
+  regionIsScarred,
+  selectAtlasHeat,
+  atlasHeatIntensity,
+} from "./atlas-heat.ts";
 import {
   dayBoardNeedsSpectacle,
   offerCopyKeyHook,
@@ -164,7 +170,23 @@ test("day-board next-offer graph applies boost unlock cool mutations", () => {
   assert.equal(offerCopyKeyHook(""), null);
 });
 
-test("wire revision with region paints shared scar without extras", () => {
+test("eventType-alone revision bumps watermark only — no scar invent without region", () => {
+  let pulse = emptyWorldPulse();
+  pulse = applyLiveBeat(pulse, {
+    type: "revision",
+    campaignRevision: 20,
+    memberRevision: 5,
+    eventType: "MissionSettled",
+  });
+  assert.equal(pulse.campaignRevision, 20);
+  assert.equal(pulse.memberRevision, 5);
+  assert.equal(pulse.beats.length, 0);
+  const heat = selectAtlasHeat(pulse);
+  assert.equal(heat.totalScar, 0);
+  assert.equal(heat.hottest, null);
+});
+
+test("Pulse wire extras with region paint shared scars without Forge extras", () => {
   let pulse = emptyWorldPulse();
   pulse = applyLiveBeat(pulse, {
     type: "revision",
@@ -181,18 +203,122 @@ test("wire revision with region paints shared scar without extras", () => {
   });
   assert.equal(pulse.beats.length, 1);
   assert.equal(pulse.beats[0]?.region, "blackspire");
+  assert.equal(pulse.beats[0]?.eventId, "boss-cleared:wire-1");
   const heat = selectAtlasHeat(pulse);
   assert.equal(heat.cells.blackspire.heat, 8);
   assert.equal(regionIsScarred(heat.cells.blackspire), true);
+  assert.equal(regionIsDeadZone(heat.cells.blackspire), true);
+  assert.ok((heat.cells.blackspire.scar?.intensity ?? 0) >= 8);
 });
 
-test("revision eventType without region is watermark only", () => {
-  let pulse = applyLiveBeat(emptyWorldPulse(), {
-    type: "revision",
-    campaignRevision: 31,
-    memberRevision: 1,
-    eventType: "MissionSettled",
+test("board cool never clears scar or deadZone; heal mutation does", () => {
+  let pulse = emptyWorldPulse();
+  pulse = applyTheaterEvent(pulse, {
+    theater: "BossCleared",
+    eventId: "boss-dead",
+    region: "ironclad",
+    kind: "boss",
+    heatDelta: 8,
+    revision: { campaign: 30 },
   });
-  assert.equal(pulse.beats.length, 0);
-  assert.equal(pulse.campaignRevision, 31);
+  let heat = selectAtlasHeat(pulse);
+  assert.equal(regionIsDeadZone(heat.cells.ironclad), true);
+  const scarBefore = heat.cells.ironclad.scar!.intensity;
+
+  pulse = applyTheaterEvent(pulse, {
+    theater: "MissionSettled",
+    eventId: "cool-board",
+    region: "ironclad",
+    kind: "scout",
+    heatDelta: 0,
+    intelDelta: 0,
+    revision: { campaign: 31 },
+    worldConsequence: {
+      offerMutations: [{ op: "cool", region: "ironclad", reason: "board-cool", weight: 4 }],
+    },
+  });
+  heat = selectAtlasHeat(pulse);
+  assert.equal(heat.cells.ironclad.scar?.intensity, scarBefore);
+  assert.equal(regionIsDeadZone(heat.cells.ironclad), true);
+  const graph = selectDayBoardOfferGraph(pulse);
+  assert.equal(graph.byRegion.ironclad.cooled, true);
+
+  pulse = applyTheaterEvent(pulse, {
+    theater: "MissionSettled",
+    eventId: "earned-heal",
+    region: "ironclad",
+    kind: "scout",
+    heatDelta: 0,
+    intelDelta: 0,
+    revision: { campaign: 32 },
+    worldConsequence: {
+      offerMutations: [{ op: "heal", region: "ironclad", reason: "earned-clear", weight: 20 }],
+    },
+  });
+  heat = selectAtlasHeat(pulse);
+  assert.equal(regionIsScarred(heat.cells.ironclad), false);
+  assert.equal(regionIsDeadZone(heat.cells.ironclad), false);
+});
+
+test("DayAdvanced rewrites strip and next-offer; heal-flavored dawn clears scar", () => {
+  let pulse = emptyWorldPulse();
+  pulse = applyTheaterEvent(pulse, {
+    theater: "BossCleared",
+    eventId: "boss-pre",
+    region: "slagtown",
+    kind: "boss",
+    heatDelta: 8,
+    revision: { campaign: 40 },
+  });
+  pulse = applyTheaterEvent(pulse, {
+    theater: "DayAdvanced",
+    eventId: "dawn-1",
+    region: "slagtown",
+    revision: { campaign: 41 },
+    worldConsequence: {
+      offerMutations: [
+        { op: "boost", region: "veyra", kinds: ["raid"], reason: "crisis-watch", weight: 3, copyKey: "foreshadow_raid" },
+        { op: "cool", region: "slagtown", reason: "dawn-heal", copyKey: "scar_heal", weight: 10 },
+      ],
+    },
+  });
+
+  const strip = selectDayBoardPulse(pulse);
+  assert.ok(strip.items.some((i) => i.theater === "DayAdvanced"));
+  assert.equal(strip.items[0]?.theater, "DayAdvanced");
+  assert.equal(strip.latestBeatId, "day_advance");
+
+  const graph = selectDayBoardOfferGraph(pulse);
+  assert.ok(graph.byRegion.veyra.weight >= 3);
+  assert.deepEqual(graph.byRegion.veyra.kinds, ["raid"]);
+
+  const heat = selectAtlasHeat(pulse);
+  assert.equal(regionIsScarred(heat.cells.slagtown), false);
+  assert.equal(regionIsDeadZone(heat.cells.slagtown), false);
+});
+
+test("crisis raid settle offerMutations rewrite next-offer before next login", () => {
+  let pulse = emptyWorldPulse();
+  pulse = applyTheaterEvent(pulse, {
+    theater: "MissionSettled",
+    eventId: "crisis-raid",
+    region: "brasswater",
+    kind: "raid",
+    heatDelta: 3,
+    intelDelta: 1,
+    beatId: "intel_drop",
+    revision: { campaign: 50 },
+    worldConsequence: {
+      offerMutations: [
+        { op: "unlock", region: "brasswater", kinds: ["boss"], reason: "crisis-unlock", copyKey: "foreshadow_boss" },
+        { op: "boost", region: "brasswater", kinds: ["raid"], reason: "crisis-heat", weight: 5 },
+      ],
+    },
+  });
+  const strip = selectDayBoardPulse(pulse);
+  assert.equal(strip.latestBeatId, "intel_drop");
+  const graph = selectDayBoardOfferGraph(pulse);
+  assert.equal(graph.byRegion.brasswater.unlocked, true);
+  assert.ok(graph.byRegion.brasswater.weight >= 5);
+  assert.ok(graph.pendingUnlocks.includes("brasswater"));
 });

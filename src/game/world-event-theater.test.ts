@@ -6,6 +6,8 @@ import {
   extractWorldConsequence,
   isScarWorthy,
   normalizeTheaterEvent,
+  isHealOfferMutation,
+  isScarHealSignal,
   parseLiveBeat,
   parseOfferMutations,
   parseWorldConsequence,
@@ -133,4 +135,55 @@ test("parseWorldConsequence / extractWorldConsequence locked shape", () => {
     "ironclad",
   );
   assert.equal(parseOfferMutations([{ op: "boost", region: "nope", reason: "x" }]).length, 0);
+});
+
+test("parseLiveBeat soft-reads Pulse theater extras; omits unknown", () => {
+  const rev = parseLiveBeat({
+    type: "revision",
+    campaignRevision: 14,
+    memberRevision: 3,
+    eventType: "BossCleared",
+    theater: "BossCleared",
+    region: "ironclad",
+    kind: "boss",
+    heatDelta: 8,
+    intelDelta: 1,
+    beatId: "boss_clear",
+    worldConsequence: {
+      offerMutations: [{ op: "heal", region: "veyra", reason: "earned-clear", weight: 8 }],
+    },
+    inventedField: "drop-me",
+  });
+  assert.equal(rev?.eventType, "BossCleared");
+  assert.equal(rev?.theater, "BossCleared");
+  assert.equal(rev?.region, "ironclad");
+  assert.equal(rev?.kind, "boss");
+  assert.equal(rev?.heatDelta, 8);
+  assert.equal(rev?.beatId, "boss_clear");
+  assert.equal(rev?.worldConsequence?.offerMutations?.[0]?.op, "heal");
+  assert.equal("inventedField" in (rev as object), false);
+
+  const badRegion = parseLiveBeat({
+    type: "revision",
+    campaignRevision: 1,
+    memberRevision: 1,
+    eventType: "MissionSettled",
+    region: "not-a-region",
+    kind: "nope",
+  });
+  assert.equal(badRegion?.region, undefined);
+  assert.equal(badRegion?.kind, undefined);
+});
+
+test("heal op parses; cool is never a scar-heal signal outside DayAdvanced heal flavor", () => {
+  const heal = parseOfferMutations([{ op: "heal", region: "slagtown", reason: "earned", weight: 5 }])[0]!;
+  assert.equal(isHealOfferMutation(heal), true);
+  assert.equal(isScarHealSignal("MissionSettled", heal), true);
+  const cool = parseOfferMutations([{ op: "cool", region: "slagtown", reason: "board-cool" }])[0]!;
+  assert.equal(isScarHealSignal("MissionSettled", cool), false);
+  assert.equal(isScarHealSignal("DayAdvanced", cool), false);
+  const dawnHeal = parseOfferMutations([
+    { op: "cool", region: "slagtown", reason: "dawn-heal", copyKey: "scar_heal" },
+  ])[0]!;
+  assert.equal(isScarHealSignal("DayAdvanced", dawnHeal), true);
 });

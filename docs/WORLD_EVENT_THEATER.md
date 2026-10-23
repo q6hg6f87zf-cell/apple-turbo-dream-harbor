@@ -2,7 +2,7 @@
 
 Moon Squad fantasy-tech contract for player-facing campaign beats.
 
-Contract version: **1.3** (Mythos · war journal + day-cycle drama voice)
+Contract version: **1.3** (Mythos war journal + day-cycle drama · Atlas Design Bible deepen — stickier scars · shared live marks)
 
 ## Doctrine
 
@@ -52,19 +52,29 @@ Sacred fence: never rewrite Moon Squad profile cards, rider identity stores, or
 ```ts
 type LiveBeatType = "hello" | "revision" | "heartbeat";
 
+// Pulse-locked revision extras (additive; omit unknown). Soft-read only.
 type LiveBeat = {
   type: LiveBeatType;
   campaignRevision: number;
   memberRevision: number;
   /** Present on revision beats when a domain event just landed. */
-  eventType?: "MissionSettled" | "RaidOpened" | "BossCleared" | string;
+  eventType?: "MissionSettled" | "RaidOpened" | "BossCleared" | "DayAdvanced" | string;
+  /** Optional theater extras — second linked client paints shared atlas marks. */
+  theater?: TheaterName;
+  region?: RegionId;
+  kind?: MissionKind;
+  heatDelta?: number;
+  intelDelta?: number;
+  beatId?: TheaterBeatId;
+  /** offerMutations only — never nested heat. */
+  worldConsequence?: { offerMutations?: OfferMutation[] };
 };
 ```
 
 | `type` | Meaning for Atlas |
 |---|---|
 | `hello` | Snapshot watermark — set pulse revisions; do not invent heat |
-| `revision` | Campaign/member revisions advanced; if `eventType` set, project theater beat |
+| `revision` | Campaign/member revisions advanced; `eventType` alone = watermark only; with `region` (+ theater extras) paint shared marks |
 | `heartbeat` | Keepalive — refresh watermark only if revisions are higher |
 
 `eventType` uses **theater / domain PascalCase** (`MissionSettled`, `RaidOpened`,
@@ -73,7 +83,9 @@ type LiveBeat = {
 settle JSON / domain row; the live beat is the sub-second signal that Forge
 should animate and that heat/board should tick.
 
-Adapter: `applyLiveBeat(pulse, beat)` in `src/game/world-pulse.ts`.
+Adapter: `applyLiveBeat(pulse, beat, extras?)` in `src/game/world-pulse.ts`.
+`eventType`-alone → watermark bump only (no scar invent).
+With `region` from the wire beat or Forge extras → shared atlas / board projections.
 
 ## Theater names ↔ domain eventType ↔ bridge catalog
 
@@ -144,8 +156,8 @@ Pure TypeScript under `src/game/` (Atlas-owned):
 
 1. **`world-event-theater.ts`** — catalog, alias map, payload normalize, `worldConsequence` parse, live `eventType` parse
 2. **`world-pulse.ts`** — pulse state + `applyLiveBeat` / `applyTheaterEvent` (carries `offerMutations` + `scarWorthy`)
-3. **`atlas-heat.ts`** — per-region heat cells + **lasting scars** (BossCleared / dense MissionSettled)
-4. **`day-board-pulse.ts`** — strip feed + **next-offer graph** (`boost` / `unlock` / `cool`)
+3. **`atlas-heat.ts`** — per-region heat cells + **stickier scars** (`deadZone` survives cool; heal only via `heal` / DayAdvanced heal)
+4. **`day-board-pulse.ts`** — strip feed + **next-offer graph** (`boost` / `unlock` / `cool` / `heal`); DayAdvanced rewrites strip
 5. **`theater-copy.ts`** — Mythos `theaterCopyFor` (Atlas consumes; does not rewrite)
 
 Do **not** implement `GET /api/hollow/live` here (Pulse). Do **not** add
@@ -286,7 +298,7 @@ theater: "MissionSettled";  // or separate BossCleared row on boss path
 worldConsequence: {
   // offerMutations ONLY — no heatDelta / intelDelta / beatId here
   offerMutations: Array<{
-    op: "boost" | "unlock" | "cool";
+    op: "boost" | "unlock" | "cool" | "heal";
     region: RegionId;
     kinds?: MissionKind[];
     weight?: number;       // optional signed weight hint
@@ -316,11 +328,30 @@ Atlas projectors:
 
 - Doc references live contract + domain/bridge alias map + locked Vault consequence schema
 - Modules + `node:test`: live `revision` + `eventType: "MissionSettled"` bumps
-  campaign revision, produces board strip beat, and (with region) heats atlas
-- Consequence projections: BossCleared / dense MissionSettled leave lasting scars;
-  `offerMutations` drive day-board next-offer graph (`boost` / `unlock` / `cool`)
-- Mythos `theaterCopyFor` only for player copy; optional `copyKey` hooks, no string rewrites
-- No SSE route, no `0018` migration, no tyrone-bot / profile / snapshot edits
+  campaign revision; **with region** produces board strip beat + atlas heat/scar;
+  **eventType-alone** is watermark-only (no invented sector scars)
+- Stickier scars: BossCleared / dense MissionSettled set `deadZone` when boss/high;
+  board `cool` never reduces scar intensity or clears deadZone; earned `heal`
+  (or DayAdvanced heal-flavored mutation) is the only clear path
+- Day-cycle drama: `DayAdvanced` + crisis/raid `offerMutations` rewrite strip/next-offer
+  in the same projection pass — no component-invented heat
+- Mythos `theaterCopyFor` / `theaterCopyByKey` only for player copy; `THEATER_COPY_KEYS`
+  snake_case; optional `copyKey` hooks, no string rewrites
+- No SSE route, no `0018` migration, no tyrone-bot / profile / snapshot edits,
+  no `/api/rtc` bus, no Resonance live-cues
+
+
+## Design Bible deepen (1 · 3 · 7)
+
+Canon near-term bar for Atlas projectors:
+
+| # | Bar | Projector rule |
+|---|---|---|
+| **1** | Stickier scars | `AtlasHeatScar.deadZone` for BossCleared / boss / high scar; survives board cool forever; heal only via `op: "heal"` or DayAdvanced heal-flavored reason/copyKey |
+| **3** | Shared live marks | Soft-read Pulse revision extras (`region`, `kind`, `heatDelta`, `theater`, `worldConsequence`); second linked client paints the same scar without polling; `eventType`-alone = watermark only |
+| **7** | Day-cycle drama | `DayAdvanced` + crisis/raid `offerMutations` rewrite day-board strip / next-offer graph; Mythos owns strip copyKeys |
+
+Out of scope: tyrone-bot, profile cards, client mint, `/api/rtc` as world bus, inventing SSE fields beyond additive optional extras, Resonance live-cues.
 
 ## Forbidden
 
