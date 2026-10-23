@@ -1,5 +1,6 @@
 import { getBearerToken } from "@/lib/auth/client";
 import type { ClassName, MissionKind, QuarterId, RegionId, RoomId } from "./types";
+import type { SortiePlan } from "./sortie-plan";
 import type { SettleSpectacleBeat } from "./spectacle-kits";
 
 export type { SettleSpectacleBeat };
@@ -56,6 +57,8 @@ export type ServerMissionTicket = {
   availableAt: string;
   expiresAt: string;
   settledAt: string | null;
+  sealedPerformanceScore?: number | null;
+  sortiePlan?: SortiePlan | null;
 };
 
 export type MissionRewardReceipt = {

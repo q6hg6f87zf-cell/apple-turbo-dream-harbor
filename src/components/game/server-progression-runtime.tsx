@@ -15,6 +15,7 @@ import {
 } from "@/game/server-progression";
 import { playSettleSpectacle } from "@/game/spectacle-kits";
 import { isLiveRailHealthy, registerLiveRefresh } from "@/game/server-live-rail";
+import { isSortiePlan, missionBeatsFromSortiePlan } from "@/game/sortie-plan";
 import { shouldApplyServerSnapshot } from "@/game/apply-snapshot-revision";
 import { playAtlasBeatCue } from "@/game/live-cues";
 import { settleBeatCueId } from "@/game/settle-beat-audio";
@@ -183,7 +184,24 @@ function ensureTicket(mission: MissionState): Promise<ServerMissionTicket | null
   const promise = startServerMission(region, mission.kind, mission.id, party)
     .then((response) => {
       applySnapshot(response);
-      return response.ticket ?? null;
+      const ticket = response.ticket ?? null;
+      if (ticket?.sortiePlan && isSortiePlan(ticket.sortiePlan)) {
+        useGame.setState((g) => {
+          const live = g.s.mission;
+          if (!live || live.id !== mission.id) return g;
+          const beats = missionBeatsFromSortiePlan(ticket.sortiePlan!);
+          g.s = {
+            ...g.s,
+            mission: {
+              ...live,
+              beats,
+              beatIndex: Math.min(live.beatIndex, Math.max(0, beats.length - 1)),
+            },
+          };
+          return g;
+        });
+      }
+      return ticket;
     })
     .catch((error) => {
       const message = error instanceof Error ? error.message : "server contract unavailable";
