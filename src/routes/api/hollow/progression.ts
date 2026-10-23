@@ -6,12 +6,14 @@ import {
   AUTHORITY_BOSS_GATES,
   authorityBossReward,
   authorityMissionReward,
+  authorityPerformanceScale,
   authorityQuarterUpgradeQuote,
   authorityResidentLevel,
   authorityRoomUpgradeQuote,
   missionSettleDelayMs,
   normalizePerformanceScore,
   regionUnlocked,
+  scaleAuthorityAmount,
   type AuthorityUpgradeQuote,
 } from "@/game/authority-rules";
 import type { ClassName, MissionKind, QuarterId, RegionId, RoomId } from "@/game/types";
@@ -403,24 +405,106 @@ async function startMission(
   return { duplicate: false, ticket: rows[0] };
 }
 
+
 type SettlementResult = { accepted: boolean; moved: boolean };
+
+/** Scale reward quantities once. Rank gates / commandRank never scale. */
+function fairSettleReward<T extends {
+  vaultCaps: number;
+  cardCaps: number;
+  ore: number;
+  favor: number;
+  riderXp: number;
+  residentXp: number;
+  intel: number;
+  missionCount: number;
+  materialChance?: number;
+  commandRank?: number;
+}>(base: T, score: number, materialQty: number) {
+  const scaleFactor = authorityPerformanceScale(score);
+  const scaled = {
+    vaultCaps: scaleAuthorityAmount(base.vaultCaps, score),
+    cardCaps: scaleAuthorityAmount(base.cardCaps, score),
+    ore: scaleAuthorityAmount(base.ore, score),
+    favor: scaleAuthorityAmount(base.favor, score),
+    riderXp: scaleAuthorityAmount(base.riderXp, score),
+    residentXp: scaleAuthorityAmount(base.residentXp, score),
+    intel: scaleAuthorityAmount(base.intel, score),
+    missionCount: base.missionCount,
+    materialQty: scaleAuthorityAmount(materialQty, score),
+  };
+  return {
+    scaleFactor,
+    scaled,
+    baseAmounts: {
+      vaultCaps: base.vaultCaps,
+      cardCaps: base.cardCaps,
+      ore: base.ore,
+      favor: base.favor,
+      riderXp: base.riderXp,
+      residentXp: base.residentXp,
+      intel: base.intel,
+      materialQty,
+      ...(base.commandRank !== undefined ? { commandRank: base.commandRank } : {}),
+    },
+    commandRank: base.commandRank,
+  };
+}
+
+function missionSettledEventId(ticketId: string) {
+  return `mse-${ticketId.slice(0, 40)}`;
+}
+
+function missionSettledIdempotencyKey(ticketId: string) {
+  return `mission-settled:${ticketId}`;
+}
+
+
+/** Lightweight theater beat id for settle response / MissionSettled payload (no SSE). */
+function settleBeatId(kind: string, intelDelta: number) {
+  if (kind === "boss") return "boss-cleared";
+  if (intelDelta > 0) return "intel-spike";
+  return "mission-cleared";
+}
+
 
 async function settleStandardMission(
   userId: string,
   ticket: MissionTicketRow,
   score: number,
   materialQty: number,
+  requestId: string | null,
 ) {
-  const reward = authorityMissionReward(ticket.region, ticket.mission_kind as Exclude<MissionKind, "boss">);
+  const base = authorityMissionReward(ticket.region, ticket.mission_kind as Exclude<MissionKind, "boss">);
+  const fair = fairSettleReward(base, score, materialQty);
   const rewardBody = {
     region: ticket.region,
     kind: ticket.mission_kind,
     performanceScore: score,
-    ...reward,
-    materialQty,
+    scaleFactor: fair.scaleFactor,
+    baseAmounts: fair.baseAmounts,
+    vaultCaps: fair.scaled.vaultCaps,
+    cardCaps: fair.scaled.cardCaps,
+    ore: fair.scaled.ore,
+    favor: fair.scaled.favor,
+    riderXp: fair.scaled.riderXp,
+    residentXp: fair.scaled.residentXp,
+    intel: fair.scaled.intel,
+    missionCount: fair.scaled.missionCount,
+    materialChance: base.materialChance,
+    materialQty: fair.scaled.materialQty,
   };
   const rewardJson = JSON.stringify(rewardBody);
   const partyJson = JSON.stringify(ticket.party_ids ?? []);
+  const eventId = missionSettledEventId(ticket.ticket_id);
+  const idemKey = missionSettledIdempotencyKey(ticket.ticket_id);
+  const eventPayload = JSON.stringify({
+    ...rewardBody,
+    theater: "MissionSettled",
+    beatId: settleBeatId(ticket.mission_kind, fair.scaled.intel),
+    partyIds: ticket.party_ids ?? [],
+    idempotencyKey: idemKey,
+  });
   const sql = await getSql();
   const rows = await sql<SettlementResult>`
     with ticket_guard as (
@@ -436,13 +520,13 @@ async function settleStandardMission(
     ), campaign_move as (
       update hollow_campaign_state
       set
-        vault_caps = vault_caps + ${reward.vaultCaps},
-        hollow_ore = hollow_ore + ${reward.ore},
-        moon_favor = moon_favor + ${reward.favor},
+        vault_caps = vault_caps + ${fair.scaled.vaultCaps},
+        hollow_ore = hollow_ore + ${fair.scaled.ore},
+        moon_favor = moon_favor + ${fair.scaled.favor},
         missions_since_day = missions_since_day + 1,
-        region_missions = jsonb_set(region_missions, array[${ticket.region}]::text[], to_jsonb(coalesce((region_missions ->> ${ticket.region})::int, 0) + ${reward.missionCount}), true),
-        region_intel = jsonb_set(region_intel, array[${ticket.region}]::text[], to_jsonb(coalesce((region_intel ->> ${ticket.region})::int, 0) + ${reward.intel}), true),
-        regional_materials = jsonb_set(regional_materials, array[${ticket.region}]::text[], to_jsonb(coalesce((regional_materials ->> ${ticket.region})::int, 0) + ${materialQty}), true),
+        region_missions = jsonb_set(region_missions, array[${ticket.region}]::text[], to_jsonb(coalesce((region_missions ->> ${ticket.region})::int, 0) + ${fair.scaled.missionCount}), true),
+        region_intel = jsonb_set(region_intel, array[${ticket.region}]::text[], to_jsonb(coalesce((region_intel ->> ${ticket.region})::int, 0) + ${fair.scaled.intel}), true),
+        regional_materials = jsonb_set(regional_materials, array[${ticket.region}]::text[], to_jsonb(coalesce((regional_materials ->> ${ticket.region})::int, 0) + ${fair.scaled.materialQty}), true),
         revision = revision + 1,
         updated_at = now()
       where campaign_id = ${CAMPAIGN_ID} and exists (select 1 from ticket_guard)
@@ -450,8 +534,8 @@ async function settleStandardMission(
     ), member_move as (
       update hollow_campaign_member
       set
-        card_caps = card_caps + ${reward.cardCaps},
-        xp = xp + ${reward.riderXp},
+        card_caps = card_caps + ${fair.scaled.cardCaps},
+        xp = xp + ${fair.scaled.riderXp},
         revision = revision + 1,
         updated_at = now()
       where campaign_id = ${CAMPAIGN_ID} and user_id = ${userId}
@@ -460,12 +544,35 @@ async function settleStandardMission(
     ), resident_move as (
       update hollow_resident_progress
       set
-        xp_total = xp_total + ${reward.residentXp},
+        xp_total = xp_total + ${fair.scaled.residentXp},
         revision = revision + 1,
         updated_at = now()
       where campaign_id = ${CAMPAIGN_ID}
         and resident_id in (select jsonb_array_elements_text(${partyJson}::jsonb))
         and exists (select 1 from campaign_move)
+      returning 1
+    ), receipt as (
+      insert into hollow_command_receipt (user_id, request_id, command_type)
+      select ${userId}, ${requestId ?? ""}, 'settle_mission'
+      where ${requestId ?? ""} <> ''
+        and exists (select 1 from ticket_guard)
+      on conflict (user_id, request_id) do nothing
+      returning 1
+    ), domain_event as (
+      insert into hollow_domain_event (
+        event_id, campaign_id, user_id, event_type, payload, request_id, ticket_id, idempotency_key
+      )
+      select
+        ${eventId},
+        ${CAMPAIGN_ID},
+        ${userId},
+        'MissionSettled',
+        ${eventPayload}::jsonb,
+        nullif(${requestId ?? ""}, ''),
+        ${ticket.ticket_id},
+        ${idemKey}
+      where exists (select 1 from campaign_move)
+      on conflict (idempotency_key) do nothing
       returning 1
     )
     select exists(select 1 from ticket_guard) as accepted,
@@ -474,18 +581,46 @@ async function settleStandardMission(
   return { result: rows[0] ?? { accepted: false, moved: false }, reward: rewardBody };
 }
 
-async function settleBossMission(userId: string, ticket: MissionTicketRow, score: number, materialQty: number) {
-  const reward = authorityBossReward(ticket.region);
+async function settleBossMission(
+  userId: string,
+  ticket: MissionTicketRow,
+  score: number,
+  materialQty: number,
+  requestId: string | null,
+) {
+  const base = authorityBossReward(ticket.region);
   const gate = AUTHORITY_BOSS_GATES[ticket.region];
+  const fair = fairSettleReward(base, score, materialQty);
   const rewardBody = {
     region: ticket.region,
     kind: "boss" as const,
     performanceScore: score,
-    ...reward,
-    materialQty,
+    scaleFactor: fair.scaleFactor,
+    baseAmounts: fair.baseAmounts,
+    vaultCaps: fair.scaled.vaultCaps,
+    cardCaps: fair.scaled.cardCaps,
+    ore: fair.scaled.ore,
+    favor: fair.scaled.favor,
+    riderXp: fair.scaled.riderXp,
+    residentXp: fair.scaled.residentXp,
+    intel: fair.scaled.intel,
+    missionCount: fair.scaled.missionCount,
+    materialChance: 1,
+    materialQty: fair.scaled.materialQty,
+    // Rank gates never scale — keep greatest(command_rank, base) unscaled.
+    commandRank: base.commandRank,
   };
   const rewardJson = JSON.stringify(rewardBody);
   const partyJson = JSON.stringify(ticket.party_ids ?? []);
+  const eventId = missionSettledEventId(ticket.ticket_id);
+  const idemKey = missionSettledIdempotencyKey(ticket.ticket_id);
+  const eventPayload = JSON.stringify({
+    ...rewardBody,
+    theater: "BossCleared",
+    beatId: settleBeatId("boss", fair.scaled.intel),
+    partyIds: ticket.party_ids ?? [],
+    idempotencyKey: idemKey,
+  });
   const sql = await getSql();
   const rows = await sql<SettlementResult>`
     with ticket_guard as (
@@ -501,15 +636,15 @@ async function settleBossMission(userId: string, ticket: MissionTicketRow, score
     ), campaign_move as (
       update hollow_campaign_state
       set
-        vault_caps = vault_caps + ${reward.vaultCaps},
-        hollow_ore = hollow_ore + ${reward.ore},
-        moon_favor = moon_favor + ${reward.favor},
-        command_rank = greatest(command_rank, ${reward.commandRank}),
+        vault_caps = vault_caps + ${fair.scaled.vaultCaps},
+        hollow_ore = hollow_ore + ${fair.scaled.ore},
+        moon_favor = moon_favor + ${fair.scaled.favor},
+        command_rank = greatest(command_rank, ${base.commandRank}),
         missions_since_day = missions_since_day + 1,
         boss_clears = jsonb_set(boss_clears, array[${ticket.region}]::text[], 'true'::jsonb, true),
-        region_missions = jsonb_set(region_missions, array[${ticket.region}]::text[], to_jsonb(coalesce((region_missions ->> ${ticket.region})::int, 0) + ${reward.missionCount}), true),
-        region_intel = jsonb_set(region_intel, array[${ticket.region}]::text[], to_jsonb(coalesce((region_intel ->> ${ticket.region})::int, 0) + ${reward.intel}), true),
-        regional_materials = jsonb_set(regional_materials, array[${ticket.region}]::text[], to_jsonb(coalesce((regional_materials ->> ${ticket.region})::int, 0) + ${materialQty}), true),
+        region_missions = jsonb_set(region_missions, array[${ticket.region}]::text[], to_jsonb(coalesce((region_missions ->> ${ticket.region})::int, 0) + ${fair.scaled.missionCount}), true),
+        region_intel = jsonb_set(region_intel, array[${ticket.region}]::text[], to_jsonb(coalesce((region_intel ->> ${ticket.region})::int, 0) + ${fair.scaled.intel}), true),
+        regional_materials = jsonb_set(regional_materials, array[${ticket.region}]::text[], to_jsonb(coalesce((regional_materials ->> ${ticket.region})::int, 0) + ${fair.scaled.materialQty}), true),
         revision = revision + 1,
         updated_at = now()
       where campaign_id = ${CAMPAIGN_ID}
@@ -519,8 +654,8 @@ async function settleBossMission(userId: string, ticket: MissionTicketRow, score
     ), member_move as (
       update hollow_campaign_member
       set
-        card_caps = card_caps + ${reward.cardCaps},
-        xp = xp + case when user_id = ${userId} then ${reward.riderXp} else 0 end,
+        card_caps = card_caps + ${fair.scaled.cardCaps},
+        xp = xp + case when user_id = ${userId} then ${fair.scaled.riderXp} else 0 end,
         revision = revision + 1,
         updated_at = now()
       where campaign_id = ${CAMPAIGN_ID}
@@ -530,12 +665,35 @@ async function settleBossMission(userId: string, ticket: MissionTicketRow, score
     ), resident_move as (
       update hollow_resident_progress
       set
-        xp_total = xp_total + ${reward.residentXp},
+        xp_total = xp_total + ${fair.scaled.residentXp},
         revision = revision + 1,
         updated_at = now()
       where campaign_id = ${CAMPAIGN_ID}
         and resident_id in (select jsonb_array_elements_text(${partyJson}::jsonb))
         and exists (select 1 from campaign_move)
+      returning 1
+    ), receipt as (
+      insert into hollow_command_receipt (user_id, request_id, command_type)
+      select ${userId}, ${requestId ?? ""}, 'settle_mission'
+      where ${requestId ?? ""} <> ''
+        and exists (select 1 from ticket_guard)
+      on conflict (user_id, request_id) do nothing
+      returning 1
+    ), domain_event as (
+      insert into hollow_domain_event (
+        event_id, campaign_id, user_id, event_type, payload, request_id, ticket_id, idempotency_key
+      )
+      select
+        ${eventId},
+        ${CAMPAIGN_ID},
+        ${userId},
+        'MissionSettled',
+        ${eventPayload}::jsonb,
+        nullif(${requestId ?? ""}, ''),
+        ${ticket.ticket_id},
+        ${idemKey}
+      where exists (select 1 from campaign_move)
+      on conflict (idempotency_key) do nothing
       returning 1
     )
     select exists(select 1 from ticket_guard) as accepted,
@@ -544,7 +702,7 @@ async function settleBossMission(userId: string, ticket: MissionTicketRow, score
   return { result: rows[0] ?? { accepted: false, moved: false }, reward: rewardBody };
 }
 
-async function settleMission(userId: string, ticketId: string, rawScore: unknown) {
+async function settleMission(userId: string, ticketId: string, rawScore: unknown, requestId: string | null = null) {
   const sql = await getSql();
   const rows = await sql<MissionTicketRow>`
     select ticket_id, region, mission_kind, party_ids, issued_at, available_at, expires_at, settled_at, performance_score, reward
@@ -583,8 +741,8 @@ async function settleMission(userId: string, ticketId: string, rawScore: unknown
     : randomInt(10_000) < Math.round(chance * 10_000) ? 1 : 0;
 
   const settled = ticket.mission_kind === "boss"
-    ? await settleBossMission(userId, ticket, score, materialQty)
-    : await settleStandardMission(userId, ticket, score, materialQty);
+    ? await settleBossMission(userId, ticket, score, materialQty, requestId)
+    : await settleStandardMission(userId, ticket, score, materialQty, requestId);
 
   if (!settled.result.accepted || !settled.result.moved) {
     const reread = await sql<MissionTicketRow>`
@@ -777,15 +935,38 @@ export const Route = createFileRoute("/api/hollow/progression")({
         if (command === "settle_mission") {
           const ticketId = cleanTicketId(body.ticketId);
           if (!ticketId) return json({ error: "invalid mission ticket" }, 400);
-          const result = await settleMission(userId, ticketId, body.performanceScore);
+          const settleRequestId = cleanRequestId(body.requestId);
+          const result = await settleMission(userId, ticketId, body.performanceScore, settleRequestId);
           if ("error" in result) return json({ error: result.error }, result.status);
           const payload = await payloadFor(userId);
           if (!payload) return json({ error: "authoritative campaign unavailable" }, 503);
+          const reward = (result.reward ?? {}) as Record<string, unknown>;
+          const kind = (typeof reward.kind === "string" ? reward.kind : result.ticket.mission_kind) as MissionKind;
+          const intelDelta = Number(reward.intel ?? 0);
+          const theater = kind === "boss" ? "BossCleared" : "MissionSettled";
+          const beat = {
+            theater,
+            eventId: missionSettledEventId(result.ticket.ticket_id),
+            ticketId: result.ticket.ticket_id,
+            requestId: settleRequestId,
+            region: result.ticket.region,
+            kind,
+            performanceScore: typeof reward.performanceScore === "number" ? reward.performanceScore : null,
+            scaleFactor: typeof reward.scaleFactor === "number" ? reward.scaleFactor : null,
+            revision: {
+              campaign: Number(payload.campaign?.revision ?? 0),
+              member: Number(payload.card?.revision ?? 0),
+            },
+            intelDelta: Number.isFinite(intelDelta) ? intelDelta : 0,
+            beatId: settleBeatId(kind, Number.isFinite(intelDelta) ? intelDelta : 0),
+            duplicate: result.duplicate,
+          };
           return json({
             ok: true,
             duplicate: result.duplicate,
             reward: result.reward,
             ticket: ticketJson(result.ticket),
+            beat,
             ...payload,
           });
         }
