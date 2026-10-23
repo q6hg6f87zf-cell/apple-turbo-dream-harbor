@@ -47,6 +47,21 @@ async function runMission(requestId, submittedScore) {
   const settled = await body(settleResponse);
   assert.equal(settled.ok, true);
 
+  const rewardScore = Number(settled.reward?.performanceScore);
+  const scaleFactor = Number(settled.reward?.scaleFactor);
+  assert.ok(Number.isFinite(rewardScore), "Settle reward missing sealed performanceScore.");
+  assert.ok(rewardScore >= 300 && rewardScore <= 950, `Settle reward score escaped envelope: ${rewardScore}`);
+  assert.notEqual(rewardScore, submittedScore, `Client score ${submittedScore} minted settle reward performanceScore.`);
+  const expectedScale = Math.round((0.55 + (rewardScore / 1000) * 0.9) * 1000) / 1000;
+  assert.equal(scaleFactor, expectedScale, "Settle scaleFactor did not match sealed performanceScore.");
+  if (started.ticket.sealedPerformanceScore != null) {
+    assert.equal(
+      rewardScore,
+      Number(started.ticket.sealedPerformanceScore),
+      "Settle reward did not use ticket sealedPerformanceScore.",
+    );
+  }
+
   const treasureResponse = await inventory({
     command: "claim_mission_treasure",
     ticketId: started.ticket.id,
@@ -57,8 +72,9 @@ async function runMission(requestId, submittedScore) {
   assert.ok(Number.isFinite(score), "Treasure receipt did not expose the sealed server performance score.");
   assert.ok(score >= 300 && score <= 950, `Server score escaped its authority envelope: ${score}`);
   assert.notEqual(score, submittedScore, `Client-submitted score ${submittedScore} survived as authoritative performance.`);
+  assert.equal(score, rewardScore, "Treasure score diverged from settle sealed score.");
 
-  return { ticketId: started.ticket.id, score, treasure };
+  return { ticketId: started.ticket.id, score, treasure, scaleFactor, rewardScore };
 }
 
 const perfectCheat = await runMission("qa-performance-perfect-0001", 1000);
