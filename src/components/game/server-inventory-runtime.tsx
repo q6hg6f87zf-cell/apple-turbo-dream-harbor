@@ -19,6 +19,7 @@ import {
   subscribeServerInventory,
   type ServerInventorySnapshot,
 } from "@/game/server-inventory";
+import { registerLiveRefresh, isLiveRailHealthy } from "@/game/server-live-rail";
 import { useGame } from "@/game/store";
 import type { Condition, GameState, Item } from "@/game/types";
 import { useEffect } from "react";
@@ -440,11 +441,17 @@ export function ServerInventoryRuntime() {
       void refreshAcquisition(true);
     };
     window.addEventListener("focus", onFocus);
-    const timer = window.setInterval(onFocus, 30_000);
+    // 30s poll is backup only — Pulse SSE demotes it while healthy.
+    const timer = window.setInterval(() => {
+      if (isLiveRailHealthy()) return;
+      onFocus();
+    }, 30_000);
+    const unregisterLive = registerLiveRefresh(onFocus);
 
     return () => {
       cancelled = true;
       acquisitionPending = false;
+      unregisterLive();
       setServerInventoryAuthorityActive(false);
       snapshotUnsub();
       storeUnsub?.();
