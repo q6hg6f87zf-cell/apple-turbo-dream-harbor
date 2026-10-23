@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { settleSpectacleKitsFor, type SettleSpectacleBeat } from "./spectacle-kits.ts";
 
-test("MissionSettled default fires vault flash only", () => {
+test("MissionSettled default fires vault flash + day-board (no region → no scar)", () => {
   const beat: SettleSpectacleBeat = {
     theater: "MissionSettled",
     beatId: "mission-cleared",
@@ -13,10 +13,13 @@ test("MissionSettled default fires vault flash only", () => {
     intelTick: false,
     intelSoft: false,
     bossUpgrade: false,
+    atlasScar: false,
+    atlasHeal: false,
+    dayBoardPulse: true,
   });
 });
 
-test("intel-spike fires vault flash + intel tick", () => {
+test("intel-spike fires vault flash + intel tick + scar when region set", () => {
   const beat: SettleSpectacleBeat = {
     theater: "MissionSettled",
     beatId: "intel-spike",
@@ -29,6 +32,9 @@ test("intel-spike fires vault flash + intel tick", () => {
     intelTick: true,
     intelSoft: false,
     bossUpgrade: false,
+    atlasScar: true,
+    atlasHeal: false,
+    dayBoardPulse: true,
   });
 });
 
@@ -37,9 +43,10 @@ test("intelDelta > 0 without beatId still triggers intel tick", () => {
     theater: "MissionSettled",
     intelDelta: 2,
   };
-  assert.equal(settleSpectacleKitsFor(beat).intelTick, true);
-  assert.equal(settleSpectacleKitsFor(beat).vaultFlash, true);
-  assert.equal(settleSpectacleKitsFor(beat).intelSoft, false);
+  const kits = settleSpectacleKitsFor(beat);
+  assert.equal(kits.intelTick, true);
+  assert.equal(kits.vaultFlash, true);
+  assert.equal(kits.intelSoft, false);
 });
 
 test("BossCleared soft-upgrades with vault flash", () => {
@@ -49,12 +56,9 @@ test("BossCleared soft-upgrades with vault flash", () => {
     kind: "boss",
     intelDelta: 0,
   };
-  assert.deepEqual(settleSpectacleKitsFor(beat), {
-    vaultFlash: true,
-    intelTick: false,
-    intelSoft: false,
-    bossUpgrade: true,
-  });
+  assert.equal(settleSpectacleKitsFor(beat).vaultFlash, true);
+  assert.equal(settleSpectacleKitsFor(beat).bossUpgrade, true);
+  assert.equal(settleSpectacleKitsFor(beat).dayBoardPulse, true);
 });
 
 test("null beat fires nothing", () => {
@@ -63,6 +67,9 @@ test("null beat fires nothing", () => {
     intelTick: false,
     intelSoft: false,
     bossUpgrade: false,
+    atlasScar: false,
+    atlasHeal: false,
+    dayBoardPulse: false,
   });
 });
 
@@ -72,12 +79,8 @@ test("Forge vault_flash aliases to vault flash kit", () => {
     beatId: "vault_flash",
     intelDelta: 0,
   };
-  assert.deepEqual(settleSpectacleKitsFor(beat), {
-    vaultFlash: true,
-    intelTick: false,
-    intelSoft: false,
-    bossUpgrade: false,
-  });
+  assert.equal(settleSpectacleKitsFor(beat).vaultFlash, true);
+  assert.equal(settleSpectacleKitsFor(beat).intelTick, false);
 });
 
 test("Forge intel_drop with intelDelta fires intel tick", () => {
@@ -86,12 +89,10 @@ test("Forge intel_drop with intelDelta fires intel tick", () => {
     beatId: "intel_drop",
     intelDelta: 4,
   };
-  assert.deepEqual(settleSpectacleKitsFor(beat), {
-    vaultFlash: true,
-    intelTick: true,
-    intelSoft: false,
-    bossUpgrade: false,
-  });
+  const kits = settleSpectacleKitsFor(beat);
+  assert.equal(kits.vaultFlash, true);
+  assert.equal(kits.intelTick, true);
+  assert.equal(kits.intelSoft, false);
 });
 
 test("Forge intel_drop without delta uses soft intel (no fake +N)", () => {
@@ -114,4 +115,42 @@ test("Forge boss_clear aliases to boss upgrade vault flash", () => {
   };
   assert.equal(settleSpectacleKitsFor(beat).vaultFlash, true);
   assert.equal(settleSpectacleKitsFor(beat).bossUpgrade, true);
+});
+
+test("MissionSettled with region scars atlas + day-board pulse", () => {
+  const beat: SettleSpectacleBeat = {
+    theater: "MissionSettled",
+    beatId: "vault_flash",
+    region: "slagtown",
+    intelDelta: 0,
+  };
+  const kits = settleSpectacleKitsFor(beat);
+  assert.equal(kits.atlasScar, true);
+  assert.equal(kits.atlasHeal, false);
+  assert.equal(kits.dayBoardPulse, true);
+});
+
+test("cool offerMutation with region heals atlas instead of scar", () => {
+  const beat: SettleSpectacleBeat = {
+    theater: "MissionSettled",
+    beatId: "vault_flash",
+    region: "veyra",
+    offerMutations: [{ op: "cool", region: "veyra" }],
+  };
+  const kits = settleSpectacleKitsFor(beat);
+  assert.equal(kits.atlasHeal, true);
+  assert.equal(kits.atlasScar, false);
+  assert.equal(kits.dayBoardPulse, true);
+});
+
+test("negative heatDelta with region heals atlas", () => {
+  const beat: SettleSpectacleBeat = {
+    theater: "MissionSettled",
+    beatId: "vault_flash",
+    region: "brasswater",
+    heatDelta: -2,
+  };
+  const kits = settleSpectacleKitsFor(beat);
+  assert.equal(kits.atlasHeal, true);
+  assert.equal(kits.atlasScar, false);
 });
