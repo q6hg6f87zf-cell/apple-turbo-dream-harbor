@@ -1,9 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  dayCycleIdleLead,
+  dayCycleOfferStrip,
+  isJournalTheater,
+  isTheaterCopyKey,
+  journalCopyFor,
   theaterCopyByKey,
   theaterCopyFor,
   theaterRegionLabel,
+  THEATER_COPY_KEYS,
 } from "./theater-copy.ts";
 test("region labels use canon short names, never raw ids", () => {
   assert.equal(theaterRegionLabel("ironclad"), "Ironclad");
@@ -225,4 +231,120 @@ test("theaterCopyByKey covers scar / grateful / colder / board hooks", () => {
   assert.match(seal.headline, /Board seal · Ironclad/);
   const foreshadow = theaterCopyByKey("foreshadow_raid", "blackspire");
   assert.match(foreshadow.radio, /^Tyrone · /);
+});
+
+test("THEATER_COPY_KEYS are snake_case only (Canon lock)", () => {
+  for (const key of THEATER_COPY_KEYS) {
+    assert.equal(key.includes("-"), false, `kebab forbidden: ${key}`);
+    assert.ok(isTheaterCopyKey(key));
+  }
+  assert.equal(isTheaterCopyKey("scarred-sector"), false);
+  assert.equal(isTheaterCopyKey("scar_sector"), true);
+});
+
+test("journalCopyFor covers four Bible-6 theaters; RaidOpened excluded", () => {
+  const settled = journalCopyFor({
+    theater: "MissionSettled",
+    beatId: "vault_flash",
+    region: "slagtown",
+    kind: "raid",
+    intelDelta: 0,
+    heatDelta: 3,
+    performanceScore: 500,
+    worldConsequence: null,
+  });
+  assert.ok(settled);
+  assert.equal(settled!.copyKey, "vault_flash_raid");
+  assert.match(settled!.headline, /Vault 13 takes the breach · Slag Town/);
+  assert.match(settled!.radio, /^SYNAPSE · /);
+  assert.equal("body" in settled!, false);
+
+  const boss = journalCopyFor({
+    theater: "BossCleared",
+    beatId: "boss_clear",
+    region: "veyra",
+    kind: "boss",
+    intelDelta: 1,
+    heatDelta: 8,
+    performanceScore: 950,
+    worldConsequence: null,
+  });
+  assert.ok(boss);
+  assert.equal(boss!.copyKey, "atlas_scar");
+  assert.match(boss!.radio, /^Tyrone · /);
+
+  const transfer = journalCopyFor({
+    theater: "TransferSettled",
+    beatId: "transfer_flash",
+    region: null,
+    kind: null,
+    intelDelta: 0,
+    heatDelta: 0,
+    performanceScore: null,
+    worldConsequence: null,
+  });
+  assert.ok(transfer);
+  assert.equal(transfer!.copyKey, null);
+  assert.match(transfer!.radio, /Transfer settled/);
+
+  const dawn = journalCopyFor({
+    theater: "DayAdvanced",
+    beatId: "day_advance",
+    region: null,
+    kind: null,
+    intelDelta: 0,
+    heatDelta: 0,
+    performanceScore: null,
+    worldConsequence: null,
+  });
+  assert.ok(dawn);
+  assert.equal(dawn!.copyKey, null);
+  assert.match(dawn!.radio, /board is new/i);
+
+  assert.equal(isJournalTheater("RaidOpened"), false);
+  assert.equal(
+    journalCopyFor({
+      theater: "RaidOpened",
+      beatId: "raid_opened",
+      region: "blackspire",
+      kind: "raid",
+      intelDelta: 0,
+      heatDelta: 2,
+      performanceScore: null,
+      worldConsequence: null,
+    }),
+    null,
+  );
+});
+
+test("dayCycleIdleLead prioritizes crisis / unanswered / tribute / heat / offer ops", () => {
+  const boost = dayCycleIdleLead({ region: "slagtown", offerOp: "boost" });
+  assert.equal(boost.copyKey, "next_offer_boost");
+  assert.match(boost.headline, /Board leans hard · Slag Town/);
+  assert.match(boost.radio, /Kane|boosted/i);
+
+  const unlock = dayCycleOfferStrip("unlock", "blackspire");
+  assert.equal(unlock.copyKey, "next_offer_unlock");
+  assert.match(unlock.radio, /^Tyrone · /);
+
+  const cool = dayCycleOfferStrip("cool", "veyra");
+  assert.equal(cool.copyKey, "next_offer_cool");
+  assert.match(cool.radio, /^SYNAPSE · /);
+
+  const crisis = dayCycleIdleLead({ region: "ironclad", hasCrisis: true });
+  assert.match(crisis.headline, /Crisis on the board · Ironclad/);
+  assert.equal(crisis.tone, "danger");
+
+  const residue = dayCycleIdleLead({ region: "slagtown", crisisResidue: true });
+  assert.match(residue.headline, /Crisis residue · Slag Town/);
+  assert.match(residue.subline, /rewrote tomorrow/i);
+
+  const unanswered = dayCycleIdleLead({ unansweredWatches: 3 });
+  assert.match(unanswered.headline, /Unanswered watches · 3/);
+
+  const tribute = dayCycleIdleLead({ region: "brasswater", hasTribute: true });
+  assert.match(tribute.headline, /Kane tribute live · Brasswater/);
+
+  const heat = dayCycleIdleLead({ kaneHeat: 12 });
+  assert.match(heat.headline, /Kane heat high · 12/);
 });

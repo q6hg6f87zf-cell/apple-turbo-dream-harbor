@@ -141,9 +141,9 @@ test("day-board next-offer graph applies boost unlock cool mutations", () => {
           kinds: ["raid", "bounty"],
           weight: 4,
           reason: "dense-settle",
-          copyKey: "scarred-sector",
+          copyKey: "scar_sector",
         },
-        { op: "unlock", region: "blackspire", kinds: ["boss"], reason: "boss-foreshadow", copyKey: "grateful-vault" },
+        { op: "unlock", region: "blackspire", kinds: ["boss"], reason: "boss-foreshadow", copyKey: "grateful_vault" },
         { op: "cool", region: "veyra", reason: "colder-intel", weight: 3, copyKey: "colder-intel" },
       ],
     },
@@ -153,13 +153,13 @@ test("day-board next-offer graph applies boost unlock cool mutations", () => {
   const graph = selectDayBoardOfferGraph(pulse);
   assert.equal(graph.byRegion.slagtown.weight, 4);
   assert.deepEqual(graph.byRegion.slagtown.kinds, ["raid", "bounty"]);
-  assert.equal(graph.byRegion.slagtown.copyKeys[0], "scarred-sector");
+  assert.equal(graph.byRegion.slagtown.copyKeys[0], "scar_sector");
   assert.equal(graph.byRegion.blackspire.unlocked, true);
   assert.ok(graph.pendingUnlocks.includes("blackspire"));
   assert.equal(graph.byRegion.veyra.cooled, true);
   assert.ok(graph.byRegion.veyra.weight < 0);
   assert.ok(graph.cooledRegions.includes("veyra"));
   assert.equal(graph.edges.length, 3);
-  assert.equal(offerCopyKeyHook("  scarred-sector  "), "scarred-sector");
+  assert.equal(offerCopyKeyHook("  scar_sector  "), "scar_sector");
   assert.equal(offerCopyKeyHook(""), null);
 });
