@@ -1,6 +1,9 @@
 /**
  * Lumina settle spectacle kits — presentation-only VFX on Forge settle HTTP `beat`.
  * Never mints balances/rewards. Uses existing juice primitives only.
+ *
+ * Forge settle theater (locked): call `playSettleSpectacle(beat)` with beatIds
+ * `vault_flash` / `intel_drop` (plus legacy mission-cleared / intel-spike / boss-cleared).
  */
 import {
   addTrauma,
@@ -12,7 +15,7 @@ import {
 } from "./juice";
 import type { MissionKind, RegionId } from "./types";
 
-/** Matches server settle `beat` from progression.ts (~946–969). */
+/** Matches server settle `beat` from progression.ts (~946–969) + Forge theater aliases. */
 export type SettleSpectacleBeat = {
   theater?: "MissionSettled" | "BossCleared" | string;
   beatId?: string;
@@ -90,6 +93,28 @@ function playIntelTick(intelDelta: number) {
   platePulse();
 }
 
+/**
+ * Soft intel cue when Forge sends `intel_drop` without a positive intelDelta —
+ * platePulse + sparks + label `intel` (never invents a fake +N).
+ */
+function playIntelSoft() {
+  if (typeof document === "undefined") return;
+  const hud = document.querySelector(".ms-hud-plate") as HTMLElement | null;
+  const rect = hud?.getBoundingClientRect();
+  const x = rect ? rect.left + rect.width * 0.55 : stageCenter().x;
+  const y = rect ? rect.top + rect.height * 0.85 : stageCenter().y + 48;
+
+  const node = document.createElement("span");
+  node.className = reducedMotion() ? "ms-intel-tick ms-intel-tick--static" : "ms-intel-tick";
+  node.textContent = "intel";
+  node.style.left = `${x}px`;
+  node.style.top = `${y}px`;
+  document.body.appendChild(node);
+  window.setTimeout(() => node.remove(), reducedMotion() ? 600 : 900);
+  if (!reducedMotion()) sparksAt(x, y, 4);
+  platePulse();
+}
+
 function playVaultFlashKit(opts: { boss?: boolean }) {
   const { x, y } = stageCenter();
   playVaultFlash();
@@ -104,36 +129,40 @@ function playVaultFlashKit(opts: { boss?: boolean }) {
   }
 }
 
+function isIntelDropBeat(beatId: string): boolean {
+  return beatId === "intel_drop" || beatId === "intel-spike" || beatId === "intel_spike";
+}
+
+function isBossBeat(beatId: string, theater: string, kind: unknown): boolean {
+  return (
+    theater === "BossCleared" ||
+    beatId === "boss-cleared" ||
+    beatId === "boss_clear" ||
+    kind === "boss"
+  );
+}
+
 /**
  * Dispatch settle HTTP `beat` → presentation kits.
- * - MissionSettled / default → vault flash
- * - intel-spike or intelDelta > 0 → intel tick (also)
- * - BossCleared / boss-cleared → vault flash + light trauma/hitstop upgrade
+ * - MissionSettled / vault_flash / mission-cleared → vault flash
+ * - intel_drop / intel-spike or intelDelta > 0 → intel tick (soft label if no delta)
+ * - BossCleared / boss_clear / boss-cleared → vault flash + light trauma/hitstop upgrade
  */
 export function playSettleSpectacle(beat: SettleSpectacleBeat | null | undefined): void {
   if (!beat || typeof document === "undefined") return;
 
-  const theater = typeof beat.theater === "string" ? beat.theater : "";
-  const beatId = typeof beat.beatId === "string" ? beat.beatId : "";
-  const intelDelta = Number(beat.intelDelta ?? 0);
-  const intelSpike = beatId === "intel-spike" || (Number.isFinite(intelDelta) && intelDelta > 0);
-  const boss =
-    theater === "BossCleared" || beatId === "boss-cleared" || beat.kind === "boss";
-
-  // Vault flash for mission settle (default) and boss soft-upgrade path.
-  if (
-    theater === "MissionSettled" ||
-    theater === "BossCleared" ||
-    !theater ||
-    beatId === "mission-cleared" ||
-    beatId === "intel-spike" ||
-    beatId === "boss-cleared"
-  ) {
-    playVaultFlashKit({ boss });
+  const kits = settleSpectacleKitsFor(beat);
+  if (kits.vaultFlash) {
+    playVaultFlashKit({ boss: kits.bossUpgrade });
   }
 
-  if (intelSpike) {
-    playIntelTick(Number.isFinite(intelDelta) ? intelDelta : 0);
+  if (kits.intelTick) {
+    const intelDelta = Number(beat.intelDelta ?? 0);
+    if (Number.isFinite(intelDelta) && intelDelta > 0) {
+      playIntelTick(intelDelta);
+    } else if (kits.intelSoft) {
+      playIntelSoft();
+    }
   }
 }
 
@@ -141,21 +170,29 @@ export function playSettleSpectacle(beat: SettleSpectacleBeat | null | undefined
 export function settleSpectacleKitsFor(beat: SettleSpectacleBeat | null | undefined): {
   vaultFlash: boolean;
   intelTick: boolean;
+  intelSoft: boolean;
   bossUpgrade: boolean;
 } {
-  if (!beat) return { vaultFlash: false, intelTick: false, bossUpgrade: false };
+  if (!beat) {
+    return { vaultFlash: false, intelTick: false, intelSoft: false, bossUpgrade: false };
+  }
   const theater = typeof beat.theater === "string" ? beat.theater : "";
   const beatId = typeof beat.beatId === "string" ? beat.beatId : "";
   const intelDelta = Number(beat.intelDelta ?? 0);
-  const intelTick = beatId === "intel-spike" || (Number.isFinite(intelDelta) && intelDelta > 0);
-  const bossUpgrade =
-    theater === "BossCleared" || beatId === "boss-cleared" || beat.kind === "boss";
+  const intelDrop = isIntelDropBeat(beatId);
+  const intelTick = intelDrop || (Number.isFinite(intelDelta) && intelDelta > 0);
+  const intelSoft = intelDrop && !(Number.isFinite(intelDelta) && intelDelta > 0);
+  const bossUpgrade = isBossBeat(beatId, theater, beat.kind);
   const vaultFlash =
     theater === "MissionSettled" ||
     theater === "BossCleared" ||
     !theater ||
+    beatId === "vault_flash" ||
     beatId === "mission-cleared" ||
-    beatId === "intel-spike" ||
-    beatId === "boss-cleared";
-  return { vaultFlash, intelTick, bossUpgrade };
+    beatId === "mission_settle" ||
+    intelDrop ||
+    beatId === "boss-cleared" ||
+    beatId === "boss_clear" ||
+    bossUpgrade;
+  return { vaultFlash, intelTick, intelSoft, bossUpgrade };
 }
