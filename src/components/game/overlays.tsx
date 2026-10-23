@@ -153,7 +153,7 @@ export function ToastHost() {
   }, [toast, clear]);
   if (!toast) return null;
   return (
-    <div className="ms-toast" data-toast="1">
+    <div className="ms-toast" data-toast="1" role="status" aria-live="polite" aria-atomic="true">
       <div className="ms-rise ms-shake rounded-[var(--radius-md)] bg-panel px-4 py-3 text-center text-body text-paper shadow-[var(--shadow-border-hover)]">
         {toast}
       </div>

@@ -13,6 +13,7 @@ import type { TyroneAssist } from "@/game/types";
 import { cn } from "@/lib/cn";
 import { AudioLines, CircleHelp, Volume2, VolumeX, X } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useDialogFocus } from "./use-dialog-focus";
 
 type Pane = "menu" | "journal" | "scenario" | "settings";
 
@@ -23,15 +24,28 @@ const ASSIST: TyroneAssist[] = ["off", "minimal", "normal", "helpful", "high"];
  * Settings. Replaces dashboard sprawl without removing dock reachability.
  */
 export function PauseMenu({ open, onClose, initial = "menu" }: { open: boolean; onClose: () => void; initial?: Pane }) {
-  const s = useGame((g) => g.s);
-  const setScreen = useGame((g) => g.setScreen);
-  const resolveScenario = useGame((g) => g.resolveScenario);
   const [pane, setPane] = useState<Pane>(initial);
   useEffect(() => {
     if (open) setPane(initial);
   }, [open, initial]);
 
   if (!open) return null;
+  return <PauseMenuDialog onClose={onClose} pane={pane} setPane={setPane} />;
+}
+
+function PauseMenuDialog({
+  onClose,
+  pane,
+  setPane,
+}: {
+  onClose: () => void;
+  pane: Pane;
+  setPane: (pane: Pane) => void;
+}) {
+  const s = useGame((g) => g.s);
+  const setScreen = useGame((g) => g.setScreen);
+  const resolveScenario = useGame((g) => g.resolveScenario);
+  const focus = useDialogFocus<HTMLDivElement>();
 
   const scenarios = availableScenarios(s);
   const beat = activeStoryBeat(s);
@@ -45,7 +59,10 @@ export function PauseMenu({ open, onClose, initial = "menu" }: { open: boolean; 
   return (
     <div className="fixed inset-0 z-[140] flex items-end justify-center md:items-center" data-pause-menu="1" role="dialog" aria-label="Field menu">
       <button type="button" className="absolute inset-0 bg-ink/70 backdrop-blur-sm" aria-label="Close menu" onClick={onClose} />
-      <div className="relative z-10 flex max-h-[min(88dvh,40rem)] w-full max-w-lg flex-col overflow-hidden border border-line/70 bg-surface/95 shadow-2xl md:rounded-[var(--radius-md)]">
+      <div
+        ref={focus}
+        className="relative z-10 flex max-h-[min(88dvh,40rem)] w-full max-w-lg flex-col overflow-hidden border border-line/70 bg-surface/95 shadow-2xl md:rounded-[var(--radius-md)]"
+      >
         <header className="flex items-center justify-between gap-2 border-b border-line/60 px-4 py-3">
           <div className="min-w-0">
             <p className="font-display text-[10px] uppercase tracking-[0.16em] text-ember">

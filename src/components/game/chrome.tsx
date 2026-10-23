@@ -25,7 +25,9 @@ import {
   Volume2,
   VolumeX,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { isLiveRailHealthy, subscribeLiveRailHealth } from "@/game/server-live-rail";
+import { useDialogFocus } from "./use-dialog-focus";
 import { MoonCrest } from "./primitives";
 import { RadioChip } from "./radio-deck";
 
@@ -46,6 +48,33 @@ const ASSIST: TyroneAssist[] = ["off", "minimal", "normal", "helpful", "high"];
 
 export function SceneBreath() {
   return <div className="ms-scene-breath" data-scene-breath="1" aria-hidden />;
+}
+
+
+/** Read-only Pulse live-rail health. Labels locked: Live | Reconnecting. */
+export function LiveRailHealthPip({ className }: { className?: string }) {
+  const [healthy, setHealthy] = useState(isLiveRailHealthy);
+  useEffect(() => subscribeLiveRailHealth(setHealthy), []);
+  const label = healthy ? "Live" : "Reconnecting";
+  return (
+    <span
+      data-live-rail-health={healthy ? "live" : "reconnecting"}
+      role="status"
+      aria-live="polite"
+      title={label}
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-line/60 bg-ink/70 px-2 py-1 font-display text-[10px] tracking-[0.04em] backdrop-blur-md",
+        healthy ? "text-ok" : "text-ember",
+        className,
+      )}
+    >
+      <span
+        aria-hidden
+        className={cn("size-1.5 shrink-0 rounded-full", healthy ? "bg-ok" : "bg-ember animate-pulse")}
+      />
+      {label}
+    </span>
+  );
 }
 
 export function HubHeader() {
@@ -98,6 +127,7 @@ export function HubHeader() {
         </button>
         {/* Ask lives in the header on every screen now, hub and task alike. The
             floating button it replaces sat on top of list rows. */}
+        <LiveRailHealthPip className="shrink-0" />
         <button
           type="button"
           data-help="1"
@@ -152,11 +182,13 @@ function OverflowMenu({
   const setAssist = useGame((g) => g.setTyroneAssist);
   const setScreen = useGame((g) => g.setScreen);
   const forged = useGame((g) => characterForged(g.s));
+  const focus = useDialogFocus<HTMLDivElement>();
 
   return (
     <div className="relative z-30">
       <button type="button" className="fixed inset-0 cursor-default bg-ink/20" aria-label="Close controls" onClick={onClose} />
       <div
+        ref={focus}
         data-overflow-menu="1"
         role="dialog"
         aria-label="Controls"
