@@ -13,6 +13,7 @@ import {
   type ServerMissionTicket,
   type ServerProgressionSnapshot,
 } from "@/game/server-progression";
+import { playSettleSpectacle } from "@/game/spectacle-kits";
 import { isLiveRailHealthy, registerLiveRefresh } from "@/game/server-live-rail";
 import { isSortiePlan, missionBeatsFromSortiePlan } from "@/game/sortie-plan";
 import { useGame } from "@/game/store";
@@ -224,6 +225,8 @@ async function settleCompletedMission(
       result,
       `${result.duplicate ? "Contract already settled" : "Tyrone settled the contract"}${parts.length ? ` · ${parts.join(" · ")}` : ""}.`,
     );
+    // Lumina: presentation-only settle spectacle from Forge HTTP beat (no mint).
+    if (result.beat) playSettleSpectacle(result.beat);
   } catch (error) {
     const fresh = await pullServerProgression().catch(() => null);
     if (fresh) applySnapshot(fresh);

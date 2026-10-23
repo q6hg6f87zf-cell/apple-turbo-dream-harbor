@@ -1,6 +1,9 @@
 import { getBearerToken } from "@/lib/auth/client";
 import type { ClassName, MissionKind, QuarterId, RegionId, RoomId } from "./types";
 import type { SortiePlan } from "./sortie-plan";
+import type { SettleSpectacleBeat } from "./spectacle-kits";
+
+export type { SettleSpectacleBeat };
 
 export type ServerResidentProgress = {
   id: string;
@@ -96,6 +99,8 @@ type ProgressionResponse = ServerProgressionSnapshot & {
   ticket?: ServerMissionTicket;
   reward?: MissionRewardReceipt;
   upgrade?: ServerUpgradeReceipt;
+  /** Forge settle theater beat — presentation only; never mint from client. */
+  beat?: SettleSpectacleBeat;
   error?: string;
 };
 
