@@ -2,7 +2,7 @@
 
 Moon Squad fantasy-tech contract for player-facing campaign beats.
 
-Contract version: **1.2** (Atlas · living-world consequence projections)
+Contract version: **1.3** (Mythos · war journal + day-cycle drama voice)
 
 ## Doctrine
 
@@ -34,7 +34,7 @@ Pulse beats into read models only.
 |---|---|---|
 | Domain event append / settle TX | **Vault** | `MissionSettled` in same TX as ticket settle + revision bump (`0018`) |
 | Theater catalog + heat / pulse / board projectors | **Atlas** | This doc + `src/game/world-*` / `atlas-heat` / `day-board-pulse` |
-| Elite settle / intel / boss / raid / day-board voice | **Mythos** | `src/game/theater-copy.ts` (+ board-copy idle lead); consumed by pulse / strip |
+| Elite settle / intel / boss / raid / day-board / war-journal voice | **Mythos** | `src/game/theater-copy.ts` (+ `board-copy` idle lead); Vault projects journal rows; Chrome cites eventId+revision |
 | SSE revision stream `GET /api/hollow/live` | **Pulse** | Fanout only; does not invent events |
 | DayBoard / Atlas / vault flash UI | **Forge** | Consumes Atlas read models |
 | Discord announce / Tyrone memory | TyroneBot via bridge | Maps dotted bridge types; never mints |
@@ -195,7 +195,57 @@ pass `{ copyKey }` in `TheaterCopyContext` for next-offer / heat-scar projection
 | `vault_flash_*` / `intel_drop_*` | Kind-split settle keys (`scout`/`raid`/`boss`) |
 
 Lookup without a full event: `theaterCopyByKey(key, region)`.
-Exported catalog: `THEATER_COPY_KEYS`.
+Exported catalog: `THEATER_COPY_KEYS` (**snake_case only** — Canon lock; no kebab aliases).
+
+
+## Bible 6 — War journal copy contract (Mythos)
+
+Vault projects durable rows from domain events only. Mythos owns **headline + radio**
+one-liners. No cozy body paragraphs. No client-fabricated rows. Chrome/Forge must cite
+`eventId` + `campaignRevision`.
+
+**Journal theaters (only):** `MissionSettled` · `BossCleared` · `TransferSettled` · `DayAdvanced`
+
+`RaidOpened` is foreshadow / day-board strip only — **not** a journal row.
+
+```ts
+// Vault row shape (Vault implements projection; Mythos fills headline+radio)
+{
+  eventId: string;
+  theater: "MissionSettled" | "BossCleared" | "TransferSettled" | "DayAdvanced";
+  campaignRevision: number;
+  region: RegionId | null;
+  kind: MissionKind | null;
+  at: string; // ISO
+  copyKey: TheaterCopyKey | null; // snake_case THEATER_COPY_KEYS or null
+  headline: string;
+  radio: string;
+}
+```
+
+Selector: `journalCopyFor(event)` → `{ copyKey, headline, radio } | null`.
+Returns `null` for non-journal theaters (e.g. `RaidOpened`). Reuses `theaterCopyFor`
+voice — never invents a second copy path.
+
+`copyKey` is a locked `THEATER_COPY_KEYS` value when the beat resolves one
+(`vault_flash_*`, `intel_drop_*`, `atlas_scar`, `board_seal`, …). `DayAdvanced` and
+`TransferSettled` may ship `copyKey: null` with headline+radio still set.
+
+## Bible 7 — Day-cycle drama copy contract (Mythos)
+
+Board offers rewrite from Kane heat / crisis / tribute / unanswered watches and from
+Vault `worldConsequence.offerMutations` (`boost` | `unlock` | `cool`).
+
+| Surface | Selector | Notes |
+|---|---|---|
+| Idle lead | `dayCycleIdleLead(ctx)` / `boardIdleLead(ctx)` | Priority: offer key → crisis/residue → unanswered → tribute → heat → dawn → calm |
+| Next-offer strip | `dayCycleOfferStrip(op, region)` / `boardOfferStrip` | Maps op → `next_offer_boost` \| `next_offer_unlock` \| `next_offer_cool` via `theaterCopyByKey` |
+| Pulse strip | `theaterCopyFor` (Atlas already) | Same tone; do not fork strings in projectors |
+
+`offerMutations[].copyKey` **must** be a `THEATER_COPY_KEYS` snake_case value.
+**No kebab aliases** (`scarred-sector` is illegal — use `scar_sector`).
+
+Atlas owns projections / heat / offer graph. Mythos owns strings only.
 
 ## Consumers
 

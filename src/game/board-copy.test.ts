@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { BOARD_KIND_LABEL, boardCost, boardStake, liveJobs, unansweredWatches } from "./board-copy";
+import { BOARD_KIND_LABEL, boardCost, boardIdleLead, boardOfferStrip, boardStake, liveJobs, unansweredWatches } from "./board-copy";
 import type { DayTask } from "./types";
 
 function job(partial: Partial<DayTask> & Pick<DayTask, "id" | "kind" | "title">): DayTask {
@@ -48,5 +48,16 @@ describe("board copy", () => {
     assert.equal(boardCost(board), 4);
     assert.equal(unansweredWatches(board, 6), 0);
     assert.equal(unansweredWatches(board, 2), 2);
+  });
+});
+
+describe("board idle / offer strip (Mythos day-cycle)", () => {
+  it("idle lead and offer strip reuse theater-copy next_offer keys", () => {
+    const idle = boardIdleLead({ region: "veyra", offerOp: "boost", kaneHeat: 2 });
+    assert.equal(idle.copyKey, "next_offer_boost");
+    const strip = boardOfferStrip("cool", "veyra");
+    assert.equal(strip.copyKey, "next_offer_cool");
+    const crisis = boardIdleLead({ hasCrisis: true, region: "ironclad" });
+    assert.match(crisis.radio, /^Tyrone · /);
   });
 });

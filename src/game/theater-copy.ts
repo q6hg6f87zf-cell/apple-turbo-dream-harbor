@@ -1,15 +1,22 @@
 /**
  * Mythos elite theater copy pack (consequence-aware).
- * Player-facing settle / intel / boss / raid / day-board voice for Atlas projectors.
+ * Player-facing settle / intel / boss / raid / day-board / war-journal voice.
  * Pure strings + selectors — no economy math, no tyrone-bot, no profile cards.
  *
- * Partners: Atlas (pulse / heat / strip), Canon (lore lock), Forge (UI consume).
+ * Partners: Atlas (pulse / heat / strip), Vault (journal projections), Canon (lore lock),
+ * Chrome/Forge (cite eventId + revision; never fabricate rows).
+ *
+ * Bible v1.3 — Mythos voice on:
+ * - 6 War journal: MissionSettled | BossCleared | TransferSettled | DayAdvanced
+ *   → headline + radio one-liners via journalCopyFor (no cozy body).
+ * - 7 Day-cycle drama: idle lead + strip/next-offer for heat / crisis / tribute /
+ *   unanswered watches + boost|unlock|cool (next_offer_* keys).
  *
  * Consequence contract (Atlas → Mythos):
  * - Event fields already carry heatDelta / intelDelta / performanceScore / worldConsequence.
  * - Optional TheaterCopyContext lets Atlas pass scar / grateful / colder / copyKey overrides
  *   (regionHeat ≥ 8, regionIntel ≥ 3, or explicit flags / offerMutations[].copyKey).
- * - Selectable copyKeys (THEATER_COPY_KEYS) hook next-offer / heat-scar projections.
+ * - Selectable copyKeys (THEATER_COPY_KEYS) — snake_case ONLY; no kebab aliases.
  */
 import { regionById } from "./data";
 import type { MissionKind, RegionId } from "./types";
@@ -245,8 +252,8 @@ export function theaterCopyByKey(
       return withKey(
         {
           headline: `Board leans hard · ${place}`,
-          subline: "Next watch reprints heavier here. The Hollow noticed the weigh.",
-          radio: "Tyrone · Take the boosted ticket or someone else will.",
+          subline: "Next watch reprints heavier here. Crisis residue still on the ribbon.",
+          radio: "Tyrone · Take the boosted ticket or Kane prices it for someone else.",
           tone: "ember",
         },
         key,
@@ -255,8 +262,8 @@ export function theaterCopyByKey(
       return withKey(
         {
           headline: `Board unlocks · ${place}`,
-          subline: "A new watch appears where the scar cooled. Read it twice.",
-          radio: "Tyrone · New ink. Idle is still work.",
+          subline: "A new watch appears where the scar cooled. Read it twice before dawn.",
+          radio: "Tyrone · New ink after the settle. Idle is still work.",
           tone: "moon",
         },
         key,
@@ -265,8 +272,8 @@ export function theaterCopyByKey(
       return withKey(
         {
           headline: `Board cools · ${place}`,
-          subline: "Offers thin. Heat bled out. Tomorrow reprints quieter.",
-          radio: "SYNAPSE · Region cooled. Weight redistributed.",
+          subline: "Offers thin. Heat bled out. Tomorrow reprints quieter — for now.",
+          radio: "SYNAPSE · Region cooled. Weight redistributed. Watch the strip.",
           tone: "muted",
         },
         key,
@@ -572,8 +579,8 @@ export function theaterCopyFor(
     return withKey(
       {
         headline: "Dawn reprints the board",
-        subline: "Six watches. Most jobs are decisions. The sortie still uses a die.",
-        radio: "Tyrone · The board is new. Idle is still work.",
+        subline: "Six watches. Crisis residue and unanswered ink still price the ribbon.",
+        radio: "Tyrone · The board is new. Idle is still work. Read the strip before you boast.",
         tone: "moon",
       },
       null,
@@ -584,8 +591,8 @@ export function theaterCopyFor(
     return withKey(
       {
         headline: "Vault 13 transfer sealed",
-        subline: "Card and treasury agree. No second weigh.",
-        radio: "SYNAPSE · Transfer settled. Revision advanced.",
+        subline: "Card and treasury agree. No second weigh. The journal keeps the stamp.",
+        radio: "SYNAPSE · Transfer settled. Revision advanced. Receipt on the rail.",
         tone: "ember",
       },
       null,
@@ -667,6 +674,190 @@ export function theaterCopyFor(
     flags,
     theater,
   );
+}
+
+/** Bible 6 — journal-eligible domain theaters. RaidOpened is foreshadow/strip only. */
+export const JOURNAL_THEATERS = [
+  "MissionSettled",
+  "BossCleared",
+  "TransferSettled",
+  "DayAdvanced",
+] as const;
+
+export type JournalTheater = (typeof JOURNAL_THEATERS)[number];
+
+export function isJournalTheater(theater: string | null | undefined): theater is JournalTheater {
+  return (
+    theater === "MissionSettled" ||
+    theater === "BossCleared" ||
+    theater === "TransferSettled" ||
+    theater === "DayAdvanced"
+  );
+}
+
+/** Locked snake_case catalog membership (Canon — no kebab aliases). */
+export function isTheaterCopyKey(key: string | null | undefined): key is TheaterCopyKey {
+  if (!key) return false;
+  return (THEATER_COPY_KEYS as readonly string[]).includes(key);
+}
+
+/**
+ * War journal framing (Bible 6).
+ * Vault projects the row; Mythos owns headline + radio only — no body, no fabricated rows.
+ * copyKey is a THEATER_COPY_KEYS value when known, else null (DayAdvanced / TransferSettled).
+ */
+export type JournalCopyLines = {
+  copyKey: string | null;
+  headline: string;
+  radio: string;
+};
+
+export function journalCopyFor(
+  event: TheaterCopyEvent,
+  ctx?: TheaterCopyContext | null,
+): JournalCopyLines | null {
+  if (!isJournalTheater(event.theater)) return null;
+  const lines = theaterCopyFor(event, ctx);
+  return {
+    copyKey: lines.copyKey ?? null,
+    headline: lines.headline,
+    radio: lines.radio,
+  };
+}
+
+/**
+ * Day-cycle idle lead + strip voice (Bible 7).
+ * Consumes Kane heat / crisis / tribute / unanswered watches and optional offer op.
+ * When offerOp or a next_offer_* copyKey is set, reuses theaterCopyByKey (Atlas strip tone).
+ */
+export type DayCycleIdleContext = {
+  region?: RegionId | string | null;
+  kaneHeat?: number;
+  hasCrisis?: boolean;
+  hasTribute?: boolean;
+  unansweredWatches?: number;
+  /** Crisis/raid just settled — board should feel the residue before next login. */
+  crisisResidue?: boolean;
+  dayAdvanced?: boolean;
+  /** Vault offerMutations op → next_offer_* key. */
+  offerOp?: "boost" | "unlock" | "cool" | null;
+  copyKey?: string | null;
+};
+
+function nextOfferKeyForOp(op: "boost" | "unlock" | "cool"): TheaterCopyKey {
+  if (op === "boost") return "next_offer_boost";
+  if (op === "unlock") return "next_offer_unlock";
+  return "next_offer_cool";
+}
+
+export function dayCycleIdleLead(ctx: DayCycleIdleContext = {}): TheaterCopyLines {
+  const place = theaterRegionLabel(ctx.region ?? null);
+  const pinned =
+    (ctx.copyKey && isTheaterCopyKey(ctx.copyKey) ? ctx.copyKey : null) ||
+    (ctx.offerOp ? nextOfferKeyForOp(ctx.offerOp) : null);
+  if (pinned === "next_offer_boost" || pinned === "next_offer_unlock" || pinned === "next_offer_cool") {
+    return theaterCopyByKey(pinned, ctx.region ?? null);
+  }
+  if (pinned) {
+    return theaterCopyByKey(pinned, ctx.region ?? null);
+  }
+
+  const unanswered = Math.max(0, ctx.unansweredWatches ?? 0);
+  const heat = Math.max(0, ctx.kaneHeat ?? 0);
+
+  if (ctx.hasCrisis || ctx.crisisResidue) {
+    return withKey(
+      {
+        headline: ctx.crisisResidue
+          ? `Crisis residue · ${place}`
+          : `Crisis on the board · ${place}`,
+        subline: ctx.crisisResidue
+          ? "The settle rewrote tomorrow. At least one offer or strip line already moved."
+          : "The compound is telling the truth. Handle it before the next watch.",
+        radio: "Tyrone · Crisis first. Boast never. Read the strip.",
+        tone: "danger",
+      },
+      null,
+    );
+  }
+
+  if (unanswered > 0) {
+    return withKey(
+      {
+        headline: `Unanswered watches · ${unanswered}`,
+        subline: "Posted work outruns the ribbon. Something goes cold overnight.",
+        radio: "Tyrone · Six watches. Choose. The rest is Kane's receipt.",
+        tone: "muted",
+      },
+      null,
+    );
+  }
+
+  if (ctx.hasTribute) {
+    return withKey(
+      {
+        headline: `Kane tribute live · ${place}`,
+        subline: "Pay, stall, or make her work for it. The board keeps the invoice.",
+        radio: "Tyrone · Kane collects. Idle does not erase the cut.",
+        tone: "ember",
+      },
+      null,
+    );
+  }
+
+  if (heat >= 10) {
+    return withKey(
+      {
+        headline: `Kane heat high · ${heat}`,
+        subline: "Visors thicken. Crisis and tribute price themselves onto the ribbon.",
+        radio: "Tyrone · Heat that high reprints the board whether you ask or not.",
+        tone: "danger",
+      },
+      null,
+    );
+  }
+
+  if (heat >= 5) {
+    return withKey(
+      {
+        headline: `Kane heat climbing · ${heat}`,
+        subline: "Quiet doors get shorter. Breach noise gets louder.",
+        radio: "Tyrone · Heat is a receipt. Spend watches like you mean it.",
+        tone: "ember",
+      },
+      null,
+    );
+  }
+
+  if (ctx.dayAdvanced) {
+    return withKey(
+      {
+        headline: "Dawn reprints the board",
+        subline: "Six watches. Most jobs are decisions. The sortie still uses a die.",
+        radio: "Tyrone · The board is new. Idle is still work.",
+        tone: "moon",
+      },
+      null,
+    );
+  }
+
+  return withKey(
+    {
+      headline: `Day board · ${place}`,
+      subline: "Six watches. Most jobs are decisions. The sortie still uses a die.",
+      radio: "Tyrone · Idle is still work. Read the board before you boast.",
+      tone: "moon",
+    },
+    null,
+  );
+}
+
+/** Strip / next-offer voice from a Vault offer mutation op (Bible 7). */
+export function dayCycleOfferStrip(
+  op: "boost" | "unlock" | "cool",
+  region: RegionId | string | null = null,
+): TheaterCopyLines {
+  return theaterCopyByKey(nextOfferKeyForOp(op), region);
 }
 
 /** Convenience: headline only (world-pulse / strip). */

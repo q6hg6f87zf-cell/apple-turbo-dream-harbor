@@ -1,4 +1,10 @@
 import type { DayTask, DayTaskKind } from "./types";
+import {
+  dayCycleIdleLead,
+  dayCycleOfferStrip,
+  type DayCycleIdleContext,
+  type TheaterCopyLines,
+} from "./theater-copy";
 
 export const BOARD_KIND_LABEL: Record<DayTaskKind, string> = {
   sortie: "Field job",
@@ -37,4 +43,17 @@ export function boardCost(board: DayTask[]): number {
 /** Watches of posted work that six watches cannot cover. */
 export function unansweredWatches(board: DayTask[], watchesLeft: number): number {
   return Math.max(0, boardCost(board) - Math.max(0, watchesLeft));
+}
+
+/** Mythos idle lead for DayBoard chrome (Bible 7). Thin re-export — copy stays in theater-copy. */
+export function boardIdleLead(ctx: DayCycleIdleContext = {}): TheaterCopyLines {
+  return dayCycleIdleLead(ctx);
+}
+
+/** Mythos next-offer strip line from Vault offerMutations op. */
+export function boardOfferStrip(
+  op: "boost" | "unlock" | "cool",
+  region: string | null = null,
+): TheaterCopyLines {
+  return dayCycleOfferStrip(op, region);
 }

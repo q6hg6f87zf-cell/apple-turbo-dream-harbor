@@ -99,7 +99,7 @@ test("normalize parses worldConsequence.offerMutations; ignores nested heat", ()
           kinds: ["raid", "not-a-kind", "bounty"],
           weight: 4,
           reason: "dense-settle",
-          copyKey: "scarred-sector",
+          copyKey: "scar_sector",
         },
         { op: "nope", region: "slagtown", reason: "bad" },
         { op: "cool", region: "veyra", reason: "colder-intel" },
@@ -110,7 +110,7 @@ test("normalize parses worldConsequence.offerMutations; ignores nested heat", ()
   assert.ok(event.worldConsequence);
   assert.equal(event.worldConsequence!.offerMutations!.length, 2);
   assert.deepEqual(event.worldConsequence!.offerMutations![0]!.kinds, ["raid", "bounty"]);
-  assert.equal(event.worldConsequence!.offerMutations![0]!.copyKey, "scarred-sector");
+  assert.equal(event.worldConsequence!.offerMutations![0]!.copyKey, "scar_sector");
   assert.equal(event.worldConsequence!.offerMutations![1]!.op, "cool");
   assert.equal(isScarWorthy("MissionSettled", "raid", 3), true);
   assert.equal(isScarWorthy("MissionSettled", "scout", 1), false);
