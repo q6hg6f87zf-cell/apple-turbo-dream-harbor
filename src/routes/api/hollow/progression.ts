@@ -17,6 +17,7 @@ import {
   type AuthorityUpgradeQuote,
 } from "@/game/authority-rules";
 import type { ClassName, MissionKind, QuarterId, RegionId, RoomId } from "@/game/types";
+import { buildServerSortiePlan, isSortiePlan, type SortiePlan } from "@/game/sortie-plan";
 
 const CAMPAIGN_ID = "moon-squad";
 const REGIONS: RegionId[] = ["ironclad", "slagtown", "blackspire", "brasswater", "veyra"];
@@ -243,6 +244,7 @@ type MissionTicketRow = {
   settled_at: string | null;
   performance_score: number | null;
   sealed_performance_score: number | null;
+  sortie_plan: SortiePlan | null;
   reward: Record<string, unknown> | null;
 };
 
@@ -257,6 +259,7 @@ function ticketJson(row: MissionTicketRow) {
     expiresAt: row.expires_at,
     settledAt: row.settled_at,
     sealedPerformanceScore: row.sealed_performance_score,
+    sortiePlan: row.sortie_plan && isSortiePlan(row.sortie_plan) ? row.sortie_plan : null,
   };
 }
 
@@ -357,7 +360,7 @@ async function startMission(
   `;
 
   const existing = await sql<MissionTicketRow>`
-    select ticket_id, region, mission_kind, party_ids, issued_at, available_at, expires_at, settled_at, performance_score, sealed_performance_score, reward
+    select ticket_id, region, mission_kind, party_ids, issued_at, available_at, expires_at, settled_at, performance_score, sealed_performance_score, sortie_plan, reward
     from hollow_mission_ticket
     where user_id = ${userId} and start_request_id = ${requestId}
     limit 1
@@ -365,7 +368,7 @@ async function startMission(
   if (existing[0]) return { duplicate: true, ticket: existing[0] };
 
   const open = await sql<MissionTicketRow>`
-    select ticket_id, region, mission_kind, party_ids, issued_at, available_at, expires_at, settled_at, performance_score, sealed_performance_score, reward
+    select ticket_id, region, mission_kind, party_ids, issued_at, available_at, expires_at, settled_at, performance_score, sealed_performance_score, sortie_plan, reward
     from hollow_mission_ticket
     where campaign_id = ${CAMPAIGN_ID} and user_id = ${userId} and settled_at is null
     limit 1
@@ -384,19 +387,22 @@ async function startMission(
   const availableAt = new Date(now + missionSettleDelayMs(kind));
   const expiresAt = new Date(now + (kind === "boss" ? 60 : 30) * 60_000);
   const partyJson = JSON.stringify(partyIds);
+  const sortiePlan = buildServerSortiePlan(kind);
+  const sortiePlanJson = JSON.stringify(sortiePlan);
   await sql`
     insert into hollow_mission_ticket (
       ticket_id, campaign_id, user_id, start_request_id, region, mission_kind,
-      party_ids, available_at, expires_at
+      party_ids, available_at, expires_at, sortie_plan
     ) values (
       ${ticketId}, ${CAMPAIGN_ID}, ${userId}, ${requestId}, ${region}, ${kind},
-      ${partyJson}::jsonb, ${availableAt.toISOString()}, ${expiresAt.toISOString()}
+      ${partyJson}::jsonb, ${availableAt.toISOString()}, ${expiresAt.toISOString()},
+      ${sortiePlanJson}::jsonb
     )
     on conflict do nothing
   `;
 
   const rows = await sql<MissionTicketRow>`
-    select ticket_id, region, mission_kind, party_ids, issued_at, available_at, expires_at, settled_at, performance_score, sealed_performance_score, reward
+    select ticket_id, region, mission_kind, party_ids, issued_at, available_at, expires_at, settled_at, performance_score, sealed_performance_score, sortie_plan, reward
     from hollow_mission_ticket
     where user_id = ${userId} and start_request_id = ${requestId}
     limit 1
@@ -707,7 +713,7 @@ async function settleBossMission(
 async function settleMission(userId: string, ticketId: string, rawScore: unknown, requestId: string | null = null) {
   const sql = await getSql();
   const rows = await sql<MissionTicketRow>`
-    select ticket_id, region, mission_kind, party_ids, issued_at, available_at, expires_at, settled_at, performance_score, sealed_performance_score, reward
+    select ticket_id, region, mission_kind, party_ids, issued_at, available_at, expires_at, settled_at, performance_score, sealed_performance_score, sortie_plan, reward
     from hollow_mission_ticket
     where ticket_id = ${ticketId} and campaign_id = ${CAMPAIGN_ID} and user_id = ${userId}
     limit 1
@@ -754,7 +760,7 @@ async function settleMission(userId: string, ticketId: string, rawScore: unknown
 
   if (!settled.result.accepted || !settled.result.moved) {
     const reread = await sql<MissionTicketRow>`
-      select ticket_id, region, mission_kind, party_ids, issued_at, available_at, expires_at, settled_at, performance_score, sealed_performance_score, reward
+      select ticket_id, region, mission_kind, party_ids, issued_at, available_at, expires_at, settled_at, performance_score, sealed_performance_score, sortie_plan, reward
       from hollow_mission_ticket where ticket_id = ${ticket.ticket_id} limit 1
     `;
     if (reread[0]?.settled_at) return { duplicate: true, reward: reread[0].reward ?? {}, ticket: reread[0] };
