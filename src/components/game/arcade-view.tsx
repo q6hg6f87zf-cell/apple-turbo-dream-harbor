@@ -8,6 +8,7 @@ import {
 } from "@/game/arcade";
 import { sfx } from "@/game/audio";
 import { punchClick } from "@/game/juice";
+import { NEON_SURFACE_CLASS } from "@/game/moon-spectacle";
 import { useGame } from "@/game/store";
 import { plateMember } from "@/game/squad";
 import type { ArcadeGameId } from "@/game/types";
@@ -54,7 +55,7 @@ export function ArcadeView() {
   return (
     <div className="space-y-5 pb-8" data-casino="1">
       {game && active ? (
-        <div className="rounded-[var(--radius-xl)] bg-raised p-4 shadow-[var(--shadow-border)] md:p-5 lg:mx-auto lg:max-w-3xl">
+        <div className={cn(NEON_SURFACE_CLASS, "rounded-[var(--radius-xl)] bg-raised p-4 shadow-[var(--shadow-border)] md:p-5 lg:mx-auto lg:max-w-3xl")} data-neon-surface="1">
           <div className="mb-3 flex items-center justify-between gap-2">
             <h3 className="font-display text-xl text-paper">{active.name}</h3>
             <Button size="sm" variant="ghost" onClick={() => setGame(null)}>

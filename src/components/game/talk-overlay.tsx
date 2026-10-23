@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { sfx } from "@/game/audio";
+import { playSpeakingRingWhoosh, setSpeakingRing } from "@/game/moon-spectacle";
 import { kaneLineAt, replyLineAt, wakeLineAt } from "@/game/opening-reel";
 import { continueIntro, getRadioSnapshot, resumeRadio, startKaneVoice, subscribeRadio } from "@/game/radio";
 import { TALK, MANUAL, MANUAL_PROMPTS, isPregameTalk, isTalkLocked, renderTalk, scriptForScreen } from "@/game/talk";
@@ -27,6 +28,20 @@ export function TalkOverlay() {
   const liveTape = talk?.script === "wake" || talk?.script === "kane" || talk?.script === "tyrone-reply";
   const total = talk ? (TALK[talk.script]?.length ?? 1) : 1;
   shownRef.current = shown;
+
+  // Lumina: speaking ring around avatar while talk line is live / typing.
+  useEffect(() => {
+    if (!talk || !line) {
+      setSpeakingRing({ active: false });
+      return;
+    }
+    const host = document.querySelector("[data-speaking-avatar]") as HTMLElement | null;
+    setSpeakingRing({ host, active: true });
+    return () => {
+      setSpeakingRing({ host, active: false });
+    };
+  }, [talk, line, talk?.script, talk?.i]);
+
 
   const revealOrAdvance = () => {
     if (liveTape) {
@@ -56,6 +71,9 @@ export function TalkOverlay() {
       return;
     }
     sfx.click();
+    playSpeakingRingWhoosh({
+      host: document.querySelector("[data-speaking-avatar]"),
+    });
     advance();
   };
 
@@ -185,12 +203,17 @@ export function TalkOverlay() {
           onClick={revealOrAdvance}
           data-wake-auto={liveTape ? "1" : undefined}
         >
-          <img
-            src={portrait}
-            alt=""
-            data-wake-portrait={talk.script === "wake" ? "1" : undefined}
-            className="size-16 shrink-0 rounded-[var(--radius-md)] object-cover object-top shadow-[var(--shadow-border)] md:size-20"
-          />
+          <span
+            data-speaking-avatar="1"
+            className="ms-speaking-ring-host relative size-16 shrink-0 rounded-[var(--radius-md)] md:size-20"
+          >
+            <img
+              src={portrait}
+              alt=""
+              data-wake-portrait={talk.script === "wake" ? "1" : undefined}
+              className="size-full rounded-[var(--radius-md)] object-cover object-top shadow-[var(--shadow-border)]"
+            />
+          </span>
           <div className="min-w-0 flex-1">
             <div className="flex items-center justify-between gap-3">
               <p className="font-display text-[10px] uppercase tracking-[0.28em] text-ember">{line.who}</p>

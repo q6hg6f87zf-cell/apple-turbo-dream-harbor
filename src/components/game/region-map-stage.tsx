@@ -2,6 +2,7 @@ import { REGION_ART } from "@/game/art";
 import { loadRegionLayout, poiMapUv, poiShortLabel, type RegionMapLayout } from "@/game/map-layouts";
 import type { RegionId, RegionPointOfInterest } from "@/game/types";
 import { cn } from "@/lib/cn";
+import { playTownTileHoverSpectacle, TOWN_TILE_CLASS } from "@/game/moon-spectacle";
 import { useEffect, useRef, useState } from "react";
 
 const DEG = Math.PI / 180;
@@ -786,13 +787,18 @@ export function RegionMapStage({
             key={pin.id}
             type="button"
             data-poi={pin.id}
+            data-town-tile="1"
             aria-label={pin.name}
             onClick={(e) => {
               e.stopPropagation();
               onSelectPoi(pin.id, e.clientX, e.clientY);
             }}
+            onPointerEnter={(e) => {
+              playTownTileHoverSpectacle({ tile: e.currentTarget });
+            }}
             style={{ left: pin.x, top: pin.y }}
             className={cn(
+              TOWN_TILE_CLASS,
               "absolute z-10 flex -translate-x-1/2 -translate-y-[70%] flex-col items-center gap-1",
               "min-h-11 min-w-11",
             )}

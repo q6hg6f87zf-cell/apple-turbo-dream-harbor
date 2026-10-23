@@ -4,6 +4,7 @@ import { CREE, SLOT_ART, SLOT_FACE, SLOT_GLYPHS, SLOT_TINT, SLOT_TRIPLE, SLOT_WE
 import { cellId, isDiagonalPath, lineCells, makeWordSearch, samePath } from "@/game/words";
 import { pulseDuck, rumble, setHeartBed, setReelMotor, sfx, startHeartBed, startReelMotor, stopHeartBed, stopReelMotor } from "@/game/audio";
 import { addTrauma, drainFly, hitstop, payoutFly, punchClick } from "@/game/juice";
+import { playTetrisClearSpectacle } from "@/game/moon-spectacle";
 import { glyphShift, groupingHalo, lampKind, outcomeLine, outcomeTone, reelIsolation, rowGround, winPeak, celebrates } from "@/game/neuro";
 import { plateMember } from "@/game/squad";
 import { atRiskLine, dryLine, heatBand, heatLine, holdMs, nearMissLine, needCommit, stakeHeat, tiltLine } from "@/game/stakes";
@@ -83,7 +84,10 @@ export function WordSearchPlay({ onDone }: { onDone: () => void }) {
       setFound(bag);
       paintPath([]);
       setNote(`${hit.word}. ${bag.length}/${board.words.length} on the list.`);
-      if (bag.length >= board.words.length) cash("clear");
+      if (bag.length >= board.words.length) {
+        playTetrisClearSpectacle({ lines: 4, boardEl: gridRef.current });
+        cash("clear");
+      }
       return;
     }
     if (hit) setNote("Already stamped.");

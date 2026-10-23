@@ -1,4 +1,5 @@
 import { punchClick, tapFeedback } from "@/game/juice";
+import { mountMoonSpectacleBus } from "@/game/moon-spectacle";
 import { useGame } from "@/game/store";
 import { isTalkLocked } from "@/game/talk";
 import { useEffect } from "react";
@@ -56,6 +57,8 @@ export function InteractionPolishRuntime() {
     document.getElementById("hollow-aaa-interactions")?.remove();
     document.getElementById("hollow-aaa-interactions-v2")?.remove();
   }, []);
+
+  useEffect(() => mountMoonSpectacleBus(), []);
 
   useEffect(() => {
     const locked = selectedId || guideOpen || confirmRest || hackOpen || termOpen || missionOpen || combatOpen;
