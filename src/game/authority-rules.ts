@@ -115,7 +115,8 @@ export function authorityMissionReward(
   const vaultCaps = Math.round(BASE_MISSION_CAPS[kind] * mult);
   const cardCaps = Math.max(15, Math.round(vaultCaps * 0.18));
   const ore = kind === "forage" ? Math.max(1, Math.floor(mult)) : kind === "raid" ? Math.max(0, Math.floor(mult - 0.5)) : 0;
-  const favor = 1;
+  // Mid-point base so 0.55–1.45× performance scale is visible after Math.round ([1,2,3] at 0/500/1000).
+  const favor = 2;
   const intel = kind === "scout" ? 2 : 1;
   const materialChance = kind === "forage" ? 0.68 : kind === "raid" ? 0.5 : kind === "bounty" ? 0.32 : kind === "scout" ? 0.2 : 0.12;
   return {

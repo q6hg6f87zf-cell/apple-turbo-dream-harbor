@@ -260,7 +260,7 @@ test("fair settle: 0018 applies, scaled credit once, retry is inert", { timeout:
     vaultCaps: scaleAuthorityAmount(baseVault, 0),
     cardCaps: scaleAuthorityAmount(baseCard, 0),
     ore: 0,
-    favor: scaleAuthorityAmount(1, 0),
+    favor: scaleAuthorityAmount(2, 0),
     riderXp: scaleAuthorityAmount(baseRiderXp, 0),
     residentXp: scaleAuthorityAmount(baseResidentXp, 0),
     intel: scaleAuthorityAmount(baseIntel, 0),
@@ -271,7 +271,7 @@ test("fair settle: 0018 applies, scaled credit once, retry is inert", { timeout:
     vaultCaps: scaleAuthorityAmount(baseVault, 1000),
     cardCaps: scaleAuthorityAmount(baseCard, 1000),
     ore: 0,
-    favor: scaleAuthorityAmount(1, 1000),
+    favor: scaleAuthorityAmount(2, 1000),
     riderXp: scaleAuthorityAmount(baseRiderXp, 1000),
     residentXp: scaleAuthorityAmount(baseResidentXp, 1000),
     intel: scaleAuthorityAmount(baseIntel, 1000),
@@ -284,6 +284,13 @@ test("fair settle: 0018 applies, scaled credit once, retry is inert", { timeout:
   assert.ok(high.vaultCaps > baseVault);
   assert.equal(low.vaultCaps, 99);
   assert.equal(high.vaultCaps, 261);
+
+  // Mission favor base 2 → scale band visible: floor/mid/ceil differ ([1,2,3]).
+  assert.equal(scaleAuthorityAmount(2, 500), 2);
+  assert.equal(low.favor, 1);
+  assert.equal(high.favor, 3);
+  assert.notEqual(low.favor, high.favor);
+
 
   const before = await balances(pg);
   const startVault = Number(before.campaign.vault_caps);
