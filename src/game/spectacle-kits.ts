@@ -9,6 +9,9 @@
  *   playAtlasScarSpectacle({ region, x?, y? })
  *   playAtlasHealSpectacle({ region, x?, y? })
  *   playDayBoardPulseSpectacle({ tone? })
+ *
+ * Settle path already fires scar/heal + day-board when `beat.region` is set
+ * (heal when heatDelta < 0 or offerMutations includes op `cool`; else scar).
  */
 import {
   addTrauma,
@@ -184,17 +187,6 @@ function hasCoolMutation(beat: SettleSpectacleBeat): boolean {
   return ops.some((m) => m && String(m.op ?? "").toLowerCase() === "cool");
 }
 
-function isVaultFlashBeat(beatId: string, theater: string): boolean {
-  return (
-    beatId === "vault_flash" ||
-    beatId === "mission-cleared" ||
-    beatId === "mission_settle" ||
-    theater === "MissionSettled" ||
-    theater === "BossCleared" ||
-    !theater
-  );
-}
-
 function isIntelDropBeat(beatId: string): boolean {
   return beatId === "intel_drop" || beatId === "intel-spike" || beatId === "intel_spike";
 }
@@ -298,11 +290,7 @@ export function playSettleSpectacle(beat: SettleSpectacleBeat | null | undefined
   }
 
   if (kits.dayBoardPulse) {
-    const tone: DayBoardPulseTone = kits.bossUpgrade
-      ? "danger"
-      : kits.intelTick
-        ? "ember"
-        : "ember";
+    const tone: DayBoardPulseTone = kits.bossUpgrade ? "danger" : "ember";
     playDayBoardPulseSpectacle({ tone });
   }
 }
@@ -337,12 +325,16 @@ export function settleSpectacleKitsFor(beat: SettleSpectacleBeat | null | undefi
   const intelSoft = intelDrop && !(Number.isFinite(intelDelta) && intelDelta > 0);
   const bossUpgrade = isBossBeat(beatId, theater, beat.kind);
   const vaultFlash =
-    isVaultFlashBeat(beatId, theater) ||
+    theater === "MissionSettled" ||
+    theater === "BossCleared" ||
+    !theater ||
+    beatId === "vault_flash" ||
+    beatId === "mission-cleared" ||
+    beatId === "mission_settle" ||
     intelDrop ||
-    bossUpgrade ||
     beatId === "boss-cleared" ||
     beatId === "boss_clear" ||
-    beatId === "intel-spike";
+    bossUpgrade;
 
   const hasRegion = typeof beat.region === "string" && beat.region.length > 0;
   const cool = hasCoolMutation(beat) || (Number.isFinite(heatDelta) && heatDelta < 0);

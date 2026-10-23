@@ -13,10 +13,10 @@ import {
   type ServerMissionTicket,
   type ServerProgressionSnapshot,
 } from "@/game/server-progression";
+import { playSettleSpectacle } from "@/game/spectacle-kits";
 import { isLiveRailHealthy, registerLiveRefresh } from "@/game/server-live-rail";
 import { shouldApplyServerSnapshot } from "@/game/apply-snapshot-revision";
 import { playAtlasBeatCue } from "@/game/live-cues";
-import { playSettleSpectacle } from "@/game/spectacle-kits";
 import { settleBeatCueId } from "@/game/settle-beat-audio";
 import { useGame } from "@/game/store";
 import type { GameState, LocationId, MissionState, Operative, RegionId } from "@/game/types";
