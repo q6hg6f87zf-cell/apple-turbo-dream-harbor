@@ -242,6 +242,7 @@ type MissionTicketRow = {
   expires_at: string;
   settled_at: string | null;
   performance_score: number | null;
+  sealed_performance_score: number | null;
   reward: Record<string, unknown> | null;
 };
 
@@ -255,6 +256,7 @@ function ticketJson(row: MissionTicketRow) {
     availableAt: row.available_at,
     expiresAt: row.expires_at,
     settledAt: row.settled_at,
+    sealedPerformanceScore: row.sealed_performance_score,
   };
 }
 
@@ -355,7 +357,7 @@ async function startMission(
   `;
 
   const existing = await sql<MissionTicketRow>`
-    select ticket_id, region, mission_kind, party_ids, issued_at, available_at, expires_at, settled_at, performance_score, reward
+    select ticket_id, region, mission_kind, party_ids, issued_at, available_at, expires_at, settled_at, performance_score, sealed_performance_score, reward
     from hollow_mission_ticket
     where user_id = ${userId} and start_request_id = ${requestId}
     limit 1
@@ -363,7 +365,7 @@ async function startMission(
   if (existing[0]) return { duplicate: true, ticket: existing[0] };
 
   const open = await sql<MissionTicketRow>`
-    select ticket_id, region, mission_kind, party_ids, issued_at, available_at, expires_at, settled_at, performance_score, reward
+    select ticket_id, region, mission_kind, party_ids, issued_at, available_at, expires_at, settled_at, performance_score, sealed_performance_score, reward
     from hollow_mission_ticket
     where campaign_id = ${CAMPAIGN_ID} and user_id = ${userId} and settled_at is null
     limit 1
@@ -394,7 +396,7 @@ async function startMission(
   `;
 
   const rows = await sql<MissionTicketRow>`
-    select ticket_id, region, mission_kind, party_ids, issued_at, available_at, expires_at, settled_at, performance_score, reward
+    select ticket_id, region, mission_kind, party_ids, issued_at, available_at, expires_at, settled_at, performance_score, sealed_performance_score, reward
     from hollow_mission_ticket
     where user_id = ${userId} and start_request_id = ${requestId}
     limit 1
@@ -705,7 +707,7 @@ async function settleBossMission(
 async function settleMission(userId: string, ticketId: string, rawScore: unknown, requestId: string | null = null) {
   const sql = await getSql();
   const rows = await sql<MissionTicketRow>`
-    select ticket_id, region, mission_kind, party_ids, issued_at, available_at, expires_at, settled_at, performance_score, reward
+    select ticket_id, region, mission_kind, party_ids, issued_at, available_at, expires_at, settled_at, performance_score, sealed_performance_score, reward
     from hollow_mission_ticket
     where ticket_id = ${ticketId} and campaign_id = ${CAMPAIGN_ID} and user_id = ${userId}
     limit 1
@@ -732,7 +734,13 @@ async function settleMission(userId: string, ticketId: string, rawScore: unknown
   const blocked = await validateMissionStart(progress, ticket.region, ticket.mission_kind, ticket.party_ids ?? []);
   if (blocked) return { error: blocked, status: 409 as const };
 
-  const score = normalizePerformanceScore(rawScore);
+  // Ledger scale is sealed at ticket issue (migrations 0008/0009). Client
+  // performanceScore is theater-only and must never mint reward amounts.
+  if (ticket.sealed_performance_score == null || !Number.isFinite(Number(ticket.sealed_performance_score))) {
+    return { error: "mission performance seal missing", status: 503 as const };
+  }
+  const score = normalizePerformanceScore(ticket.sealed_performance_score);
+  void rawScore;
   const chance = ticket.mission_kind === "boss"
     ? 1
     : authorityMissionReward(ticket.region, ticket.mission_kind as Exclude<MissionKind, "boss">).materialChance;
@@ -746,7 +754,7 @@ async function settleMission(userId: string, ticketId: string, rawScore: unknown
 
   if (!settled.result.accepted || !settled.result.moved) {
     const reread = await sql<MissionTicketRow>`
-      select ticket_id, region, mission_kind, party_ids, issued_at, available_at, expires_at, settled_at, performance_score, reward
+      select ticket_id, region, mission_kind, party_ids, issued_at, available_at, expires_at, settled_at, performance_score, sealed_performance_score, reward
       from hollow_mission_ticket where ticket_id = ${ticket.ticket_id} limit 1
     `;
     if (reread[0]?.settled_at) return { duplicate: true, reward: reread[0].reward ?? {}, ticket: reread[0] };
