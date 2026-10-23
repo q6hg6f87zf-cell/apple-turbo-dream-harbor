@@ -251,7 +251,20 @@ export function CampaignBalanceRuntime() {
         const newCount = next.locations[mission.locationId]?.missions ?? 0;
         if (newCount > oldCount) {
           const matrix = scoreMission(prev, next, mission);
+          const authorityActive = authorityOwnsCampaign(prev) || authorityOwnsCampaign(next);
           mutateState((state) => {
+            // Linked + authority: never mint caps/loot locally — Vault settle + snapshot own the ledger.
+            // Keep grade log + toast so homecoming still feels scored (VFX/copy only).
+            if (authorityActive) {
+              pushLog(
+                state,
+                "S.Y.N.A.P.S.E Matrix",
+                `Grade ${matrix.grade} · ${matrix.score}/1000 · execution ${matrix.execution} · survival ${matrix.survival} · teamwork ${matrix.teamwork} · preparation ${matrix.preparation} · awaiting Tyrone settle (×${matrix.multiplier.toFixed(2)}).`,
+              );
+              state.toast = `Grade ${matrix.grade} · Tyrone is settling the contract…`;
+              return;
+            }
+
             const desiredCaps = Math.max(0, Math.round(mission.coins * matrix.multiplier));
             const delta = desiredCaps - mission.coins;
             state.coins = Math.max(0, state.coins + delta);
@@ -288,7 +301,10 @@ export function CampaignBalanceRuntime() {
       const bossLocs: LocationId[] = ["ironclad", "kingdom", "caverns", "library", "veyra"];
       for (const loc of bossLocs) {
         if (!prev.locations[loc]?.bossDefeated && next.locations[loc]?.bossDefeated) {
-          mutateState((state) => rewardBoss(state, loc));
+          // Authority campaigns: boss payouts come from Vault settle — no local mint.
+          if (!authorityOwnsCampaign(next) && !authorityOwnsCampaign(prev)) {
+            mutateState((state) => rewardBoss(state, loc));
+          }
           needsGatePass = true;
         }
       }
