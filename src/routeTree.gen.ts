@@ -30,6 +30,7 @@ import { Route as ApiHollowAcquisitionRouteImport } from './routes/api/hollow/ac
 import { Route as ApiHollowChronicleRouteImport } from './routes/api/hollow/chronicle'
 import { Route as ApiHollowEconomyRouteImport } from './routes/api/hollow/economy'
 import { Route as ApiHollowInventoryRouteImport } from './routes/api/hollow/inventory'
+import { Route as ApiHollowLiveRouteImport } from './routes/api/hollow/live'
 import { Route as ApiHollowPorchRouteImport } from './routes/api/hollow/porch'
 import { Route as ApiHollowProgressionRouteImport } from './routes/api/hollow/progression'
 import { Route as ApiHollowSoulRouteImport } from './routes/api/hollow/soul'
@@ -142,6 +143,11 @@ const ApiHollowInventoryRoute = ApiHollowInventoryRouteImport.update({
   path: '/api/hollow/inventory',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiHollowLiveRoute = ApiHollowLiveRouteImport.update({
+  id: '/api/hollow/live',
+  path: '/api/hollow/live',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiHollowPorchRoute = ApiHollowPorchRouteImport.update({
   id: '/api/hollow/porch',
   path: '/api/hollow/porch',
@@ -195,6 +201,7 @@ export interface FileRoutesByFullPath {
   '/api/hollow/chronicle': typeof ApiHollowChronicleRoute
   '/api/hollow/economy': typeof ApiHollowEconomyRoute
   '/api/hollow/inventory': typeof ApiHollowInventoryRoute
+  '/api/hollow/live': typeof ApiHollowLiveRoute
   '/api/hollow/porch': typeof ApiHollowPorchRoute
   '/api/hollow/progression': typeof ApiHollowProgressionRoute
   '/api/hollow/soul': typeof ApiHollowSoulRoute
@@ -224,6 +231,7 @@ export interface FileRoutesByTo {
   '/api/hollow/chronicle': typeof ApiHollowChronicleRoute
   '/api/hollow/economy': typeof ApiHollowEconomyRoute
   '/api/hollow/inventory': typeof ApiHollowInventoryRoute
+  '/api/hollow/live': typeof ApiHollowLiveRoute
   '/api/hollow/porch': typeof ApiHollowPorchRoute
   '/api/hollow/progression': typeof ApiHollowProgressionRoute
   '/api/hollow/soul': typeof ApiHollowSoulRoute
@@ -254,6 +262,7 @@ export interface FileRoutesById {
   '/api/hollow/chronicle': typeof ApiHollowChronicleRoute
   '/api/hollow/economy': typeof ApiHollowEconomyRoute
   '/api/hollow/inventory': typeof ApiHollowInventoryRoute
+  '/api/hollow/live': typeof ApiHollowLiveRoute
   '/api/hollow/porch': typeof ApiHollowPorchRoute
   '/api/hollow/progression': typeof ApiHollowProgressionRoute
   '/api/hollow/soul': typeof ApiHollowSoulRoute
@@ -285,6 +294,7 @@ export interface FileRouteTypes {
     | '/api/hollow/chronicle'
     | '/api/hollow/economy'
     | '/api/hollow/inventory'
+    | '/api/hollow/live'
     | '/api/hollow/porch'
     | '/api/hollow/progression'
     | '/api/hollow/soul'
@@ -314,6 +324,7 @@ export interface FileRouteTypes {
     | '/api/hollow/chronicle'
     | '/api/hollow/economy'
     | '/api/hollow/inventory'
+    | '/api/hollow/live'
     | '/api/hollow/porch'
     | '/api/hollow/progression'
     | '/api/hollow/soul'
@@ -343,6 +354,7 @@ export interface FileRouteTypes {
     | '/api/hollow/chronicle'
     | '/api/hollow/economy'
     | '/api/hollow/inventory'
+    | '/api/hollow/live'
     | '/api/hollow/porch'
     | '/api/hollow/progression'
     | '/api/hollow/soul'
@@ -373,6 +385,7 @@ export interface RootRouteChildren {
   ApiHollowChronicleRoute: typeof ApiHollowChronicleRoute
   ApiHollowEconomyRoute: typeof ApiHollowEconomyRoute
   ApiHollowInventoryRoute: typeof ApiHollowInventoryRoute
+  ApiHollowLiveRoute: typeof ApiHollowLiveRoute
   ApiHollowPorchRoute: typeof ApiHollowPorchRoute
   ApiHollowProgressionRoute: typeof ApiHollowProgressionRoute
   ApiHollowSoulRoute: typeof ApiHollowSoulRoute
@@ -530,6 +543,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiHollowInventoryRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/hollow/live': {
+      id: '/api/hollow/live'
+      path: '/api/hollow/live'
+      fullPath: '/api/hollow/live'
+      preLoaderRoute: typeof ApiHollowLiveRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/hollow/porch': {
       id: '/api/hollow/porch'
       path: '/api/hollow/porch'
@@ -597,6 +617,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiHollowChronicleRoute: ApiHollowChronicleRoute,
   ApiHollowEconomyRoute: ApiHollowEconomyRoute,
   ApiHollowInventoryRoute: ApiHollowInventoryRoute,
+  ApiHollowLiveRoute: ApiHollowLiveRoute,
   ApiHollowPorchRoute: ApiHollowPorchRoute,
   ApiHollowProgressionRoute: ApiHollowProgressionRoute,
   ApiHollowSoulRoute: ApiHollowSoulRoute,

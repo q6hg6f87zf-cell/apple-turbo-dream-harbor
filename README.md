@@ -13,6 +13,9 @@ Hollow Realm now has a staged server-authoritative path for verified TyroneBot r
 - Duplicate request IDs cannot double-credit or double-debit caps.
 - Overdrafts and transfers to unlinked riders are rejected server-side.
 - The client refreshes authoritative card/treasury values on focus and on a light polling interval.
+- Linked riders also subscribe to `GET /api/hollow/live` (Pulse SSE): `hello` / `revision` / `heartbeat` beats carry `campaignRevision` + `memberRevision` (optional `eventType`: `MissionSettled` | `TransferSettled` when Vault domain events exist).
+- While the live rail is healthy, the 30s progression/inventory pollers demote to backup; focus/visibility refresh stays. On SSE drop, clients reconnect with backoff and the 30s poll resumes until healthy.
+- SSE durability is reconnect-based (serverless maxDuration); revision detection is DB-backed, not an in-process fanout bus. `/api/rtc` remains P2P signaling only.
 
 ### Campaign progression and reward issuance
 

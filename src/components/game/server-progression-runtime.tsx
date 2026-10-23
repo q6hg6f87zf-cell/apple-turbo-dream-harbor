@@ -13,6 +13,7 @@ import {
   type ServerMissionTicket,
   type ServerProgressionSnapshot,
 } from "@/game/server-progression";
+import { isLiveRailHealthy, registerLiveRefresh } from "@/game/server-live-rail";
 import { useGame } from "@/game/store";
 import type { GameState, LocationId, MissionState, Operative, RegionId } from "@/game/types";
 import { useEffect } from "react";
@@ -317,10 +318,18 @@ export function ServerProgressionRuntime() {
 
     const onFocus = () => void refresh(true);
     window.addEventListener("focus", onFocus);
-    const timer = window.setInterval(() => void refresh(true), 30_000);
+    // 30s poll is backup only — Pulse SSE demotes it while healthy.
+    const timer = window.setInterval(() => {
+      if (isLiveRailHealthy()) return;
+      void refresh(true);
+    }, 30_000);
+    const unregisterLive = registerLiveRefresh(() => {
+      void refresh(true);
+    });
 
     return () => {
       cancelled = true;
+      unregisterLive();
       unsubscribe?.();
       window.removeEventListener("focus", onFocus);
       window.clearInterval(timer);

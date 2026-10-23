@@ -9,6 +9,7 @@ import { ResidentProgressionRuntime } from "@/components/game/resident-progressi
 import { SecureGameApp } from "@/components/game/secure-game-app";
 import { ServerEconomyRuntime } from "@/components/game/server-economy-runtime";
 import { ServerInventoryRuntime } from "@/components/game/server-inventory-runtime";
+import { ServerLiveRuntime } from "@/components/game/server-live-runtime";
 import { ServerProgressionRuntime } from "@/components/game/server-progression-runtime";
 import { WorldBridgeRuntime } from "@/components/game/world-bridge-runtime";
 import { TyroneDebugPanel } from "@/components/game/tyrone-debug";
@@ -47,6 +48,7 @@ function Home() {
       <ServerEconomyRuntime />
       <ServerProgressionRuntime />
       <ServerInventoryRuntime />
+      <ServerLiveRuntime />
       <ClassAliasLayer />
       <CampaignBalanceRuntime />
       <ResidentProgressionRuntime />
