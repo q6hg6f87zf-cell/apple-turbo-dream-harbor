@@ -231,7 +231,7 @@ const scaleAmount = (base) => (base ? Math.max(0, Math.round(base * expectedScal
 const baseVaultCaps = 180;
 const baseCardCaps = Math.max(15, Math.round(baseVaultCaps * 0.18)); // 32
 const baseOre = 0;
-const baseFavor = 1;
+const baseFavor = 2; // mid-point so 0.55–1.45× shows ([1,2,3] at 0/500/1000)
 const baseResidentXp = 18;
 const baseRiderXp = 3;
 const baseIntel = 2;
