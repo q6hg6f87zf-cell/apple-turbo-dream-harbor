@@ -1,72 +1,228 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { theaterCopyFor, theaterRegionLabel } from "./theater-copy.ts";
-
+import {
+  theaterCopyByKey,
+  theaterCopyFor,
+  theaterRegionLabel,
+} from "./theater-copy.ts";
 test("region labels use canon short names, never raw ids", () => {
   assert.equal(theaterRegionLabel("ironclad"), "Ironclad");
   assert.equal(theaterRegionLabel("slagtown"), "Slag Town");
   assert.equal(theaterRegionLabel("veyra"), "Veyra");
   assert.equal(theaterRegionLabel(null), "the Hollow");
 });
-
-test("MissionSettled intel / vault / raid / scout copy is elite, not placeholder", () => {
-  const intel = theaterCopyFor({
+test("MissionSettled intel / vault variants split by kind", () => {
+  const intelRaid = theaterCopyFor({
     theater: "MissionSettled",
     beatId: "intel_drop",
     region: "slagtown",
     kind: "raid",
-    intelDelta: 2,
+    intelDelta: 1,
+    heatDelta: 3,
     performanceScore: 800,
+    worldConsequence: null,
   });
-  assert.match(intel.headline, /Intel spike · Slag Town/);
-  assert.doesNotMatch(intel.headline, /Mission settled/i);
-  assert.ok(intel.subline.length > 20);
-  assert.match(intel.radio, /^Tyrone · /);
-
-  const vault = theaterCopyFor({
+  assert.match(intelRaid.headline, /Breach intel · Slag Town/);
+  assert.equal(intelRaid.copyKey, "intel_drop_raid");
+  assert.match(intelRaid.radio, /^Tyrone · /);
+  const intelScout = theaterCopyFor({
+    theater: "MissionSettled",
+    beatId: "intel_drop",
+    region: "ironclad",
+    kind: "scout",
+    intelDelta: 1,
+    heatDelta: 1,
+    performanceScore: 600,
+    worldConsequence: null,
+  });
+  assert.match(intelScout.headline, /Scout intel · Ironclad/);
+  assert.equal(intelScout.copyKey, "intel_drop_scout");
+  const intelBoss = theaterCopyFor({
+    theater: "MissionSettled",
+    beatId: "intel_drop",
+    region: "veyra",
+    kind: "boss",
+    intelDelta: 1,
+    heatDelta: 8,
+    performanceScore: 900,
+    worldConsequence: null,
+  });
+  assert.match(intelBoss.headline, /Named intel · Veyra/);
+  assert.equal(intelBoss.copyKey, "intel_drop_boss");
+  const vaultRaid = theaterCopyFor({
+    theater: "MissionSettled",
+    beatId: "vault_flash",
+    region: "blackspire",
+    kind: "raid",
+    intelDelta: 0,
+    heatDelta: 3,
+    performanceScore: 500,
+    worldConsequence: null,
+  });
+  assert.match(vaultRaid.headline, /Vault 13 takes the breach · Blackspire/);
+  assert.equal(vaultRaid.copyKey, "vault_flash_raid");
+  const vaultBoss = theaterCopyFor({
+    theater: "MissionSettled",
+    beatId: "vault_flash",
+    region: "veyra",
+    kind: "boss",
+    intelDelta: 0,
+    heatDelta: 8,
+    performanceScore: 500,
+    worldConsequence: null,
+  });
+  assert.match(vaultBoss.headline, /Vault 13 seals the hill · Veyra/);
+  assert.equal(vaultBoss.copyKey, "vault_flash_boss");
+  const vaultScout = theaterCopyFor({
     theater: "MissionSettled",
     beatId: "vault_flash",
     region: "brasswater",
-    kind: "forage",
+    kind: "scout",
     intelDelta: 0,
-    performanceScore: 500,
+    heatDelta: 1,
+    performanceScore: 400,
+    worldConsequence: null,
   });
-  assert.match(vault.headline, /Vault 13 pulse · Brasswater/);
-
+  assert.match(vaultScout.headline, /Vault 13 pulse · Brasswater/);
+  assert.equal(vaultScout.copyKey, "vault_flash_scout");
   const scout = theaterCopyFor({
     theater: "MissionSettled",
     beatId: "mission_settle",
     region: "ironclad",
     kind: "scout",
     intelDelta: 0,
+    heatDelta: 1,
     performanceScore: 600,
+    worldConsequence: null,
   });
   assert.match(scout.headline, /Scout closed · Ironclad/);
 });
-
-test("RaidOpened and BossCleared speak Moon Squad fantasy-tech", () => {
+test("RaidOpened foreshadow and BossCleared atlas scar / board seal", () => {
   const raid = theaterCopyFor({
     theater: "RaidOpened",
     beatId: "raid_opened",
     region: "blackspire",
     kind: "raid",
     intelDelta: 0,
+    heatDelta: 2,
     performanceScore: null,
+    worldConsequence: null,
   });
   assert.match(raid.headline, /Raid ticket live · Blackspire/);
   assert.match(raid.subline, /Kane/);
   assert.equal(raid.tone, "moon");
-
+  assert.equal(raid.copyKey, "foreshadow_raid");
+  const bossOpen = theaterCopyFor({
+    theater: "RaidOpened",
+    beatId: "raid_opened",
+    region: "veyra",
+    kind: "boss",
+    intelDelta: 0,
+    heatDelta: 4,
+    performanceScore: null,
+    worldConsequence: null,
+  });
+  assert.equal(bossOpen.copyKey, "foreshadow_boss");
+  assert.match(bossOpen.subline, /hill has a name/i);
   const boss = theaterCopyFor({
     theater: "BossCleared",
     beatId: "boss_clear",
     region: "veyra",
     kind: "boss",
     intelDelta: 1,
+    heatDelta: 8,
     performanceScore: 950,
+    worldConsequence: null,
   });
-  assert.match(boss.headline, /Named hill falls · Veyra/);
-  assert.match(boss.subline, /does not let you kill it twice/);
+  assert.match(boss.headline, /Atlas scar · Veyra/);
+  assert.match(boss.subline, /Board seal|does not let you kill it twice/);
   assert.equal(boss.tone, "danger");
   assert.match(boss.radio, /Tyrone · /);
+  assert.equal(boss.copyKey, "atlas_scar");
+});
+test("consequence-aware voice: scarred, grateful vault, colder intel", () => {
+  const grateful = theaterCopyFor({
+    theater: "MissionSettled",
+    beatId: "vault_flash",
+    region: "slagtown",
+    kind: "forage",
+    intelDelta: 0,
+    heatDelta: 1,
+    performanceScore: 820,
+    worldConsequence: null,
+  });
+  assert.match(grateful.headline, /Vault 13 grateful · Slag Town/);
+  assert.equal(grateful.copyKey, "grateful_vault");
+  assert.match(grateful.radio, /^SYNAPSE · /);
+  const colder = theaterCopyFor({
+    theater: "MissionSettled",
+    beatId: "intel_drop",
+    region: "ironclad",
+    kind: "scout",
+    intelDelta: 2,
+    heatDelta: 1,
+    performanceScore: 700,
+    worldConsequence: null,
+  });
+  assert.match(colder.headline, /Colder intel · Ironclad/);
+  assert.equal(colder.copyKey, "colder_intel");
+  const scarredRaid = theaterCopyFor(
+    {
+      theater: "MissionSettled",
+      beatId: "vault_flash",
+      region: "blackspire",
+      kind: "raid",
+      intelDelta: 0,
+      heatDelta: 3,
+      performanceScore: 400,
+      worldConsequence: null,
+    },
+    { scarred: true },
+  );
+  assert.match(scarredRaid.subline, /glowing rim|scar/i);
+  const fromCtx = theaterCopyFor(
+    {
+      theater: "MissionSettled",
+      beatId: "mission_settle",
+      region: "brasswater",
+      kind: "trade",
+      intelDelta: 0,
+      heatDelta: 0,
+      performanceScore: 500,
+      worldConsequence: null,
+    },
+    { copyKey: "next_offer_boost" },
+  );
+  assert.match(fromCtx.headline, /Board leans hard · Brasswater/);
+  assert.equal(fromCtx.copyKey, "next_offer_boost");
+  const fromMutation = theaterCopyFor({
+    theater: "MissionSettled",
+    beatId: "mission_settle",
+    region: "slagtown",
+    kind: "raid",
+    intelDelta: 0,
+    heatDelta: 3,
+    performanceScore: 500,
+    worldConsequence: {
+      offerMutations: [
+        {
+          op: "cool",
+          region: "slagtown",
+          reason: "post-raid",
+          copyKey: "next_offer_cool",
+        },
+      ],
+    },
+  });
+  assert.match(fromMutation.headline, /Board cools · Slag Town/);
+  assert.equal(fromMutation.copyKey, "next_offer_cool");
+});
+test("theaterCopyByKey covers scar / grateful / colder / board hooks", () => {
+  const scar = theaterCopyByKey("scar_sector", "veyra");
+  assert.match(scar.headline, /Scarred sector · Veyra/);
+  assert.equal(scar.tone, "danger");
+  const seal = theaterCopyByKey("board_seal", "ironclad");
+  assert.match(seal.headline, /Board seal · Ironclad/);
+  const foreshadow = theaterCopyByKey("foreshadow_raid", "blackspire");
+  assert.match(foreshadow.radio, /^Tyrone · /);
 });
