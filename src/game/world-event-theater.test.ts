@@ -3,8 +3,12 @@ import test from "node:test";
 import {
   bridgeTypeForTheater,
   defaultBeatId,
+  extractWorldConsequence,
+  isScarWorthy,
   normalizeTheaterEvent,
   parseLiveBeat,
+  parseOfferMutations,
+  parseWorldConsequence,
   resolveTheaterBeatId,
   shouldEnqueueBridgeOutbox,
   theaterFromLiveEventType,
@@ -74,4 +78,59 @@ test("Vault kebab beat ids alias onto Atlas snake beat ids", () => {
     intelDelta: 2,
   });
   assert.equal(event.beatId, "intel_drop");
+});
+
+test("normalize parses worldConsequence.offerMutations; ignores nested heat", () => {
+  const event = normalizeTheaterEvent({
+    theater: "MissionSettled",
+    eventId: "wc-1",
+    region: "slagtown",
+    kind: "raid",
+    heatDelta: 3,
+    intelDelta: 1,
+    beatId: "intel_drop",
+    revision: { campaign: 7 },
+    worldConsequence: {
+      heatDelta: 99,
+      offerMutations: [
+        {
+          op: "boost",
+          region: "slagtown",
+          kinds: ["raid", "not-a-kind", "bounty"],
+          weight: 4,
+          reason: "dense-settle",
+          copyKey: "scarred-sector",
+        },
+        { op: "nope", region: "slagtown", reason: "bad" },
+        { op: "cool", region: "veyra", reason: "colder-intel" },
+      ],
+    } as never,
+  });
+  assert.equal(event.heatDelta, 3);
+  assert.ok(event.worldConsequence);
+  assert.equal(event.worldConsequence!.offerMutations!.length, 2);
+  assert.deepEqual(event.worldConsequence!.offerMutations![0]!.kinds, ["raid", "bounty"]);
+  assert.equal(event.worldConsequence!.offerMutations![0]!.copyKey, "scarred-sector");
+  assert.equal(event.worldConsequence!.offerMutations![1]!.op, "cool");
+  assert.equal(isScarWorthy("MissionSettled", "raid", 3), true);
+  assert.equal(isScarWorthy("MissionSettled", "scout", 1), false);
+  assert.equal(isScarWorthy("BossCleared", "boss", 8), true);
+});
+
+test("parseWorldConsequence / extractWorldConsequence locked shape", () => {
+  assert.equal(parseWorldConsequence(null), null);
+  assert.equal(parseWorldConsequence({ heatDelta: 5 }), null);
+  const bag = parseWorldConsequence({
+    offerMutations: [{ op: "unlock", region: "blackspire", reason: "boss-path", kinds: ["boss"] }],
+  });
+  assert.equal(bag?.offerMutations?.[0]?.op, "unlock");
+  assert.deepEqual(
+    extractWorldConsequence({
+      worldConsequence: {
+        offerMutations: [{ op: "boost", region: "ironclad", reason: "vault" }],
+      },
+    })?.offerMutations?.[0]?.region,
+    "ironclad",
+  );
+  assert.equal(parseOfferMutations([{ op: "boost", region: "nope", reason: "x" }]).length, 0);
 });

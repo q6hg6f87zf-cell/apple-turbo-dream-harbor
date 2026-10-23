@@ -2,7 +2,7 @@
 
 Moon Squad fantasy-tech contract for player-facing campaign beats.
 
-Contract version: **1.1** (Atlas · Pulse live fold-in)
+Contract version: **1.2** (Atlas · living-world consequence projections)
 
 ## Doctrine
 
@@ -124,6 +124,7 @@ merges settle snapshot fields.
 | `beatId` | TheaterBeatId | Client animation key |
 | `at` | ISO timestamptz | Event time |
 | `duplicate` | boolean | Idempotent replay |
+| `worldConsequence` | `{ offerMutations? }` \| null | Vault board mutations only (see Vault handoff) |
 
 ### Beat ids (Forge animation keys)
 
@@ -141,10 +142,11 @@ merges settle snapshot fields.
 
 Pure TypeScript under `src/game/` (Atlas-owned):
 
-1. **`world-event-theater.ts`** — catalog, alias map, payload normalize, live `eventType` parse
-2. **`world-pulse.ts`** — pulse state + `applyLiveBeat` / `applyTheaterEvent`
-3. **`atlas-heat.ts`** — per-region heat cells from pulse
-4. **`day-board-pulse.ts`** — strip feed for DayBoard
+1. **`world-event-theater.ts`** — catalog, alias map, payload normalize, `worldConsequence` parse, live `eventType` parse
+2. **`world-pulse.ts`** — pulse state + `applyLiveBeat` / `applyTheaterEvent` (carries `offerMutations` + `scarWorthy`)
+3. **`atlas-heat.ts`** — per-region heat cells + **lasting scars** (BossCleared / dense MissionSettled)
+4. **`day-board-pulse.ts`** — strip feed + **next-offer graph** (`boost` / `unlock` / `cool`)
+5. **`theater-copy.ts`** — Mythos `theaterCopyFor` (Atlas consumes; does not rewrite)
 
 Do **not** implement `GET /api/hollow/live` here (Pulse). Do **not** add
 `0018_hollow_domain_event.sql` here (Vault).
@@ -153,19 +155,54 @@ Do **not** implement `GET /api/hollow/live` here (Pulse). Do **not** add
 
 `src/game/theater-copy.ts` owns player-facing headlines, sublines, and Moon Squad
 radio for `MissionSettled`, `RaidOpened`, `BossCleared`, intel spikes, Vault
-pulses, and day-board idle lead. Atlas projectors call `theaterCopyFor`; Forge
-renders strip fields (`headline` / `subline` / `radio` / `tone`). Do not invent
-economy numbers or Caps rules here.
+pulses, and day-board idle lead. Atlas projectors call `theaterCopyFor` (source
+of truth); Forge renders strip fields (`headline` / `subline` / `radio` / `tone`
+/ optional `copyKey`). Do not invent economy numbers or Caps rules here.
 
 Vault settle may still emit kebab `beatId`s (`intel-spike`, `boss-cleared`,
 `mission-cleared`). `resolveTheaterBeatId` aliases them onto Atlas snake ids.
+
+### Consequence-aware voice
+
+Settled missions change how the world speaks next. Mythos derives flags from the
+event (and optional Atlas `TheaterCopyContext`):
+
+| Flag | Derived when | Voice |
+|---|---|---|
+| `scarred` | `isScarWorthy(...)`, `regionHeat ≥ 8`, or `copyKey` scar/atlas | Scarred sector / glowing rim / Atlas scar |
+| `gratefulVault` | `vault_flash` + `performanceScore ≥ 750`, or key | Vault 13 grateful · SYNAPSE radio |
+| `colderIntel` | `intelDelta ≥ 2`, `regionIntel ≥ 3`, or key | Colder intel · Tyrone radio |
+
+Kind-split beats (scout / raid / boss) apply to **both** `vault_flash` and
+`intel_drop` before the boss catch-all, so `MissionSettled` + boss kind still
+gets Named intel / Vault seals the hill when beatId says so.
+
+`RaidOpened` foreshadows via `foreshadow_raid` / `foreshadow_boss`.
+`BossCleared` seals the board as `atlas_scar` (scarred) or `board_seal`.
+
+### Selectable `copyKey` hooks (Atlas)
+
+Atlas may pin a Mythos key on `worldConsequence.offerMutations[].copyKey` or
+pass `{ copyKey }` in `TheaterCopyContext` for next-offer / heat-scar projections:
+
+| Key | Use |
+|---|---|
+| `scar_sector` / `atlas_scar` | Heat scar cell / boss board seal |
+| `grateful_vault` / `colder_intel` | Consequence strip overrides |
+| `board_seal` | Named-hill seal without scar tone |
+| `foreshadow_raid` / `foreshadow_boss` | Day-board next-offer foreshadow |
+| `next_offer_boost` / `next_offer_unlock` / `next_offer_cool` | Offer mutation strip voice |
+| `vault_flash_*` / `intel_drop_*` | Kind-split settle keys (`scout`/`raid`/`boss`) |
+
+Lookup without a full event: `theaterCopyByKey(key, region)`.
+Exported catalog: `THEATER_COPY_KEYS`.
 
 ## Consumers
 
 | Consumer | How |
 |---|---|
-| DayBoard (Forge) | `selectDayBoardPulse(pulse)` → strip above watch ribbon |
-| WorldAtlas / region rim (Forge) | `selectAtlasHeat(pulse)` → rim tint / cell intensity |
+| DayBoard (Forge) | `selectDayBoardPulse(pulse)` → strip; `selectDayBoardOfferGraph(pulse)` → next-offer |
+| WorldAtlas / region rim (Forge) | `selectAtlasHeat(pulse)` → rim tint / heat + lasting scar intensity |
 | Vault flash / intel (Forge) | Queue VFX from `beatId` on revision beats |
 | Pulse SSE | Streams live beats → `applyLiveBeat` |
 | Bridge outbox | Vault *may* enqueue mapped `bridgeType` after settle; continuity policy gates memory |
@@ -174,10 +211,46 @@ Vault settle may still emit kebab `beatId`s (`intel-spike`, `boss-cleared`,
 
 ### Vault
 
-- Migration `0018_hollow_domain_event` + append `MissionSettled` in settle TX.
-- Unique key e.g. `settle:${ticketId}`; retries must not double-append.
-- Optional: include `region` / `kind` in domain payload so Atlas heat is precise
+- Migration `0018_hollow_domain_event` + append `MissionSettled` in settle TX
+  (same TX as ticket settle + revision bump). Boss path: also append `BossCleared`
+  with unique idempotency `boss-cleared:{ticketId}` when `boss_clears` flips.
+- Unique settle key e.g. `settle:${ticketId}`; retries must not double-append.
+- Include `region` / `kind` in domain payload so Atlas heat / scars are precise
   without waiting for snapshot merge.
+
+#### Locked `MissionSettled` consequence schema
+
+Keep **one domain row per ticket**. Heat / intel / beatId stay **top-level**.
+`offerMutations` live **only** nested under `worldConsequence` (never duplicate
+heat inside the bag).
+
+```ts
+// Top-level on MissionSettled payload (Vault)
+heatDelta: number;          // defaults match Atlas defaultHeatDelta
+intelDelta: number;
+beatId: "vault_flash" | "intel_drop" | "boss_clear" | "mission_settle" | …;
+region: RegionId;
+kind: MissionKind;
+theater: "MissionSettled";  // or separate BossCleared row on boss path
+
+worldConsequence: {
+  // offerMutations ONLY — no heatDelta / intelDelta / beatId here
+  offerMutations: Array<{
+    op: "boost" | "unlock" | "cool";
+    region: RegionId;
+    kinds?: MissionKind[];
+    weight?: number;       // optional signed weight hint
+    reason: string;        // machine reason for Forge/debug
+    copyKey?: string;      // Mythos selectable key only — Atlas does not invent copy
+  }>;
+};
+```
+
+Atlas projectors:
+
+- `heatDelta` → atlas heat cells
+- BossCleared / dense MissionSettled (`isScarWorthy`) → **lasting per-region scar**
+- `worldConsequence.offerMutations` → day-board **next-offer graph**
 
 ### Pulse
 
@@ -191,9 +264,12 @@ Vault settle may still emit kebab `beatId`s (`intel-spike`, `boss-cleared`,
 
 ## Success criteria (this Atlas slice)
 
-- Doc references live contract + domain/bridge alias map
+- Doc references live contract + domain/bridge alias map + locked Vault consequence schema
 - Modules + `node:test`: live `revision` + `eventType: "MissionSettled"` bumps
   campaign revision, produces board strip beat, and (with region) heats atlas
+- Consequence projections: BossCleared / dense MissionSettled leave lasting scars;
+  `offerMutations` drive day-board next-offer graph (`boost` / `unlock` / `cool`)
+- Mythos `theaterCopyFor` only for player copy; optional `copyKey` hooks, no string rewrites
 - No SSE route, no `0018` migration, no tyrone-bot / profile / snapshot edits
 
 ## Forbidden

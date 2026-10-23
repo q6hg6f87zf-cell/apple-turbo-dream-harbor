@@ -8,10 +8,12 @@ import { theaterCopyFor } from "./theater-copy";
 import {
   defaultBeatId,
   defaultHeatDelta,
+  isScarWorthy,
   normalizeTheaterEvent,
   parseLiveBeat,
   theaterFromLiveEventType,
   type LiveBeat,
+  type OfferMutation,
   type TheaterBeatId,
   type TheaterEventPayload,
   type TheaterEventInput,
@@ -32,9 +34,12 @@ export type WorldPulseBeat = {
   memberRevision: number | null;
   at: string;
   headline: string;
-  /** Mythos stake line under the strip headline */
   subline: string;
   radio: string;
+  /** Vault offerMutations carried for day-board next-offer graph. */
+  offerMutations: OfferMutation[];
+  /** BossCleared / dense MissionSettled — atlas scar candidate. */
+  scarWorthy: boolean;
 };
 
 export type WorldPulseState = {
@@ -42,7 +47,6 @@ export type WorldPulseState = {
   campaignRevision: number;
   memberRevision: number;
   beats: WorldPulseBeat[];
-  /** eventIds already folded — idempotent apply */
   seen: string[];
 };
 
@@ -58,6 +62,7 @@ export function emptyWorldPulse(campaignId = "moon-squad"): WorldPulseState {
 
 function toPulseBeat(event: TheaterEventPayload): WorldPulseBeat {
   const copy = theaterCopyFor(event);
+  const offerMutations = event.worldConsequence?.offerMutations ?? [];
   return {
     eventId: event.eventId,
     theater: event.theater,
@@ -72,6 +77,8 @@ function toPulseBeat(event: TheaterEventPayload): WorldPulseBeat {
     headline: copy.headline,
     subline: copy.subline,
     radio: copy.radio,
+    offerMutations,
+    scarWorthy: isScarWorthy(event.theater, event.kind, event.heatDelta),
   };
 }
 
@@ -96,18 +103,11 @@ function pushBeat(state: WorldPulseState, event: TheaterEventPayload): WorldPuls
   return { ...next, beats, seen };
 }
 
-/** Apply a full Vault/domain theater payload (or settle snapshot merge). */
 export function applyTheaterEvent(state: WorldPulseState, input: TheaterEventInput): WorldPulseState {
   const event = normalizeTheaterEvent(input);
   return pushBeat(state, event);
 }
 
-/**
- * Apply one Pulse SSE beat from GET /api/hollow/live.
- * hello/heartbeat → watermark only.
- * revision + eventType → project a theater beat with default heat/beatId.
- * Optional extras (region, kind, …) let Forge merge settle snapshot fields.
- */
 export function applyLiveBeat(
   state: WorldPulseState,
   raw: LiveBeat | unknown,
@@ -156,10 +156,10 @@ export function applyLiveBeat(
     },
     at: extras.at,
     duplicate: extras.duplicate,
+    worldConsequence: extras.worldConsequence,
   });
 }
 
-/** Latest N beats (already newest-first). */
 export function selectRecentBeats(state: WorldPulseState, limit = 8): WorldPulseBeat[] {
   return state.beats.slice(0, Math.max(0, Math.min(WORLD_PULSE_BEAT_CAP, limit)));
 }

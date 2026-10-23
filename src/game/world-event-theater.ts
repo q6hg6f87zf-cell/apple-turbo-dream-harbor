@@ -78,6 +78,12 @@ export type TheaterRevision = {
 export const OFFER_MUTATION_OPS = ["boost", "unlock", "cool"] as const;
 export type OfferMutationOp = (typeof OFFER_MUTATION_OPS)[number];
 
+const MISSION_KIND_SET = new Set<string>(["scout", "forage", "raid", "trade", "bounty", "boss"]);
+
+export function isMissionKind(raw: unknown): raw is MissionKind {
+  return typeof raw === "string" && MISSION_KIND_SET.has(raw);
+}
+
 /**
  * One board-consequence mutation Vault may attach on MissionSettled.
  * Heat lives on the event root (heatDelta) — never duplicated here.
@@ -230,7 +236,7 @@ export function parseOfferMutations(raw: unknown): OfferMutation[] {
     const reason = typeof r.reason === "string" && r.reason.trim() ? r.reason.trim().slice(0, 96) : "vault";
     const mut: OfferMutation = { op: r.op, region: r.region, reason };
     if (Array.isArray(r.kinds)) {
-      const kinds = r.kinds.filter((k): k is MissionKind => typeof k === "string").slice(0, 8) as MissionKind[];
+      const kinds = r.kinds.filter(isMissionKind).slice(0, 8);
       if (kinds.length) mut.kinds = kinds;
     }
     if (typeof r.weight === "number" && Number.isFinite(r.weight)) {
@@ -247,9 +253,16 @@ export function parseOfferMutations(raw: unknown): OfferMutation[] {
 export function parseWorldConsequence(raw: unknown): WorldConsequence | null {
   if (!raw || typeof raw !== "object") return null;
   const r = raw as Record<string, unknown>;
+  // Locked schema: offerMutations only nested here. Ignore nested heatDelta/intelDelta/beatId.
   const offerMutations = parseOfferMutations(r.offerMutations);
   if (!offerMutations.length) return null;
   return { offerMutations };
+}
+
+/** Pull worldConsequence from a Vault/domain row. Prefers nested bag; does not invent heat. */
+export function extractWorldConsequence(raw: unknown): WorldConsequence | null {
+  if (!raw || typeof raw !== "object") return null;
+  return parseWorldConsequence((raw as Record<string, unknown>).worldConsequence);
 }
 
 /** Dense settle that should scar the atlas (raid/bounty/boss or high heat). */
