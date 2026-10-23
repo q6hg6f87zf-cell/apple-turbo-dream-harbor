@@ -10,7 +10,9 @@ import {
   requestLiveRefresh,
   setLiveRailHealthy,
 } from "@/game/server-live-rail";
+import { playAtlasBeatCue, playLiveEventCue } from "@/game/live-cues";
 import { playSettleSpectacle, type SettleSpectacleBeat } from "@/game/spectacle-kits";
+import { settleBeatCueId } from "@/game/settle-beat-audio";
 import { useGame } from "@/game/store";
 import { useEffect } from "react";
 
@@ -133,11 +135,14 @@ export function ServerLiveRuntime() {
       }
       if (beat.type === "revision") {
         markUp();
-        // Forge settle theater on live rail (Resonance adds playLiveEventCue beside this in #15).
+        // Forge settle theater on live rail + Resonance SFX.
         if (beat.eventType) {
-          playSettleSpectacle(
-            spectacleBeatFromLiveEvent(beat.eventType, beat.campaignRevision, beat.memberRevision),
-          );
+          // Resonance: theater SFX from Pulse eventType (MissionSettled → mission.settled).
+          playLiveEventCue(beat.eventType);
+          const spectacle = spectacleBeatFromLiveEvent(beat.eventType, beat.campaignRevision, beat.memberRevision);
+          playSettleSpectacle(spectacle);
+          const cue = settleBeatCueId(spectacle, beat.eventType);
+          if (cue) playAtlasBeatCue(cue);
         }
         void refreshIfNewer({
           campaignRevision: beat.campaignRevision,

@@ -15,7 +15,9 @@ import {
 } from "@/game/server-progression";
 import { isLiveRailHealthy, registerLiveRefresh } from "@/game/server-live-rail";
 import { shouldApplyServerSnapshot } from "@/game/apply-snapshot-revision";
+import { playAtlasBeatCue } from "@/game/live-cues";
 import { playSettleSpectacle } from "@/game/spectacle-kits";
+import { settleBeatCueId } from "@/game/settle-beat-audio";
 import { useGame } from "@/game/store";
 import type { GameState, LocationId, MissionState, Operative, RegionId } from "@/game/types";
 import { useEffect } from "react";
@@ -225,9 +227,11 @@ async function settleCompletedMission(
     // Forge settle theater: HTTP beat from Vault (presentation only — never mint).
     if (result.beat) {
       playSettleSpectacle(result.beat);
+      const cue = settleBeatCueId(result.beat);
+      if (cue) playAtlasBeatCue(cue);
     } else if (!result.duplicate) {
       // Fallback when older servers omit beat — still show the board changed.
-      playSettleSpectacle({
+      const fallbackBeat = {
         theater: result.reward?.kind === "boss" ? "BossCleared" : "MissionSettled",
         beatId: result.reward?.kind === "boss" ? "boss_clear" : Number(result.reward?.intel || 0) > 0 ? "intel_drop" : "vault_flash",
         intelDelta: Number(result.reward?.intel || 0) || undefined,
@@ -237,7 +241,10 @@ async function settleCompletedMission(
           campaign: Number(result.campaign?.revision || 0),
           member: Number(result.card?.revision || 0),
         },
-      });
+      };
+      playSettleSpectacle(fallbackBeat);
+      const cue = settleBeatCueId(fallbackBeat);
+      if (cue) playAtlasBeatCue(cue);
     }
   } catch (error) {
     const fresh = await pullServerProgression().catch(() => null);
