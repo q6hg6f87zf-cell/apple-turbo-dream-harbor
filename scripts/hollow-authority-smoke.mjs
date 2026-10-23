@@ -230,25 +230,32 @@ const settleResponse = await progression({
 });
 assert.equal(settleResponse.status, 200);
 const settled = await body(settleResponse);
-assert.equal(settled.reward.vaultCaps, 180, "Client chose the mission cap reward.");
-assert.equal(settled.reward.cardCaps, 32);
+// Milestone 1: performanceScore 1000 → scale 1.45 on ironclad scout base (180/32/…).
+// Client-submitted vaultCaps/ore/residentXp must never mint; only the scaled server table applies.
+assert.equal(settled.reward.performanceScore, 1000);
+assert.equal(settled.reward.scaleFactor, 1.45);
+assert.equal(settled.reward.baseAmounts?.vaultCaps, 180, "Base table drifted from ironclad scout.");
+assert.equal(settled.reward.vaultCaps, 261, "Server did not apply performance-scaled vault caps.");
+assert.equal(settled.reward.cardCaps, 46);
 assert.equal(settled.reward.ore, 0);
 assert.equal(settled.reward.favor, 1);
-assert.equal(settled.reward.residentXp, 18);
+assert.equal(settled.reward.residentXp, 26);
+assert.equal(settled.reward.riderXp, 4);
+assert.notEqual(settled.reward.vaultCaps, 999999999, "Client chose the mission cap reward.");
 assert.equal(settled.campaign.missions.ironclad, 1);
-assert.equal(settled.campaign.intel.ironclad, 2);
-assert.equal(settled.treasury.caps, 1901);
-assert.equal(settled.card.caps, 4032);
-assert.equal(settled.card.xp, 90);
+assert.equal(settled.campaign.intel.ironclad, 3);
+assert.equal(settled.treasury.caps, 1982);
+assert.equal(settled.card.caps, 4046);
+assert.equal(settled.card.xp, 91);
 const trained = settled.residents.find((resident) => resident.id === qaParty[0].id);
 assert.ok(trained, "Sealed mission resident disappeared from server progression.");
-assert.equal(trained.xpTotal, 18);
+assert.equal(trained.xpTotal, 26);
 
 const settleReplay = await body(await progression({ command: "settle_mission", ticketId: missionStart.ticket.id, performanceScore: 0 }));
 assert.equal(settleReplay.duplicate, true);
-assert.equal(settleReplay.treasury.caps, 1901);
-assert.equal(settleReplay.card.caps, 4032);
-assert.equal(settleReplay.residents.find((resident) => resident.id === qaParty[0].id)?.xpTotal, 18);
+assert.equal(settleReplay.treasury.caps, 1982);
+assert.equal(settleReplay.card.caps, 4046);
+assert.equal(settleReplay.residents.find((resident) => resident.id === qaParty[0].id)?.xpTotal, 26);
 
 const bossTooEarly = await progression({
   command: "start_mission",
@@ -275,4 +282,4 @@ const prematureVaultUpgrade = await progression({
 });
 assert.equal(prematureVaultUpgrade.status, 409, "Vault Tier 2 bypassed authoritative gates.");
 
-console.log("Hollow authority smoke passed: identity, shared card economy, sealed Forge residents, server mission tickets, fixed rewards, resident XP, replay defense, region gates, earned days and hard Vault gates.");
+console.log("Hollow authority smoke passed: identity, shared card economy, sealed Forge residents, server mission tickets, performance-scaled rewards, resident XP, replay defense, region gates, earned days and hard Vault gates.");
