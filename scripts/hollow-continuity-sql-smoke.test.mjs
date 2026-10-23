@@ -41,7 +41,7 @@ async function applyAll(pg) {
   return pending.map((row) => row.name);
 }
 
-test("filesystem migrations apply through 0017 and the event-memory SQL path holds", { timeout: 60_000 }, async () => {
+test("filesystem migrations apply through 0018 and the event-memory SQL path holds", { timeout: 60_000 }, async () => {
   const pg = new PGlite();
   await pg.waitReady;
   const applied = await applyAll(pg);
@@ -252,6 +252,11 @@ test("filesystem migrations apply through 0017 and the event-memory SQL path hol
     applied.includes("0017_event_memories.sql") ||
       (await pg.query("select name from _migrations where name = '0017_event_memories.sql'")).rows.length === 1,
     "0017_event_memories.sql must apply",
+  );
+  assert.ok(
+    applied.includes("0018_hollow_domain_event.sql") ||
+      (await pg.query("select name from _migrations where name = '0018_hollow_domain_event.sql'")).rows.length === 1,
+    "0018_hollow_domain_event.sql must apply",
   );
 
   await pg.query(
