@@ -32,7 +32,7 @@ test("live revision MissionSettled bumps watermark and board strip", () => {
   assert.equal(strip.items.length, 1);
   assert.equal(strip.latestBeatId, "intel_drop");
   assert.equal(dayBoardNeedsSpectacle(strip), true);
-  assert.match(strip.items[0]!.headline, /Breach intel · Slag Town/);
+  assert.match(strip.items[0]!.headline, /Intel spike · Slag Town/);
   assert.ok(strip.items[0]!.subline.length > 12);
   assert.match(strip.items[0]!.radio, /^Tyrone · /);
 });
