@@ -16,6 +16,14 @@ import {
   scaleAuthorityAmount,
   type AuthorityUpgradeQuote,
 } from "@/game/authority-rules";
+import {
+  bossClearedEventId,
+  bossClearedIdempotencyKey,
+  buildBossClearedOfferMutations,
+  buildMissionSettledOfferMutations,
+  heatDeltaFor,
+  settleBeatIdSnake,
+} from "@/game/authority-world-consequence";
 import type { ClassName, MissionKind, QuarterId, RegionId, RoomId } from "@/game/types";
 
 const CAMPAIGN_ID = "moon-squad";
@@ -462,11 +470,14 @@ function missionSettledIdempotencyKey(ticketId: string) {
 }
 
 
-/** Lightweight theater beat id for settle response / MissionSettled payload (no SSE). */
-function settleBeatId(kind: string, intelDelta: number) {
-  if (kind === "boss") return "boss-cleared";
-  if (intelDelta > 0) return "intel-spike";
-  return "mission-cleared";
+/** Lightweight intel/day/rider-xp gate check for offerMutation boss unlocks (start_mission still enforces full gates). */
+function bossGatesMetForOffer(row: ProgressRow, region: RegionId, postSettleIntel: number) {
+  if (row.boss_clears?.[region]) return false;
+  const gate = AUTHORITY_BOSS_GATES[region];
+  if (row.campaign_day < BOSS_DAY_GATE[region]) return false;
+  if (postSettleIntel < gate.minIntel) return false;
+  if (row.xp < gate.minRiderXp) return false;
+  return true;
 }
 
 
@@ -476,9 +487,20 @@ async function settleStandardMission(
   score: number,
   materialQty: number,
   requestId: string | null,
+  intelBefore: number,
+  bossGatesMet: boolean,
 ) {
   const base = authorityMissionReward(ticket.region, ticket.mission_kind as Exclude<MissionKind, "boss">);
   const fair = fairSettleReward(base, score, materialQty);
+  const heatDelta = heatDeltaFor(ticket.mission_kind);
+  const intelDelta = fair.scaled.intel;
+  const beatId = settleBeatIdSnake(ticket.mission_kind, intelDelta);
+  const offerMutations = buildMissionSettledOfferMutations({
+    region: ticket.region,
+    kind: ticket.mission_kind,
+    postSettleIntel: intelBefore + intelDelta,
+    bossGatesMet,
+  });
   const rewardBody = {
     region: ticket.region,
     kind: ticket.mission_kind,
@@ -503,7 +525,12 @@ async function settleStandardMission(
   const eventPayload = JSON.stringify({
     ...rewardBody,
     theater: "MissionSettled",
-    beatId: settleBeatId(ticket.mission_kind, fair.scaled.intel),
+    beatId,
+    heatDelta,
+    intelDelta,
+    region: ticket.region,
+    kind: ticket.mission_kind,
+    worldConsequence: { offerMutations },
     partyIds: ticket.party_ids ?? [],
     idempotencyKey: idemKey,
   });
@@ -580,7 +607,11 @@ async function settleStandardMission(
     select exists(select 1 from ticket_guard) as accepted,
            exists(select 1 from member_move) as moved
   `;
-  return { result: rows[0] ?? { accepted: false, moved: false }, reward: rewardBody };
+  return {
+    result: rows[0] ?? { accepted: false, moved: false },
+    reward: rewardBody,
+    beatMeta: { beatId, heatDelta, intelDelta, theater: "MissionSettled" as const },
+  };
 }
 
 async function settleBossMission(
@@ -589,10 +620,21 @@ async function settleBossMission(
   score: number,
   materialQty: number,
   requestId: string | null,
+  intelBefore: number,
 ) {
   const base = authorityBossReward(ticket.region);
   const gate = AUTHORITY_BOSS_GATES[ticket.region];
   const fair = fairSettleReward(base, score, materialQty);
+  const heatDelta = heatDeltaFor("boss");
+  const intelDelta = fair.scaled.intel;
+  const beatId = settleBeatIdSnake("boss", intelDelta);
+  const missionOfferMutations = buildMissionSettledOfferMutations({
+    region: ticket.region,
+    kind: "boss",
+    postSettleIntel: intelBefore + intelDelta,
+    bossGatesMet: false,
+  });
+  const bossOfferMutations = buildBossClearedOfferMutations(ticket.region);
   const rewardBody = {
     region: ticket.region,
     kind: "boss" as const,
@@ -616,12 +658,32 @@ async function settleBossMission(
   const partyJson = JSON.stringify(ticket.party_ids ?? []);
   const eventId = missionSettledEventId(ticket.ticket_id);
   const idemKey = missionSettledIdempotencyKey(ticket.ticket_id);
+  const bossEventId = bossClearedEventId(ticket.ticket_id);
+  const bossIdemKey = bossClearedIdempotencyKey(ticket.ticket_id);
   const eventPayload = JSON.stringify({
     ...rewardBody,
-    theater: "BossCleared",
-    beatId: settleBeatId("boss", fair.scaled.intel),
+    theater: "MissionSettled",
+    beatId,
+    heatDelta,
+    intelDelta,
+    region: ticket.region,
+    kind: "boss",
+    worldConsequence: { offerMutations: missionOfferMutations },
     partyIds: ticket.party_ids ?? [],
     idempotencyKey: idemKey,
+  });
+  const bossPayload = JSON.stringify({
+    region: ticket.region,
+    kind: "boss",
+    theater: "BossCleared",
+    beatId: "boss_clear",
+    heatDelta: 8,
+    intelDelta,
+    worldConsequence: { offerMutations: bossOfferMutations },
+    partyIds: ticket.party_ids ?? [],
+    idempotencyKey: bossIdemKey,
+    performanceScore: score,
+    scaleFactor: fair.scaleFactor,
   });
   const sql = await getSql();
   const rows = await sql<SettlementResult>`
@@ -697,11 +759,31 @@ async function settleBossMission(
       where exists (select 1 from campaign_move)
       on conflict (idempotency_key) do nothing
       returning 1
+    ), boss_cleared_event as (
+      insert into hollow_domain_event (
+        event_id, campaign_id, user_id, event_type, payload, request_id, ticket_id, idempotency_key
+      )
+      select
+        ${bossEventId},
+        ${CAMPAIGN_ID},
+        ${userId},
+        'BossCleared',
+        ${bossPayload}::jsonb,
+        nullif(${requestId ?? ""}, ''),
+        ${ticket.ticket_id},
+        ${bossIdemKey}
+      where exists (select 1 from campaign_move)
+      on conflict (idempotency_key) do nothing
+      returning 1
     )
     select exists(select 1 from ticket_guard) as accepted,
            exists(select 1 from campaign_move) as moved
   `;
-  return { result: rows[0] ?? { accepted: false, moved: false }, reward: rewardBody };
+  return {
+    result: rows[0] ?? { accepted: false, moved: false },
+    reward: rewardBody,
+    beatMeta: { beatId, heatDelta, intelDelta, theater: "BossCleared" as const },
+  };
 }
 
 async function settleMission(userId: string, ticketId: string, rawScore: unknown, requestId: string | null = null) {
@@ -748,9 +830,19 @@ async function settleMission(userId: string, ticketId: string, rawScore: unknown
     ? 2 + REGIONS.indexOf(ticket.region)
     : randomInt(10_000) < Math.round(chance * 10_000) ? 1 : 0;
 
+  const intelBefore = Number(progress.region_intel?.[ticket.region] ?? 0);
+  const expectedIntel =
+    ticket.mission_kind === "boss"
+      ? scaleAuthorityAmount(authorityBossReward(ticket.region).intel, score)
+      : scaleAuthorityAmount(
+          authorityMissionReward(ticket.region, ticket.mission_kind as Exclude<MissionKind, "boss">).intel,
+          score,
+        );
+  const bossGatesMet = bossGatesMetForOffer(progress, ticket.region, intelBefore + expectedIntel);
+
   const settled = ticket.mission_kind === "boss"
-    ? await settleBossMission(userId, ticket, score, materialQty, requestId)
-    : await settleStandardMission(userId, ticket, score, materialQty, requestId);
+    ? await settleBossMission(userId, ticket, score, materialQty, requestId, intelBefore)
+    : await settleStandardMission(userId, ticket, score, materialQty, requestId, intelBefore, bossGatesMet);
 
   if (!settled.result.accepted || !settled.result.moved) {
     const reread = await sql<MissionTicketRow>`
@@ -760,7 +852,12 @@ async function settleMission(userId: string, ticketId: string, rawScore: unknown
     if (reread[0]?.settled_at) return { duplicate: true, reward: reread[0].reward ?? {}, ticket: reread[0] };
     return { error: "authoritative reward settlement was rejected", status: 409 as const };
   }
-  return { duplicate: false, reward: settled.reward, ticket: { ...ticket, settled_at: new Date().toISOString() } };
+  return {
+    duplicate: false,
+    reward: settled.reward,
+    ticket: { ...ticket, settled_at: new Date().toISOString() },
+    beatMeta: settled.beatMeta,
+  };
 }
 
 async function advanceDay(userId: string, requestId: string) {
@@ -950,8 +1047,17 @@ export const Route = createFileRoute("/api/hollow/progression")({
           if (!payload) return json({ error: "authoritative campaign unavailable" }, 503);
           const reward = (result.reward ?? {}) as Record<string, unknown>;
           const kind = (typeof reward.kind === "string" ? reward.kind : result.ticket.mission_kind) as MissionKind;
-          const intelDelta = Number(reward.intel ?? 0);
-          const theater = kind === "boss" ? "BossCleared" : "MissionSettled";
+          const intelDelta = Number(
+            result.beatMeta?.intelDelta ?? reward.intel ?? 0,
+          );
+          const heatDelta = Number(
+            result.beatMeta?.heatDelta ?? heatDeltaFor(kind),
+          );
+          const theater =
+            result.beatMeta?.theater ?? (kind === "boss" ? "BossCleared" : "MissionSettled");
+          const beatId =
+            result.beatMeta?.beatId ??
+            settleBeatIdSnake(kind, Number.isFinite(intelDelta) ? intelDelta : 0);
           const beat = {
             theater,
             eventId: missionSettledEventId(result.ticket.ticket_id),
@@ -966,7 +1072,8 @@ export const Route = createFileRoute("/api/hollow/progression")({
               member: Number(payload.card?.revision ?? 0),
             },
             intelDelta: Number.isFinite(intelDelta) ? intelDelta : 0,
-            beatId: settleBeatId(kind, Number.isFinite(intelDelta) ? intelDelta : 0),
+            heatDelta: Number.isFinite(heatDelta) ? heatDelta : heatDeltaFor(kind),
+            beatId,
             duplicate: result.duplicate,
           };
           return json({
