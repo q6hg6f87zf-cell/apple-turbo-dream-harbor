@@ -75,7 +75,7 @@ export type TheaterRevision = {
 };
 
 /** Vault worldConsequence.offerMutations ops (MissionSettled payload). */
-export const OFFER_MUTATION_OPS = ["boost", "unlock", "cool"] as const;
+export const OFFER_MUTATION_OPS = ["boost", "unlock", "cool", "heal"] as const;
 export type OfferMutationOp = (typeof OFFER_MUTATION_OPS)[number];
 
 const MISSION_KIND_SET = new Set<string>(["scout", "forage", "raid", "trade", "bounty", "boss"]);
@@ -349,13 +349,15 @@ export const LIVE_BEAT_TYPES = ["hello", "revision", "heartbeat"] as const;
 export type LiveBeatType = (typeof LIVE_BEAT_TYPES)[number];
 
 /** Domain eventType strings Pulse may attach to a revision beat. */
-export const LIVE_DOMAIN_EVENT_TYPES = ["MissionSettled", "RaidOpened", "BossCleared", "TransferSettled"] as const;
+export const LIVE_DOMAIN_EVENT_TYPES = ["MissionSettled", "RaidOpened", "BossCleared", "TransferSettled", "DayAdvanced"] as const;
 export type LiveDomainEventType = (typeof LIVE_DOMAIN_EVENT_TYPES)[number];
 
 /**
  * Additive Pulse live-beat wire (Canon + Atlas lock, Design Bible v1.3 §3).
  * Optional theater identity fields are soft-parsed; omit when unknown — never invent.
  * eventType alone = watermark only; region (+ theater/eventType) enables atlas paint.
+ * Shape: `{ type, campaignRevision, memberRevision, eventType?, theater?, region?,
+ *    kind?, heatDelta?, intelDelta?, beatId?, eventId?, worldConsequence? }`
  * worldConsequence = offerMutations ONLY (heat/intel/beatId stay on the beat root).
  */
 export type LiveBeat = {
@@ -393,6 +395,7 @@ function softFiniteInt(raw: unknown): number | undefined {
   return undefined;
 }
 
+
 /**
  * Soft-read optional Pulse theater extras from a revision beat.
  * Omits unknown / malformed fields — never invents heat or scars.
@@ -417,6 +420,27 @@ export function parseLiveBeatExtras(row: Record<string, unknown>): Partial<LiveB
   return extras;
 }
 
+/** True when an offer mutation is an earned heal (scar clear path). Cool is never heal. */
+export function isHealOfferMutation(mut: OfferMutation): boolean {
+  return mut.op === "heal";
+}
+
+/**
+ * Heal path for atlas scars: explicit `heal` offerMutation, or DayAdvanced with
+ * heal-flavored reason/copyKey. Board `cool` never qualifies on its own.
+ */
+export function isScarHealSignal(
+  theater: TheaterName,
+  mut: OfferMutation | null | undefined,
+): boolean {
+  if (mut && isHealOfferMutation(mut)) return true;
+  if (!mut || theater !== "DayAdvanced") return false;
+  const reason = (mut.reason ?? "").toLowerCase();
+  const key = (mut.copyKey ?? "").toLowerCase();
+  return reason.includes("heal") || key.includes("heal");
+}
+
+
 /** Parse a wire JSON object into a LiveBeat; reject malformed. Soft-reads Pulse extras. */
 export function parseLiveBeat(raw: unknown): LiveBeat | null {
   if (!raw || typeof raw !== "object") return null;
@@ -433,6 +457,8 @@ export function parseLiveBeat(raw: unknown): LiveBeat | null {
   if (typeof row.eventType === "string" && row.eventType.length > 0) {
     beat.eventType = row.eventType.slice(0, 64);
   }
+  // Additive Pulse theater extras — omit unknown; never invent.
+
   Object.assign(beat, parseLiveBeatExtras(row));
   return beat;
 }

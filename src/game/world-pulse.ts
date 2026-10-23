@@ -115,7 +115,8 @@ export function applyTheaterEvent(state: WorldPulseState, input: TheaterEventInp
  * - revision + eventType/theater **without region** → watermark only (no scar paint)
  * - revision + region (+ theater/eventType) → shared atlas marks / board projections
  *
- * Soft-reads Pulse wire extras on the beat when extras omit them.
+ * Soft-reads Pulse wire extras on the beat; Forge may still pass settle extras
+ * that merge on top when Pulse omitted a field.
  */
 export function applyLiveBeat(
   state: WorldPulseState,
