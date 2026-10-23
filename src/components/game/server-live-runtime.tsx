@@ -1,3 +1,4 @@
+import { playLiveEventCue } from "@/game/live-cues";
 import { LIVE_SSE_PATH, parseLiveBeat, revisionIsNewer, type LiveRevisionWatermark } from "@/game/server-live";
 import {
   isLiveRailHealthy,
@@ -90,6 +91,8 @@ export function ServerLiveRuntime() {
       }
       if (beat.type === "revision") {
         markUp();
+        // Resonance: theater SFX from Pulse eventType (MissionSettled first).
+        if (beat.eventType) playLiveEventCue(beat.eventType);
         void refreshIfNewer({
           campaignRevision: beat.campaignRevision,
           memberRevision: beat.memberRevision,
