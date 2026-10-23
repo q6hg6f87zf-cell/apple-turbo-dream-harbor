@@ -352,11 +352,25 @@ export type LiveBeatType = (typeof LIVE_BEAT_TYPES)[number];
 export const LIVE_DOMAIN_EVENT_TYPES = ["MissionSettled", "RaidOpened", "BossCleared", "TransferSettled"] as const;
 export type LiveDomainEventType = (typeof LIVE_DOMAIN_EVENT_TYPES)[number];
 
+/**
+ * Additive Pulse live-beat wire (Canon + Atlas lock, Design Bible v1.3 §3).
+ * Optional theater identity fields are soft-parsed; omit when unknown — never invent.
+ * eventType alone = watermark only; region (+ theater/eventType) enables atlas paint.
+ * worldConsequence = offerMutations ONLY (heat/intel/beatId stay on the beat root).
+ */
 export type LiveBeat = {
   type: LiveBeatType;
   campaignRevision: number;
   memberRevision: number;
   eventType?: string;
+  theater?: TheaterName;
+  region?: RegionId;
+  kind?: MissionKind;
+  heatDelta?: number;
+  intelDelta?: number;
+  beatId?: TheaterBeatId;
+  eventId?: string;
+  worldConsequence?: WorldConsequence;
 };
 
 export function isLiveBeatType(raw: unknown): raw is LiveBeatType {
@@ -370,7 +384,40 @@ export function theaterFromLiveEventType(raw: unknown): TheaterName | null {
   return theaterFromBridgeType(raw);
 }
 
-/** Parse a wire JSON object into a LiveBeat; reject malformed. */
+function softFiniteInt(raw: unknown): number | undefined {
+  if (typeof raw === "number" && Number.isFinite(raw)) return Math.trunc(raw);
+  if (typeof raw === "string" && raw.trim() !== "") {
+    const n = Number(raw);
+    if (Number.isFinite(n)) return Math.trunc(n);
+  }
+  return undefined;
+}
+
+/**
+ * Soft-read optional Pulse theater extras from a revision beat.
+ * Omits unknown / malformed fields — never invents heat or scars.
+ */
+export function parseLiveBeatExtras(row: Record<string, unknown>): Partial<LiveBeat> {
+  const extras: Partial<LiveBeat> = {};
+  const theater = theaterFromLiveEventType(row.theater);
+  if (theater) extras.theater = theater;
+  if (isTheaterRegion(row.region)) extras.region = row.region;
+  if (isMissionKind(row.kind)) extras.kind = row.kind;
+  const heatDelta = softFiniteInt(row.heatDelta);
+  if (heatDelta !== undefined) extras.heatDelta = heatDelta;
+  const intelDelta = softFiniteInt(row.intelDelta);
+  if (intelDelta !== undefined) extras.intelDelta = intelDelta;
+  const beatId = resolveTheaterBeatId(row.beatId);
+  if (beatId) extras.beatId = beatId;
+  if (typeof row.eventId === "string" && row.eventId.trim()) {
+    extras.eventId = row.eventId.trim().slice(0, 96);
+  }
+  const wc = parseWorldConsequence(row.worldConsequence);
+  if (wc) extras.worldConsequence = wc;
+  return extras;
+}
+
+/** Parse a wire JSON object into a LiveBeat; reject malformed. Soft-reads Pulse extras. */
 export function parseLiveBeat(raw: unknown): LiveBeat | null {
   if (!raw || typeof raw !== "object") return null;
   const row = raw as Record<string, unknown>;
@@ -386,5 +433,6 @@ export function parseLiveBeat(raw: unknown): LiveBeat | null {
   if (typeof row.eventType === "string" && row.eventType.length > 0) {
     beat.eventType = row.eventType.slice(0, 64);
   }
+  Object.assign(beat, parseLiveBeatExtras(row));
   return beat;
 }
