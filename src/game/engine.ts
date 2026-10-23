@@ -1,3 +1,4 @@
+import { authorityEconomyLocked } from "./authority-rules";
 import type {
   ClassName,
   CombatState,
@@ -846,10 +847,14 @@ export function completeMission(state: GameState): GameState {
   const m = state.mission;
   if (!m) return state;
   const loc = m.locationId;
+  // Linked authority campaigns: Vault settle owns caps/XP/intel/loot. Keep party return +
+  // mission clear + toast (VFX/copy optimism). Guest / unlinked paths mint as before.
+  const economyLocked = authorityEconomyLocked(state as GameState & { authorityCampaign?: { active?: boolean } | null });
+  const intelGain = m.kind === "scout" ? 2 : 1;
   state.locations[loc] = {
     ...state.locations[loc],
     missions: state.locations[loc].missions + 1,
-    intel: state.locations[loc].intel + (m.kind === "scout" ? 2 : 1),
+    intel: economyLocked ? state.locations[loc].intel : state.locations[loc].intel + intelGain,
   };
   const L = locById(loc);
   const survivors = m.partyIds.some((id) => {
@@ -876,7 +881,7 @@ export function completeMission(state: GameState): GameState {
       raids: op.raids + 1,
     };
   });
-  if (survivors) {
+  if (survivors && !economyLocked) {
     const drop = grantPackLoot(state, { source: L.short });
     if (drop) {
       pushLog(state, "loot", "Vault", `Clean win. ${drop.replaceAll("_", " ")} stowed.`);
@@ -884,21 +889,23 @@ export function completeMission(state: GameState): GameState {
   }
   const leadId = m.partyIds[0];
   const li = state.operatives.findIndex((o) => o.id === leadId);
-  m.loot.forEach((it) => {
-    if (
-      li >= 0 &&
-      state.operatives[li].status !== "dead" &&
-      state.operatives[li].inventory.length < packCap(state.operatives[li])
-    ) {
-      state.operatives[li] = {
-        ...state.operatives[li],
-        inventory: [...state.operatives[li].inventory, it],
-      };
-    } else {
-      state.vault.push(it);
-    }
-  });
-  if (m.kind === "bounty" && state.bounty) {
+  if (!economyLocked) {
+    m.loot.forEach((it) => {
+      if (
+        li >= 0 &&
+        state.operatives[li].status !== "dead" &&
+        state.operatives[li].inventory.length < packCap(state.operatives[li])
+      ) {
+        state.operatives[li] = {
+          ...state.operatives[li],
+          inventory: [...state.operatives[li].inventory, it],
+        };
+      } else {
+        state.vault.push(it);
+      }
+    });
+  }
+  if (!economyLocked && m.kind === "bounty" && state.bounty) {
     state.coins += state.bounty.rewardCoins;
     pushLog(state, "loot", "Bounty Board", `${state.bounty.name} collected. +${state.bounty.rewardCoins} caps`);
     state.bounty = rollBounty(state);
@@ -908,7 +915,9 @@ export function completeMission(state: GameState): GameState {
       state,
       "loot",
       "Sortie",
-      `Returned from ${L.short} with ${m.loot.map((x) => x.name).join(", ") || "scraps"}. +${m.coins} caps`,
+      economyLocked
+        ? `Returned from ${L.short} — Tyrone settling haul (${m.loot.map((x) => x.name).join(", ") || "scraps"}).`
+        : `Returned from ${L.short} with ${m.loot.map((x) => x.name).join(", ") || "scraps"}. +${m.coins} caps`,
     );
   }
   const travisDrop = m.loot.filter(isTravisPart);
@@ -922,11 +931,13 @@ export function completeMission(state: GameState): GameState {
     state.toast = `${travisDrop[0]!.name} is a Travis part. Take it to the Ironclad Mechanical Shop.`;
   }
   if (state.tutorial === "sortie") state.tutorial = "rest";
-  state.moonFavor += m.kind === "boss" ? 0 : 1;
-  grantXp(state, m.kind === "boss" ? 42 : m.kind === "raid" ? 18 : m.kind === "bounty" ? 22 : 12);
+  if (!economyLocked) {
+    state.moonFavor += m.kind === "boss" ? 0 : 1;
+    grantXp(state, m.kind === "boss" ? 42 : m.kind === "raid" ? 18 : m.kind === "bounty" ? 22 : 12);
+  }
   const rider = ensureSquad(state);
   const cut = Math.round(m.coins * 0.2);
-  if (cut > 0) {
+  if (!economyLocked && cut > 0) {
     rider.personalCaps += cut;
     rider.xp += m.kind === "boss" ? 12 : 4;
   }
@@ -937,13 +948,16 @@ export function completeMission(state: GameState): GameState {
     queueTalk(state, "wing");
   }
   const place = (m.poiId && poiById(m.locationId, m.poiId)?.name) || L.short;
-  const intel = m.kind === "scout" ? 2 : 1;
   const haul = m.loot.map((item) => item.name).filter((name, i, all) => all.indexOf(name) === i);
   const parts = [`${place} ${KIND_LABEL[m.kind].toLowerCase()} done`];
-  if (m.coins > 0) parts.push(`+${m.coins} caps`);
-  if (cut > 0) parts.push(`+${cut} on the card`);
-  if (m.ore > 0) parts.push(`+${m.ore} ore`);
-  parts.push(`intel +${intel}`);
+  if (economyLocked) {
+    parts.push("awaiting Tyrone settle");
+  } else {
+    if (m.coins > 0) parts.push(`+${m.coins} caps`);
+    if (cut > 0) parts.push(`+${cut} on the card`);
+    if (m.ore > 0) parts.push(`+${m.ore} ore`);
+    parts.push(`intel +${intelGain}`);
+  }
   if (haul.length) {
     const shown = haul.slice(0, 2);
     const rest = haul.length - shown.length;
