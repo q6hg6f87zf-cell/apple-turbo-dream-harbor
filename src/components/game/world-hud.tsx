@@ -5,6 +5,7 @@ import { useGame } from "@/game/store";
 import type { StoryActId } from "@/game/narrative-state";
 import { cn } from "@/lib/cn";
 import { BookOpen, CircleHelp, Menu } from "lucide-react";
+import { LiveRailHealthPip } from "./chrome";
 
 /**
  * Minimal world HUD — objective + day + situation + ICR bulletin + Tyrone whisper.
@@ -58,7 +59,8 @@ export function WorldHUD({ onJournal, onPause }: { onJournal?: () => void; onPau
             </p>
           ) : null}
         </div>
-        <div className="flex shrink-0 gap-1">
+        <div className="flex shrink-0 items-start gap-1">
+          <LiveRailHealthPip className="mt-1.5" />
           <button
             type="button"
             data-world-journal="1"

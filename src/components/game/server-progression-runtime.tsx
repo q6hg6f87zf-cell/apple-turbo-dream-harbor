@@ -16,6 +16,9 @@ import {
 import { playSettleSpectacle } from "@/game/spectacle-kits";
 import { isLiveRailHealthy, registerLiveRefresh } from "@/game/server-live-rail";
 import { isSortiePlan, missionBeatsFromSortiePlan } from "@/game/sortie-plan";
+import { shouldApplyServerSnapshot } from "@/game/apply-snapshot-revision";
+import { playAtlasBeatCue } from "@/game/live-cues";
+import { settleBeatCueId } from "@/game/settle-beat-audio";
 import { useGame } from "@/game/store";
 import type { GameState, LocationId, MissionState, Operative, RegionId } from "@/game/types";
 import { useEffect } from "react";
@@ -39,7 +42,10 @@ export type AuthorityCampaignCache = {
   commandRank: number;
   materials: Partial<Record<RegionId, number>>;
   residentLevels: Record<string, number>;
+  /** Campaign ledger revision from authority snapshot. */
   revision: number;
+  /** Member/card ledger revision — used with campaign rev to gate applySnapshot. */
+  memberRevision: number;
 };
 
 type AuthorityGameState = GameState & {
@@ -56,9 +62,19 @@ export function authorityCampaignCache(state: GameState): AuthorityCampaignCache
 }
 
 function applySnapshot(snapshot: ServerProgressionSnapshot, toast?: string) {
+  const cached = authorityCampaignCache(useGame.getState().s);
+  if (!shouldApplyServerSnapshot(snapshot, cached)) {
+    // Stale poll / racing settle — never clobber a fresher authority ledger.
+    return;
+  }
   applyingSnapshot = true;
   try {
     useGame.setState((store) => {
+      // Re-check inside the write in case a newer snapshot landed between gate and mutate.
+      const liveCache = authorityCampaignCache(store.s);
+      if (!shouldApplyServerSnapshot(snapshot, liveCache)) {
+        return store;
+      }
       const s = cloneState(store.s) as AuthorityGameState;
       s.day = Math.max(1, Number(snapshot.campaign.day || 1));
       s.coins = Math.max(0, Number(snapshot.treasury.caps || 0));
@@ -112,6 +128,7 @@ function applySnapshot(snapshot: ServerProgressionSnapshot, toast?: string) {
         materials: { ...snapshot.campaign.materials },
         residentLevels: Object.fromEntries(snapshot.residents.map((resident) => [resident.id, resident.level])),
         revision: Number(snapshot.campaign.revision || 0),
+        memberRevision: Number(snapshot.card.revision || 0),
       };
 
       const rider = s.squad.find((member) => member.discordId === snapshot.card.discordId);
@@ -225,8 +242,28 @@ async function settleCompletedMission(
       result,
       `${result.duplicate ? "Contract already settled" : "Tyrone settled the contract"}${parts.length ? ` · ${parts.join(" · ")}` : ""}.`,
     );
-    // Lumina: presentation-only settle spectacle from Forge HTTP beat (no mint).
-    if (result.beat) playSettleSpectacle(result.beat);
+    // Forge settle theater: HTTP beat from Vault (presentation only — never mint).
+    if (result.beat) {
+      playSettleSpectacle(result.beat);
+      const cue = settleBeatCueId(result.beat);
+      if (cue) playAtlasBeatCue(cue);
+    } else if (!result.duplicate) {
+      // Fallback when older servers omit beat — still show the board changed.
+      const fallbackBeat = {
+        theater: result.reward?.kind === "boss" ? "BossCleared" : "MissionSettled",
+        beatId: result.reward?.kind === "boss" ? "boss_clear" : Number(result.reward?.intel || 0) > 0 ? "intel_drop" : "vault_flash",
+        intelDelta: Number(result.reward?.intel || 0) || undefined,
+        region: result.reward?.region,
+        kind: result.reward?.kind,
+        revision: {
+          campaign: Number(result.campaign?.revision || 0),
+          member: Number(result.card?.revision || 0),
+        },
+      };
+      playSettleSpectacle(fallbackBeat);
+      const cue = settleBeatCueId(fallbackBeat);
+      if (cue) playAtlasBeatCue(cue);
+    }
   } catch (error) {
     const fresh = await pullServerProgression().catch(() => null);
     if (fresh) applySnapshot(fresh);

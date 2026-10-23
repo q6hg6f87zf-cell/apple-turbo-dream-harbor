@@ -1,12 +1,56 @@
-import { playLiveEventCue } from "@/game/live-cues";
-import { LIVE_SSE_PATH, parseLiveBeat, revisionIsNewer, type LiveRevisionWatermark } from "@/game/server-live";
+import {
+  LIVE_SSE_PATH,
+  parseLiveBeat,
+  revisionIsNewer,
+  type LiveEventType,
+  type LiveRevisionWatermark,
+} from "@/game/server-live";
 import {
   isLiveRailHealthy,
   requestLiveRefresh,
   setLiveRailHealthy,
 } from "@/game/server-live-rail";
+import { playAtlasBeatCue, playLiveEventCue } from "@/game/live-cues";
+import { playSettleSpectacle, type SettleSpectacleBeat } from "@/game/spectacle-kits";
+import { settleBeatCueId } from "@/game/settle-beat-audio";
 import { useGame } from "@/game/store";
 import { useEffect } from "react";
+
+
+/** Map Pulse eventType → Forge/Lumina settle spectacle (no invented balances). */
+function spectacleBeatFromLiveEvent(
+  eventType: LiveEventType,
+  campaignRevision: number,
+  memberRevision: number,
+): SettleSpectacleBeat {
+  if (eventType === "MissionSettled") {
+    return {
+      theater: "MissionSettled",
+      beatId: "vault_flash",
+      revision: { campaign: campaignRevision, member: memberRevision },
+    };
+  }
+  if (eventType === "BossCleared") {
+    return {
+      theater: "BossCleared",
+      beatId: "boss_clear",
+      revision: { campaign: campaignRevision, member: memberRevision },
+    };
+  }
+  if (eventType === "RaidOpened") {
+    return {
+      theater: "RaidOpened",
+      beatId: "raid_opened",
+      revision: { campaign: campaignRevision, member: memberRevision },
+    };
+  }
+  // TransferSettled — vault character without inventing amounts
+  return {
+    theater: eventType,
+    beatId: "vault_flash",
+    revision: { campaign: campaignRevision, member: memberRevision },
+  };
+}
 
 const BASE_BACKOFF_MS = 1_000;
 const MAX_BACKOFF_MS = 30_000;
@@ -91,8 +135,15 @@ export function ServerLiveRuntime() {
       }
       if (beat.type === "revision") {
         markUp();
-        // Resonance: theater SFX from Pulse eventType (MissionSettled first).
-        if (beat.eventType) playLiveEventCue(beat.eventType);
+        // Forge settle theater on live rail + Resonance SFX.
+        if (beat.eventType) {
+          // Resonance: theater SFX from Pulse eventType (MissionSettled → mission.settled).
+          playLiveEventCue(beat.eventType);
+          const spectacle = spectacleBeatFromLiveEvent(beat.eventType, beat.campaignRevision, beat.memberRevision);
+          playSettleSpectacle(spectacle);
+          const cue = settleBeatCueId(spectacle, beat.eventType);
+          if (cue) playAtlasBeatCue(cue);
+        }
         void refreshIfNewer({
           campaignRevision: beat.campaignRevision,
           memberRevision: beat.memberRevision,
